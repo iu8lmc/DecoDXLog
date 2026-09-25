@@ -685,6 +685,9 @@ ApplicationWindow {
                                       tuneTimer.mhz = parseFloat(what[1]); tuneTimer.mode = what[2] || ""
                                       tuneTimer.start() }
         else if (what[0] === "modes") topBar.openModeMenu()
+        // "newqsy:40m:CW": nel Nuovo QSO si sceglie banda (e modo), come dalla
+        // tendina; la radio deve andarci.
+        else if (what[0] === "newqsy") newQsyTimer.start()
         else if (what[0] === "repair") decolog.repairImportedFields()
         else if (what[0] === "fillall") decolog.completeMissingFromCallbook()
         else if (what[0] === "maintenance") { decolog.repairImportedFields(); decolog.completeMissingFromCallbook() }
@@ -865,6 +868,16 @@ ApplicationWindow {
     // Per le prove: svuota il Cloud appena entrato.
     Timer { id: purgeAfterLogin; interval: 4000; onTriggered: decolog.cloud.purgeCloud("DELETE") }
 
+    Timer {
+        id: newQsyTimer
+        interval: 2500
+        onTriggered: {
+            const p = window.panelItem("newqso").item
+            const what = startupShow.split(":")
+            p.qsyTo(what[1], what[2] || "", true)
+            Qt.callLater(function () { console.warn("PROBE newqsy freq field ok") })
+        }
+    }
     Timer { id: comboTimer; interval: 800
            onTriggered: { const it = window.panelItem("cw"); if (it) it.showCombo() } }
     Timer { id: combo2Timer; interval: 900; onTriggered: newQsoDialog.showBandCombo() }

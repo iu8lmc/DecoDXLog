@@ -30,6 +30,46 @@ DialogFrame {
         }
     }
 
+    // La radio va dove si sceglie, come nell'inserimento della gara: una
+    // banda nuova porta la radio li' (dove la si era lasciata in quel modo, o
+    // all'inizio del segmento del modo), un modo nuovo cambia il modo. Senza
+    // radio e senza Decodium la frequenza si scrive lo stesso nel campo.
+    property var bandMemory: ({})
+    property double lastQsy: 0
+    function memoryKey(band, mode) {
+        const m = ["LSB", "USB", "AM", "FM", "SSB"].indexOf(mode) >= 0 ? "SSB"
+                : mode === "CW-R" || mode === "CWR" ? "CW" : mode
+        return band + "|" + m
+    }
+    function qsyTo(band, mode, bandChanged) {
+        if (!band || band === "—")
+            return
+        const m = String(mode || "").toUpperCase()
+        const here = parseFloat(decolog.shownFrequency || "0")
+        const hereBand = here > 0 ? decolog.bandForFrequency(String(here)) : ""
+        const hereMode = String(decolog.shownMode || "").toUpperCase()
+        if (hereBand.length > 0 && hereMode.length > 0)
+            root.bandMemory[root.memoryKey(hereBand, hereMode)] = here
+        let mhz = 0
+        if (bandChanged || band !== hereBand)
+            mhz = root.bandMemory[root.memoryKey(band, m)] || decolog.bandFrequency(band, m)
+        // I digitali hanno la loro frequenza di chiamata anche restando in banda.
+        else if (["FT8", "FT4", "FT2"].indexOf(m) >= 0)
+            mhz = decolog.bandFrequency(band, m)
+        if (mhz > 0)
+            freqField.text = Number(mhz).toFixed(6)
+        if (decolog.rig.connected || decolog.decoLinkClients.length > 0) {
+            root.lastQsy = Date.now()
+            decolog.tuneTo(mhz, m)
+        }
+    }
+
+    // Il modo per la radio: il sottomodo se c'e' (FT8, FT4…), se no il modo.
+    function tuneMode() {
+        const sub = submodeBox.editText.trim()
+        return sub.length > 0 && modeBox.editText.toUpperCase() !== "SSB" ? sub : modeBox.editText
+    }
+
     function resetTime() {
         const now = decolog.utcNow()
         dateField.text = decolog.showDate(now.date)
@@ -86,8 +126,8 @@ DialogFrame {
 
     onOpened: {
         clearAll()
-        if (decolog.dialFrequency.length)
-            freqField.text = decolog.dialFrequency
+        if (decolog.shownFrequency.length)
+            freqField.text = decolog.shownFrequency
         const pwr = decolog.stationProfiles.activeProfile.defaultTxPwr
         pwrField.text = pwr > 0 ? String(pwr) : ""
     }
@@ -256,7 +296,12 @@ DialogFrame {
                     Layout.preferredWidth: 1
                     Layout.horizontalStretchFactor: 2; Layout.fillWidth: true
                     label: qsTr("Band")
-                    StyledComboBox { id: bandBox; Layout.fillWidth: true; model: ["—"].concat(decolog.bands) }
+                    StyledComboBox {
+                        id: bandBox
+                        Layout.fillWidth: true
+                        model: ["—"].concat(decolog.bands)
+                        onActivated: root.qsyTo(currentText, root.tuneMode(), true)
+                    }
                 }
                 LabeledField {
                     Layout.preferredWidth: 1
@@ -280,6 +325,7 @@ DialogFrame {
                         Layout.fillWidth: true
                         editable: true
                         model: ["SSB", "CW", "FM", "AM", "RTTY", "MFSK", "FT8", "PSK"]
+                        onActivated: root.qsyTo(bandBox.currentText, root.tuneMode(), false)
                     }
                 }
                 LabeledField {
@@ -291,6 +337,7 @@ DialogFrame {
                         Layout.fillWidth: true
                         editable: true
                         model: root.submodesFor(modeBox.editText.toUpperCase())
+                        onActivated: root.qsyTo(bandBox.currentText, root.tuneMode(), false)
                     }
                 }
                 LabeledField {

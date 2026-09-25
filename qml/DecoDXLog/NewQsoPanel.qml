@@ -44,6 +44,59 @@ GlassPanel {
     // Per le schermate di prova: apre la tendina dei modi.
     function showModes() { modeBox.popup.open() }
 
+    // La radio va dove si sceglie, come nell'inserimento della gara: una
+    // banda nuova porta la radio li' (dove la si era lasciata in quel modo, o
+    // all'inizio del segmento del modo), un modo nuovo cambia il modo. Senza
+    // radio e senza Decodium la frequenza si scrive lo stesso nel campo.
+    property var bandMemory: ({})
+    property double lastQsy: 0
+    function memoryKey(band, mode) {
+        const m = ["LSB", "USB", "AM", "FM", "SSB"].indexOf(mode) >= 0 ? "SSB"
+                : mode === "CW-R" || mode === "CWR" ? "CW" : mode
+        return band + "|" + m
+    }
+    function qsyTo(band, mode, bandChanged) {
+        if (!band || band === "—")
+            return
+        const m = String(mode || "").toUpperCase()
+        const here = parseFloat(decolog.shownFrequency || "0")
+        const hereBand = here > 0 ? decolog.bandForFrequency(String(here)) : ""
+        const hereMode = String(decolog.shownMode || "").toUpperCase()
+        if (hereBand.length > 0 && hereMode.length > 0)
+            root.bandMemory[root.memoryKey(hereBand, hereMode)] = here
+        let mhz = 0
+        if (bandChanged || band !== hereBand)
+            mhz = root.bandMemory[root.memoryKey(band, m)] || decolog.bandFrequency(band, m)
+        // I digitali hanno la loro frequenza di chiamata anche restando in banda.
+        else if (["FT8", "FT4", "FT2"].indexOf(m) >= 0)
+            mhz = decolog.bandFrequency(band, m)
+        if (mhz > 0)
+            freqField.text = Number(mhz).toFixed(6)
+        if (decolog.rig.connected || decolog.decoLinkClients.length > 0) {
+            root.lastQsy = Date.now()
+            decolog.tuneTo(mhz, m)
+        }
+    }
+
+    // E al contrario: girando la manopola, o cambiando modo sulla radio,
+    // frequenza, banda e modo qui seguono — tranne mentre si scrive la
+    // frequenza a mano, e subito dopo aver mandato la radio da qualche parte.
+    Connections {
+        target: decolog
+        function onTuningChanged() {
+            if (Date.now() - root.lastQsy < 2500 || freqField.activeFocus)
+                return
+            const f = decolog.shownFrequency || ""
+            if (f.length > 0 && f !== freqField.text)
+                freqField.text = f
+            const raw = String(decolog.shownMode || "").toUpperCase()
+            const m = raw === "LSB" || raw === "USB" ? "SSB" : raw === "CW-R" || raw === "CWR" ? "CW" : raw
+            const i = modeBox.find(m)
+            if (i >= 0 && modeBox.currentIndex !== i && !modeBox.activeFocus)
+                modeBox.currentIndex = i
+        }
+    }
+
     function resetTime() {
         const now = decolog.utcNow()
         dateField.text = decolog.showDate(now.date)
@@ -276,6 +329,7 @@ GlassPanel {
                             id: bandBox
                             Layout.fillWidth: true
                             model: ["—"].concat(decolog.bands)
+                            onActivated: root.qsyTo(currentText, modeBox.editText, true)
                         }
                     }
                     LabeledField {
@@ -288,6 +342,7 @@ GlassPanel {
                             Layout.fillWidth: true
                             editable: true
                             model: ["SSB", "CW", "FM", "AM", "RTTY", "JTTY", "FT8", "FT4", "FT2", "PSK31"]
+                            onActivated: root.qsyTo(bandBox.currentText, currentText, false)
                         }
                     }
                     LabeledField {
@@ -298,7 +353,7 @@ GlassPanel {
                         StyledTextField {
                             id: freqField
                             Layout.fillWidth: true
-                            text: decolog.dialFrequency
+                            text: decolog.shownFrequency
                             onTextChanged: {
                                 const i = bandBox.find(decolog.bandForFrequency(text))
                                 if (i >= 0) bandBox.currentIndex = i
