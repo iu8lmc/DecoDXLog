@@ -3,6 +3,10 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.16.14 — 25 settembre 2026
+
+Release di manutenzione con il codebase aggiornato e i pacchetti multipiattaforma.
+
 ## 1.16.13 — 25 settembre 2026
 
 **La radio anche via TCI, come in Decodium.**
