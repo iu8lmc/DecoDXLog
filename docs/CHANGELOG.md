@@ -3,16 +3,20 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
-## 1.16.14 — 25 settembre 2026
+## 1.16.15 — 25 settembre 2026
 
-Release di manutenzione con il codebase aggiornato e i pacchetti multipiattaforma.
+**Il Nuovo QSO muove la radio.**
 
-- **Il Nuovo QSO muove la radio**, come l'inserimento della gara: scegliendo la banda la radio
+- Come l'inserimento della gara: scegliendo la banda la radio
   va li' (dove la si era lasciata in quel modo, o all'inizio del segmento del modo, piano IARU
   Regione 1), scegliendo il modo cambia modo; la frequenza si scrive anche nel campo. Vale nel
   pannello e nella finestra del nuovo QSO, con la radio (Hamlib o TCI) o con Decodium.
 - Al contrario, girando la manopola il pannello Nuovo QSO segue frequenza, banda e modo della
   radio, e non solo quelli di Decodium.
+
+## 1.16.14 — 25 settembre 2026
+
+Release di manutenzione con il codebase aggiornato e i pacchetti multipiattaforma.
 
 ## 1.16.13 — 25 settembre 2026
 
