@@ -111,6 +111,11 @@ void UdpReceiver::handleDatagram(const QByteArray& data, const QHostAddress& fro
         return;
     }
 
+    if (const auto* d = std::get_if<wsjtx::Decode>(&msg->payload)) {
+        emit decodeReceived(msg->clientId, *d);
+        return;
+    }
+
     if (std::holds_alternative<wsjtx::Close>(msg->payload)) {
         m_clients.remove(msg->clientId);
         emit clientClosed(msg->clientId);

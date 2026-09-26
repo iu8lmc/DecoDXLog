@@ -5346,6 +5346,46 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
         <translation>Met Decodium open is de CAT-poort van de radio al bezet, en een CAT-brug kan niet seinen. Hier seint DecoDXLog zelf: hij trekt DTR of RTS op een eigen poort — die aan het seincircuit vastzit — zodat Decodium het CAT houdt en de macro&apos;s toch de lucht in gaan. Laat de poort op &quot;geen&quot; staan om zoals eerder via het CAT te seinen.</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>De besturingskast, rechtstreeks (ingebouwde gateway)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>Poort van de besturingskast</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Control box</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Gesimuleerd</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>App-poort (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Poort van de webpagina</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>rotctld-poort</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Overnemen van DecoRotor</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Poorten bezet door een ander programma (draait DecoRotor nog?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog opent zelf de seriële poort van de PRO.SIS.TEL-besturingskast en doet wat DecoRotor deed: de telefoon-app, de webpagina en de stationsprogramma&apos;s (rotctld: N1MM+, Log4OM, PstRotator…) verbinden met deze computer op dezelfde poorten als voorheen. Sluit eerst DecoRotor: de seriële poort en de poorten kunnen maar één eigenaar hebben. De stations op de kaart van de app komen via DecoDXLog van Decodium en het cluster.</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>Tijd (plaatselijk)</translation>
     </message>
@@ -7182,6 +7222,10 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
         <translation>Rotor naar %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>Rotor: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 s</translation>
     </message>
@@ -7214,6 +7258,14 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
         <translation>Rotor: geheugen &quot;%1&quot; op %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Gesimuleerde besturingskast start…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>Besturingskast openen op %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>rotctld kent geen locators: richt in graden</translation>
     </message>
@@ -7228,6 +7280,18 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
     <message>
         <source>Rotor: park</source>
         <translation>Rotor: parkeren</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Rotor: instellingen overgenomen van DecoRotor (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Rotor: config.json van DecoRotor niet gevonden</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Zelf herkennen</translation>
     </message>
 </context>
 <context>

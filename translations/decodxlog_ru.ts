@@ -5356,6 +5356,46 @@ The call Decodium is working shows up here by itself.</source>
         <translation>Когда открыт Decodium, порт CAT трансивера уже занят, а мост CAT манипулировать не умеет. Здесь DecoDXLog манипулирует сам: он поднимает DTR или RTS на своём порту — том, что идёт на схему манипуляции, — так что CAT остаётся у Decodium, а макросы всё равно уходят в эфир. Оставьте порт на «нет», чтобы манипулировать через CAT, как раньше.</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>Блок управления напрямую (встроенный шлюз)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>Порт блока управления</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Блок управления</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Симуляция</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>Порт приложения (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Порт веб-страницы</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>Порт rotctld</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Взять из DecoRotor</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Порты заняты другой программой (DecoRotor ещё запущен?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog сам открывает последовательный порт блока управления PRO.SIS.TEL и делает то, что делал DecoRotor: приложение на телефоне, веб-страница и программы станции (rotctld: N1MM+, Log4OM, PstRotator…) подключаются к этому компьютеру на тех же портах, что и раньше. Сначала закройте DecoRotor: у последовательного порта и портов может быть только один владелец. Станции на карте приложения приходят из Decodium и кластера через DecoDXLog.</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>Время (местное)</translation>
     </message>
@@ -7223,6 +7263,10 @@ The call Decodium is working shows up here by itself.</source>
         <translation>Поворотное устройство на %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>Поворот: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 с</translation>
     </message>
@@ -7255,6 +7299,14 @@ The call Decodium is working shows up here by itself.</source>
         <translation>Поворот: ячейка «%1» на %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Симулированный блок управления запускается…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>Открываю блок управления на %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>rotctld не понимает локаторы: направляйте в градусах</translation>
     </message>
@@ -7269,6 +7321,18 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>Rotor: park</source>
         <translation>Поворот: парковка</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Ротатор: настройки взяты из DecoRotor (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Ротатор: config.json DecoRotor не найден</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Определить самому</translation>
     </message>
 </context>
 <context>

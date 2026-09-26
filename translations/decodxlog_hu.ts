@@ -5336,6 +5336,46 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <translation>Ha a Decodium nyitva van, a rádió CAT-portja már foglalt, és egy CAT-híd nem tud manipulálni. Itt a DecoDXLog maga manipulál: a saját portján húzza a DTR-t vagy az RTS-t — azon, amelyik a manipuláló áramkörre van kötve —, így a CAT a Decodiumé marad, a makrók mégis adásba mennek. Hagyd a portot „nincs” állapotban, ha a CAT-on át akarsz manipulálni, mint eddig.</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>A vezérlődoboz, közvetlenül (beépített átjáró)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>A vezérlődoboz portja</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Control box</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Szimulált</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>Az app portja (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>A weboldal portja</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>rotctld port</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Átvétel a DecoRotorból</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Más program által foglalt portok (fut még a DecoRotor?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>A DecoDXLog maga nyitja meg a PRO.SIS.TEL vezérlődoboz soros portját, és azt teszi, amit a DecoRotor tett: a telefonos app, a weboldal és az állomásprogramok (rotctld: N1MM+, Log4OM, PstRotator…) ugyanazokon a portokon csatlakoznak ehhez a géphez, mint eddig. Előbb zárd be a DecoRotort: a soros portnak és a portoknak csak egy gazdája lehet. Az app térképén az állomások a Decodiumból és a clusterből jönnek, a DecoDXLogon keresztül.</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>Időpont (helyi)</translation>
     </message>
@@ -7141,6 +7181,10 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <translation>Forgató ide: %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>Forgató: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 s</translation>
     </message>
@@ -7173,6 +7217,14 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <translation>Forgató: „%1” memória %2°-on</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Szimulált vezérlődoboz indul…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>A vezérlődoboz megnyitása itt: %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>a rotctld nem ismeri a lokátorokat: fokban adj irányt</translation>
     </message>
@@ -7187,6 +7239,18 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
     <message>
         <source>Rotor: park</source>
         <translation>Forgató: parkolás</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Rotor: beállítások átvéve a DecoRotorból (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Rotor: a DecoRotor config.json fájlja nem található</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Felismerés magától</translation>
     </message>
 </context>
 <context>

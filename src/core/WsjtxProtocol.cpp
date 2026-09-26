@@ -140,6 +140,16 @@ std::optional<Message> parse(const QByteArray& datagram)
     case Type::Close:
         msg.payload = Close{};
         return msg;
+    case Type::Decode: {
+        Decode d;
+        in >> d.isNew >> d.time >> d.snr >> d.deltaTime >> d.deltaFrequency;
+        d.mode = readUtf8(in);
+        d.message = readUtf8(in);
+        if (!ok(in))
+            return std::nullopt;
+        msg.payload = d;
+        return msg;
+    }
     default:
         msg.payload = Other{type};
         return msg;
@@ -176,6 +186,18 @@ QByteArray buildStatus(const QString& clientId, const Status& st, quint32 schema
     s << false << quint8{0} << quint32{0} << quint32{0};
     writeUtf8(s, st.configurationName);
     writeUtf8(s, QString());
+    return buffer;
+}
+
+QByteArray buildDecode(const QString& clientId, const Decode& d, quint32 schema)
+{
+    QByteArray buffer;
+    QDataStream s(&buffer, QIODevice::WriteOnly);
+    begin(s, Type::Decode, clientId, schema);
+    s << d.isNew << d.time << d.snr << d.deltaTime << d.deltaFrequency;
+    writeUtf8(s, d.mode);
+    writeUtf8(s, d.message);
+    s << false << false;   // low confidence, off air
     return buffer;
 }
 

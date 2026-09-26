@@ -430,6 +430,8 @@ void ClusterController::onSpot(const Spot& spot)
     bool isNew = false;
     const EnrichedSpot& stored = m_model.add(enrich(spot), &isNew);
     const EnrichedSpot e = stored;   // copia: le regole possono toccare il modello
+    if (m_ctx.spotSeen)
+        m_ctx.spotSeen(e);
     checkRules(e, isNew);
 }
 

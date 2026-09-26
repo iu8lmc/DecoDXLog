@@ -66,6 +66,8 @@ signals:
                      const QString& source,
                      const QString& sourceApp);
     void statusReceived(const QString& clientId, const decolog::core::wsjtx::Status& status);
+    // Ogni riga decodificata: chi c'e' in aria adesso.
+    void decodeReceived(const QString& clientId, const decolog::core::wsjtx::Decode& decode);
     void clientSeen(const decolog::core::UdpClientInfo& client);
     void clientClosed(const QString& clientId);
     void listeningChanged();

@@ -3,6 +3,25 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.16.16 — 26 settembre 2026
+
+**Il gateway del rotore e' dentro DecoDXLog: DecoRotor non serve piu'.**
+
+- In Impostazioni → Rotore, "Parla con" ha di serie "il control box, direttamente": DecoDXLog
+  apre da se' la seriale del control box PRO.SIS.TEL (control box D, azimut e/o elevazione, o
+  Combi-Track, anche riconosciuto da solo) e fa tutto quello che faceva DecoRotor: interroga
+  la posizione cinque volte al secondo, applica finecorsa, riposo, tolleranza, stop se il
+  rotore non si muove e stop se sparisce l'ultimo client durante un movimento.
+- Per il telefono e gli altri programmi non cambia niente: WebSocket 8765 per l'app (stesso
+  protocollo, memorie e configurazione a caldo comprese), pagina web e API REST sulla 8080,
+  riquadri della mappa satellitare in cache, rotctld di Hamlib sulla 4532 per N1MM+, Log4OM,
+  PstRotator e gli altri. Le stazioni sulla mappa dell'app arrivano da Decodium (decode e QSO
+  in corso) e dal cluster, attraverso DecoDXLog.
+- "Prendile da DecoRotor" legge il config.json di DecoRotor: porta, modello, porte, finecorsa
+  e memorie passano in DecoDXLog. C'e' anche il control box simulato, per provare senza rotore.
+- DecoRotor va chiuso: la seriale e le porte possono avere un solo padrone; se sono occupate,
+  DecoDXLog dice quali. Restano possibili anche DecoRotor a parte e un rotctld qualsiasi.
+
 ## 1.16.15 — 25 settembre 2026
 
 **Il Nuovo QSO muove la radio.**

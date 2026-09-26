@@ -78,6 +78,9 @@ public:
         // Mette il DX nel riquadro del QSO nuovo: nominativo, banda, modo,
         // frequenza. Da li' il callbook riempie nome, QTH e locatore.
         std::function<void(const QVariantMap& fields)> prepareQso;
+        // Ogni spot arrivato, gia' con entita' e posizione: il gateway del
+        // rotore lo mette sulla mappa dell'app.
+        std::function<void(const core::EnrichedSpot& spot)> spotSeen;
     };
 
     explicit ClusterController(Context context, QObject* parent = nullptr);

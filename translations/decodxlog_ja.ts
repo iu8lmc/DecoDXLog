@@ -5336,6 +5336,46 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <translation>Decodium が開いていると、無線機の CAT ポートはもうふさがっていて、CAT の橋渡しでは電鍵を打てません。ここでは DecoDXLog 自身が打ちます。自分のポート — 電鍵の回路につないだほう — で DTR か RTS を上げるので、CAT は Decodium が持ったまま、マクロはちゃんと電波に乗ります。前と同じように CAT 越しに打つなら、ポートは「なし」のままに。</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>コントロールボックスに直接（内蔵ゲートウェイ）</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>コントロールボックスのポート</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>コントロールボックス</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>シミュレーション</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>アプリのポート（WebSocket）</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Webページのポート</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>rotctld ポート</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>DecoRotor から取り込む</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>ほかのプログラムが使用中のポート（DecoRotor がまだ動いていませんか？）：%1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog が自分で PRO.SIS.TEL コントロールボックスのシリアルポートを開き、DecoRotor がしていたことを行います。スマートフォンのアプリ、Webページ、局のプログラム（rotctld：N1MM+、Log4OM、PstRotator…）は、これまでと同じポートでこのコンピューターに接続します。先に DecoRotor を終了してください：シリアルポートと各ポートの持ち主は一つだけです。アプリの地図の局は、DecoDXLog を通じて Decodium とクラスターから届きます。</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>時刻 (現地)</translation>
     </message>
@@ -7141,6 +7181,10 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <translation>ローテーターを %1 へ</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>ローテーター: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 秒</translation>
     </message>
@@ -7173,6 +7217,14 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <translation>ローテーター: メモリー「%1」は %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>シミュレーションのコントロールボックスを起動中…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>%1 でコントロールボックスを開いています…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>rotctld はグリッドを知りません。度で向けてください</translation>
     </message>
@@ -7187,6 +7239,18 @@ Decodium が交信しているコールサインは、ここにひとりでに�
     <message>
         <source>Rotor: park</source>
         <translation>ローテーター: 停める</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>ローテーター：DecoRotor から設定を取り込みました（%1）</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>ローテーター：DecoRotor の config.json が見つかりません</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>自動検出</translation>
     </message>
 </context>
 <context>

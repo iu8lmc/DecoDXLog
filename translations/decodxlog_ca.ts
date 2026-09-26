@@ -5346,6 +5346,46 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <translation>Amb Decodium obert, el port CAT de la ràdio ja està ocupat, i un pont CAT no pot manipular. Aquí DecoDXLog manipula ell mateix: aixeca DTR o RTS en un port propi — el que va cablejat al circuit de manipulació — així Decodium es queda el CAT i les macros surten igualment. Deixa el port a «cap» per manipular pel CAT com abans.</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>La caixa de control, directament (passarel·la integrada)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>Port de la caixa</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Control box</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Simulat</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>Port de l&apos;app (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Port de la pàgina web</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>Port rotctld</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Agafa&apos;ls de DecoRotor</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Ports ocupats per un altre programa (DecoRotor encara funciona?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog obre ell mateix el port sèrie de la caixa PRO.SIS.TEL i fa el que feia DecoRotor: l&apos;app del mòbil, la pàgina web i els programes d&apos;estació (rotctld: N1MM+, Log4OM, PstRotator…) es connecten a aquest ordinador als mateixos ports que abans. Tanca abans DecoRotor: el port sèrie i els ports només poden tenir un amo. Les estacions del mapa de l&apos;app arriben de Decodium i del clúster, a través de DecoDXLog.</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>Hora (local)</translation>
     </message>
@@ -7182,6 +7222,10 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <translation>Rotor cap a %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>Rotor: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 s</translation>
     </message>
@@ -7214,6 +7258,14 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <translation>Rotor: memòria &quot;%1&quot; a %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Caixa simulada, engegant…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>Obrint la caixa a %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>el rotctld no entén els locators: apunta en graus</translation>
     </message>
@@ -7228,6 +7280,18 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
     <message>
         <source>Rotor: park</source>
         <translation>Rotor: aparca</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Rotor: configuració presa de DecoRotor (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Rotor: no s&apos;ha trobat el config.json de DecoRotor</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Detecta-ho sol</translation>
     </message>
 </context>
 <context>

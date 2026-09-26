@@ -4365,7 +4365,7 @@ The call Decodium is working shows up here by itself.</source>
     </message>
     <message>
         <source>Control box</source>
-        <translation type="unfinished"></translation>
+        <translation>Control box</translation>
     </message>
 </context>
 <context>
@@ -5343,6 +5343,46 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>With Decodium open the radio&apos;s CAT port is already taken, and a CAT bridge cannot key. Here DecoDXLog keys by itself: it raises DTR or RTS on a port of its own — the one wired to the keying circuit — so Decodium keeps the CAT and the macros go on air anyway. Leave the port on &quot;none&quot; to key through the CAT as before.</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>The control box, directly (built-in gateway)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>Control box port</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Control box</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Simulated</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>App port (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Web page port</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>rotctld port</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Take them from DecoRotor</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Ports in use by another program (is DecoRotor still running?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</translation>
     </message>
     <message>
         <source>Time (local)</source>
@@ -7181,6 +7221,10 @@ The call Decodium is working shows up here by itself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation></translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7213,6 +7257,14 @@ The call Decodium is working shows up here by itself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Simulated control box, starting…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>Opening the control box on %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7227,6 +7279,18 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>Rotor: park</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Rotor: settings taken from DecoRotor (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Rotor: DecoRotor&apos;s config.json not found</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Detect by itself</translation>
     </message>
 </context>
 <context>
@@ -7590,7 +7654,7 @@ The call Decodium is working shows up here by itself.</source>
     </message>
     <message>
         <source>Rotor: %1</source>
-        <translation type="unfinished"></translation>
+        <translation></translation>
     </message>
     <message>
         <source>rotctld (Hamlib)</source>

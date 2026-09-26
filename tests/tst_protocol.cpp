@@ -88,6 +88,26 @@ private slots:
         QVERIFY(back->transmitting);
     }
 
+    // Le righe decodificate: servono alla mappa del rotore.
+    void decodeRoundTrip()
+    {
+        wsjtx::Decode d;
+        d.time = QTime(12, 34, 15);
+        d.snr = -14;
+        d.deltaTime = 0.3;
+        d.deltaFrequency = 1234;
+        d.mode = "~";
+        d.message = "CQ EA8ABC IL18";
+        const auto msg = wsjtx::parse(wsjtx::buildDecode("Decodium", d));
+        QVERIFY(msg);
+        const auto* back = std::get_if<wsjtx::Decode>(&msg->payload);
+        QVERIFY(back);
+        QCOMPARE(back->snr, -14);
+        QCOMPARE(back->time, QTime(12, 34, 15));
+        QCOMPARE(back->deltaFrequency, quint32(1234));
+        QCOMPARE(back->message, QString("CQ EA8ABC IL18"));
+    }
+
     // Il caso normale di WSJT-X e Decodium: arrivano entrambi, vale solo l'ADIF.
     void loggedAdifSupersedesQsoLogged()
     {

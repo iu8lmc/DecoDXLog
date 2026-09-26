@@ -1,11 +1,13 @@
 // DecoDXLog — il rotore: dove guarda l'antenna e dove mandarla.
 //
-// DecoDXLog non tocca la seriale: parla con DecoRotor (WebSocket) o con un
-// rotctld qualsiasi. Quello che aggiunge e' il contesto che ha solo lui — la
+// Tre strade: il gateway integrato (DecoDXLog stesso apre la seriale del
+// control box PRO.SIS.TEL e fa da DecoRotor per l'app e per gli altri
+// programmi), DecoRotor a parte (WebSocket), o un rotctld qualsiasi. Quello che aggiunge e' il contesto che ha solo lui — la
 // rotta di uno spot del cluster, del nominativo che si sta lavorando, del QSO
 // aperto — e la possibilita' di seguirlo da solo.
 #pragma once
 
+#include "core/RotorGateway.h"
 #include "core/RotorLink.h"
 
 #include <QObject>
@@ -40,10 +42,21 @@ class RotorController : public QObject {
     Q_PROPERTY(QVariantList history READ history NOTIFY historyChanged)
     Q_PROPERTY(QString uptimeText READ uptimeText NOTIFY stateChanged)
     Q_PROPERTY(QVariantList endpoints READ endpoints NOTIFY stateChanged)
+    // Il gateway integrato: la seriale del control box, il modello, le porte.
+    Q_PROPERTY(QString gatewaySerialPort READ gatewaySerialPort WRITE setGatewaySerialPort NOTIFY changed)
+    Q_PROPERTY(QString gatewayModel READ gatewayModel WRITE setGatewayModel NOTIFY changed)
+    Q_PROPERTY(bool gatewaySimulate READ gatewaySimulate WRITE setGatewaySimulate NOTIFY changed)
+    Q_PROPERTY(int gatewayWsPort READ gatewayWsPort WRITE setGatewayWsPort NOTIFY changed)
+    Q_PROPERTY(int gatewayRotctldPort READ gatewayRotctldPort WRITE setGatewayRotctldPort NOTIFY changed)
+    Q_PROPERTY(QStringList gatewayProblems READ gatewayProblems NOTIFY stateChanged)
 
 public:
     struct Context {
         std::function<void(const QString& category, const QString& text, const QString& level)> activity;
+        // Il QTH e il nominativo della stazione: il gateway integrato li usa
+        // per le rotte e per le stazioni sulla mappa.
+        std::function<QString()> stationGrid;
+        std::function<QString()> stationCall;
     };
 
     explicit RotorController(Context context, QObject* parent = nullptr);
@@ -56,7 +69,7 @@ public:
 
     bool enabled() const { return m_enabled; }
     void setEnabled(bool enabled);
-    // "decorotor" | "rotctld"
+    // "builtin" | "decorotor" | "rotctld"
     QString backend() const { return m_backend; }
     void setBackend(const QString& backend);
     QString host() const { return m_host; }
@@ -115,6 +128,30 @@ public:
     // che parte sta, l'antenna ci va da sola.
     void dxBearing(const QString& call, double azimuth);
 
+    QString gatewaySerialPort() const { return m_gw.serialPort; }
+    void setGatewaySerialPort(const QString& port);
+    // "auto", "d_az", "d_el", "d_azel", "combi"
+    QString gatewayModel() const { return m_gw.model; }
+    void setGatewayModel(const QString& model);
+    bool gatewaySimulate() const { return m_gw.simulate; }
+    void setGatewaySimulate(bool on);
+    int gatewayWsPort() const { return m_gw.wsPort; }
+    void setGatewayWsPort(int port);
+    int gatewayRotctldPort() const { return m_gw.rotctldPort; }
+    void setGatewayRotctldPort(int port);
+    QStringList gatewayProblems() const { return m_gateway ? m_gateway->problems() : QStringList(); }
+    // Le porte seriali di questo computer, e i modelli di control box.
+    Q_INVOKABLE QStringList serialPorts() const;
+    Q_INVOKABLE QVariantList gatewayModels() const;
+    // Prende porta, modello, porte di rete, finecorsa e memorie dal
+    // config.json di DecoRotor. Vuoto: lo cerca dove sta di solito.
+    // Torna il file letto, o vuoto se non l'ha trovato.
+    Q_INVOKABLE QString importDecoRotor(const QString& path = QString());
+    // Il profilo della stazione e' cambiato: QTH e nominativo nuovi al gateway.
+    void stationChanged();
+    // Quello che Decodium e il cluster sentono, per la mappa dell'app.
+    core::RotorGateway* gateway() const { return m_gateway; }
+
 signals:
     void changed();
     void stateChanged();
@@ -126,6 +163,8 @@ signals:
 private:
     void apply();
     void note(const QString& text, const QString& level);
+    bool builtin() const { return m_backend == QLatin1String("builtin"); }
+    void saveGateway();
 
     Context m_ctx;
     core::RotorLink m_link;
@@ -141,6 +180,9 @@ private:
     int     m_httpPort{8080};
     int     m_sense{0};         // -1 antiorario, +1 orario, 0 fermo
     double  m_lastAz{-1.0};
+    // Il gateway integrato, acceso solo con il backend "builtin".
+    core::RotorGateway* m_gateway{nullptr};
+    core::GatewaySettings m_gw;
 };
 
 } // namespace decolog::app

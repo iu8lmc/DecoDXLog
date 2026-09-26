@@ -1,6 +1,15 @@
 #include "app/RotorController.h"
 
+#include <QDir>
+#include <QFile>
+#include <QHostAddress>
+#include <QJsonDocument>
+#include <QNetworkInterface>
+#include <QSerialPortInfo>
 #include <QSettings>
+#include <QStandardPaths>
+
+#include <algorithm>
 #include <cmath>
 
 namespace decolog::app {
@@ -24,13 +33,25 @@ RotorController::RotorController(Context context, QObject* parent)
 {
     QSettings s;
     m_enabled = s.value(QStringLiteral("rotor/enabled"), false).toBool();
-    m_backend = s.value(QStringLiteral("rotor/backend"), QStringLiteral("decorotor")).toString();
+    // Di serie il gateway integrato: DecoDXLog comanda il control box da se'.
+    m_backend = s.value(QStringLiteral("rotor/backend"), QStringLiteral("builtin")).toString();
     m_host = s.value(QStringLiteral("rotor/host"), QStringLiteral("127.0.0.1")).toString();
     m_port = s.value(QStringLiteral("rotor/port"), defaultPortFor(m_backend)).toInt();
     m_followDx = s.value(QStringLiteral("rotor/followDx"), false).toBool();
     m_beamwidth = qBound(5, s.value(QStringLiteral("rotor/beamwidth"), 45).toInt(), 180);
 
     m_httpPort = qBound(1, s.value(QStringLiteral("rotor/httpPort"), 8080).toInt(), 65535);
+
+    // Il gateway integrato: di serie le stesse porte di DecoRotor, cosi' l'app
+    // sul telefono e i programmi di stazione non vanno toccati.
+    m_gw.serialPort = s.value(QStringLiteral("rotorGateway/serialPort")).toString();
+    m_gw.model = s.value(QStringLiteral("rotorGateway/model"), QStringLiteral("auto")).toString();
+    m_gw.simulate = s.value(QStringLiteral("rotorGateway/simulate"), false).toBool();
+    m_gw.wsPort = s.value(QStringLiteral("rotorGateway/wsPort"), 8765).toInt();
+    m_gw.rotctldPort = s.value(QStringLiteral("rotorGateway/rotctldPort"), 4532).toInt();
+    m_gw.bind = s.value(QStringLiteral("rotorGateway/bind"), QStringLiteral("0.0.0.0")).toString();
+    m_gw.tileCacheDir = QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation))
+                            .filePath(QStringLiteral("rotor-tiles"));
 
     connect(&m_link, &RotorLink::stateChanged, this, [this] {
         // Il verso di rotazione non lo dice il gateway: si legge da come
@@ -68,6 +89,20 @@ void RotorController::start()
 
 void RotorController::overrideConnection(const QString& backend, const QString& host, int port)
 {
+    // "builtin@COM3" o "builtin@sim": il gateway integrato, per questa volta.
+    if (backend == QLatin1String("builtin")) {
+        m_backend = backend;
+        if (host == QLatin1String("sim"))
+            m_gw.simulate = true;
+        else if (!host.trimmed().isEmpty())
+            m_gw.serialPort = host.trimmed();
+        if (port > 0)
+            m_gw.wsPort = port;
+        m_enabled = true;
+        apply();
+        emit stateChanged();
+        return;
+    }
     m_backend = backend == QLatin1String("rotctld") ? QStringLiteral("rotctld") : QStringLiteral("decorotor");
     if (!host.trimmed().isEmpty())
         m_host = host.trimmed();
@@ -80,15 +115,45 @@ void RotorController::overrideConnection(const QString& backend, const QString& 
 
 void RotorController::apply()
 {
+    if (!m_enabled || !builtin()) {
+        if (m_gateway)
+            m_gateway->stop();
+    }
     if (!m_enabled) {
         m_link.stop();
         emit changed();
         emit stateChanged();
         return;
     }
+    const QString token = QSettings().value(QStringLiteral("rotor/token")).toString();
+    if (builtin()) {
+        // DecoDXLog fa da DecoRotor: apre la seriale e le porte, e poi ci si
+        // collega come si collegherebbe l'app.
+        if (!m_gateway) {
+            m_gateway = new core::RotorGateway(this);
+            connect(m_gateway, &core::RotorGateway::note, this,
+                    [this](const QString& text, const QString& level) { note(tr("Rotor: %1").arg(text), level); });
+            connect(m_gateway, &core::RotorGateway::liveChanged, this, &RotorController::saveGateway);
+        }
+        core::GatewaySettings settings = m_gw;
+        settings.token = token;
+        settings.httpPort = m_httpPort;
+        core::GatewayLive live = core::GatewayLive::fromJson(
+            QJsonDocument::fromJson(QSettings().value(QStringLiteral("rotorGateway/live")).toByteArray()).object());
+        if (m_ctx.stationGrid && !m_ctx.stationGrid().trimmed().isEmpty())
+            live.locator = m_ctx.stationGrid().trimmed().toUpper();
+        if (m_ctx.stationCall)
+            live.callsign = m_ctx.stationCall().trimmed().toUpper();
+        live.beamwidth = m_beamwidth;
+        m_gateway->start(settings, live);
+        m_link.start(RotorLink::Backend::DecoRotor, QStringLiteral("127.0.0.1"), m_gw.wsPort, token);
+        emit changed();
+        emit stateChanged();
+        return;
+    }
     m_link.start(m_backend == QLatin1String("rotctld") ? RotorLink::Backend::Rotctld
                                                        : RotorLink::Backend::DecoRotor,
-                 m_host, m_port, QSettings().value(QStringLiteral("rotor/token")).toString());
+                 m_host, m_port, token);
     emit changed();
     emit stateChanged();
 }
@@ -112,8 +177,8 @@ void RotorController::setEnabled(bool enabled)
 
 void RotorController::setBackend(const QString& backend)
 {
-    const QString value = backend == QLatin1String("rotctld") ? QStringLiteral("rotctld")
-                                                              : QStringLiteral("decorotor");
+    const QString value = backend == QLatin1String("rotctld") || backend == QLatin1String("builtin")
+                              ? backend : QStringLiteral("decorotor");
     if (value == m_backend)
         return;
     // Cambiando modo cambia anche la porta solita: si sposta, a meno che non sia
@@ -161,8 +226,10 @@ QString RotorController::tileEndpoint() const
 {
     // Con DecoRotor in piedi i riquadri arrivano da lui; con rotctld non c'e'
     // nessun gateway, e la mappa si arrangia con quella stradale.
-    if (!m_enabled || m_backend != QLatin1String("decorotor"))
+    if (!m_enabled || m_backend == QLatin1String("rotctld"))
         return {};
+    if (builtin())
+        return QStringLiteral("http://127.0.0.1:%1/tiles/").arg(m_httpPort);
     return QStringLiteral("http://%1:%2/tiles/").arg(m_host).arg(m_httpPort);
 }
 
@@ -180,7 +247,37 @@ QVariantList RotorController::endpoints() const
 {
     // Le tre porte le serve il gateway: se risponde lui, ci sono tutte.
     const bool up = m_link.state().linkUp;
-    const bool deco = m_backend == QLatin1String("decorotor");
+    const bool deco = m_backend != QLatin1String("rotctld");
+    if (builtin()) {
+        // Il gateway e' questo computer: al telefono serve il suo indirizzo
+        // nella rete di casa.
+        QString lan = QStringLiteral("127.0.0.1");
+        for (const QHostAddress& a : QNetworkInterface::allAddresses()) {
+            if (a.protocol() == QAbstractSocket::IPv4Protocol && !a.isLoopback() && !a.isLinkLocal()
+                && a.toString().startsWith(QLatin1String("192.168."))) {
+                lan = a.toString();
+                break;
+            }
+        }
+        const QStringList problems = gatewayProblems();
+        auto open = [&problems](const QString& prefix) {
+            for (const QString& p : problems)
+                if (p.startsWith(prefix))
+                    return false;
+            return true;
+        };
+        return QVariantList{
+            QVariantMap{{QStringLiteral("role"), tr("APP (WebSocket)")},
+                        {QStringLiteral("address"), QStringLiteral("%1:%2").arg(lan).arg(m_gw.wsPort)},
+                        {QStringLiteral("active"), up && open(QStringLiteral("WebSocket"))}},
+            QVariantMap{{QStringLiteral("role"), tr("WEB UI")},
+                        {QStringLiteral("address"), QStringLiteral("%1:%2").arg(lan).arg(m_httpPort)},
+                        {QStringLiteral("active"), m_gateway && m_gateway->running() && open(QStringLiteral("web"))}},
+            QVariantMap{{QStringLiteral("role"), tr("ROTCTLD (Hamlib)")},
+                        {QStringLiteral("address"), QStringLiteral("%1:%2").arg(lan).arg(m_gw.rotctldPort)},
+                        {QStringLiteral("active"), m_gateway && m_gateway->running() && open(QStringLiteral("rotctld"))}},
+        };
+    }
     return QVariantList{
         QVariantMap{{QStringLiteral("role"), tr("APP (WebSocket)")},
                     {QStringLiteral("address"), QStringLiteral("%1:%2").arg(m_host).arg(deco ? m_port : 8765)},
@@ -301,6 +398,14 @@ QString RotorController::status() const
     if (!m_enabled)
         return tr("Rotor off");
     const RotorState& s = m_link.state();
+    if (!s.connected && builtin()) {
+        // Il gateway e' qui: se il control box non risponde, si dice perche'.
+        if (!s.error.isEmpty())
+            return s.error;
+        return m_gw.simulate ? tr("Simulated control box, starting…")
+                             : tr("Opening the control box on %1…").arg(m_gw.serialPort.isEmpty() ? QStringLiteral("—")
+                                                                                                    : m_gw.serialPort);
+    }
     if (!s.connected) {
         return m_backend == QLatin1String("rotctld")
             ? tr("Looking for rotctld on %1:%2…").arg(m_host).arg(m_port)
@@ -383,6 +488,162 @@ void RotorController::dxBearing(const QString& call, double azimuth)
         return;
     m_followedCall = who;
     pointTo(azimuth, who);
+}
+
+// ── Il gateway integrato ──────────────────────────────────────────────────────
+
+void RotorController::setGatewaySerialPort(const QString& port)
+{
+    if (port.trimmed() == m_gw.serialPort)
+        return;
+    m_gw.serialPort = port.trimmed();
+    QSettings().setValue(QStringLiteral("rotorGateway/serialPort"), m_gw.serialPort);
+    if (m_enabled && builtin())
+        apply();
+    emit changed();
+}
+
+void RotorController::setGatewayModel(const QString& model)
+{
+    const QString value = core::prosistel::modelFor(model) ? model : QStringLiteral("auto");
+    if (value == m_gw.model)
+        return;
+    m_gw.model = value;
+    QSettings().setValue(QStringLiteral("rotorGateway/model"), value);
+    if (m_enabled && builtin())
+        apply();
+    emit changed();
+}
+
+void RotorController::setGatewaySimulate(bool on)
+{
+    if (on == m_gw.simulate)
+        return;
+    m_gw.simulate = on;
+    QSettings().setValue(QStringLiteral("rotorGateway/simulate"), on);
+    if (m_enabled && builtin())
+        apply();
+    emit changed();
+}
+
+void RotorController::setGatewayWsPort(int port)
+{
+    if (port <= 0 || port > 65535 || port == m_gw.wsPort)
+        return;
+    m_gw.wsPort = port;
+    QSettings().setValue(QStringLiteral("rotorGateway/wsPort"), port);
+    if (m_enabled && builtin())
+        apply();
+    emit changed();
+}
+
+void RotorController::setGatewayRotctldPort(int port)
+{
+    if (port < 0 || port > 65535 || port == m_gw.rotctldPort)
+        return;
+    m_gw.rotctldPort = port;
+    QSettings().setValue(QStringLiteral("rotorGateway/rotctldPort"), port);
+    if (m_enabled && builtin())
+        apply();
+    emit changed();
+}
+
+QStringList RotorController::serialPorts() const
+{
+    QStringList out;
+    for (const QSerialPortInfo& info : QSerialPortInfo::availablePorts())
+        out << info.portName();
+    std::sort(out.begin(), out.end(), [](const QString& a, const QString& b) {
+        return a.size() != b.size() ? a.size() < b.size() : a < b;
+    });
+    return out;
+}
+
+QString RotorController::importDecoRotor(const QString& path)
+{
+    QStringList candidates;
+    if (!path.trimmed().isEmpty())
+        candidates << path.trimmed();
+    candidates << QStringLiteral("C:/decorotor/gateway/config.json")
+               << QDir::home().filePath(QStringLiteral("decorotor/gateway/config.json"))
+               << QDir::home().filePath(QStringLiteral("Documents/decorotor/gateway/config.json"));
+    for (const QString& candidate : std::as_const(candidates)) {
+        QFile file(candidate);
+        if (!file.open(QIODevice::ReadOnly))
+            continue;
+        const QJsonObject c = QJsonDocument::fromJson(file.readAll()).object();
+        if (c.isEmpty())
+            continue;
+        QSettings s;
+        if (c.contains(QStringLiteral("port"))) {
+            m_gw.serialPort = c.value(QStringLiteral("port")).toString();
+            s.setValue(QStringLiteral("rotorGateway/serialPort"), m_gw.serialPort);
+        }
+        if (c.contains(QStringLiteral("model"))) {
+            const QString model = c.value(QStringLiteral("model")).toString();
+            m_gw.model = core::prosistel::modelFor(model) ? model : QStringLiteral("auto");
+            s.setValue(QStringLiteral("rotorGateway/model"), m_gw.model);
+        }
+        if (c.contains(QStringLiteral("simulate"))) {
+            m_gw.simulate = c.value(QStringLiteral("simulate")).toBool();
+            s.setValue(QStringLiteral("rotorGateway/simulate"), m_gw.simulate);
+        }
+        if (c.value(QStringLiteral("ws_port")).toInt() > 0) {
+            m_gw.wsPort = c.value(QStringLiteral("ws_port")).toInt();
+            s.setValue(QStringLiteral("rotorGateway/wsPort"), m_gw.wsPort);
+        }
+        if (c.value(QStringLiteral("rotctld_port")).toInt() > 0) {
+            m_gw.rotctldPort = c.value(QStringLiteral("rotctld_port")).toInt();
+            s.setValue(QStringLiteral("rotorGateway/rotctldPort"), m_gw.rotctldPort);
+        }
+        if (c.value(QStringLiteral("http_port")).toInt() > 0) {
+            m_httpPort = c.value(QStringLiteral("http_port")).toInt();
+            s.setValue(QStringLiteral("rotor/httpPort"), m_httpPort);
+        }
+        if (c.contains(QStringLiteral("token")))
+            s.setValue(QStringLiteral("rotor/token"), c.value(QStringLiteral("token")).toString());
+        // Finecorsa, riposo, sicurezza e memorie: quello che l'app cambia a caldo.
+        core::GatewayLive live = core::GatewayLive::fromJson(
+            QJsonDocument::fromJson(s.value(QStringLiteral("rotorGateway/live")).toByteArray()).object());
+        QJsonObject merged = live.toJson();
+        for (const char* key : {"park_az", "park_el", "tolerance", "stall_timeout", "stop_on_client_loss",
+                                "limits", "presets", "beamwidth", "my_locator", "callsign"}) {
+            if (c.contains(QLatin1String(key)))
+                merged.insert(QLatin1String(key), c.value(QLatin1String(key)));
+        }
+        s.setValue(QStringLiteral("rotorGateway/live"), QJsonDocument(merged).toJson(QJsonDocument::Compact));
+        note(tr("Rotor: settings taken from DecoRotor (%1)").arg(QDir::toNativeSeparators(candidate)),
+             QStringLiteral("info"));
+        if (m_enabled && builtin())
+            apply();
+        emit changed();
+        return candidate;
+    }
+    note(tr("Rotor: DecoRotor's config.json not found"), QStringLiteral("warning"));
+    return {};
+}
+
+QVariantList RotorController::gatewayModels() const
+{
+    QVariantList out{QVariantMap{{QStringLiteral("key"), QStringLiteral("auto")},
+                                 {QStringLiteral("label"), tr("Detect by itself")}}};
+    for (const core::prosistel::Model& m : core::prosistel::models())
+        out << QVariantMap{{QStringLiteral("key"), m.key}, {QStringLiteral("label"), m.label}};
+    return out;
+}
+
+void RotorController::saveGateway()
+{
+    if (!m_gateway)
+        return;
+    QSettings().setValue(QStringLiteral("rotorGateway/live"),
+                         QJsonDocument(m_gateway->live().toJson()).toJson(QJsonDocument::Compact));
+}
+
+void RotorController::stationChanged()
+{
+    if (m_gateway && m_gateway->running() && m_ctx.stationGrid)
+        m_gateway->setStation(m_ctx.stationGrid(), m_ctx.stationCall ? m_ctx.stationCall() : QString());
 }
 
 } // namespace decolog::app

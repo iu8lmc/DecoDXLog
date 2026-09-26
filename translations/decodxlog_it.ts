@@ -5346,6 +5346,46 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <translation>Con Decodium aperto la porta del CAT e&apos; gia&apos; occupata, e un ponte CAT il manipolatore non lo sa fare. Qui il CW lo manipola DecoDXLog da solo: alza DTR o RTS su una porta tutta sua — quella attaccata al circuito di manipolazione — cosi&apos; Decodium si tiene il CAT e le macro vanno in aria lo stesso. Lascia la porta su &quot;nessuna&quot; per manipolare dal CAT come prima.</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>Il control box, direttamente (gateway integrato)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>Porta del control box</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Control box</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Simulato</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>Porta dell&apos;app (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Porta della pagina web</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>Porta rotctld</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Prendile da DecoRotor</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Porte occupate da un altro programma (DecoRotor è ancora acceso?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog apre da sé la porta seriale del control box PRO.SIS.TEL e fa quello che faceva DecoRotor: l&apos;app sul telefono, la pagina web e i programmi di stazione (rotctld: N1MM+, Log4OM, PstRotator…) si collegano a questo computer sulle stesse porte di prima. Chiudi prima DecoRotor: la seriale e le porte possono avere un solo padrone. Le stazioni sulla mappa dell&apos;app arrivano da Decodium e dal cluster, attraverso DecoDXLog.</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>Ora (locale)</translation>
     </message>
@@ -7182,6 +7222,10 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <translation>Rotore su %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>Rotore: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 s</translation>
     </message>
@@ -7214,6 +7258,14 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <translation>Rotore: memoria &quot;%1&quot; a %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Control box simulato, in avvio…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>Apro il control box su %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>rotctld non conosce i locatori: punta in gradi</translation>
     </message>
@@ -7228,6 +7280,18 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
     <message>
         <source>Rotor: park</source>
         <translation>Rotore: park</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Rotore: impostazioni prese da DecoRotor (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Rotore: config.json di DecoRotor non trovato</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Riconosci da solo</translation>
     </message>
 </context>
 <context>

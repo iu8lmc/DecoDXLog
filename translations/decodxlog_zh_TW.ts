@@ -5336,6 +5336,46 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
         <translation>Decodium 開著的時候，電台的 CAT 埠已經被佔住了，而 CAT 橋接是打不了電鍵的。這裡 DecoDXLog 自己來打：它在自己的連接埠上 — 就是接到電鍵電路的那個 — 拉起 DTR 或 RTS，於是 CAT 留給 Decodium，巨集照樣上天。想像以前那樣透過 CAT 打鍵，就把連接埠留在「無」。</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>直接連接控制盒（內建閘道）</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>控制盒連接埠</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>控制盒</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>模擬</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>應用程式連接埠（WebSocket）</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>網頁連接埠</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>rotctld 連接埠</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>從 DecoRotor 匯入</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>連接埠被其他程式佔用（DecoRotor 還在執行嗎？）：%1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog 自己開啟 PRO.SIS.TEL 控制盒的序列埠，完成原先 DecoRotor 的工作：手機應用程式、網頁和電台程式（rotctld：N1MM+、Log4OM、PstRotator…）仍依原來的連接埠連到這台電腦。請先關閉 DecoRotor：序列埠和各連接埠只能有一個使用者。應用程式地圖上的電台來自 Decodium 和叢集，經由 DecoDXLog 提供。</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>時間（當地）</translation>
     </message>
@@ -7141,6 +7181,10 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
         <translation>旋轉器轉向 %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>旋轉器：%1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 秒</translation>
     </message>
@@ -7173,6 +7217,14 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
         <translation>旋轉器：記憶位「%1」在 %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>模擬控制盒，正在啟動…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>正在開啟 %1 上的控制盒…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>rotctld 不認網格：請用度數指向</translation>
     </message>
@@ -7187,6 +7239,18 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
     <message>
         <source>Rotor: park</source>
         <translation>旋轉器：停放</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>旋轉器：已從 DecoRotor 匯入設定（%1）</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>旋轉器：找不到 DecoRotor 的 config.json</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>自動辨識</translation>
     </message>
 </context>
 <context>

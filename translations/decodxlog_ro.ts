@@ -5356,6 +5356,46 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <translation>Cu Decodium deschis, portul CAT al stației este deja ocupat, iar o punte CAT nu poate manipula. Aici DecoDXLog manipulează singur: ridică DTR sau RTS pe un port al lui — cel legat la circuitul de manipulare — așa că Decodium păstrează CAT-ul, iar macrourile pleacă oricum în eter. Lasă portul pe „niciunul” ca să manipulezi prin CAT ca înainte.</translation>
     </message>
     <message>
+        <source>The control box, directly (built-in gateway)</source>
+        <translation>Cutia de comandă, direct (gateway integrat)</translation>
+    </message>
+    <message>
+        <source>Control box port</source>
+        <translation>Portul cutiei de comandă</translation>
+    </message>
+    <message>
+        <source>Control box</source>
+        <translation>Control box</translation>
+    </message>
+    <message>
+        <source>Simulated</source>
+        <translation>Simulat</translation>
+    </message>
+    <message>
+        <source>App port (WebSocket)</source>
+        <translation>Portul aplicației (WebSocket)</translation>
+    </message>
+    <message>
+        <source>Web page port</source>
+        <translation>Portul paginii web</translation>
+    </message>
+    <message>
+        <source>rotctld port</source>
+        <translation>Port rotctld</translation>
+    </message>
+    <message>
+        <source>Take them from DecoRotor</source>
+        <translation>Preia-le din DecoRotor</translation>
+    </message>
+    <message>
+        <source>Ports in use by another program (is DecoRotor still running?): %1</source>
+        <translation>Porturi ocupate de alt program (mai rulează DecoRotor?): %1</translation>
+    </message>
+    <message>
+        <source>DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does what DecoRotor did: the phone app, the web page and the station programs (rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same ports as before. Close DecoRotor first: the serial port and the ports can have only one owner. The stations on the app map come from Decodium and the cluster, through DecoDXLog.</source>
+        <translation>DecoDXLog deschide singur portul serial al cutiei de comandă PRO.SIS.TEL și face ce făcea DecoRotor: aplicația de pe telefon, pagina web și programele de stație (rotctld: N1MM+, Log4OM, PstRotator…) se conectează la acest calculator pe aceleași porturi ca înainte. Închide mai întâi DecoRotor: portul serial și porturile pot avea un singur stăpân. Stațiile de pe harta aplicației vin din Decodium și din cluster, prin DecoDXLog.</translation>
+    </message>
+    <message>
         <source>Time (local)</source>
         <translation>Ora (locală)</translation>
     </message>
@@ -7223,6 +7263,10 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <translation>Rotor spre %1</translation>
     </message>
     <message>
+        <source>Rotor: %1</source>
+        <translation>Rotor: %1</translation>
+    </message>
+    <message>
         <source>%1 s</source>
         <translation>%1 s</translation>
     </message>
@@ -7255,6 +7299,14 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <translation>Rotor: memoria „%1” la %2°</translation>
     </message>
     <message>
+        <source>Simulated control box, starting…</source>
+        <translation>Cutie simulată, pornire…</translation>
+    </message>
+    <message>
+        <source>Opening the control box on %1…</source>
+        <translation>Deschid cutia de comandă pe %1…</translation>
+    </message>
+    <message>
         <source>rotctld does not do locators: point in degrees</source>
         <translation>rotctld nu știe locatoare: arată în grade</translation>
     </message>
@@ -7269,6 +7321,18 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
     <message>
         <source>Rotor: park</source>
         <translation>Rotor: park</translation>
+    </message>
+    <message>
+        <source>Rotor: settings taken from DecoRotor (%1)</source>
+        <translation>Rotor: setări preluate din DecoRotor (%1)</translation>
+    </message>
+    <message>
+        <source>Rotor: DecoRotor&apos;s config.json not found</source>
+        <translation>Rotor: config.json al DecoRotor nu a fost găsit</translation>
+    </message>
+    <message>
+        <source>Detect by itself</source>
+        <translation>Detectează singur</translation>
     </message>
 </context>
 <context>

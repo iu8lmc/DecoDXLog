@@ -539,6 +539,13 @@ bool DecoLogController::openDatabase(const QString& path)
         return call.isEmpty() ? m_status.deCall : call;
     };
     ctx.stationGrid = [this] { return myGrid(); };
+    ctx.spotSeen = [this](const EnrichedSpot& e) {
+        if (!m_rotor || !e.hasPosition)
+            return;
+        if (auto* gw = m_rotor->gateway(); gw && gw->running())
+            gw->noteCluster(e.spot.dxCall, e.lat, e.lon, e.entity, e.spot.mode,
+                            static_cast<quint64>(e.spot.freqKhz * 1000.0), e.spot.comment);
+    };
     ctx.decodiumBand = [this] { return clientConnected() ? dialBand() : QString(); };
     ctx.confirmations = [this](bool& lotw, bool& card, bool& eqsl) {
         lotw = m_awardFilter.confirmLotw;
@@ -634,7 +641,24 @@ bool DecoLogController::openDatabase(const QString& path)
     rotorCtx.activity = [this](const QString& category, const QString& text, const QString& level) {
         addActivity(category, text, level);
     };
+    rotorCtx.stationGrid = [this] { return myGrid(); };
+    rotorCtx.stationCall = [this] {
+        const QString call = m_profiles ? m_profiles->activeProfile().value(QStringLiteral("stationCallsign")).toString()
+                                        : QString();
+        return call.isEmpty() ? m_status.deCall : call;
+    };
     m_rotor = new RotorController(std::move(rotorCtx), this);
+    connect(this, &DecoLogController::stationChanged, m_rotor, &RotorController::stationChanged);
+    // Il gateway integrato del rotore mette sulla mappa dell'app quello che
+    // Decodium sente e che lavora, come faceva DecoRotor ascoltando la 2239.
+    connect(&m_udp, &UdpReceiver::decodeReceived, this, [this](const QString&, const wsjtx::Decode& d) {
+        if (auto* gw = m_rotor->gateway(); gw && gw->running())
+            gw->noteDecode(d.message, d.snr, d.mode, m_status.dialFrequencyHz);
+    });
+    connect(&m_udp, &UdpReceiver::statusReceived, this, [this](const QString&, const wsjtx::Status& st) {
+        if (auto* gw = m_rotor->gateway(); gw && gw->running())
+            gw->noteStatus(st.dxCall, st.dxGrid, st.mode, st.dialFrequencyHz);
+    });
 
     RigController::Context rigCtx;
     rigCtx.activity = [this](const QString& category, const QString& text, const QString& level) {

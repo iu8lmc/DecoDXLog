@@ -1525,14 +1525,16 @@ DialogFrame {
                         LabeledField {
                             label: qsTr("Talks to")
                             StyledComboBox {
-                                Layout.preferredWidth: 300
-                                readonly property var ids: ["decorotor", "rotctld"]
-                                model: [qsTr("DecoRotor (WebSocket)"), qsTr("rotctld (Hamlib) — any program")]
+                                Layout.preferredWidth: 380
+                                readonly property var ids: ["builtin", "decorotor", "rotctld"]
+                                model: [qsTr("The control box, directly (built-in gateway)"),
+                                        qsTr("DecoRotor (WebSocket)"), qsTr("rotctld (Hamlib) — any program")]
                                 currentIndex: Math.max(0, ids.indexOf(decolog.rotor.backend))
                                 onActivated: decolog.rotor.backend = ids[currentIndex]
                             }
                         }
                         LabeledField {
+                            visible: decolog.rotor.backend !== "builtin"
                             label: qsTr("Host")
                             StyledTextField {
                                 Layout.preferredWidth: 180
@@ -1542,6 +1544,7 @@ DialogFrame {
                             }
                         }
                         LabeledField {
+                            visible: decolog.rotor.backend !== "builtin"
                             label: qsTr("Port")
                             StyledTextField {
                                 Layout.preferredWidth: 100
@@ -1559,6 +1562,111 @@ DialogFrame {
                                 onActivated: decolog.rotor.beamwidth = values[currentIndex]
                             }
                         }
+                    }
+                    // Il gateway integrato: DecoDXLog apre la seriale del control
+                    // box e fa da DecoRotor per l'app e per gli altri programmi.
+                    RowLayout {
+                        spacing: 12
+                        visible: decolog.rotor.backend === "builtin"
+                        LabeledField {
+                            label: qsTr("Control box port")
+                            StyledComboBox {
+                                id: rotorPortBox
+                                Layout.preferredWidth: 130
+                                property var ports: []
+                                model: ports
+                                // "—" in cima: finche' non si sceglie, nessuna porta.
+                                Component.onCompleted: {
+                                    const list = decolog.rotor.serialPorts()
+                                    const now = decolog.rotor.gatewaySerialPort
+                                    if (now.length > 0 && list.indexOf(now) < 0)
+                                        list.unshift(now)
+                                    list.unshift("—")
+                                    ports = list
+                                    currentIndex = Math.max(0, list.indexOf(now))
+                                }
+                                onActivated: decolog.rotor.gatewaySerialPort = currentIndex > 0 ? ports[currentIndex] : ""
+                            }
+                        }
+                        LabeledField {
+                            label: qsTr("Control box")
+                            StyledComboBox {
+                                Layout.preferredWidth: 260
+                                readonly property var models: decolog.rotor.gatewayModels()
+                                model: models.map(m => m.label)
+                                currentIndex: Math.max(0, models.findIndex(m => m.key === decolog.rotor.gatewayModel))
+                                onActivated: decolog.rotor.gatewayModel = models[currentIndex].key
+                            }
+                        }
+                        ToggleSwitch {
+                            Layout.alignment: Qt.AlignBottom
+                            text: qsTr("Simulated")
+                            checked: decolog.rotor.gatewaySimulate
+                            onToggled: decolog.rotor.gatewaySimulate = checked
+                        }
+                    }
+                    RowLayout {
+                        spacing: 12
+                        visible: decolog.rotor.backend === "builtin"
+                        LabeledField {
+                            label: qsTr("App port (WebSocket)")
+                            StyledTextField {
+                                Layout.preferredWidth: 90
+                                text: decolog.rotor.gatewayWsPort
+                                onEditingFinished: decolog.rotor.gatewayWsPort = parseInt(text) || 8765
+                            }
+                        }
+                        LabeledField {
+                            label: qsTr("Web page port")
+                            StyledTextField {
+                                Layout.preferredWidth: 90
+                                text: decolog.rotor.httpPort
+                                onEditingFinished: { decolog.rotor.httpPort = parseInt(text) || 8080; decolog.rotor.reconnect() }
+                            }
+                        }
+                        LabeledField {
+                            label: qsTr("rotctld port")
+                            StyledTextField {
+                                Layout.preferredWidth: 90
+                                text: decolog.rotor.gatewayRotctldPort
+                                onEditingFinished: decolog.rotor.gatewayRotctldPort = parseInt(text) || 0
+                            }
+                        }
+                        GlassButton {
+                            Layout.alignment: Qt.AlignBottom
+                            Layout.bottomMargin: 2
+                            text: qsTr("Take them from DecoRotor")
+                            tone: Theme.primaryColor
+                            onClicked: {
+                                decolog.rotor.importDecoRotor("")
+                                const list = decolog.rotor.serialPorts()
+                                const now = decolog.rotor.gatewaySerialPort
+                                if (now.length > 0 && list.indexOf(now) < 0)
+                                    list.unshift(now)
+                                list.unshift("—")
+                                rotorPortBox.ports = list
+                                rotorPortBox.currentIndex = Math.max(0, list.indexOf(now))
+                            }
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        visible: decolog.rotor.backend === "builtin" && decolog.rotor.gatewayProblems.length > 0
+                        wrapMode: Text.Wrap
+                        text: qsTr("Ports in use by another program (is DecoRotor still running?): %1")
+                              .arg(decolog.rotor.gatewayProblems.join(" · "))
+                        color: Theme.warningColor
+                        font.family: Theme.monoFamily
+                        font.pixelSize: 11
+                    }
+                    Note {
+                        visible: decolog.rotor.backend === "builtin"
+                        text: qsTr("DecoDXLog itself opens the serial port of the PRO.SIS.TEL control box and does "
+                                   + "what DecoRotor did: the phone app, the web page and the station programs "
+                                   + "(rotctld: N1MM+, Log4OM, PstRotator…) connect to this computer on the same "
+                                   + "ports as before. Close DecoRotor first: the serial port and the ports can "
+                                   + "have only one owner. The stations on the app map come from Decodium and "
+                                   + "the cluster, through DecoDXLog.")
                     }
                     ToggleSwitch {
                         text: qsTr("Follow the call Decodium is working")
@@ -1582,6 +1690,7 @@ DialogFrame {
                         }
                     }
                     Note {
+                        visible: decolog.rotor.backend !== "builtin"
                         text: qsTr("DecoRotor is the gateway of the family: it reads the Prosistel control box on the "
                                    + "serial port and publishes it on the network (WebSocket 8765). With rotctld any "
                                    + "other rotor program works too — DecoRotor itself answers on 4532. DecoDXLog never "
