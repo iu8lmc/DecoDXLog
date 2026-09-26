@@ -3,6 +3,17 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.16.17 — 26 settembre 2026
+
+**Lo scarico da LoTW anche per un periodo: dal … al ….**
+
+- Accanto a "Scarica le conferme LoTW" (scheda Invio QSL) c'e' "LoTW dal… al…", e in
+  Impostazioni → Servizi QSL una riga con le due date: si scaricano le conferme dei QSO fatti
+  in quel periodo, estremi compresi. Una delle due date si puo' lasciare vuota (dal primo QSO,
+  o fino a oggi); si scrivono come nel resto del programma (in italiano gg/mm/aaaa).
+- Lo scarico per periodo non sposta il segno dell'ultimo scarico: "Sincronizza adesso"
+  riparte da dove era e non perde le conferme arrivate nel frattempo per gli altri QSO.
+
 ## 1.16.16 — 26 settembre 2026
 
 **Il gateway del rotore e' dentro DecoDXLog: DecoRotor non serve piu'.**

@@ -47,7 +47,8 @@ LotwClient::LotwClient(QObject* parent)
 {
 }
 
-void LotwClient::download(const QString& user, const QString& password, const QString& since)
+void LotwClient::download(const QString& user, const QString& password, const QString& since,
+                          const QDate& from, const QDate& to)
 {
     if (m_reply)
         return;
@@ -60,6 +61,11 @@ void LotwClient::download(const QString& user, const QString& password, const QS
     q.addQueryItem(QStringLiteral("qso_withown"), QStringLiteral("yes"));
     if (!since.trimmed().isEmpty())
         q.addQueryItem(QStringLiteral("qso_qslsince"), since.trimmed());
+    // Il periodo dei QSO (non delle conferme): qso_startdate e qso_enddate.
+    if (from.isValid())
+        q.addQueryItem(QStringLiteral("qso_startdate"), from.toString(Qt::ISODate));
+    if (to.isValid())
+        q.addQueryItem(QStringLiteral("qso_enddate"), to.toString(Qt::ISODate));
     // LoTW vuole le credenziali nella query, solo su HTTPS; l'URL non si scrive
     // da nessuna parte e gli errori lo tolgono (NetworkError.h).
     QUrl url = m_url;

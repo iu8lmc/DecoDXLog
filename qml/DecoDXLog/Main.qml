@@ -692,6 +692,8 @@ ApplicationWindow {
         else if (what[0] === "fillall") decolog.completeMissingFromCallbook()
         else if (what[0] === "maintenance") { decolog.repairImportedFields(); decolog.completeMissingFromCallbook() }
         else if (what[0] === "tab") window.panelItem("tabs").setTab(parseInt(what[1]))
+        // La scelta del periodo per lo scarico LoTW, aperta per guardarla.
+        else if (what[0] === "lotwperiod") { window.panelItem("tabs").setTab(2); lotwPeriodTimer.start() }
         else if (what[0] === "pop") popWindow.active = true
         else if (what[0] === "panels") { if (what[1]) { const how = what.slice(2); for (let i = 0; i < how.length; ++i) { if (what[1] === "close") window.closePanel(how[i]); else if (what[1] === "detach") window.detachPanel(how[i]); else if (what[1] === "show") window.showPanel(how[i]); else if (what[1] === "attach") window.attachPanel(how[i]) } } else panelsPopup.open() }
         // "cluster:spot:14025.1:3Y0J:CW" mette una riga come se venisse da un
@@ -878,6 +880,7 @@ ApplicationWindow {
             Qt.callLater(function () { console.warn("PROBE newqsy freq field ok") })
         }
     }
+    Timer { id: lotwPeriodTimer; interval: 1200; onTriggered: window.panelItem("tabs").item.openLotwPeriod() }
     Timer { id: comboTimer; interval: 800
            onTriggered: { const it = window.panelItem("cw"); if (it) it.showCombo() } }
     Timer { id: combo2Timer; interval: 900; onTriggered: newQsoDialog.showBandCombo() }

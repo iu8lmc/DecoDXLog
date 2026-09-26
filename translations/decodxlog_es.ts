@@ -493,6 +493,14 @@
         <translation>Descargar las confirmaciones de LoTW</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW del… al…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Confirmaciones de los QSO hechos en este periodo</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>QSL de papel (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ El indicativo que Decodium está trabajando aparece aquí solo.</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: respuesta inesperada</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO del</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>al</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Descargar este periodo</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ El indicativo que Decodium está trabajando aparece aquí solo.</translation>
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: el periodo empieza después de terminar</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: pon usuario y contraseña en Ajustes → Servicios QSL</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: descargando las confirmaciones de los QSO del %1 al %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

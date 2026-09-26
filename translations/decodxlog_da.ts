@@ -493,6 +493,14 @@
         <translation>Hent LoTW-bekræftelser</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW fra… til…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Bekræftelser af QSO&apos;er fra denne periode</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>Papir-QSL (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: uventet svar</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO&apos;er fra</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>til</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Hent denne periode</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: perioden starter efter den slutter</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: skriv brugernavn og adgangskode under Indstillinger → QSL-tjenester</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: henter bekræftelserne af QSO&apos;erne fra %1 til %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

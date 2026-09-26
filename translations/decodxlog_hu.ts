@@ -491,6 +491,14 @@
         <translation>LoTW-igazolások letöltése</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW ettől… eddig…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Az ebben az időszakban készült QSO-k visszaigazolásai</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>Papír QSL (%1)</translation>
     </message>
@@ -2403,6 +2411,21 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: váratlan válasz</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO-k ettől</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>eddig</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Időszak letöltése</translation>
     </message>
 </context>
 <context>
@@ -6531,8 +6554,16 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: az időszak a vége után kezdődik</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: add meg a felhasználónevet és a jelszót a Beállítások → QSL-szolgáltatások alatt</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: a QSO-k visszaigazolásainak letöltése %1 és %2 között…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

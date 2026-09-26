@@ -493,6 +493,14 @@
         <translation>Télécharger les confirmations LoTW</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW du… au…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Confirmations des QSO faits sur cette période</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>QSL papier (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ L&apos;indicatif que Decodium travaille apparaît ici tout seul.</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW : réponse inattendue</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO du</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>au</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Télécharger cette période</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ L&apos;indicatif que Decodium travaille apparaît ici tout seul.</translation>
         <translation>%1 → %2 (%3 Mo)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW : la période commence après sa fin</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW : ajoutez identifiant et mot de passe dans Réglages → Services QSL</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW : téléchargement des confirmations des QSO du %1 au %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

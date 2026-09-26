@@ -491,6 +491,14 @@
         <translation>LoTW の確認を取り込む</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW 期間指定…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>この期間に行った QSO のコンファメーション</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>紙の QSL (%1)</translation>
     </message>
@@ -2403,6 +2411,21 @@ Decodium が交信しているコールサインは、ここにひとりでに�
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: 思いがけない返事</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO 開始日</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>終了日</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>この期間をダウンロード</translation>
     </message>
 </context>
 <context>
@@ -6531,8 +6554,16 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW：期間の開始が終了より後です</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: 設定 → QSL のサービス に、ユーザー名とパスワードを入れてください</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW：%1 から %2 までの QSO のコンファメーションをダウンロード中…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

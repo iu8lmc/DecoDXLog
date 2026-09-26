@@ -493,6 +493,14 @@
         <translation>LoTW-Bestätigungen holen</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW von… bis…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Bestätigungen der QSOs aus diesem Zeitraum</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>Papier-QSL (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ Das Rufzeichen, an dem Decodium arbeitet, erscheint hier von selbst.</translatio
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: unerwartete Antwort</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSOs vom</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>bis</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Diesen Zeitraum laden</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ Das Rufzeichen, an dem Decodium arbeitet, erscheint hier von selbst.</translatio
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: der Zeitraum beginnt nach seinem Ende</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: Benutzername und Passwort in Einrichtung → QSL-Dienste eintragen</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: lade die Bestätigungen der QSOs vom %1 bis %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

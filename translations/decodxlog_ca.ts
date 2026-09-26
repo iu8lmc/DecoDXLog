@@ -493,6 +493,14 @@
         <translation>Baixa les confirmacions de LoTW</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW del… al…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Confirmacions dels QSO fets en aquest període</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>QSL de paper (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: resposta inesperada</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO del</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>al</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Descarrega aquest període</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: el període comença després d&apos;acabar</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: posa el nom d&apos;usuari i la contrasenya a Configuració → Serveis QSL</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: descarregant les confirmacions dels QSO del %1 al %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

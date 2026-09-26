@@ -2392,10 +2392,35 @@ void DecoLogController::checkLotwSchedule()
     syncLotw(false);
 }
 
+void DecoLogController::syncLotwRange(const QString& fromIso, const QString& toIso)
+{
+    const QDate from = QDate::fromString(fromIso.trimmed(), Qt::ISODate);
+    const QDate to = QDate::fromString(toIso.trimmed(), Qt::ISODate);
+    if (!from.isValid() && !to.isValid()) {
+        syncLotw(true);
+        return;
+    }
+    if (from.isValid() && to.isValid() && from > to) {
+        m_lotwStatus = tr("LoTW: the period starts after it ends");
+        addActivity(QStringLiteral("LOTW"), m_lotwStatus, QStringLiteral("warning"));
+        emit lotwChanged();
+        return;
+    }
+    m_lotwFrom = from;
+    m_lotwTo = to;
+    syncLotw(true);
+}
+
 void DecoLogController::syncLotw(bool full)
 {
     if (lotwBusy() || !m_db.isOpen())
         return;
+    // Un periodo scelto vale per questo scarico soltanto.
+    const QDate from = m_lotwFrom;
+    const QDate to = m_lotwTo;
+    m_lotwFrom = QDate();
+    m_lotwTo = QDate();
+    m_lotwRange = from.isValid() || to.isValid();
     const QString user = m_credentials->account(QStringLiteral("lotw"));
     if (user.isEmpty() || !m_credentials->hasSecret(QStringLiteral("lotw"))) {
         m_lotwStatus = tr("LoTW: add username and password in Setup → QSL services");
@@ -2405,12 +2430,16 @@ void DecoLogController::syncLotw(bool full)
     }
     const QString since = full ? QString() : m_db.setting(QStringLiteral("lotw.last_qsl"));
     m_lotwStarting = true;
-    m_lotwStatus = since.isEmpty() ? tr("LoTW: downloading all confirmations…")
-                                   : tr("LoTW: downloading confirmations since %1…").arg(since);
+    m_lotwStatus = m_lotwRange
+        ? tr("LoTW: downloading the confirmations of the QSOs from %1 to %2…")
+              .arg(from.isValid() ? dates::show(from.toString(Qt::ISODate)) : QStringLiteral("…"),
+                   to.isValid() ? dates::show(to.toString(Qt::ISODate)) : QStringLiteral("…"))
+        : since.isEmpty() ? tr("LoTW: downloading all confirmations…")
+                          : tr("LoTW: downloading confirmations since %1…").arg(since);
     addActivity(QStringLiteral("LOTW"), m_lotwStatus);
     emit lotwChanged();
 
-    m_credentials->readSecret(QStringLiteral("lotw"), [this, user, since](const QString& secret, const QString& error) {
+    m_credentials->readSecret(QStringLiteral("lotw"), [this, user, since, from, to](const QString& secret, const QString& error) {
         m_lotwStarting = false;
         if (!error.isEmpty() || secret.isEmpty()) {
             lotw::Report failed;
@@ -2418,7 +2447,7 @@ void DecoLogController::syncLotw(bool full)
             onLotwReport(failed);
             return;
         }
-        m_lotw.download(user, secret, since);
+        m_lotw.download(user, secret, since, from, to);
         emit lotwChanged();
     });
 }
@@ -2441,6 +2470,8 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
 {
     const bool automatic = m_lotwAuto;
     m_lotwAuto = false;
+    const bool ranged = m_lotwRange;
+    m_lotwRange = false;
     if (!report.ok) {
         m_lotwStatus = report.error;
         m_db.setSetting(QStringLiteral("lotw.last_result"), report.error);
@@ -2479,7 +2510,10 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     if (transaction)
         db.commit();
 
-    if (!report.lastQsl.isEmpty())
+    // Il segno dell'ultimo scarico si sposta solo con lo scarico di tutto: uno
+    // scarico per periodo lo porterebbe avanti e il prossimo "solo le nuove"
+    // salterebbe le conferme degli altri QSO arrivate nel frattempo.
+    if (!report.lastQsl.isEmpty() && !ranged)
         m_db.setSetting(QStringLiteral("lotw.last_qsl"), report.lastQsl);
     m_db.setSetting(QStringLiteral("lotw.last_sync_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
 

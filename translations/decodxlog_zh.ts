@@ -491,6 +491,14 @@
         <translation>下载 LoTW 确认</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW 从…到…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>此期间所做 QSO 的确认</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>纸质 QSL (%1)</translation>
     </message>
@@ -2403,6 +2411,21 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW：回复出乎意料</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO 从</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>到</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>下载此期间</translation>
     </message>
 </context>
 <context>
@@ -6531,8 +6554,16 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW：期间的开始晚于结束</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW：请在 设置 → QSL 服务 里填上用户名和密码</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW：正在下载 %1 到 %2 的 QSO 确认…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

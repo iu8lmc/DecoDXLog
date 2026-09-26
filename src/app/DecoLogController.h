@@ -364,6 +364,10 @@ public:
     void setLotwAutoHours(int hours);
     // Scarica le conferme nuove (o tutte, `full`) e le segna sui QSO.
     Q_INVOKABLE void syncLotw(bool full = false);
+    // Le conferme dei QSO fatti dal … al … (ISO, "yyyy-MM-dd"; uno dei due puo'
+    // mancare). Non sposta il segno dell'ultimo scarico: il prossimo "solo le
+    // nuove" riparte da dove era.
+    Q_INVOKABLE void syncLotwRange(const QString& fromIso, const QString& toIso);
     Q_INVOKABLE void cancelLotw() { m_lotw.cancel(); }
 
     bool backupEnabled() const { return m_backupEnabled; }
@@ -516,6 +520,10 @@ private:
     core::AwardFilter m_awardFilter;
     core::DecoLinkServer m_decoLink;
     core::LotwClient  m_lotw;
+    // Il periodo chiesto per il prossimo scarico LoTW, e se quello in corso e' per periodo.
+    QDate m_lotwFrom;
+    QDate m_lotwTo;
+    bool m_lotwRange{false};
     bool      m_lotwStarting{false};
     bool      m_lotwAuto{false};
     QString   m_lotwStatus;

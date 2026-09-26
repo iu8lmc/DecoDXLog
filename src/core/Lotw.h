@@ -9,6 +9,7 @@
 
 #include "core/Adif.h"
 
+#include <QDate>
 #include <QObject>
 #include <QString>
 #include <QUrl>
@@ -45,8 +46,10 @@ public:
     bool busy() const { return m_reply != nullptr; }
 
     // Le conferme ricevute da `since` in poi ("yyyy-MM-dd HH:mm:ss"; vuoto = tutte).
-    // L'esito arriva con finished().
-    void download(const QString& user, const QString& password, const QString& since);
+    // `from` e `to` (valide o no) limitano ai QSO fatti in quei giorni, estremi
+    // compresi: e' il "dal … al …" dello scarico. L'esito arriva con finished().
+    void download(const QString& user, const QString& password, const QString& since,
+                  const QDate& from = {}, const QDate& to = {});
     void cancel();
 
 signals:

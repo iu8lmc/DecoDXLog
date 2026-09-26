@@ -832,6 +832,8 @@ DialogFrame {
                             onClicked: decolog.cancelLotw()
                         }
                     }
+                    // Solo un periodo: le conferme dei QSO fatti dal … al …
+                    LotwRangeRow { }
                     RowLayout {
                         spacing: 8
                         Text { text: qsTr("Automatic sync"); color: Theme.textSecondary; font.pixelSize: 12 }

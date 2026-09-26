@@ -495,6 +495,14 @@
         <translation>Descarcă confirmările LoTW</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW de la… la…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Confirmările QSO-urilor făcute în această perioadă</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>QSL pe hârtie (%1)</translation>
     </message>
@@ -2413,6 +2421,21 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: răspuns neașteptat</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO de la</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>la</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Descarcă această perioadă</translation>
     </message>
 </context>
 <context>
@@ -6577,8 +6600,16 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: perioada începe după ce se termină</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: pune numele de utilizator și parola la Setări → Servicii QSL</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: descarc confirmările QSO-urilor de la %1 la %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

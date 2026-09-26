@@ -6,6 +6,8 @@ import Decodium.UI
 
 GlassPanel {
     id: root
+    // Per le prove: la scelta del periodo LoTW aperta.
+    function openLotwPeriod() { lotwPeriod.open() }
 
     // 0 Awards · 1 Statistics · 2 QSL Upload · 3 Activity log · 4 DX Cluster · 5 Propagation
     property int currentTab: 3
@@ -308,6 +310,32 @@ GlassPanel {
                     fontPixelSize: 11
                     enabled: !decolog.lotwBusy
                     onClicked: decolog.syncLotw(false)
+                }
+                // Lo scarico per un periodo: dal … al …
+                GlassButton {
+                    id: lotwPeriodButton
+                    text: qsTr("LoTW from… to…")
+                    buttonHeight: 24
+                    fontPixelSize: 11
+                    enabled: !decolog.lotwBusy
+                    onClicked: lotwPeriod.open()
+                    Popup {
+                        id: lotwPeriod
+                        y: -implicitHeight - 6
+                        padding: 12
+                        modal: true
+                        popupType: Popup.Window
+                        background: Rectangle { color: Theme.panelColor; border.color: Theme.glassBorder; radius: 6 }
+                        contentItem: ColumnLayout {
+                            spacing: 8
+                            Text {
+                                text: qsTr("Confirmations of the QSOs made in this period")
+                                color: Theme.textSecondary
+                                font.pixelSize: 12
+                            }
+                            LotwRangeRow { onStarted: lotwPeriod.close() }
+                        }
+                    }
                 }
                 GlassButton {
                     text: qsTr("Paper QSL (%1)").arg(decolog.cards.counts.queue || 0)

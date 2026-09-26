@@ -242,6 +242,7 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/StationProfilesDialog.qml
     qml/DecoDXLog/SetupDialog.qml
     qml/DecoDXLog/LogbookWindow.qml
+    qml/DecoDXLog/LotwRangeRow.qml
     qml/DecoDXLog/CwPanel.qml
     qml/DecoDXLog/OnScreen.qml
     qml/DecoDXLog/PanelWindow.qml

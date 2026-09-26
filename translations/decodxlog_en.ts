@@ -493,6 +493,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW from… to…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Confirmations of the QSOs made in this period</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2407,6 +2415,21 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSOs from</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>to</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Download this period</translation>
     </message>
 </context>
 <context>
@@ -6553,8 +6576,16 @@ The call Decodium is working shows up here by itself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: the period starts after it ends</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: downloading the confirmations of the QSOs from %1 to %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

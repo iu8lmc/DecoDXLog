@@ -493,6 +493,14 @@
         <translation>LoTW-bevestigingen ophalen</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW van… tot…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Bevestigingen van de QSO&apos;s uit deze periode</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>Papieren QSL (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: onverwacht antwoord</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO&apos;s van</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>tot</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Deze periode downloaden</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: de periode begint na het einde</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: vul gebruikersnaam en wachtwoord in bij Instellingen → QSL-diensten</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: bevestigingen van de QSO&apos;s van %1 tot %2 downloaden…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

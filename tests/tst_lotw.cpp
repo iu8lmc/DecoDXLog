@@ -209,6 +209,28 @@ private slots:
         QCOMPARE(q.queryItemValue("qso_qslsince", QUrl::FullyDecoded), QString("2026-09-01 00:00:00"));
     }
 
+    void downloadForAPeriod()
+    {
+        // Il "dal … al …": sono le date dei QSO, e senza segno dell'ultimo scarico.
+        FakeLotw server;
+        server.body = kReport;
+        LotwClient client;
+        client.setEndpoint(server.url());
+        QSignalSpy done(&client, &LotwClient::finished);
+        client.download("IU8LMC", "pw", {}, QDate(2026, 1, 1), QDate(2026, 3, 31));
+        QVERIFY(done.wait(5000));
+        const QUrlQuery q = server.requests.first();
+        QCOMPARE(q.queryItemValue("qso_startdate"), QString("2026-01-01"));
+        QCOMPARE(q.queryItemValue("qso_enddate"), QString("2026-03-31"));
+        QVERIFY(!q.hasQueryItem("qso_qslsince"));
+
+        // Solo l'inizio: fino a oggi.
+        client.download("IU8LMC", "pw", {}, QDate(2025, 6, 1), {});
+        QVERIFY(done.wait(5000));
+        QCOMPARE(server.requests.last().queryItemValue("qso_startdate"), QString("2025-06-01"));
+        QVERIFY(!server.requests.last().hasQueryItem("qso_enddate"));
+    }
+
     void errorsHideThePassword()
     {
         FakeLotw server;

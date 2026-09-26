@@ -495,6 +495,14 @@
         <translation>Скачать подтверждения LoTW</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW с… по…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Подтверждения QSO за этот период</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>Бумажные QSL (%1)</translation>
     </message>
@@ -2413,6 +2421,21 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: неожиданный ответ</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO с</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>по</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Загрузить этот период</translation>
     </message>
 </context>
 <context>
@@ -6577,8 +6600,16 @@ The call Decodium is working shows up here by itself.</source>
         <translation>%1 → %2 (%3 МБ)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: период начинается после окончания</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: укажите имя пользователя и пароль в «Настройки → Службы QSL»</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: загрузка подтверждений QSO с %1 по %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

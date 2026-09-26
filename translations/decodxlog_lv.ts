@@ -495,6 +495,14 @@
         <translation>Lejupielādēt LoTW apstiprinājumus</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW no… līdz…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Šajā periodā veikto QSO apstiprinājumi</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>Papīra QSL (%1)</translation>
     </message>
@@ -2413,6 +2421,21 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: negaidīta atbilde</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO no</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>līdz</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Lejupielādēt šo periodu</translation>
     </message>
 </context>
 <context>
@@ -6577,8 +6600,16 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: periods sākas pēc beigām</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: ieraksti lietotājvārdu un paroli sadaļā Iestatījumi → QSL pakalpojumi</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: lejupielādē QSO apstiprinājumus no %1 līdz %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>

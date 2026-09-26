@@ -493,6 +493,14 @@
         <translation>Scarica le conferme LoTW</translation>
     </message>
     <message>
+        <source>LoTW from… to…</source>
+        <translation>LoTW dal… al…</translation>
+    </message>
+    <message>
+        <source>Confirmations of the QSOs made in this period</source>
+        <translation>Le conferme dei QSO fatti in questo periodo</translation>
+    </message>
+    <message>
         <source>Paper QSL (%1)</source>
         <translation>QSL cartacee (%1)</translation>
     </message>
@@ -2408,6 +2416,21 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
     <message>
         <source>LoTW: unexpected answer</source>
         <translation>LoTW: risposta inattesa</translation>
+    </message>
+</context>
+<context>
+    <name>LotwRangeRow</name>
+    <message>
+        <source>QSOs from</source>
+        <translation>QSO dal</translation>
+    </message>
+    <message>
+        <source>to</source>
+        <translation>al</translation>
+    </message>
+    <message>
+        <source>Download this period</source>
+        <translation>Scarica questo periodo</translation>
     </message>
 </context>
 <context>
@@ -6554,8 +6577,16 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <translation>%1 → %2 (%3 MB)</translation>
     </message>
     <message>
+        <source>LoTW: the period starts after it ends</source>
+        <translation>LoTW: il periodo comincia dopo la fine</translation>
+    </message>
+    <message>
         <source>LoTW: add username and password in Setup → QSL services</source>
         <translation>LoTW: metti nome utente e password in Impostazioni → Servizi QSL</translation>
+    </message>
+    <message>
+        <source>LoTW: downloading the confirmations of the QSOs from %1 to %2…</source>
+        <translation>LoTW: scarico le conferme dei QSO dal %1 al %2…</translation>
     </message>
     <message>
         <source>LoTW: downloading all confirmations…</source>
