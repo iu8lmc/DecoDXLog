@@ -4192,16 +4192,16 @@ The call Decodium is working shows up here by itself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation type="unfinished"></translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Point to the DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation type="unfinished"></translation>
+        <source>Point to the DX</source>
+        <translation>Point to the DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation type="unfinished"></translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Pick a spot in the cluster, or a call: its bearing comes here by itself</translation>
     </message>
 </context>
 <context>

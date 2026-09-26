@@ -4201,16 +4201,16 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <translation>Deschide ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>OPREȘTE</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Spre DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Park</translation>
+        <source>Point to the DX</source>
+        <translation>Spre DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Pe DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Alege un spot din cluster sau un indicativ: direcția lui apare aici singură</translation>
     </message>
 </context>
 <context>

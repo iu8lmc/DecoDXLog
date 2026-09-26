@@ -4185,16 +4185,16 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <translation>Megnyitás ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Irány a DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Parkolás</translation>
+        <source>Point to the DX</source>
+        <translation>Irány a DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>A DX-re</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Válassz egy spotot a clusterben vagy egy hívójelet: az iránya magától ide kerül</translation>
     </message>
 </context>
 <context>

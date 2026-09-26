@@ -1,5 +1,7 @@
 #include "app/RotorController.h"
 
+#include "core/Maidenhead.h"
+
 #include <QDir>
 #include <QFile>
 #include <QHostAddress>
@@ -481,13 +483,41 @@ void RotorController::reconnect()
 
 void RotorController::dxBearing(const QString& call, double azimuth)
 {
-    if (!m_enabled || !m_followDx || azimuth < 0.0)
+    if (azimuth < 0.0 || call.trimmed().isEmpty())
+        return;
+    // Il DX scelto lo si ricorda sempre: il pannello lo mostra, e "Punta il DX"
+    // ci va con un clic. Andarci da solo e' solo se "segui" e' acceso.
+    const QVariantMap target{{QStringLiteral("call"), call.trimmed().toUpper()},
+                             {QStringLiteral("azimuth"), qRound(rotor::normalize(azimuth))}};
+    if (target != m_dxTarget) {
+        m_dxTarget = target;
+        emit dxTargetChanged();
+    }
+    if (!m_enabled || !m_followDx)
         return;
     const QString who = call.trimmed().toUpper();
     if (who.isEmpty() || who == m_followedCall)
         return;
     m_followedCall = who;
     pointTo(azimuth, who);
+}
+
+void RotorController::pointToDx()
+{
+    if (m_dxTarget.isEmpty())
+        return;
+    pointTo(m_dxTarget.value(QStringLiteral("azimuth")).toDouble(), m_dxTarget.value(QStringLiteral("call")).toString());
+}
+
+double RotorController::bearingTo(double lat, double lon) const
+{
+    QString grid = m_ctx.stationGrid ? m_ctx.stationGrid().trimmed() : QString();
+    if (grid.isEmpty())
+        grid = m_link.state().locator;
+    const auto home = maidenhead::toLatLon(grid);
+    if (!home)
+        return -1.0;
+    return maidenhead::azimuthDeg(*home, maidenhead::LatLon{lat, lon});
 }
 
 // ── Il gateway integrato ──────────────────────────────────────────────────────

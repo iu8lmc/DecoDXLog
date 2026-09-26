@@ -4193,16 +4193,16 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <translation>Apri ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Punta il DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Park</translation>
+        <source>Point to the DX</source>
+        <translation>Punta il DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Sul DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Scegli uno spot nel cluster, o un nominativo: la sua rotta arriva qui da sola</translation>
     </message>
 </context>
 <context>

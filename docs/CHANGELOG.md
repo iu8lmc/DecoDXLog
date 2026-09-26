@@ -3,6 +3,17 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.16.18 — 26 settembre 2026
+
+**Il pannello del rotore: quadrante grande al centro, i gradi e "Punta il DX".**
+
+- Nella finestra principale il pannello Rotore ha solo il quadrante, grande e centrato, i gradi
+  (e dove sta andando) e il pulsante "Punta il DX". Passi, STOP, park e il resto stanno nella
+  finestra del rotore (Apri ▾, Ctrl+R).
+- Scegliendo uno spot nel cluster (clic o doppio clic) il rotore ne prende subito la rotta, e il
+  pulsante la dice: "Punta il DX · VK9XX 98°". Vale anche per il nominativo nella scheda. Se il
+  QTH della stazione non c'e', la rotta si conta da quello del gateway del rotore.
+
 ## 1.16.17 — 26 settembre 2026
 
 **Lo scarico da LoTW anche per un periodo: dal … al ….**

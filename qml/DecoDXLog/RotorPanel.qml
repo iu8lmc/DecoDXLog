@@ -1,8 +1,9 @@
-// DecoDXLog — il rotore nella colonna di destra: il quadrante di DecoRotor in
-// piccolo, i gradi, il bersaglio e i comandi che servono mentre si opera.
+// DecoDXLog — il rotore nella colonna di destra: il quadrante grande al
+// centro, i gradi e "Punta il DX". Nient'altro: passi, STOP, park e il resto
+// stanno nella finestra del rotore (Apri ▾, Ctrl+R).
 //
-// Il pannello compare solo se il rotore e' acceso: chi non ce l'ha non se lo
-// trova fra i piedi. Per il quadrante grande c'e' la finestra (Ctrl+R).
+// Il DX e' quello scelto adesso: uno spot cliccato nel cluster o il
+// nominativo nella scheda. La sua rotta arriva da sola, e il pulsante la dice.
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -17,19 +18,13 @@ GlassPanel {
     readonly property var state: rotor.state
     readonly property var home: decolog.myPosition
     readonly property var dx: decolog.callInfo.position
+    readonly property var dxTarget: rotor.dxTarget
+    readonly property bool hasDx: dxTarget && dxTarget.azimuth !== undefined
 
     title: qsTr("Rotor")
     dotColor: state.connected ? (state.moving ? Theme.warningColor : Theme.accentColor) : Theme.errorColor
     padding: 8
     headerTools: [
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.rotor.lastTarget
-            color: Theme.textSecondary
-            font.family: Theme.monoFamily
-            font.pixelSize: 11
-            elide: Text.ElideRight
-        },
         GlassButton {
             anchors.verticalCenter: parent.verticalCenter
             text: qsTr("Open ▾")
@@ -39,138 +34,71 @@ GlassPanel {
         }
     ]
 
-    implicitHeight: 236
+    implicitHeight: 300
 
-    // Il quadrante e i gradi in alto, i comandi in fondo larghi quanto il
-    // pannello: nella colonna stretta i pulsanti andavano a capo a meta' e la
-    // scritta di stato si mangiava il resto.
     ColumnLayout {
         anchors.fill: parent
         spacing: 6
 
-    RowLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        spacing: 10
-
-        RotorDial {
-            // Il quadrante si stringe con il pannello, fino a restare leggibile.
-            readonly property int side: Math.max(92, Math.min(132, root.width * 0.42))
-            Layout.preferredWidth: side
-            Layout.preferredHeight: side
-            Layout.alignment: Qt.AlignVCenter
-
-            azimuth: root.state.az || 0
-            target: root.state.azTarget !== undefined && root.state.azTarget >= 0 ? root.state.azTarget : -1
-            beamwidth: root.state.beamwidth || 45
-            hasPosition: root.state.connected === true
-            moving: root.state.moving === true
-            latitude: root.home && root.home.lat !== undefined ? root.home.lat : 41.5
-            longitude: root.home && root.home.lon !== undefined ? root.home.lon : 12.5
-            pinValid: root.dx !== undefined && root.dx !== null && root.dx.lat !== undefined
-            pinLatitude: pinValid ? root.dx.lat : 0
-            pinLongitude: pinValid ? root.dx.lon : 0
-
-            onBearingRequested: (degrees) => root.rotor.pointTo(degrees, "")
-        }
-
-        ColumnLayout {
+        // Il quadrante: grande quanto il pannello lascia, sempre al centro.
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 4
+            Layout.minimumHeight: 120
 
-            RowLayout {
-                spacing: 6
-                Text {
-                    text: root.state.connected ? Math.round(root.state.az || 0) + "°" : "—"
-                    color: Theme.textPrimary
-                    font.family: Theme.monoFamily
-                    font.pixelSize: 22
-                    font.bold: true
-                }
-                Text {
-                    visible: (root.state.azTarget || -1) >= 0
-                    text: "→ " + Math.round(root.state.azTarget || 0) + "°"
-                    color: Theme.warningColor
-                    font.family: Theme.monoFamily
-                    font.pixelSize: 13
-                }
+            RotorDial {
+                readonly property real side: Math.max(110, Math.min(parent.width, parent.height))
+                width: side
+                height: side
+                anchors.centerIn: parent
+
+                azimuth: root.state.az || 0
+                target: root.state.azTarget !== undefined && root.state.azTarget >= 0 ? root.state.azTarget : -1
+                beamwidth: root.state.beamwidth || 45
+                hasPosition: root.state.connected === true
+                moving: root.state.moving === true
+                latitude: root.home && root.home.lat !== undefined ? root.home.lat : 41.5
+                longitude: root.home && root.home.lon !== undefined ? root.home.lon : 12.5
+                pinValid: root.dx !== undefined && root.dx !== null && root.dx.lat !== undefined
+                pinLatitude: pinValid ? root.dx.lat : 0
+                pinLongitude: pinValid ? root.dx.lon : 0
+
+                onBearingRequested: (degrees) => root.rotor.pointTo(degrees, "")
             }
+        }
 
+        // I gradi, grandi, e dove sta andando.
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 8
             Text {
-                Layout.fillWidth: true
-                text: root.rotor.status
-                color: root.state.connected ? Theme.textSecondary : Theme.warningColor
-                font.pixelSize: 11
-                wrapMode: Text.Wrap
-                maximumLineCount: 2
-                elide: Text.ElideRight
+                text: root.state.connected ? Math.round(root.state.az || 0) + "°" : "—"
+                color: root.state.connected ? Theme.textPrimary : Theme.warningColor
+                font.family: Theme.monoFamily
+                font.pixelSize: 26
+                font.bold: true
             }
-
-            Item { Layout.fillHeight: true }
-        }
-    }
-
-    // Due file di pulsanti che occupano tutta la larghezza: quattro passi in
-    // alto, i tre comandi sotto. Ogni pulsante si allarga con il pannello,
-    // quindi restano in riga anche quando la colonna e' stretta.
-    GridLayout {
-        Layout.fillWidth: true
-        columns: 4
-        columnSpacing: 4
-        rowSpacing: 4
-
-        GlassButton {
-            Layout.fillWidth: true
-            text: "−10"; buttonHeight: 22; fontPixelSize: 11
-            enabled: root.state.connected
-            onClicked: root.rotor.nudge(-10)
-        }
-        GlassButton {
-            Layout.fillWidth: true
-            text: "−1"; buttonHeight: 22; fontPixelSize: 11
-            enabled: root.state.connected
-            onClicked: root.rotor.nudge(-1)
-        }
-        GlassButton {
-            Layout.fillWidth: true
-            text: "+1"; buttonHeight: 22; fontPixelSize: 11
-            enabled: root.state.connected
-            onClicked: root.rotor.nudge(1)
-        }
-        GlassButton {
-            Layout.fillWidth: true
-            text: "+10"; buttonHeight: 22; fontPixelSize: 11
-            enabled: root.state.connected
-            onClicked: root.rotor.nudge(10)
+            Text {
+                visible: (root.state.azTarget || -1) >= 0
+                text: "→ " + Math.round(root.state.azTarget || 0) + "°"
+                color: Theme.warningColor
+                font.family: Theme.monoFamily
+                font.pixelSize: 15
+            }
         }
 
         GlassButton {
             Layout.fillWidth: true
-            text: qsTr("STOP")
-            tone: Theme.errorColor
-            buttonHeight: 22
-            fontPixelSize: 11
-            enabled: root.state.connected
-            onClicked: root.rotor.stopNow(false)
-        }
-        GlassButton {
-            Layout.fillWidth: true
-            text: qsTr("Park"); buttonHeight: 22; fontPixelSize: 11
-            enabled: root.state.connected
-            onClicked: root.rotor.park()
-        }
-        GlassButton {
-            readonly property var info: decolog.callInfo
-            Layout.fillWidth: true
-            Layout.columnSpan: 2
-            text: qsTr("On the DX")
+            text: root.hasDx ? qsTr("Point to the DX · %1 %2°").arg(root.dxTarget.call).arg(root.dxTarget.azimuth)
+                             : qsTr("Point to the DX")
             tone: Theme.primaryColor
-            buttonHeight: 22
-            fontPixelSize: 11
-            enabled: root.state.connected && info.azimuth !== undefined
-            onClicked: root.rotor.pointTo(info.azimuth, info.call || "")
+            filled: root.hasDx
+            buttonHeight: 26
+            fontPixelSize: 12
+            enabled: root.state.connected && root.hasDx
+            onClicked: root.rotor.pointToDx()
+            ToolTip.visible: hovered && !root.hasDx
+            ToolTip.text: qsTr("Pick a spot in the cluster, or a call: its bearing comes here by itself")
         }
-    }
     }
 }

@@ -546,6 +546,7 @@ void ClusterController::tune(const QString& spotKey)
     if (!e)
         return;
     emit spotPicked(e->spot.dxCall, e->spot.band, e->spot.mode, e->spot.freqKhz);
+    emit spotAimed(e->spot.dxCall, e->hasPosition, e->lat, e->lon, e->azimuth);
     if (m_ctx.lookup)
         m_ctx.lookup(e->spot.dxCall);
 
@@ -607,6 +608,7 @@ void ClusterController::lookupSpot(const QString& spotKey)
     if (!e)
         return;
     emit spotPicked(e->spot.dxCall, e->spot.band, e->spot.mode, e->spot.freqKhz);
+    emit spotAimed(e->spot.dxCall, e->hasPosition, e->lat, e->lon, e->azimuth);
     if (m_ctx.lookup)
         m_ctx.lookup(e->spot.dxCall);
 }

@@ -4193,16 +4193,16 @@ L&apos;indicatif que Decodium travaille apparaît ici tout seul.</translation>
         <translation>Ouvrir ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Pointer le DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Park</translation>
+        <source>Point to the DX</source>
+        <translation>Pointer le DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Sur le DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Choisissez un spot du cluster ou un indicatif : son azimut arrive ici tout seul</translation>
     </message>
 </context>
 <context>

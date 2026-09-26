@@ -4193,16 +4193,16 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
         <translation>Openen ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Op de DX richten · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Parkeren</translation>
+        <source>Point to the DX</source>
+        <translation>Op de DX richten</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Op de DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Kies een spot in het cluster of een roepnaam: de richting komt hier vanzelf</translation>
     </message>
 </context>
 <context>

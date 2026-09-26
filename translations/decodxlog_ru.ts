@@ -4201,16 +4201,16 @@ The call Decodium is working shows up here by itself.</source>
         <translation>Открыть ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>СТОП</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>На DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Парковка</translation>
-    </message>
-    <message>
-        <source>On the DX</source>
+        <source>Point to the DX</source>
         <translation>На DX</translation>
+    </message>
+    <message>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Выберите спот в кластере или позывной: азимут появится здесь сам</translation>
     </message>
 </context>
 <context>

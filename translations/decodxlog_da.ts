@@ -4193,16 +4193,16 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
         <translation>Åbn ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Peg på DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Park</translation>
+        <source>Point to the DX</source>
+        <translation>Peg på DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Mod DX&apos;en</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Vælg et spot i clusteret eller et kaldesignal: retningen kommer her af sig selv</translation>
     </message>
 </context>
 <context>

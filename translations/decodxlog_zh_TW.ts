@@ -4185,16 +4185,16 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
         <translation>開啟 ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>停</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>指向 DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>停放</translation>
+        <source>Point to the DX</source>
+        <translation>指向 DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>對準 DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>在叢集中選擇一個 spot 或一個呼號：其方位會自動顯示在這裡</translation>
     </message>
 </context>
 <context>

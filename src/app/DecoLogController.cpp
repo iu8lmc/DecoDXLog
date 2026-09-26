@@ -649,6 +649,13 @@ bool DecoLogController::openDatabase(const QString& path)
     };
     m_rotor = new RotorController(std::move(rotorCtx), this);
     connect(this, &DecoLogController::stationChanged, m_rotor, &RotorController::stationChanged);
+    // Uno spot scelto nel cluster: il rotore ne sa subito la rotta, anche se il
+    // QTH della stazione non c'e' (allora conta dal QTH del gateway).
+    connect(m_cluster, &ClusterController::spotAimed, this,
+            [this](const QString& call, bool hasPosition, double lat, double lon, int azimuth) {
+                const double az = azimuth >= 0 ? azimuth : hasPosition ? m_rotor->bearingTo(lat, lon) : -1.0;
+                m_rotor->dxBearing(call, az);
+            });
     // Il gateway integrato del rotore mette sulla mappa dell'app quello che
     // Decodium sente e che lavora, come faceva DecoRotor ascoltando la 2239.
     connect(&m_udp, &UdpReceiver::decodeReceived, this, [this](const QString&, const wsjtx::Decode& d) {

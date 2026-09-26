@@ -4201,16 +4201,16 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
         <translation>Atvērt ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Pagriezt uz DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Novietot</translation>
+        <source>Point to the DX</source>
+        <translation>Pagriezt uz DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Uz DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Izvēlies spotu klasterī vai izsaukuma signālu: tā virziens parādīsies šeit pats</translation>
     </message>
 </context>
 <context>

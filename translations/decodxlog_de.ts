@@ -4193,16 +4193,16 @@ Das Rufzeichen, an dem Decodium arbeitet, erscheint hier von selbst.</translatio
         <translation>Öffnen ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Auf den DX drehen · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Park</translation>
+        <source>Point to the DX</source>
+        <translation>Auf den DX drehen</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Auf den DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Wähle einen Spot im Cluster oder ein Rufzeichen: die Richtung kommt von selbst hierher</translation>
     </message>
 </context>
 <context>

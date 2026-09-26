@@ -4193,16 +4193,16 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <translation>Obre ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>Apunta al DX · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>Aparca</translation>
+        <source>Point to the DX</source>
+        <translation>Apunta al DX</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>Cap al DX</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>Tria un spot del clúster o un indicatiu: el seu rumb arriba aquí sol</translation>
     </message>
 </context>
 <context>

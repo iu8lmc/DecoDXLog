@@ -30,6 +30,9 @@ class RotorController : public QObject {
     Q_PROPERTY(bool connected READ connected NOTIFY stateChanged)
     Q_PROPERTY(QString status READ status NOTIFY stateChanged)
     Q_PROPERTY(QString lastTarget READ lastTarget NOTIFY stateChanged)
+    // Il DX scelto adesso (uno spot cliccato nel cluster, il nominativo nella
+    // scheda) e la sua rotta: {call, azimuth}; vuoto se non se ne sa niente.
+    Q_PROPERTY(QVariantMap dxTarget READ dxTarget NOTIFY dxTargetChanged)
     // Quello che serve al quadrante completo, come nel posto di comando.
     Q_PROPERTY(QVariantList presets READ presets NOTIFY presetsChanged)
     Q_PROPERTY(int rotationSense READ rotationSense NOTIFY stateChanged)
@@ -127,6 +130,12 @@ public:
     // Il nominativo che Decodium sta lavorando: se "segui" e' acceso e si sa da
     // che parte sta, l'antenna ci va da sola.
     void dxBearing(const QString& call, double azimuth);
+    QVariantMap dxTarget() const { return m_dxTarget; }
+    // Punta al DX scelto adesso.
+    Q_INVOKABLE void pointToDx();
+    // La rotta verso un punto, dal QTH della stazione o, se non c'e', da
+    // quello del gateway. -1 se non si sa da dove si parte.
+    double bearingTo(double lat, double lon) const;
 
     QString gatewaySerialPort() const { return m_gw.serialPort; }
     void setGatewaySerialPort(const QString& port);
@@ -159,6 +168,7 @@ signals:
     void bearingChanged();
     void trafficChanged();
     void historyChanged();
+    void dxTargetChanged();
 
 private:
     void apply();
@@ -177,6 +187,7 @@ private:
     QString m_lastTarget;
     QString m_followedCall;
     QVariantMap m_bearing;
+    QVariantMap m_dxTarget;
     int     m_httpPort{8080};
     int     m_sense{0};         // -1 antiorario, +1 orario, 0 fermo
     double  m_lastAz{-1.0};

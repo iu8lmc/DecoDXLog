@@ -4185,16 +4185,16 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <translation>開く ▾</translation>
     </message>
     <message>
-        <source>STOP</source>
-        <translation>STOP</translation>
+        <source>Point to the DX · %1 %2°</source>
+        <translation>DX へ向ける · %1 %2°</translation>
     </message>
     <message>
-        <source>Park</source>
-        <translation>停める</translation>
+        <source>Point to the DX</source>
+        <translation>DX へ向ける</translation>
     </message>
     <message>
-        <source>On the DX</source>
-        <translation>DX に向ける</translation>
+        <source>Pick a spot in the cluster, or a call: its bearing comes here by itself</source>
+        <translation>クラスターのスポットかコールサインを選ぶと、その方位が自動でここに入ります</translation>
     </message>
 </context>
 <context>
