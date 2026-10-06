@@ -2354,6 +2354,10 @@ Labais klikšķis: mainīt</translation>
         <translation>Radio ir izslēgta: Iestatījumi → Radio (CAT), lai to ieslēgtu. Dekoders darbojas tik un tā, tam vajag tikai skaņu, kas nāk no radio.</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac: turiet nospiestu fn (vai Globe) un spiediet F1–F12. Ar tastatūru bez fn darbojas arī Ctrl+F1–F12.</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>Ātrums</translation>
     </message>
@@ -2382,8 +2386,48 @@ Labais klikšķis: mainīt</translation>
         <translation>Nav pieejams: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 vārdi/min · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>Ieeja: %1 → mono 16 biti</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>Dekodera tonis</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>Auto seko spēcīgākajam tonim. Manuāla vērtība notur dekoderi uz šīs CW frekvences; vajadzības gadījumā ierakstiet precīzu vērtību.</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>Dekodera ātrums</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>Auto iemācās otras stacijas ātrumu. Zināmu ātrumu fiksējiet tikai tad, ja Auto ir nestabils; tas nemaina raidīšanas ātrumu.</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>fiksēts %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>fiksēts %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>fiksēts %1 Hz · troksnis</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>auto · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10971,6 +11015,22 @@ Atver to vienreiz DecoDXLog, lai atjauninātu.</translation>
         <translation>Ports %1 ir paša DecoDXLog koplietotā CAT: izvēlies programmas portu, kas tur radio</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>CW dekodera tonis fiksēts uz %1 Hz</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>CW dekodera tonis iestatīts uz automātisko meklēšanu</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>CW dekodera ātrums fiksēts uz %1 WPM</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>CW dekodera ātrums iestatīts uz automātisko meklēšanu</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>Audio ieeja &quot;%1&quot; nav pieejama: izvēlieties citu CW panelī (dekodētājs nepāriet uz citu karti).</translation>
     </message>
@@ -10985,6 +11045,10 @@ Atver to vienreiz DecoDXLog, lai atjauninātu.</translation>
     <message>
         <source>The audio input did not open</source>
         <translation>Skaņas ieeja neatvērās</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>Audio ieejas formātu %1 nevar pārveidot mono 16 bitu audio</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>

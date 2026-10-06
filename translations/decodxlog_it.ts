@@ -2345,6 +2345,10 @@ Tasto destro: modificala</translation>
         <translation>La radio è spenta: si accende da Impostazioni → Radio (CAT). Il decoder funziona lo stesso, gli basta l&apos;audio che esce dalla radio.</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac: tieni premuto fn (o Globe) e premi F1–F12. Con una tastiera senza fn funziona anche Ctrl+F1–F12.</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>Velocità</translation>
     </message>
@@ -2373,8 +2377,48 @@ Tasto destro: modificala</translation>
         <translation>Non disponibile: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 wpm · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>Ingresso: %1 → mono 16 bit</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>Tono del decoder</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>Auto segue il tono più forte. Un valore manuale tiene il decoder su quella frequenza CW; scrivi un valore preciso se serve.</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>Velocità del decoder</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>Auto impara la velocità dell&apos;altra stazione. Fissa una velocità nota solo quando Auto è instabile; non cambia la velocità in trasmissione.</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>fissa %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>fisso %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>fisso %1 Hz · rumore</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>auto · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10909,6 +10953,22 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
         <translation>La porta %1 è la CAT condivisa di DecoDXLog stesso: scegli la porta del programma che tiene la radio</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>Tono del decoder CW fissato a %1 Hz</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>Tono del decoder CW in ricerca automatica</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>Velocità del decoder CW fissata a %1 WPM</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>Velocità del decoder CW in ricerca automatica</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>L&apos;ingresso audio &quot;%1&quot; non è disponibile: sceglierne un altro nel pannello CW (il decoder non ripiega su un&apos;altra scheda).</translation>
     </message>
@@ -10923,6 +10983,10 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
     <message>
         <source>The audio input did not open</source>
         <translation>L&apos;ingresso audio non si è aperto</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>Il formato dell&apos;ingresso audio %1 non si può convertire in audio mono a 16 bit</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>

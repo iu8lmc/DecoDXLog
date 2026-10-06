@@ -2336,6 +2336,10 @@ Jobb kattintás: módosítás</translation>
         <translation>A rádió ki van kapcsolva: Beállítások → Rádió (CAT), ott lehet bekapcsolni. A dekóder így is működik, neki csak a rádióból jövő hang kell.</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac: tartsd lenyomva az fn (vagy Globe) billentyűt, és nyomd meg az F1–F12-t. Fn nélküli billentyűzeten a Ctrl+F1–F12 is működik.</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>Sebesség</translation>
     </message>
@@ -2364,8 +2368,48 @@ Jobb kattintás: módosítás</translation>
         <translation>Nem érhető el: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 szó/perc · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>Bemenet: %1 → mono 16 bit</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>Dekóder hangja</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>Az Auto a legerősebb hangot követi. A kézi érték azon a CW-frekvencián tartja a dekódert; szükség esetén írj be pontos értéket.</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>Dekóder sebessége</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>Az Auto megtanulja a másik állomás sebességét. Ismert sebességet csak akkor rögzíts, ha az Auto instabil; az adási sebességet nem változtatja.</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>rögzített %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>rögzített %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>rögzített %1 Hz · zaj</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>auto · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10847,6 +10891,22 @@ Nyisd meg egyszer a DecoDXLog-ban a frissítéshez.</translation>
         <translation>A(z) %1 port a DecoDXLog saját megosztott CAT-ja: a rádiót tartó program portját válaszd</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>CW-dekóder hangja rögzítve: %1 Hz</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>CW-dekóder hangja automatikus keresésre állítva</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>CW-dekóder sebessége rögzítve: %1 WPM</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>CW-dekóder sebessége automatikus keresésre állítva</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>A(z) &quot;%1&quot; hangbemenet nem érhető el: válasszon másikat a CW panelen (a dekódoló nem esik vissza másik kártyára).</translation>
     </message>
@@ -10861,6 +10921,10 @@ Nyisd meg egyszer a DecoDXLog-ban a frissítéshez.</translation>
     <message>
         <source>The audio input did not open</source>
         <translation>A hangbemenet nem nyílt meg</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>A hangbemenet %1 formátuma nem alakítható mono 16 bites hanggá</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>

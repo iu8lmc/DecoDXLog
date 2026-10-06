@@ -2343,6 +2343,10 @@ Right click: change it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2371,7 +2375,47 @@ Right click: change it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -10905,6 +10949,22 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10918,6 +10978,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
     </message>
     <message>
         <source>The audio input did not open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

@@ -2354,6 +2354,10 @@ Clic dreapta: modific-o</translation>
         <translation>Stația este oprită: Setări → Radio (CAT) ca să o pornești. Decodorul merge oricum, îi trebuie doar sunetul care iese din stație.</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac: ține apăsat fn (sau Globe) și apasă F1–F12. Cu o tastatură fără fn funcționează și Ctrl+F1–F12.</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>Viteză</translation>
     </message>
@@ -2382,8 +2386,48 @@ Clic dreapta: modific-o</translation>
         <translation>Indisponibil: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 cuv/min · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>Intrare: %1 → mono 16 biți</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>Tonul decodorului</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>Auto urmărește cel mai puternic ton. O valoare manuală ține decodorul pe acea frecvență CW; scrie o valoare exactă dacă e nevoie.</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>Viteza decodorului</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>Auto învață viteza celeilalte stații. Fixează o viteză cunoscută doar când Auto este instabil; nu schimbă viteza de transmisie.</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>fixă %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>fix %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>fix %1 Hz · zgomot</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>auto · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10971,6 +11015,22 @@ Deschide-l o dată în DecoDXLog ca să-l actualizezi.</translation>
         <translation>Portul %1 este CAT-ul partajat al lui DecoDXLog însuși: alege portul programului care ține stația</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>Tonul decodorului CW fixat la %1 Hz</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>Tonul decodorului CW setat pe căutare automată</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>Viteza decodorului CW fixată la %1 WPM</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>Viteza decodorului CW setată pe căutare automată</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>Intrarea audio &quot;%1&quot; nu este disponibilă: alege alta în panoul CW (decodorul nu revine la altă placă).</translation>
     </message>
@@ -10985,6 +11045,10 @@ Deschide-l o dată în DecoDXLog ca să-l actualizezi.</translation>
     <message>
         <source>The audio input did not open</source>
         <translation>Intrarea audio nu s-a deschis</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>Formatul %1 al intrării audio nu poate fi convertit în audio mono pe 16 biți</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>

@@ -2345,6 +2345,10 @@ Højreklik: ret den</translation>
         <translation>Radioen er slået fra: Indstillinger → Radio (CAT) for at slå den til. Dekoderen virker alligevel, den skal blot have lyden fra radioen.</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac: hold fn (eller Globe) nede og tryk F1–F12. Med et tastatur uden fn virker Ctrl+F1–F12 også.</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>Hastighed</translation>
     </message>
@@ -2373,8 +2377,48 @@ Højreklik: ret den</translation>
         <translation>Ikke tilgængelig: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 wpm · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>Indgang: %1 → mono 16 bit</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>Dekodertone</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>Auto følger den stærkeste tone. En manuel værdi holder dekoderen på den CW-frekvens; skriv en præcis værdi om nødvendigt.</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>Dekoderhastighed</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>Auto lærer den anden stations hastighed. Lås kun en kendt hastighed, når Auto er ustabil; det ændrer ikke sendehastigheden.</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>fast %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>fast %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>fast %1 Hz · støj</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>auto · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10909,6 +10953,22 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <translation>Port %1 er DecoDXLogs egen delte CAT: vælg porten for det program, der har radioen</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>CW-dekodertone låst til %1 Hz</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>CW-dekodertone sat til automatisk søgning</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>CW-dekoderhastighed låst til %1 WPM</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>CW-dekoderhastighed sat til automatisk søgning</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>Lydindgangen &quot;%1&quot; er ikke tilgængelig: vælg en anden i CW-panelet (dekoderen falder ikke tilbage på et andet kort).</translation>
     </message>
@@ -10923,6 +10983,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>The audio input did not open</source>
         <translation>Lydindgangen åbnede ikke</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>Lydindgangens format %1 kan ikke konverteres til mono 16-bit lyd</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>

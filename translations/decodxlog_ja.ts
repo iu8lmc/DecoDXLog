@@ -2336,6 +2336,10 @@ Right click: change it</source>
         <translation>無線機は切ってあります。入れるには 設定 → 無線機 (CAT) へ。デコーダーはそれでも動きます。無線機から出る音さえあれば足ります。</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac: fn (または Globe) を押したまま F1–F12 を押します。fn のないキーボードでは Ctrl+F1–F12 でも使えます。</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>速さ</translation>
     </message>
@@ -2364,8 +2368,48 @@ Right click: change it</source>
         <translation>利用できません: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 wpm · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>入力: %1 → モノラル 16 ビット</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>デコーダーのトーン</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>自動</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>自動は最も強いトーンに追従します。手動の値はデコーダーをその CW 周波数に保ちます。必要なら正確な値を入力してください。</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>デコーダーの速度</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>自動は相手局の速度を学習します。自動が不安定なときだけ既知の速度を固定してください。送信速度は変わりません。</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>固定 %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>固定 %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>固定 %1 Hz · ノイズ</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>自動 · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10847,6 +10891,22 @@ DecoDXLog で一度開いて更新してください。</translation>
         <translation>ポート %1 は DecoDXLog 自身の共有 CAT です: 無線機を持っているプログラムのポートを選んでください</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>CW デコーダーのトーンを %1 Hz に固定しました</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>CW デコーダーのトーンを自動検索にしました</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>CW デコーダーの速度を %1 WPM に固定しました</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>CW デコーダーの速度を自動検索にしました</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>オーディオ入力 &quot;%1&quot; は利用できません: CW パネルで別のものを選んでください (デコーダーは別のカードに切り替えません)。</translation>
     </message>
@@ -10861,6 +10921,10 @@ DecoDXLog で一度開いて更新してください。</translation>
     <message>
         <source>The audio input did not open</source>
         <translation>音の入り口が開きませんでした</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>オーディオ入力の形式 %1 はモノラル 16 ビットに変換できません</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>

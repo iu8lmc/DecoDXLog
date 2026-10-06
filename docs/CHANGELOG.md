@@ -9,6 +9,7 @@ in stazione.
 audio (con la scelta di tono e velocita' del corrispondente), le callback dei pannelli QML che non
 restano piu' in coda alla chiusura, le macro F1–F12 con fn/Globe e Ctrl su macOS: tutto nella sezione
 1.17.08 qui sotto. Il numero 1.17.08 e' della loro release, e la nostra e' la 1.17.09, piu' alta.
+Le 17 stringhe nuove sono tradotte nelle 14 lingue.
 
 **Il web cluster nella barra in basso.** Accanto all'orologio mondiale c'e' un globo disegnato
 (non un'emoji, come le altre icone del programma): un clic apre nel browser

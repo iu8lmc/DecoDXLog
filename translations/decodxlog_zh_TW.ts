@@ -2336,6 +2336,10 @@ Right click: change it</source>
         <translation>電台是關著的：到 設定 → 電台 (CAT) 打開它。解碼器照樣工作，它只需要從電台出來的音訊。</translation>
     </message>
     <message>
+        <source>Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.</source>
+        <translation>Mac：按住 fn（或 Globe）再按 F1–F12。沒有 fn 的鍵盤也可以用 Ctrl+F1–F12。</translation>
+    </message>
+    <message>
         <source>Speed</source>
         <translation>速度</translation>
     </message>
@@ -2364,8 +2368,48 @@ Right click: change it</source>
         <translation>無法使用: %1</translation>
     </message>
     <message>
-        <source>%1 wpm · %2 Hz</source>
-        <translation>%1 字/分 · %2 Hz</translation>
+        <source>Input: %1 → mono 16-bit</source>
+        <translation>輸入：%1 → 單聲道 16 位元</translation>
+    </message>
+    <message>
+        <source>Decoder tone</source>
+        <translation>解碼器音調</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>自動</translation>
+    </message>
+    <message>
+        <source>Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.</source>
+        <translation>自動會跟隨最強的音調。手動值會讓解碼器保持在該 CW 頻率；需要時可輸入精確值。</translation>
+    </message>
+    <message>
+        <source>Decoder speed</source>
+        <translation>解碼器速度</translation>
+    </message>
+    <message>
+        <source>Auto learns the other station&apos;s speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.</source>
+        <translation>自動會學習對方電台的速度。僅在自動不穩定時才鎖定已知速度；這不會改變發射速度。</translation>
+    </message>
+    <message>
+        <source>fixed %1 WPM</source>
+        <translation>固定 %1 WPM</translation>
+    </message>
+    <message>
+        <source>%1 WPM</source>
+        <translation>%1 WPM</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · %2</source>
+        <translation>固定 %1 Hz · %2</translation>
+    </message>
+    <message>
+        <source>fixed %1 Hz · noise</source>
+        <translation>固定 %1 Hz · 雜訊</translation>
+    </message>
+    <message>
+        <source>auto · %1 · %2 Hz</source>
+        <translation>自動 · %1 · %2 Hz</translation>
     </message>
     <message>
         <source>listening…</source>
@@ -10847,6 +10891,22 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <translation>連接埠 %1 是 DecoDXLog 自己的共享 CAT：請選擇占用電台的程式的連接埠</translation>
     </message>
     <message>
+        <source>CW decoder tone locked at %1 Hz</source>
+        <translation>CW 解碼器音調已鎖定為 %1 Hz</translation>
+    </message>
+    <message>
+        <source>CW decoder tone set to automatic search</source>
+        <translation>CW 解碼器音調已設為自動搜尋</translation>
+    </message>
+    <message>
+        <source>CW decoder speed locked at %1 WPM</source>
+        <translation>CW 解碼器速度已鎖定為 %1 WPM</translation>
+    </message>
+    <message>
+        <source>CW decoder speed set to automatic search</source>
+        <translation>CW 解碼器速度已設為自動搜尋</translation>
+    </message>
+    <message>
         <source>The audio input &quot;%1&quot; is not available: choose another one in the CW panel (the decoder does not fall back to a different card).</source>
         <translation>音訊輸入 &quot;%1&quot; 無法使用: 請在 CW 面板中另選一個 (解碼器不會改用其他音效卡)。</translation>
     </message>
@@ -10861,6 +10921,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>The audio input did not open</source>
         <translation>音訊輸入沒有打開</translation>
+    </message>
+    <message>
+        <source>The audio input format %1 cannot be converted to mono 16-bit audio</source>
+        <translation>音訊輸入格式 %1 無法轉換為單聲道 16 位元音訊</translation>
     </message>
     <message>
         <source>CW decoder listening to %1</source>
