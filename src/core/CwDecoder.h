@@ -38,6 +38,12 @@ public:
     int tone() const { return m_tone; }
     double toneHz() const { return m_toneHz; }
 
+    // 0 lascia che ggmorse misuri la velocita'; altrimenti usa il valore
+    // indicato per evitare che un segnale intermittente venga scambiato per
+    // un CW molto piu' veloce.
+    void setSpeed(int wpm);
+    int speed() const { return m_speed; }
+
     // La velocita' che ha imparato, in parole al minuto.
     int wpm() const { return m_wpm; }
 
@@ -66,11 +72,13 @@ public:
 
 private:
     void rebuild();
+    void applyDecodeParameters();
     QString drain();
     void updateScope(const std::vector<float>& signal);
 
     int m_sampleRate{8000};
     int m_tone{0};
+    int m_speed{0};
     std::unique_ptr<GGMorse> m_morse;
     // L'audio che e' arrivato e non e' ancora stato consumato: ggmorse lo
     // chiede a blocchi interi, e dalla scheda audio arriva come capita.

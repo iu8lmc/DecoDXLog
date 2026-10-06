@@ -3,12 +3,40 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
-## 1.17.08 — 6 ottobre 2026
+## 1.17.09 — 6 ottobre 2026
+
+**Allineata alla 1.17.08 di elisir80.** Il CW in ricezione che ascolta il formato vero della scheda
+audio (con la scelta di tono e velocita' del corrispondente), le callback dei pannelli QML che non
+restano piu' in coda alla chiusura, le macro F1–F12 con fn/Globe e Ctrl su macOS: tutto nella sezione
+1.17.08 qui sotto. Il numero 1.17.08 e' della loro release, e la nostra e' la 1.17.09, piu' alta.
 
 **Il web cluster nella barra in basso.** Accanto all'orologio mondiale c'e' un globo disegnato
 (non un'emoji, come le altre icone del programma): un clic apre nel browser
 decowebcluster.ft2.it, e il suggerimento al passaggio del mouse dice cos'e'. Si raggiunge anche con
 Tab e si attiva con Invio o Spazio. Traduzioni nelle 14 lingue.
+
+## 1.17.08 — 6 ottobre 2026
+
+**CW in ricezione: ascolta il formato vero della scheda.** Alcune interfacce USB Audio, soprattutto
+su macOS/CoreAudio, dichiaravano disponibile un formato a 8 kHz ma consegnavano al decoder campioni
+con un ritmo o una disposizione diversa: il segnale era visibile ma il testo usciva come rumore. Ora
+DecoDXLog apre il formato nativo effettivamente negoziato, lo converte esplicitamente in mono signed
+16-bit e fa il downmix corretto quando la sorgente e' stereo. Il pannello mostra formato, frequenza di
+campionamento e canali realmente aperti; se un formato non e' convertibile, non finge di ascoltare e
+spiega il motivo.
+
+Il tono puo' restare in **Auto**, oppure essere fissato fra 300 e 1500 Hz; si puo' fissare anche la
+velocita' del corrispondente fra 5 e 59 WPM senza toccare la velocita' del proprio keyer. Cambiando
+tono o velocita' la finestra di analisi si azzera, cosi' non mescola punti e linee raccolti con due
+parametri diversi. In Auto il pannello non mostra piu' come dato buono un vecchio aggancio mentre sta
+ascoltando solo rumore. Le conversioni e le scelte vengono provate separatamente, comprese le sorgenti
+mono, stereo, Int16, Int32, float e non supportate.
+
+**Pannelli QML.** Band map, mappa, chat e rete contest non lasciano piu' callback `Qt.callLater` in
+coda quando il pannello viene chiuso o scaricato: usano timer che appartengono alla vista. Questo evita
+il messaggio `QQmlVMEMetaObject: Internal error - attempted to evaluate a function in an invalid context`.
+Su macOS le macro CW F1–F12 si possono attivare con fn/Globe+F1–F12; sulle tastiere senza fn funziona
+anche Ctrl+F1–F12.
 
 ## 1.17.07 — 5 ottobre 2026
 

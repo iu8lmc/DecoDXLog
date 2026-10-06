@@ -127,6 +127,16 @@ RigController::RigController(Context context, QObject* parent)
     m_pttPort = s.value(QStringLiteral("rig/pttPort")).toString();
     m_audioInput = s.value(QStringLiteral("cw/audioInput")).toString();
     m_audioInputId = s.value(QStringLiteral("cw/audioInputId")).toString();
+    m_decoderToneLock = s.value(QStringLiteral("cw/decoderToneLock"), 0).toInt();
+    // Le versioni vecchie non hanno questa chiave; valori fuori dal campo
+    // utile tornano automaticamente alla ricerca del tono.
+    if (m_decoderToneLock < 300 || m_decoderToneLock > 1500)
+        m_decoderToneLock = 0;
+    m_decoderSpeedLock = s.value(QStringLiteral("cw/decoderSpeedLock"), 0).toInt();
+    if (m_decoderSpeedLock < 5 || m_decoderSpeedLock > 59)
+        m_decoderSpeedLock = 0;
+    m_decoder.setTone(m_decoderToneLock);
+    m_decoder.setSpeed(m_decoderSpeedLock);
     loadMacros();
 
     for (core::RigLink* link : {static_cast<core::RigLink*>(&m_hamlib), static_cast<core::RigLink*>(&m_tci),
@@ -956,6 +966,52 @@ void RigController::setDecoderOn(bool on)
     emit decoderChanged();
 }
 
+void RigController::setDecoderToneLock(int hz)
+{
+    // Zero e' "Auto". Il CW audio di una radio cade normalmente fra 300 e
+    // 1500 Hz; non accettiamo altri numeri per non lasciare il decoder in una
+    // configurazione silenziosamente impossibile.
+    const int clean = hz <= 0 ? 0 : std::clamp(hz, 300, 1500);
+    if (clean == m_decoderToneLock)
+        return;
+    m_decoderToneLock = clean;
+    QSettings().setValue(QStringLiteral("cw/decoderToneLock"), clean);
+    m_decoder.setTone(clean);
+    // La finestra di analisi contiene ancora il tono precedente: svuotarla
+    // impedisce che punti e linee di due frequenze diverse finiscano assieme.
+    m_decoder.reset();
+    publishScope(true);
+    emit decoderChanged();
+    if (m_ctx.activity) {
+        const QString what = clean > 0 ? tr("CW decoder tone locked at %1 Hz").arg(clean)
+                                       : tr("CW decoder tone set to automatic search");
+        m_ctx.activity(QStringLiteral("CW"), what, QStringLiteral("info"));
+    }
+}
+
+void RigController::setDecoderSpeedLock(int wpm)
+{
+    // Zero vuol dire Auto. Il decodificatore sotto non cerca oltre 59 WPM:
+    // rimanere nel suo intervallo evita una scelta apparentemente valida ma
+    // che non produrrebbe mai un fotogramma.
+    const int clean = wpm <= 0 ? 0 : std::clamp(wpm, 5, 59);
+    if (clean == m_decoderSpeedLock)
+        return;
+    m_decoderSpeedLock = clean;
+    QSettings().setValue(QStringLiteral("cw/decoderSpeedLock"), clean);
+    m_decoder.setSpeed(clean);
+    // Come per il tono, la finestra contiene misure con il ritmo precedente:
+    // ricominciare impedisce di unire le sue lettere alle nuove.
+    m_decoder.reset();
+    publishScope(true);
+    emit decoderChanged();
+    if (m_ctx.activity) {
+        const QString what = clean > 0 ? tr("CW decoder speed locked at %1 WPM").arg(clean)
+                                       : tr("CW decoder speed set to automatic search");
+        m_ctx.activity(QStringLiteral("CW"), what, QStringLiteral("info"));
+    }
+}
+
 void RigController::clearDecoder()
 {
     m_decoderText.clear();
@@ -966,6 +1022,12 @@ void RigController::clearDecoder()
 
 void RigController::startAudio()
 {
+    // Il formato puo' cambiare quando si passa da una scheda all'altra. Non
+    // lasciare per un istante nel pannello quello della periferica precedente.
+    m_audioBuffer.clear();
+    m_audioFormat = QAudioFormat();
+    m_audioInputFormat.clear();
+
     // La scheda scelta, e solo quella: se non si trova non si ripiega su
     // un'altra (il predefinito di sistema e' una scelta, non un ripiego), si
     // dice quale manca e il decoder non parte.
@@ -989,6 +1051,7 @@ void RigController::startAudio()
                            QStringLiteral("warning"));
         m_decoderOn = false;
         m_audioInUse.clear();
+        m_audioInputFormat.clear();
         emit audioSelectionChanged();
         return;
     }
@@ -1013,31 +1076,59 @@ void RigController::startAudio()
         if (m_ctx.activity)
             m_ctx.activity(QStringLiteral("CW"), tr("No audio input to listen to"), QStringLiteral("warning"));
         m_decoderOn = false;
+        m_audioInUse.clear();
+        m_audioInputFormat.clear();
+        emit audioSelectionChanged();
         return;
     }
 
-    QAudioFormat format;
-    format.setSampleRate(8000);
-    format.setChannelCount(1);
-    format.setSampleFormat(QAudioFormat::Int16);
-    if (!chosen.isFormatSupported(format))
-        format = chosen.preferredFormat();
+    // Acquisire nel formato nativo della periferica e normalizzarlo sotto. Su
+    // alcuni backend (in particolare CoreAudio con certe USB Audio CODEC) la
+    // conversione richiesta a 8 kHz viene dichiarata supportata ma consegna
+    // campioni a un ritmo errato: il CW risulta accelerato e non decodifica.
+    // Il convertitore gestisce mono/stereo e Int16/Int32/float, mentre
+    // ggmorse ricampiona internamente alla propria frequenza di lavoro.
+    QAudioFormat format = chosen.preferredFormat();
 
-    m_decoder.setSampleRate(format.sampleRate());
-    m_decoder.reset();
     m_audio = std::make_unique<QAudioSource>(chosen, format);
     m_audioDevice = m_audio->start();
     if (!m_audioDevice) {
         m_audio.reset();
         m_decoderOn = false;
+        m_audioInUse.clear();
+        m_audioInputFormat.clear();
+        emit audioSelectionChanged();
         if (m_ctx.activity)
             m_ctx.activity(QStringLiteral("CW"), tr("The audio input did not open"), QStringLiteral("warning"));
         return;
     }
+    // QAudioSource puo' negoziare un formato diverso da quello richiesto: e'
+    // questo, non il formato desiderato, che arriva da readyRead().
+    m_audioFormat = m_audio->format();
+    if (!app::audiodev::canConvertToMonoInt16(m_audioFormat)) {
+        const QString description = app::audiodev::formatDescription(m_audioFormat);
+        m_audio->stop();
+        m_audio.reset();
+        m_audioDevice = nullptr;
+        m_audioFormat = QAudioFormat();
+        m_decoderOn = false;
+        m_audioInUse.clear();
+        m_audioInputFormat.clear();
+        emit audioSelectionChanged();
+        if (m_ctx.activity)
+            m_ctx.activity(QStringLiteral("CW"),
+                           tr("The audio input format %1 cannot be converted to mono 16-bit audio")
+                               .arg(description),
+                           QStringLiteral("warning"));
+        return;
+    }
+    m_decoder.setSampleRate(m_audioFormat.sampleRate());
+    m_decoder.reset();
     connect(m_audioDevice, &QIODevice::readyRead, this, [this] {
         consumeAudio(m_audioDevice->readAll());
     });
     m_audioInUse = chosen.description();
+    m_audioInputFormat = app::audiodev::formatDescription(m_audioFormat);
     emit audioSelectionChanged();
     if (m_ctx.activity)
         m_ctx.activity(QStringLiteral("CW"), tr("CW decoder listening to %1").arg(chosen.description()),
@@ -1049,11 +1140,12 @@ void RigController::consumeAudio(const QByteArray& chunk)
     if (chunk.isEmpty())
         return;
     m_audioBuffer += chunk;
-    const int samples = static_cast<int>(m_audioBuffer.size() / sizeof(qint16));
-    if (samples <= 0)
+    const app::audiodev::MonoPcm pcm = app::audiodev::convertToMonoInt16(m_audioBuffer, m_audioFormat);
+    if (pcm.samples.isEmpty())
         return;
-    const QString text = m_decoder.feed(reinterpret_cast<const qint16*>(m_audioBuffer.constData()), samples);
-    m_audioBuffer.remove(0, samples * sizeof(qint16));
+    const int samples = static_cast<int>(pcm.samples.size() / sizeof(qint16));
+    const QString text = m_decoder.feed(reinterpret_cast<const qint16*>(pcm.samples.constData()), samples);
+    m_audioBuffer.remove(0, pcm.consumedBytes);
     if (!text.isEmpty()) {
         m_decoderText += text;
         // Non si tiene una giornata di CW in memoria: gli ultimi 4000
@@ -1142,11 +1234,13 @@ void RigController::stopAudio()
     m_testAudio.reset();
     m_audioDevice = nullptr;
     m_audioBuffer.clear();
+    m_audioFormat = QAudioFormat();
     m_scope.clear();
     if (!m_audioInUse.isEmpty()) {
         m_audioInUse.clear();
-        emit audioSelectionChanged();
     }
+    m_audioInputFormat.clear();
+    emit audioSelectionChanged();
     emit decoderScopeChanged();
 }
 

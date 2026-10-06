@@ -110,7 +110,7 @@ GlassPanel {
                 anchors.margins: 4
                 clip: true
                 model: root.net.messages
-                onCountChanged: Qt.callLater(positionViewAtEnd)
+                onCountChanged: gabScrollTimer.restart()
                 ScrollBar.vertical: PanelScrollBar {}
                 delegate: Text {
                     required property var modelData
@@ -122,6 +122,14 @@ GlassPanel {
                     font.pixelSize: 11
                 }
             }
+        }
+        // Se il pannello viene chiuso mentre arriva un messaggio, il Timer e'
+        // distrutto insieme alla ListView e non rimane una funzione QML in
+        // attesa su Qt.callLater.
+        Timer {
+            id: gabScrollTimer
+            interval: 0
+            onTriggered: gabList.positionViewAtEnd()
         }
         RowLayout {
             Layout.fillWidth: true

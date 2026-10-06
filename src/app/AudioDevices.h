@@ -15,6 +15,7 @@
 #pragma once
 
 #include <QAudioDevice>
+#include <QAudioFormat>
 #include <QByteArray>
 #include <QList>
 #include <QString>
@@ -45,6 +46,19 @@ struct Resolution {
     Kind kind{SystemDefault};
     int index{-1};      // la riga dell'elenco, per Found e Ambiguous
 };
+
+// Il backend audio puo' consegnare il suo formato nativo (per esempio 48 kHz,
+// stereo, float) quando 8 kHz mono Int16 non e' disponibile. Il decoder CW
+// lavora invece sempre su campioni mono Int16: questa struttura conserva anche
+// i byte non ancora completi di un frame fra due readyRead().
+struct MonoPcm {
+    QByteArray samples;
+    qsizetype consumedBytes{0};
+};
+
+bool canConvertToMonoInt16(const QAudioFormat& format);
+MonoPcm convertToMonoInt16(const QByteArray& input, const QAudioFormat& format);
+QString formatDescription(const QAudioFormat& format);
 
 Resolution resolve(const QList<Entry>& entries, const Saved& saved);
 

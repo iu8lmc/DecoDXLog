@@ -47,8 +47,16 @@ RoundedWindow {
         function onMessagesChanged() {
             if (root.active)
                 root.chat.markRead()
-            Qt.callLater(() => messageList.positionViewAtEnd())
+            scrollToLatest.restart()
         }
+    }
+    // La chat e' caricata da un Loader. Un Timer viene eliminato assieme alla
+    // finestra, mentre una lambda passata a Qt.callLater potrebbe essere
+    // eseguita quando il suo contesto QML non esiste piu'.
+    Timer {
+        id: scrollToLatest
+        interval: 0
+        onTriggered: messageList.positionViewAtEnd()
     }
 
     function sendLine() {

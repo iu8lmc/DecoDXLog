@@ -75,6 +75,14 @@ class RigController : public QObject {
     Q_PROPERTY(QString decoderText READ decoderText NOTIFY decoderChanged)
     Q_PROPERTY(int decoderWpm READ decoderWpm NOTIFY decoderChanged)
     Q_PROPERTY(int decoderTone READ decoderTone NOTIFY decoderChanged)
+    // 0 = cerca il tono da solo; altrimenti ascolta solo quella frequenza.
+    // Serve quando una banda affollata fa inseguire al decoder una portante
+    // vicina invece della stazione che l'operatore ha sintonizzato.
+    Q_PROPERTY(int decoderToneLock READ decoderToneLock WRITE setDecoderToneLock NOTIFY decoderChanged)
+    // 0 = misura da solo la velocita'; altrimenti conserva il ritmo indicato.
+    // E' indipendente dai WPM con cui si trasmette: il corrispondente puo'
+    // andare a una velocita' completamente diversa.
+    Q_PROPERTY(int decoderSpeedLock READ decoderSpeedLock WRITE setDecoderSpeedLock NOTIFY decoderChanged)
     // Il grafico del decoder, come quello di ggmorse: {signal: [0..1],
     // level, pitch, wpm, cost, reading}. Si aggiorna una quindicina di volte
     // al secondo, non a ogni pezzetto di audio.
@@ -87,6 +95,9 @@ class RigController : public QObject {
     Q_PROPERTY(QVariantList audioInputDevices READ audioInputDevices NOTIFY audioDevicesChanged)
     Q_PROPERTY(int audioInputIndex READ audioInputIndex NOTIFY audioSelectionChanged)
     Q_PROPERTY(QString audioInputInUse READ audioInputInUse NOTIFY audioSelectionChanged)
+    // Il formato reale che il backend audio ha aperto; puo' essere diverso da
+    // 8 kHz mono Int16 e viene normalizzato prima del decoder.
+    Q_PROPERTY(QString audioInputFormat READ audioInputFormat NOTIFY audioSelectionChanged)
     // Come si arriva alla radio: "network" (un rigctld gia' acceso),
     // "serial" (la porta della radio, e rigctld lo avvia DecoDXLog) oppure
     // "tci" (il WebSocket TCI delle SDR, come in Decodium).
@@ -230,6 +241,10 @@ public:
     QString decoderText() const { return m_decoderText; }
     int decoderWpm() const { return m_decoder.wpm(); }
     int decoderTone() const { return static_cast<int>(m_decoder.toneHz()); }
+    int decoderToneLock() const { return m_decoderToneLock; }
+    void setDecoderToneLock(int hz);
+    int decoderSpeedLock() const { return m_decoderSpeedLock; }
+    void setDecoderSpeedLock(int wpm);
     QVariantMap decoderScope() const { return m_scope; }
     // Per le prove: fa ascoltare al decoder un file audio (WAV o PCM a 16 bit,
     // mono) al passo del tempo vero, come se arrivasse dalla scheda audio.
@@ -240,6 +255,7 @@ public:
     QVariantList audioInputDevices() const;
     int audioInputIndex() const;
     QString audioInputInUse() const { return m_audioInUse; }
+    QString audioInputFormat() const { return m_audioInputFormat; }
     // Dalla riga del menu a tendina (0 = predefinito del sistema): la scelta si
     // salva con l'identificativo della scheda e vale finche' non se ne sceglie
     // un'altra.
@@ -347,13 +363,17 @@ private:
     std::unique_ptr<QAudioSource> m_audio;
     QIODevice* m_audioDevice{nullptr};
     QByteArray m_audioBuffer;
+    QAudioFormat m_audioFormat;
     QString m_decoderText;
+    int m_decoderToneLock{0};
+    int m_decoderSpeedLock{0};
     QVariantMap m_scope;
     QElapsedTimer m_scopeClock;
     std::unique_ptr<QTimer> m_testAudio;
     QString m_audioInput;
     QString m_audioInputId;
     QString m_audioInUse;
+    QString m_audioInputFormat;
     mutable QMediaDevices* m_mediaDevices{nullptr};
     bool m_decoderOn{false};
     // rigctld avviato da noi quando la radio sta su una seriale.

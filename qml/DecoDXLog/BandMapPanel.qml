@@ -103,6 +103,14 @@ GlassPanel {
         interval: 1500
         onTriggered: root.relayout()
     }
+    // Come per gli altri pannelli staccabili, non lasciamo una funzione nella
+    // coda globale di Qt: potrebbe essere richiamata dopo che il Loader ha
+    // distrutto il pannello e produrre "invalid context" nel motore QML.
+    Timer {
+        id: centerTimer
+        interval: 0
+        onTriggered: root.centerOnRadio()
+    }
     Connections {
         target: root.cluster
         // Nascosta (pannello chiuso, o l'altra lavagna davanti) non si rifa'.
@@ -110,9 +118,9 @@ GlassPanel {
     }
     // Anche l'eta' degli spot cambia: ogni mezzo minuto si rifa' comunque.
     Timer { interval: 30000; repeat: true; running: root.visible; onTriggered: root.relayout() }
-    onBandChanged: { relayout(); Qt.callLater(centerOnRadio) }
+    onBandChanged: { relayout(); centerTimer.restart() }
     onVisibleChanged: if (visible) relayout()
-    onKppChanged: { relayout(); Qt.callLater(centerOnRadio) }
+    onKppChanged: { relayout(); centerTimer.restart() }
     onRadioKhzChanged: {
         if (!store.follow || radioKhz <= 0)
             return
@@ -120,7 +128,7 @@ GlassPanel {
         if (py < scroller.contentY + 30 || py > scroller.contentY + scroller.height - 30)
             centerOnRadio()
     }
-    Component.onCompleted: { relayout(); Qt.callLater(centerOnRadio) }
+    Component.onCompleted: { relayout(); centerTimer.start() }
 
     title: qsTr("Band map")
     showDot: false
@@ -223,10 +231,20 @@ GlassPanel {
                 if (next === root.zoom)
                     return
                 store.zoom = next
-                Qt.callLater(() => {
-                    scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height,
-                                                             root.yOf(before) - point.position.y))
-                })
+                pendingScroll.frequency = before
+                pendingScroll.pointerY = point.position.y
+                pendingScroll.restart()
+            }
+        }
+
+        Timer {
+            id: pendingScroll
+            property real frequency: 0
+            property real pointerY: 0
+            interval: 0
+            onTriggered: {
+                scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height,
+                                                         root.yOf(frequency) - pointerY))
             }
         }
 

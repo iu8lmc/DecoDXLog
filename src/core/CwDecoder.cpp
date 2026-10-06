@@ -73,11 +73,26 @@ void CwDecoder::setSampleRate(int sampleRate)
 void CwDecoder::setTone(int hz)
 {
     m_tone = hz > 0 ? hz : 0;
+    applyDecodeParameters();
+}
+
+void CwDecoder::setSpeed(int wpm)
+{
+    // ggmorse cerca velocita' fino a 59 WPM; 0 mantiene il suo rilevamento
+    // automatico. Non mandargli valori fuori dal suo intervallo di ricerca.
+    m_speed = wpm > 0 ? std::clamp(wpm, 5, 59) : 0;
+    applyDecodeParameters();
+}
+
+void CwDecoder::applyDecodeParameters()
+{
     if (!m_morse)
         return;
     GGMorse::ParametersDecode decode = GGMorse::getDefaultParametersDecode();
     // Con -1 se lo cerca da solo; con un numero ascolta solo li'.
     decode.frequency_hz = m_tone > 0 ? static_cast<float>(m_tone) : -1.0f;
+    // Con -1 cerca anche la velocita'; un valore positivo la blocca.
+    decode.speed_wpm = m_speed > 0 ? static_cast<float>(m_speed) : -1.0f;
     m_morse->setParametersDecode(decode);
 }
 

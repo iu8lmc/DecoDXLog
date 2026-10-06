@@ -107,6 +107,42 @@ private slots:
         }
     }
 
+    void honoursALockedSpeed()
+    {
+        // La velocita' puo' essere fissata quando Auto trova un ritmo spurio
+        // in mezzo a un segnale intermittente. Deve restare un'opzione del
+        // ricevitore, non confondersi con la velocita' del keyer TX.
+        for (int wpm : {15, 25, 35}) {
+            CwDecoder decoder(8000);
+            decoder.setTone(700);
+            decoder.setSpeed(wpm);
+            const QVector<qint16> audio = morseAudio(QStringLiteral("PARIS PARIS"), wpm);
+            QString text;
+            for (int i = 0; i < audio.size(); i += 512)
+                text += decoder.feed(audio.constData() + i, qMin(512, audio.size() - i));
+            text += decoder.flush();
+            QVERIFY2(text.contains(QStringLiteral("PARIS")),
+                     qPrintable(QStringLiteral("%1 WPM: %2").arg(wpm).arg(text)));
+            QCOMPARE(decoder.speed(), wpm);
+        }
+    }
+
+    void readsNativeRateAudio()
+    {
+        // Le schede USB moderne lavorano normalmente a 44,1 o 48 kHz. Il
+        // decoder deve leggerle nel loro formato nativo, senza dipendere dal
+        // ricampionatore del backend audio, e lasciare a ggmorse la
+        // conversione alla sua frequenza interna.
+        CwDecoder decoder(48000);
+        const QVector<qint16> audio = morseAudio(QStringLiteral("CQ DE IU8LMC"), 20, 48000, 620);
+        QString text;
+        for (int i = 0; i < audio.size(); i += 2048)
+            text += decoder.feed(audio.constData() + i, qMin(2048, audio.size() - i));
+        text += decoder.flush();
+        QVERIFY2(text.contains(QStringLiteral("IU8LMC")), qPrintable(text));
+        QVERIFY2(qAbs(decoder.toneHz() - 620) < 20, qPrintable(QString::number(decoder.toneHz())));
+    }
+
     void survivesSomeNoise()
     {
         // Col rumore in banda il decoder tiene: le prime lettere dopo un lungo
@@ -195,6 +231,7 @@ private slots:
         QCOMPARE(decoder.tone(), 600);
         QVERIFY2(qAbs(decoder.toneHz() - 600) < 5, qPrintable(QString::number(decoder.toneHz())));
     }
+
 };
 
 QTEST_MAIN(TestCw)

@@ -165,6 +165,19 @@ GlassPanel {
             }
         }
 
+        // Su macOS la fila superiore nasce per luminosita', Mission Control e
+        // volume: fn/Globe la trasforma nel vero F1-F12 che Qt riceve. Ctrl+F
+        // e' un'alternativa utile con tastiere senza tasto fn; sugli altri
+        // sistemi resta solo la scorciatoia canonica F1-F12.
+        Text {
+            Layout.fillWidth: true
+            visible: Qt.platform.os === "osx"
+            text: qsTr("Mac: hold fn (or Globe) and press F1–F12. With a keyboard without fn, Ctrl+F1–F12 also works.")
+            color: Theme.textSecondary
+            font.pixelSize: 10
+            wrapMode: Text.Wrap
+        }
+
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
@@ -229,26 +242,144 @@ GlassPanel {
                 checked: root.rig.decoderOn
                 onToggled: root.rig.decoderOn = checked
             }
-            StyledComboBox {
-                id: audioBox
+            ColumnLayout {
                 Layout.fillWidth: true
-                mono: false
-                fieldHeight: 26
-                // Quello che si vede e' quello che ascolta: «Predefinito» e' una
-                // scelta scritta, e se la scheda scelta non c'e' lo dice invece di
-                // mostrare un'altra riga e usarne una a caso.
-                model: [qsTr("System default")].concat(root.rig.audioInputDevices.map(d => d.label))
-                currentIndex: root.rig.audioInputIndex
-                displayText: root.rig.audioInputIndex < 0 ? qsTr("Not available: %1").arg(root.rig.audioInput)
-                                                          : currentText
-                onActivated: (row) => root.rig.chooseAudioInput(row)
+                spacing: 1
+                StyledComboBox {
+                    id: audioBox
+                    Layout.fillWidth: true
+                    mono: false
+                    fieldHeight: 26
+                    // Quello che si vede e' quello che ascolta: «Predefinito» e' una
+                    // scelta scritta, e se la scheda scelta non c'e' lo dice invece di
+                    // mostrare un'altra riga e usarne una a caso.
+                    model: [qsTr("System default")].concat(root.rig.audioInputDevices.map(d => d.label))
+                    currentIndex: root.rig.audioInputIndex
+                    displayText: root.rig.audioInputIndex < 0 ? qsTr("Not available: %1").arg(root.rig.audioInput)
+                                                              : currentText
+                    onActivated: (row) => root.rig.chooseAudioInput(row)
+                }
+                Text {
+                    Layout.fillWidth: true
+                    visible: root.rig.decoderOn && root.rig.audioInputFormat.length > 0
+                    text: qsTr("Input: %1 → mono 16-bit").arg(root.rig.audioInputFormat)
+                    color: Theme.textSecondary
+                    font.family: Theme.monoFamily
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                }
+            }
+            ColumnLayout {
+                Layout.preferredWidth: 122
+                spacing: 1
+                Text {
+                    text: qsTr("Decoder tone")
+                    color: Theme.textSecondary
+                    font.pixelSize: 10
+                }
+                StyledComboBox {
+                    id: toneBox
+                    Layout.fillWidth: true
+                    mono: false
+                    editable: true
+                    fieldHeight: 26
+                    popupMinimumWidth: 150
+                    readonly property var choices: [0, 400, 500, 550, 570, 575, 600, 610, 615, 620, 625, 630, 650, 700, 800, 1000]
+                    model: choices.map(hz => hz === 0 ? qsTr("Auto") : hz + " Hz")
+                    currentIndex: choices.indexOf(root.rig.decoderToneLock)
+                    Component.onCompleted: editText = root.rig.decoderToneLock === 0 ? qsTr("Auto")
+                                                                                      : root.rig.decoderToneLock + " Hz"
+                    onActivated: (row) => {
+                        root.rig.decoderToneLock = choices[row]
+                        editText = root.rig.decoderToneLock === 0 ? qsTr("Auto")
+                                                                   : root.rig.decoderToneLock + " Hz"
+                    }
+                    onAccepted: {
+                        const text = editText.trim().toLowerCase()
+                        if (text === "auto" || text === "0") {
+                            root.rig.decoderToneLock = 0
+                            editText = qsTr("Auto")
+                            return
+                        }
+                        const hz = parseInt(text)
+                        if (!isNaN(hz)) {
+                            root.rig.decoderToneLock = hz
+                            editText = root.rig.decoderToneLock + " Hz"
+                        }
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Auto follows the strongest tone. A manual value keeps the decoder on that CW frequency; type an exact value if needed.")
+                }
+            }
+            ColumnLayout {
+                Layout.preferredWidth: 116
+                spacing: 1
+                Text {
+                    text: qsTr("Decoder speed")
+                    color: Theme.textSecondary
+                    font.pixelSize: 10
+                }
+                StyledComboBox {
+                    id: speedBox
+                    Layout.fillWidth: true
+                    mono: false
+                    editable: true
+                    fieldHeight: 26
+                    popupMinimumWidth: 150
+                    // Ricezione e trasmissione non sono la stessa cosa: questa
+                    // lista non modifica il cursore Speed sopra, che regola il
+                    // keyer. Qui si puo' fissare il ritmo del corrispondente
+                    // quando Auto scambia un segnale debole per 40 WPM.
+                    readonly property var choices: [0, 10, 12, 15, 16, 17, 18, 19, 20, 22, 25, 27, 30, 35, 40, 45, 50]
+                    model: choices.map(wpm => wpm === 0 ? qsTr("Auto") : wpm + " WPM")
+                    currentIndex: choices.indexOf(root.rig.decoderSpeedLock)
+                    Component.onCompleted: editText = root.rig.decoderSpeedLock === 0 ? qsTr("Auto")
+                                                                                       : root.rig.decoderSpeedLock + " WPM"
+                    onActivated: (row) => {
+                        root.rig.decoderSpeedLock = choices[row]
+                        editText = root.rig.decoderSpeedLock === 0 ? qsTr("Auto")
+                                                                    : root.rig.decoderSpeedLock + " WPM"
+                    }
+                    onAccepted: {
+                        const text = editText.trim().toLowerCase()
+                        if (text === "auto" || text === "0") {
+                            root.rig.decoderSpeedLock = 0
+                            editText = qsTr("Auto")
+                            return
+                        }
+                        const wpm = parseInt(text)
+                        if (!isNaN(wpm)) {
+                            root.rig.decoderSpeedLock = wpm
+                            editText = root.rig.decoderSpeedLock + " WPM"
+                        }
+                    }
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Auto learns the other station's speed. Lock a known speed only when Auto is unstable; this does not change transmit speed.")
+                }
             }
             Text {
+                readonly property var scopeInfo: root.rig.decoderScope
+                readonly property bool readingNow: scopeInfo && scopeInfo.reading === true
                 visible: root.rig.decoderOn
-                text: root.rig.decoderWpm > 0
-                      ? qsTr("%1 wpm · %2 Hz").arg(root.rig.decoderWpm).arg(root.rig.decoderTone)
-                      : qsTr("listening…")
-                color: Theme.secondaryColor
+                // decoderWpm e decoderTone sono l'ultimo aggancio valido. Non
+                // usarli mentre il grafico segnala rumore: altrimenti poteva
+                // restare scritto, per esempio, "16 wpm · 600 Hz" mentre in
+                // realta' il decoder stava vedendo rumore a 52 wpm.
+                text: {
+                    const speed = root.rig.decoderSpeedLock > 0
+                                  ? qsTr("fixed %1 WPM").arg(root.rig.decoderSpeedLock)
+                                  : qsTr("%1 WPM").arg(Math.round(scopeInfo.wpm || 0))
+                    if (root.rig.decoderToneLock > 0) {
+                        return readingNow
+                               ? qsTr("fixed %1 Hz · %2").arg(root.rig.decoderToneLock).arg(speed)
+                               : qsTr("fixed %1 Hz · noise").arg(root.rig.decoderToneLock)
+                    }
+                    return readingNow
+                           ? qsTr("auto · %1 · %2 Hz").arg(speed)
+                                                           .arg(Math.round(scopeInfo.pitch || 0))
+                           : qsTr("listening…")
+                }
+                color: readingNow ? Theme.secondaryColor : Theme.warningColor
                 font.family: Theme.monoFamily
                 font.pixelSize: 11
             }
@@ -417,7 +548,12 @@ GlassPanel {
         Item {
             required property int index
             Shortcut {
-                sequence: "F" + (index + 1)
+                // fn/Globe+F su macOS arriva qui come F. L'alternativa Ctrl+F
+                // serve alle tastiere Mac esterne prive di fn, senza cambiare
+                // nulla a Windows e Linux.
+                sequences: Qt.platform.os === "osx"
+                           ? ["F" + (index + 1), "Ctrl+F" + (index + 1)]
+                           : ["F" + (index + 1)]
                 // In gara i tasti funzione li tiene l'inserimento del contest (ESM).
                 enabled: root.visible && (root.rig.connected || root.rig.keyerOn)
                          && root.rig.canKeyCw && !decolog.activation.active

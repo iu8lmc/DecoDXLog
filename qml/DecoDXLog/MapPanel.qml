@@ -55,6 +55,15 @@ GlassPanel {
         interval: 2000
         onTriggered: root.reloadSpots()
     }
+    // Una callback di Qt.callLater puo' arrivare dopo che questo pannello e'
+    // stato scaricato da un Loader (per esempio chiudendo una finestra
+    // staccata). Il Timer appartiene invece al pannello: se il pannello muore,
+    // non resta nessuna funzione QML da valutare fuori contesto.
+    Timer {
+        id: initialPaint
+        interval: 0
+        onTriggered: root.repaintAll()
+    }
 
     title: qsTr("Map")
     showDot: false
@@ -147,7 +156,7 @@ GlassPanel {
         else
             root.coastline = decolog.coastline()
         root.reloadSpots()
-        Qt.callLater(root.repaintAll)
+        initialPaint.start()
     }
 
     Loader {

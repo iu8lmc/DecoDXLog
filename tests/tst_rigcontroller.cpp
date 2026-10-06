@@ -120,6 +120,28 @@ private slots:
         QVERIFY(activity.constFirst().contains(QStringLiteral("memory 1")));
         QVERIFY(activity.constFirst().contains(QStringLiteral("not sent")));
     }
+
+    void decoderToneAndSpeedLocksAreSavedAndAcceptAuto()
+    {
+        app::RigController::Context context;
+        app::RigController controller(context);
+        QCOMPARE(controller.decoderToneLock(), 0);
+        QCOMPARE(controller.decoderSpeedLock(), 0);
+
+        controller.setDecoderToneLock(625);
+        controller.setDecoderSpeedLock(18);
+        QCOMPARE(controller.decoderToneLock(), 625);
+        QCOMPARE(controller.decoderSpeedLock(), 18);
+
+        app::RigController restored(context);
+        QCOMPARE(restored.decoderToneLock(), 625);
+        QCOMPARE(restored.decoderSpeedLock(), 18);
+
+        restored.setDecoderToneLock(0);
+        restored.setDecoderSpeedLock(0);
+        QCOMPARE(restored.decoderToneLock(), 0);
+        QCOMPARE(restored.decoderSpeedLock(), 0);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestRigController)

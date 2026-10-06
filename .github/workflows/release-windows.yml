@@ -16,7 +16,7 @@ on:
       tag:
         description: Tag sorgente e release destinataria
         required: true
-        default: v1.17.04
+        default: v1.17.08
         type: string
       publish:
         description: Ho provato l'artefatto Windows e autorizzo la pubblicazione
