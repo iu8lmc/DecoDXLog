@@ -8758,6 +8758,17 @@ Ouvrez-le une fois dans DecoDXLog pour le mettre à jour.</translation>
     </message>
 </context>
 <context>
+    <name>WebClusterButton</name>
+    <message>
+        <source>Open the web cluster</source>
+        <translation>Ouvrir le cluster web</translation>
+    </message>
+    <message>
+        <source>Web cluster — decowebcluster.ft2.it</source>
+        <translation>Cluster web — decowebcluster.ft2.it</translation>
+    </message>
+</context>
+<context>
     <name>WinKeyer</name>
     <message>
         <source>WinKeyer: cannot open %1: %2</source>

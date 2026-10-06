@@ -83,6 +83,8 @@ Rectangle {
             boldValue: false
         }
         Item { Layout.fillWidth: true }
+        // Il cluster sul web: decowebcluster.ft2.it nel browser.
+        WebClusterButton {}
         WorldClockButton {
             id: clockButton
             onClicked: rail.worldClockRequested()

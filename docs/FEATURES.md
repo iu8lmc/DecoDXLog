@@ -497,6 +497,9 @@ Quello che manca è in fondo.
   + audio offset), from the cluster window and from the menu; it checks call, bands and
   comment (30 characters), warns when it was already spotted recently, and sends
   `DX <kHz> <call> <comment>` to the chosen node.
+- **Web cluster nella barra in basso**: un globo accanto all'orologio apre
+  decowebcluster.ft2.it nel browser. / **Web cluster in the bottom bar**: a globe next to the
+  clock opens decowebcluster.ft2.it in the browser.
 - **«Check» su ogni fonte**: il nome, la porta, la prima parola del nodo, e dove si ferma —
   con il suggerimento giusto quando a tenere la connessione è un antivirus o un firewall
   (AVG, Avast…). / **"Check" on every source**: the name, the port, the node's first word,

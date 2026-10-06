@@ -3,6 +3,13 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.08 — 6 ottobre 2026
+
+**Il web cluster nella barra in basso.** Accanto all'orologio mondiale c'e' un globo disegnato
+(non un'emoji, come le altre icone del programma): un clic apre nel browser
+decowebcluster.ft2.it, e il suggerimento al passaggio del mouse dice cos'e'. Si raggiunge anche con
+Tab e si attiva con Invio o Spazio. Traduzioni nelle 14 lingue.
+
 ## 1.17.07 — 5 ottobre 2026
 
 **Il nominativo sbagliato si corregge.** Nella scheda del QSO il nominativo era solo letto, in
