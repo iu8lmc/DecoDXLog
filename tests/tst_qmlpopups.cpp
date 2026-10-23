@@ -5,7 +5,9 @@
 // contiene un campo da scrivere deve dichiarare il fuoco.
 #include <QDir>
 #include <QFile>
+#include <QMap>
 #include <QRegularExpression>
+#include <QSet>
 #include <QTest>
 
 namespace {
@@ -74,6 +76,24 @@ bool declaresFocus(const QString& body)
             return true;
     }
     return false;
+}
+
+QStringList qmlStringListProperty(const QString& text, const QString& name)
+{
+    const QRegularExpression property(
+        QStringLiteral(R"((?:readonly\s+)?property\s+var\s+%1\s*:\s*\[([^\]]*)\])")
+            .arg(QRegularExpression::escape(name)),
+        QRegularExpression::DotMatchesEverythingOption);
+    const QRegularExpressionMatch match = property.match(text);
+    if (!match.hasMatch())
+        return {};
+
+    QStringList values;
+    const QRegularExpression quoted(QStringLiteral("\\\"([^\\\"]+)\\\""));
+    auto it = quoted.globalMatch(match.captured(1));
+    while (it.hasNext())
+        values.append(it.next().captured(1));
+    return values;
 }
 
 } // namespace
@@ -156,6 +176,134 @@ private slots:
         QVERIFY(text.contains(QStringLiteral("function applyOperationalPreset")));
         QVERIFY(text.contains(QStringLiteral("layout.detachedPanels = \"\"")));
         QVERIFY(text.contains(QStringLiteral("mainBoard.resetLayout()")));
+    }
+
+    void detachedPanelsAreIndependentAndPersistent()
+    {
+        const QDir qmlDir(QStringLiteral(QML_DIR));
+        const QString panel = readFile(qmlDir.filePath(QStringLiteral("PanelWindow.qml")));
+        QVERIFY(panel.contains(QStringLiteral("transientParent: null")));
+        QVERIFY(panel.contains(QStringLiteral("modality: Qt.NonModal")));
+        QVERIFY(panel.contains(QStringLiteral("category: \"layout/panel/\" + root.panelKey")));
+        for (const QString& alias : {QStringLiteral("windowWidth: root.width"),
+                                     QStringLiteral("windowHeight: root.height"),
+                                     QStringLiteral("windowX: root.x"),
+                                     QStringLiteral("windowY: root.y")})
+            QVERIFY2(panel.contains(QStringLiteral("property alias ") + alias), qPrintable(alias));
+        QVERIFY(panel.contains(QStringLiteral("function persistPlacement()")));
+        QVERIFY(panel.contains(QStringLiteral("panelSettings.sync()")));
+
+        const QString contest = readFile(qmlDir.filePath(QStringLiteral("ContestLayout.qml")));
+        QVERIFY(contest.contains(QStringLiteral("function persistFloatingWindows()")));
+        QVERIFY(contest.contains(QStringLiteral("transientParent: null")));
+        QVERIFY(!contest.contains(QStringLiteral("transientParent: root.Window.window")));
+        QVERIFY(contest.contains(QStringLiteral("property bool quitting: false")));
+        QVERIFY(contest.contains(QStringLiteral("if (!root.quitting)")));
+
+        const QString main = readFile(qmlDir.filePath(QStringLiteral("Main.qml")));
+        QVERIFY(main.contains(QStringLiteral("function persistDetachedWindowState()")));
+        QVERIFY(main.contains(QStringLiteral("window.persistDetachedWindowState()")));
+        QVERIFY(main.contains(QStringLiteral("layout.sync()")));
+        QVERIFY(main.contains(QStringLiteral("property string detachedPanels: \"\"")));
+        QVERIFY(main.contains(QStringLiteral("property alias clusterWindowOpen: clusterWindow.active")));
+        QVERIFY(main.contains(QStringLiteral("quitting: window.quitting")));
+        QVERIFY(main.contains(QStringLiteral("clusterWindow.item.persistPlacement()")));
+        QVERIFY(main.contains(QStringLiteral("if (window.quitting || window.panelStateTransition || window.syncingDetachedWindows)")));
+
+        // Anche le finestre operative aperte dalla dashboard devono essere
+        // top-level vere, altrimenti su alcuni desktop restano sul suo monitor.
+        const QStringList independent = {
+            QStringLiteral("ChatWindow.qml"), QStringLiteral("ClusterWindow.qml"),
+            QStringLiteral("ContestWindow.qml"), QStringLiteral("LogbookWindow.qml"),
+            QStringLiteral("QslCardsWindow.qml"), QStringLiteral("RotorWindow.qml"),
+            QStringLiteral("StatsWindow.qml")};
+        for (const QString& name : independent) {
+            const QString source = readFile(qmlDir.filePath(name));
+            QVERIFY2(source.contains(QStringLiteral("transientParent: null")), qPrintable(name));
+            QVERIFY2(source.contains(QStringLiteral("OnScreen { target: root }")), qPrintable(name));
+        }
+    }
+
+    void everyPanelHasARealDetachableWindowRoute()
+    {
+        const QDir qmlDir(QStringLiteral(QML_DIR));
+        const QString main = readFile(qmlDir.filePath(QStringLiteral("Main.qml")));
+        const QString contest = readFile(qmlDir.filePath(QStringLiteral("ContestLayout.qml")));
+
+        const QMap<QString, QString> panels = {
+            {QStringLiteral("newqso"), QStringLiteral("NewQsoPanel.qml")},
+            {QStringLiteral("logbook"), QStringLiteral("LogbookPanel.qml")},
+            {QStringLiteral("callinfo"), QStringLiteral("CallInfoPanel.qml")},
+            {QStringLiteral("cw"), QStringLiteral("CwPanel.qml")},
+            {QStringLiteral("rotor"), QStringLiteral("RotorPanel.qml")},
+            {QStringLiteral("ft2"), QStringLiteral("Ft2AwardPanel.qml")},
+            {QStringLiteral("tabs"), QStringLiteral("BottomTabs.qml")},
+            {QStringLiteral("map"), QStringLiteral("MapPanel.qml")},
+            {QStringLiteral("bandmap"), QStringLiteral("BandMapPanel.qml")},
+            {QStringLiteral("decodium"), QStringLiteral("DecodiumPanel.qml")},
+            {QStringLiteral("decfull"), QStringLiteral("DecodiumWindowPanel.qml")},
+            {QStringLiteral("decsig"), QStringLiteral("DecodiumWindowPanel.qml")},
+            {QStringLiteral("contest"), QStringLiteral("ContestEntryPanel.qml")},
+            {QStringLiteral("score"), QStringLiteral("ContestScorePanel.qml")},
+            {QStringLiteral("rate"), QStringLiteral("ContestRatePanel.qml")},
+            {QStringLiteral("cluster"), QStringLiteral("ClusterPanel.qml")},
+            {QStringLiteral("net"), QStringLiteral("ContestNetPanel.qml")},
+            {QStringLiteral("dvk"), QStringLiteral("DvkPanel.qml")},
+            {QStringLiteral("mults"), QStringLiteral("ContestMultipliersPanel.qml")}
+        };
+        QCOMPARE(panels.size(), 19);
+
+        QStringList registered = qmlStringListProperty(main, QStringLiteral("panelKeys"));
+        QStringList board = qmlStringListProperty(main, QStringLiteral("boardKeys"));
+        QStringList contestKeys = qmlStringListProperty(contest, QStringLiteral("allKeys"));
+        QStringList expected = panels.keys();
+        registered.sort();
+        board.sort();
+        contestKeys.sort();
+        expected.sort();
+        QCOMPARE(registered, expected);
+
+        QSet<QString> routed(board.cbegin(), board.cend());
+        routed.unite(QSet<QString>(contestKeys.cbegin(), contestKeys.cend()));
+        QStringList routedList(routed.cbegin(), routed.cend());
+        routedList.sort();
+        QCOMPARE(routedList, expected);
+
+        for (auto it = panels.cbegin(); it != panels.cend(); ++it) {
+            const QString key = it.key();
+            const QString source = it.value();
+            const QRegularExpression mainRoute(
+                QStringLiteral(R"(case\s+"%1"\s*:\s*return\s+"%2")")
+                    .arg(QRegularExpression::escape(key), QRegularExpression::escape(source)));
+            QVERIFY2(mainRoute.match(main).hasMatch(), qPrintable(QStringLiteral("factory mancante: ") + key));
+            QVERIFY2(qmlDir.exists(source), qPrintable(QStringLiteral("sorgente mancante: ") + source));
+
+            if (contestKeys.contains(key)) {
+                const QRegularExpression contestRoute(
+                    QStringLiteral(R"(case\s+"%1"\s*:\s*return\s+"%2")")
+                        .arg(QRegularExpression::escape(key), QRegularExpression::escape(source)));
+                QVERIFY2(contestRoute.match(contest).hasMatch(),
+                         qPrintable(QStringLiteral("factory contest mancante: ") + key));
+            }
+        }
+
+        // Entrambi i percorsi generici usano la stessa finestra top-level;
+        // Rotore e Cluster sono le due eccezioni con una finestra dedicata.
+        QVERIFY(main.contains(QStringLiteral("delegate: PanelWindow")));
+        QVERIFY(contest.contains(QStringLiteral("delegate: PanelWindow")));
+        QVERIFY(main.contains(QStringLiteral("if (key === \"rotor\")")));
+        QVERIFY(main.contains(QStringLiteral("if (key === \"cluster\")")));
+
+        const QString clusterWindow = readFile(qmlDir.filePath(QStringLiteral("ClusterWindow.qml")));
+        QVERIFY(clusterWindow.contains(QStringLiteral("transientParent: null")));
+        QVERIFY(clusterWindow.contains(QStringLiteral("modality: Qt.NonModal")));
+        QVERIFY(clusterWindow.contains(QStringLiteral("function persistPlacement()")));
+        QVERIFY(clusterWindow.contains(QStringLiteral("clusterWindowSettings.sync()")));
+
+        const QString rotorWindow = readFile(qmlDir.filePath(QStringLiteral("RotorWindow.qml")));
+        QVERIFY(rotorWindow.contains(QStringLiteral("transientParent: null")));
+        QVERIFY(rotorWindow.contains(QStringLiteral("modality: Qt.NonModal")));
+        QVERIFY(rotorWindow.contains(QStringLiteral("function persistPlacement()")));
     }
 
     void firstRunGuideExplainsRadioAndFirstQso()

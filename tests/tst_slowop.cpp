@@ -38,13 +38,16 @@ private slots:
 
     void theLongestOneStays()
     {
+        decolog::lastSlowOp().name.store(nullptr);
+        decolog::lastSlowOp().durationMs.store(0);
+        decolog::lastSlowOp().endMs.store(0);
         {
             decolog::StartupSpan span("the long one");
-            QThread::msleep(500);
+            QThread::msleep(800);
         }
         {
             decolog::StartupSpan span("a shorter one");
-            QThread::msleep(330);
+            QThread::msleep(350);
         }
         QCOMPARE(QString::fromLatin1(decolog::lastSlowOp().name.load()), QStringLiteral("the long one"));
     }

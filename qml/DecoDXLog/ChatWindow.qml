@@ -21,6 +21,8 @@ RoundedWindow {
     visible: true
     title: qsTr("DecoDXLog — ON4KST chat")
     surfaceColor: Theme.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 

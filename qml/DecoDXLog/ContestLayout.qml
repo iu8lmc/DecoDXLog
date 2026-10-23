@@ -50,6 +50,10 @@ Item {
     property bool external: false
     property var externalShown: []
     property var externalFloating: []
+    // Durante la chiusura generale le finestre native ricevono onClosing. Non
+    // e' un comando dell'operatore per riagganciare il pannello: lo stato
+    // flottante deve restare salvato per il prossimo avvio.
+    property bool quitting: false
     // Disposizione bloccata: niente spostamenti ne' misure.
     property bool locked: false
     property string emptyText: qsTr("All the contest panels are closed: open them again from Contest Mode, up in the bar.")
@@ -193,6 +197,18 @@ Item {
         }
         saved.geometry = ""
         saved.order = ""
+    }
+
+    // Prima dell'uscita rende durevoli sia l'elenco dei pannelli in finestra
+    // sia la geometria di ciascuna finestra. PanelWindow fa gia' il proprio
+    // sync; qui lo si richiama prima che l'albero QML venga distrutto.
+    function persistFloatingWindows() {
+        for (let i = 0; i < floatingWindows.count; ++i) {
+            const w = floatingWindows.objectAt(i)
+            if (w && w.persistPlacement)
+                w.persistPlacement()
+        }
+        saved.sync()
     }
     function panelFor(key) {
         for (let i = 0; i < boardPanels.count; ++i) {
@@ -586,13 +602,17 @@ Item {
             dockable: true
             contestMode: true
             pinned: false
-            // Tenute con la finestra principale: le stanno sopra e si
-            // riducono con lei.
-            transientParent: root.Window.window
+            // Finestre di primo livello reali: possono stare su un altro
+            // monitor o desktop e non vengono trascinate/minimizzate assieme
+            // alla dashboard.
+            transientParent: null
             // Anche la chiusura nativa deve compiere la stessa transizione del
             // pulsante ↩: altrimenti la finestra sparisce ma floating resta
             // salvato, e il pannello non torna piu' selezionabile dal menu.
-            onClosing: root.setFloating(modelData, false)
+            onClosing: {
+                if (!root.quitting)
+                    root.setFloating(modelData, false)
+            }
             onAttachRequested: root.setFloating(modelData, false)
             onCloseRequested: root.setShown(modelData, false)
             onOpenQsoRequested: (id) => root.openQso(id)

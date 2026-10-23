@@ -38,6 +38,7 @@ RoundedWindow {
     // aspetta che si chiuda l'ultima finestra, e quella staccata era ancora li'.
     onClosing: {
         window.quitting = true
+        window.persistDetachedWindowState()
         Qt.quit()
     }
 
@@ -74,6 +75,10 @@ RoundedWindow {
         // separate da virgola. Restano da una sessione all'altra.
         property string hiddenPanels: "cw,bandmap,decodium,decfull,decsig"
         property string detachedPanels: ""
+        // Il Cluster fuori dal Contest vive sempre in una finestra propria.
+        // Fa quindi parte dello stato dei pannelli esattamente come quelli
+        // elencati in detachedPanels.
+        property alias clusterWindowOpen: clusterWindow.active
         // La band map e' arrivata dopo: a chi aveva gia' la sua lavagna si
         // presenta chiusa, la apre da Pannelli quando vuole.
         property bool bandMapIntroduced: false
@@ -1690,7 +1695,10 @@ RoundedWindow {
         sourceComponent: ClusterWindow {
             tab: clusterWindow.tab
             contestMode: clusterWindow.contestMode
-            onClosing: Qt.callLater(function () { clusterWindow.active = false })
+            onClosing: Qt.callLater(function () {
+                if (!window.quitting)
+                    clusterWindow.active = false
+            })
         }
     }
 
@@ -1752,7 +1760,10 @@ RoundedWindow {
 
     Connections {
         target: Qt.application
-        function onAboutToQuit() { window.quitting = true }
+        function onAboutToQuit() {
+            window.quitting = true
+            window.persistDetachedWindowState()
+        }
     }
 
     ListModel {
@@ -1806,6 +1817,24 @@ RoundedWindow {
             win.raise()
             win.requestActivate()
         }
+    }
+
+    function persistDetachedWindowState() {
+        for (let i = 0; i < detachedWindows.count; ++i) {
+            const win = detachedWindows.objectAt(i)
+            if (win && win.persistPlacement)
+                win.persistPlacement()
+        }
+        if (contestLayout && contestLayout.persistFloatingWindows)
+            contestLayout.persistFloatingWindows()
+        if (rotorWindow.item && rotorWindow.item.persistPlacement)
+            rotorWindow.item.persistPlacement()
+        if (clusterWindow.item && clusterWindow.item.persistPlacement)
+            clusterWindow.item.persistPlacement()
+        // hiddenPanels/detachedPanels descrivono lo stato che deve tornare al
+        // prossimo avvio. Lo si scrive prima di Qt.quit(), non affidandosi
+        // all'ordine con cui QML distrugge finestre e Settings.
+        layout.sync()
     }
 
     Instantiator {
@@ -2224,6 +2253,7 @@ RoundedWindow {
     // quella di tutti i giorni.
     ContestLayout {
         id: contestLayout
+        quitting: window.quitting
         titleOf: (key) => window.panelTitle(key)
         Component.onCompleted: window.settleContestMode()
         // boardArea sta nella colonna, che copre tutta la finestra: le sue

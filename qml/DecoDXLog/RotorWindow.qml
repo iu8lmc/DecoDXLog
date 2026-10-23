@@ -26,10 +26,13 @@ DUI.RoundedWindow {
     visible: true
     title: qsTr("DecoRotor — PRO.SIS.TEL rotor control")
     surfaceColor: rt.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 
     Settings {
+        id: rotorWindowSettings
         category: "rotorWindow"
         property alias width: root.width
         property alias height: root.height
@@ -39,6 +42,9 @@ DUI.RoundedWindow {
         property alias windowY: root.y
         property alias nightMode: root.nightMode
     }
+
+    function persistPlacement() { rotorWindowSettings.sync() }
+    Component.onDestruction: root.persistPlacement()
 
     // Il quadrante chiaro o notturno e' una scelta che resta: alla riapertura
     // lo shack ritrova la luce che aveva.

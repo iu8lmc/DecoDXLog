@@ -3,6 +3,35 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.37 — 24 ottobre 2026
+
+**Allineata alla 1.17.36 di elisir80.** Porta i pannelli staccati come vere finestre di primo livello
+(trascinabili su un altro monitor, non modali), la posizione e la dimensione salvate per tutti i
+pannelli e per le finestre operative separate (Cluster, Rotore, Contest, Chat, Logbook, Statistiche,
+QSL), la chiusura generale che non riaggancia piu' i pannelli e i test QML relativi. Nessun conflitto
+e nessuna stringa nuova da tradurre.
+
+
+## 1.17.36 — 24 ottobre 2026
+
+**Pannelli realmente indipendenti.** I pannelli staccati sono ora vere finestre di primo livello,
+non piu' legate alla dashboard principale dal `transientParent`. Possono essere trascinati su un
+monitor diverso, restano non modali e non vengono minimizzati o spostati insieme alla dashboard.
+
+**Posizione persistente.** Per tutti i pannelli vengono salvati posizione, dimensione e stato di
+apertura; il salvataggio e' sincronizzato anche durante la chiusura dell'applicazione, cosi' il
+layout viene ripristinato al successivo avvio. La stessa gestione vale per le finestre operative
+separate (Cluster, Rotore, Contest, Chat, Logbook, Statistiche e QSL) e per le finestre flottanti
+del Contest.
+
+**Chiusura sicura.** La chiusura generale non viene piu' interpretata come un comando per
+riagganciare i pannelli: lo stato flottante resta coerente e non si perde l'ultima posizione.
+
+**Test.** Aggiunti test QML che verificano la top-level ownership, l'assenza di transient parent,
+la persistenza della geometria e il percorso di sgancio per tutti i pannelli registrati. Verificati
+anche build, suite CTest e comportamento su configurazione macOS multi-monitor.
+
+
 ## 1.17.35 — 23 ottobre 2026
 
 **Allineata alla 1.17.34 di elisir80.** Porta il Nuovo QSO configurabile (campi opzionali e campi ADIF

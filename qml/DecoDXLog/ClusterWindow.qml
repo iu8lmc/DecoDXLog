@@ -23,6 +23,8 @@ RoundedWindow {
     visible: true
     title: qsTr("DecoDXLog — DX Cluster")
     surfaceColor: Theme.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 
@@ -38,6 +40,7 @@ RoundedWindow {
     }
 
     Settings {
+        id: clusterWindowSettings
         category: "clusterWindow"
         property alias width: root.width
         property alias height: root.height
@@ -46,6 +49,9 @@ RoundedWindow {
         property alias windowX: root.x
         property alias windowY: root.y
     }
+
+    function persistPlacement() { clusterWindowSettings.sync() }
+    Component.onDestruction: root.persistPlacement()
 
     component Section: SectionTitle { Layout.fillWidth: true }
     component Note: Text {

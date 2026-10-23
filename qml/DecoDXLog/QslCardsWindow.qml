@@ -29,6 +29,8 @@ RoundedWindow {
     visible: true
     title: qsTr("DecoDXLog — Paper QSL")
     surfaceColor: Theme.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 

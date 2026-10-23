@@ -15,6 +15,8 @@ RoundedWindow {
     visible: true
     title: qsTr("DecoDXLog — Logbook")
     surfaceColor: Theme.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 

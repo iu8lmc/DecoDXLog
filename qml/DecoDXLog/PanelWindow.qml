@@ -38,6 +38,16 @@ RoundedWindow {
     surfaceColor: Theme.bgDeep
     title: qsTr("DecoDXLog — %1").arg(root.panelTitle)
 
+    // Una Window dichiarata dentro un'altra Window riceve automaticamente da
+    // QML quella esterna come transientParent. Su macOS (e con alcuni window
+    // manager Windows/Linux) questo la tiene legata allo schermo/desktop della
+    // dashboard: sembra staccata, ma non lo e' per il sistema operativo.
+    // I pannelli sono invece finestre di primo livello vere, spostabili su
+    // qualunque monitor e indipendenti da minimizzazione e cambio desktop
+    // della finestra principale.
+    transientParent: null
+    modality: Qt.NonModal
+
     // Davanti a tutte le altre. Il CW nasce cosi': mentre si manipola si guarda
     // quello che esce dal decoder e si scrive nel log, e la finestra del CW non
     // deve finire dietro a quella grande. Dalla puntina nella sua testata si
@@ -75,11 +85,36 @@ RoundedWindow {
         property alias windowY: root.y
     }
 
+    // Settings aggiorna gli alias mentre la finestra si muove; sync() rende il
+    // punto finale durevole anche quando subito dopo si chiude tutto il
+    // programma. Il timer evita una scrittura su disco per ogni pixel.
+    property bool placementReady: false
+    function schedulePlacementSave() {
+        if (root.placementReady)
+            placementSave.restart()
+    }
+    function persistPlacement() {
+        placementSave.stop()
+        panelSettings.sync()
+    }
+    onXChanged: root.schedulePlacementSave()
+    onYChanged: root.schedulePlacementSave()
+    onWidthChanged: root.schedulePlacementSave()
+    onHeightChanged: root.schedulePlacementSave()
+
+    Timer {
+        id: placementSave
+        interval: 300
+        onTriggered: panelSettings.sync()
+    }
+
     Component.onCompleted: {
         // Il .ini restituisce stringhe: "true" e true sono la stessa cosa.
         const saved = panelSettings.value("alwaysOnTop", root.panelKey === "cw")
         root.alwaysOnTop = saved === true || saved === "true"
+        root.placementReady = true
     }
+    Component.onDestruction: root.persistPlacement()
     onAlwaysOnTopChanged: panelSettings.setValue("alwaysOnTop", root.alwaysOnTop)
 
     QsoDetailDialog { id: qsoDialog }

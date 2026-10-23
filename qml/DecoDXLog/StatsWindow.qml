@@ -48,6 +48,8 @@ RoundedWindow {
     visible: true
     title: qsTr("DecoDXLog — Statistics")
     surfaceColor: Theme.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 

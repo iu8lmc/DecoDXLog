@@ -32,6 +32,8 @@ RoundedWindow {
     visible: true
     title: qsTr("DecoDXLog — Contest")
     surfaceColor: Theme.bgDeep
+    transientParent: null
+    modality: Qt.NonModal
 
     OnScreen { target: root }
 
