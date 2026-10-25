@@ -375,6 +375,8 @@ DecoLogController::DecoLogController(QObject* parent)
     // DecoLink: il log verso Decodium. I dati li fornisce il controller.
     m_decoLinkEnabled = s.value(QStringLiteral("decolink/enabled"), true).toBool();
     m_decoLinkPort = s.value(QStringLiteral("decolink/port"), DecoLinkServer::kDefaultPort).toInt();
+    m_hamHubLinkEnabled = s.value(QStringLiteral("hamhublink/enabled"), true).toBool();
+    m_hamHubLinkPort = s.value(QStringLiteral("hamhublink/port"), decoportlog::kDefaultSessionPort).toInt();
     m_decoLink.workedRows = [this] {
         return m_db.workedRows(m_awardFilter.confirmLotw, m_awardFilter.confirmCard, m_awardFilter.confirmEqsl);
     };
@@ -429,6 +431,24 @@ DecoLogController::DecoLogController(QObject* parent)
         previous = n;
         emit decoLinkChanged();
     });
+    // HH su DecoPort: chi si collega, e se i QSO sono arrivati.
+    connect(&m_hamHubLink, &DecoPortLogServer::clientsChanged, this, [this] {
+        static int previous = 0;
+        const int n = m_hamHubLink.clientCount();
+        if (n != previous)
+            addActivity(QStringLiteral("HAMHUB"), n > previous ? tr("HH connected over DecoPort")
+                                                                : tr("HH disconnected"));
+        previous = n;
+        emit hamHubLinkChanged();
+    });
+    connect(&m_hamHubLink, &DecoPortLogServer::qsoAcked, this, [this] { emit hamHubLinkChanged(); });
+    connect(&m_hamHubLink, &DecoPortLogServer::qsoGaveUp, this, [this](qint64 id) {
+        addActivity(QStringLiteral("HAMHUB"), tr("HH did not confirm QSO #%1: it was not delivered over DecoPort").arg(id),
+                    QStringLiteral("warning"));
+        emit hamHubLinkChanged();
+    });
+    connect(&m_hamHubLink, &DecoPortLogServer::diagnostic, this,
+            [this](const QString& line) { addActivity(QStringLiteral("HAMHUB"), line, QStringLiteral("warning")); });
     // Lo stato dell'award non a ogni QSO di un import: al piu' uno al secondo.
     m_decoLinkAwardDebounce.setSingleShot(true);
     m_decoLinkAwardDebounce.setInterval(1000);
@@ -447,6 +467,9 @@ DecoLogController::DecoLogController(QObject* parent)
                 // Mai il segreto: solo il servizio e l'esito.
                 addActivity(QStringLiteral("KEYS"), QStringLiteral("%1: %2").arg(service, message),
                             ok ? QStringLiteral("info") : QStringLiteral("error"));
+                // La password del collegamento con HH: la sessione si riapre con la nuova chiave.
+                if (service == QLatin1String("hamhub"))
+                    startHamHubLink();
                 // Credenziali cambiate: la sessione del callbook va rifatta.
                 if (service == QLatin1String("qrz") || service == QLatin1String("hamqth")) {
                     m_callbook.reset();
@@ -614,6 +637,7 @@ void DecoLogController::shutdown()
     m_n1mm.stop();
     m_api.stop();
     m_decoLink.stop();
+    m_hamHubLink.stop();
 
     if (m_dvk)
         m_dvk->stop();
@@ -1256,6 +1280,72 @@ void DecoLogController::startDecoLink()
                         .arg(m_decoLinkPort).arg(m_decoLink.lastError()).arg(DecoLinkServer::kRetrySeconds),
                     QStringLiteral("warning"));
     emit decoLinkChanged();
+}
+
+void DecoLogController::startHamHubLink()
+{
+    m_hamHubLink.setIdentity(version(), m_profiles ? m_profiles->activeProfile().value(QStringLiteral("stationCallsign")).toString()
+                                                   : QString());
+    m_hamHubLink.stop();
+    m_hamHubLinkNote.clear();
+    m_hamHubLinkHasPassword = m_credentials && m_credentials->hasSecret(QStringLiteral("hamhub"));
+    if (!m_hamHubLinkEnabled || !m_hamHubLinkHasPassword) {
+        // DecoPort non ha una modalita' senza firma: senza password non si parte.
+        if (m_hamHubLinkEnabled)
+            addActivity(QStringLiteral("HAMHUB"),
+                        tr("HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH"),
+                        QStringLiteral("warning"));
+        emit hamHubLinkChanged();
+        return;
+    }
+    m_credentials->readSecret(QStringLiteral("hamhub"), [this](const QString& secret, const QString& error) {
+        if (!m_hamHubLinkEnabled)
+            return;
+        if (secret.isEmpty()) {
+            m_hamHubLinkNote = error.isEmpty() ? tr("the password is not in the system keystore") : error;
+        } else if (m_hamHubLink.start(static_cast<quint16>(m_hamHubLinkPort), secret)) {
+            addActivity(QStringLiteral("HAMHUB"), tr("HH link listening on 127.0.0.1:%1 (DecoPort)").arg(m_hamHubLinkPort));
+        } else {
+            addActivity(QStringLiteral("HAMHUB"),
+                        tr("HH link cannot listen on %1: %2").arg(m_hamHubLinkPort).arg(m_hamHubLink.lastError()),
+                        QStringLiteral("warning"));
+        }
+        emit hamHubLinkChanged();
+    });
+}
+
+void DecoLogController::setHamHubLinkEnabled(bool enabled)
+{
+    if (enabled == m_hamHubLinkEnabled)
+        return;
+    m_hamHubLinkEnabled = enabled;
+    QSettings().setValue(QStringLiteral("hamhublink/enabled"), enabled);
+    startHamHubLink();
+}
+
+void DecoLogController::setHamHubLinkPort(int port)
+{
+    if (port == m_hamHubLinkPort || port <= 0 || port > 65535)
+        return;
+    m_hamHubLinkPort = port;
+    QSettings().setValue(QStringLiteral("hamhublink/port"), port);
+    startHamHubLink();
+}
+
+QString DecoLogController::hamHubLinkError() const
+{
+    return m_hamHubLink.lastError().isEmpty() ? m_hamHubLinkNote : m_hamHubLink.lastError();
+}
+
+void DecoLogController::hamHubQso(const AdifRecord& record, qint64 id)
+{
+    if (!m_hamHubLink.isListening() || m_hamHubLink.clientCount() == 0)
+        return;
+    if (m_hamHubLink.publishQso(id, adif::writeRecord(record)) > 0) {
+        addActivity(QStringLiteral("HAMHUB"), tr("%1 sent to HH").arg(record.value(QStringLiteral("CALL")).toUpper()),
+                    QStringLiteral("success"));
+        emit hamHubLinkChanged();
+    }
 }
 
 void DecoLogController::setDecoLinkEnabled(bool enabled)
@@ -2905,6 +2995,7 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
     case InsertResult::Status::Inserted: {
         item[QStringLiteral("status")] = QStringLiteral("logged");
         decoLinkQso(enriched, QStringLiteral("logged"), r.id, source, sourceApp);
+        hamHubQso(enriched, r.id);
         m_qsl->qsoLogged(r.id);
         m_activation->qsoLogged();
         if (m_net)
@@ -3420,6 +3511,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         decolog::StartupSpan t1("logManual: model insert");
         m_model->insertQso(res.id);
         broadcastN1mmQso(r, res.id);
+        hamHubQso(r, res.id);
         }
         {
         decolog::StartupSpan t2("logManual: decolink+qsl+cloud+activation");

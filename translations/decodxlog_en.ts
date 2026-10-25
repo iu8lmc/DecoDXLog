@@ -2895,6 +2895,21 @@ Right click: change it</source>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8660,6 +8675,30 @@ Extra fields are preserved: %8</source>
         <source>Apply</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11480,6 +11519,38 @@ Extra fields are preserved: %8</source>
         <source>External result was rejected</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12967,6 +13038,10 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Secret present in the keystore</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

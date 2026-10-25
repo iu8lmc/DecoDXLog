@@ -3,6 +3,36 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.40 — 25 ottobre 2026
+
+**HH parla con DecoDXLog in modo nativo, con DecoPort.** HH, il programma di HamHub Log che
+spedisce i QSO a hamhub.cloud, li prendeva da DecoDXLog come N1MM in UDP, con indirizzo e porta da
+scrivere a mano nei due programmi e nessuna conferma di arrivo. Ora DecoDXLog fa da «gateway» del
+log sul protocollo DecoPort (lo stesso con cui Decodium 4 mette in rete la radio): HH si registra
+da solo sulla porta 5561 di `127.0.0.1`, riceve ogni QSO appena scritto e lo conferma; DecoDXLog,
+senza conferma, lo rimanda fino a tre volte e poi lo scrive nel registro attività.
+
+- **Firmato.** Come in DecoPort, ogni pacchetto porta l'HMAC-SHA256 (16 byte) di una chiave derivata da
+  una password condivisa, con finestra di ±30 secondi contro i rinvii. Senza password non parte
+  niente; un pacchetto con la firma sbagliata non riceve risposta, e cinque da uno stesso
+  mittente in un minuto lo fanno ignorare per cinque. La password sta nel portachiavi del sistema
+  (Impostazioni → Decodium link → HamHub · QSO verso HH), e la stessa va in HH.
+- **Solo su questo computer.** La sessione ascolta solo `127.0.0.1`; l'annuncio del log va a
+  `127.0.0.1:5560` e il monitor del traffico lo mostra leggibile. Gli altri client DecoPort non
+  lo vedono: i tipi nuovi (16 annuncio, 17 QSO, 18 conferma) partono da dove finiscono quelli
+  della radio.
+- **Nel registro attività**: «HH connesso con DecoPort», «IU8LMC inviato a HH», e un avviso se HH non
+  conferma. Tutto il protocollo è in `docs/DECOPORT-LOG.md`.
+- **Dal lato di HH (1.3.0)**: campo *Password DecoPort* in Configura, `HH --decoport PASSWORD [PORTA]`
+  da riga di comando, stato nel tooltip dell'icona («DecoDXLog collegato via DecoPort»), un QSO
+  rimandato non va in coda due volte. Il vecchio canale UDP (N1MM, WSJT-X, ADIF) resta com'è.
+- **Test**: `tst_decoportlog` (firma e finestra di tempo, registrazione, QSO e conferma, rinvii, ban,
+  client che tace, annuncio) e, in HH, la stessa prova con un DecoDXLog finto; i due condividono
+  due vettori calcolati a parte con Python, e un giro completo tra il server C++ e HH.py veri ha
+  consegnato un QSO e ricevuto la conferma.
+- **Traduzioni**: 18 stringhe nuove in tutte e 14 le lingue.
+
+
 ## 1.17.39 — 25 ottobre 2026
 
 **Allineata alla 1.17.38 di elisir80.** Porta il CW via CAT Yaesu di nuovo disponibile (anche FTDX-3000,

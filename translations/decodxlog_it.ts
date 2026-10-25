@@ -2897,6 +2897,21 @@ Tasto destro: modificala</translation>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation>nessuna password: DecoPort non funziona senza firma</translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation>DecoPort: %1 ignorato per %2 minuti, firma sbagliata o assente</translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation>DecoPort: QSO %1 non inviato, il record è vuoto o troppo lungo</translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8667,6 +8682,30 @@ Campi extra conservati: %8</translation>
         <source>Apply</source>
         <translation>Applica</translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation>HamHub · QSO verso HH</translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation>Invia i QSO a HH con DecoPort</translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation>nessuna password</translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation>HH collegato</translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation>Ogni QSO registrato qui va anche a HH, il ponte di HamHub Log, firmato con DecoPort e solo su questo computer. %1 inviati, %2 confermati. Protocollo: docs/DECOPORT-LOG.md.</translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation>Imposta qui sotto una password e la stessa in HH, sotto Configura. DecoPort firma ogni pacchetto: senza password non parte niente.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11487,6 +11526,38 @@ Campi extra conservati: %8</translation>
         <source>External result was rejected</source>
         <translation>Il risultato esterno è stato rifiutato</translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation>HH collegato con DecoPort</translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation>HH scollegato</translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation>HH non ha confermato il QSO #%1: non è stato consegnato con DecoPort</translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation>la password non è nel portachiavi del sistema</translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation>Collegamento con HH in ascolto su 127.0.0.1:%1 (DecoPort)</translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation>Il collegamento con HH non può ascoltare sulla %1: %2</translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation>%1 inviato a HH</translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation>Il collegamento con HH aspetta una password: impostala in Impostazioni, sotto HamHub, la stessa di HH</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12975,6 +13046,10 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Secret present in the keystore</source>
         <translation>Il segreto c&apos;è nel portachiavi</translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation>I QSO vanno a HH, il ponte di HamHub Log, con DecoPort. Scrivi la stessa password in HH: senza, non viene inviato niente</translation>
     </message>
 </context>
 <context>

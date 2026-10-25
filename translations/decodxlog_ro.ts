@@ -2906,6 +2906,21 @@ Clic dreapta: modific-o</translation>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation>fără parolă: DecoPort nu funcționează fără semnătură</translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation>DecoPort: %1 ignorat timp de %2 minute, semnătură greșită sau lipsă</translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation>DecoPort: QSO %1 netrimis, înregistrarea este goală sau prea lungă</translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8689,6 +8704,30 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>Apply</source>
         <translation>Aplică</translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation>HamHub · QSO-uri către HH</translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation>Trimite QSO-urile la HH prin DecoPort</translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation>fără parolă</translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation>HH conectat</translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation>Fiecare QSO înregistrat aici merge și la HH, puntea către HamHub Log, semnat cu DecoPort și doar pe acest calculator. %1 trimise, %2 confirmate. Protocol: docs/DECOPORT-LOG.md.</translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation>Setează mai jos o parolă și aceeași în HH, la Configurare. DecoPort semnează fiecare pachet: fără parolă nu pornește nimic.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11536,6 +11575,38 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>External result was rejected</source>
         <translation>Rezultatul extern a fost respins</translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation>HH conectat prin DecoPort</translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation>HH deconectat</translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation>HH nu a confirmat QSO-ul #%1: nu a fost livrat prin DecoPort</translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation>parola nu este în breloc de chei al sistemului</translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation>Legătura cu HH ascultă pe 127.0.0.1:%1 (DecoPort)</translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation>Legătura cu HH nu poate asculta pe %1: %2</translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation>%1 trimis la HH</translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation>Legătura cu HH așteaptă o parolă: setează-o în Setări, la HamHub, aceeași ca în HH</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -13040,6 +13111,10 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Secret present in the keystore</source>
         <translation>Secretul există în seif</translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation>QSO-urile merg la HH, puntea către HamHub Log, prin DecoPort. Scrie aceeași parolă în HH: fără ea nu se trimite nimic</translation>
     </message>
 </context>
 <context>

@@ -660,6 +660,7 @@ int main(int argc, char* argv[])
     controller.startN1mm();
     controller.startApi();
     controller.startDecoLink();
+    controller.startHamHubLink();
     // Una schermata di prova non si collega ai nodi veri.
     if (!parser.isSet(grabOption) && !parser.isSet(spotsOption))
         controller.startCluster();

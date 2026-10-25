@@ -63,6 +63,8 @@ QList<CredentialService> CredentialStore::knownServices()
          tr("Free callbook lookups")},
         {QStringLiteral("hamalert"), QStringLiteral("HamAlert"), tr("Username"), tr("Password"),
          tr("Spots from your HamAlert triggers (telnet)")},
+        {QStringLiteral("hamhub"), QStringLiteral("HamHub HH"), tr("Callsign"), tr("Password"),
+         tr("The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it")},
         {QStringLiteral("mail"), tr("Outgoing mailbox"), tr("Address"), tr("Password"),
          tr("Sending QSL cards by email. With Gmail it wants an app password, not the account one.")},
     };

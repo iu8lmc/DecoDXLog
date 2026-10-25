@@ -32,6 +32,7 @@
 #include "core/Callbook.h"
 #include "core/Countries.h"
 #include "core/DecoLinkServer.h"
+#include "core/DecoPortLog.h"
 #include "core/CredentialStore.h"
 #include "core/LogBackup.h"
 #include "core/LogDatabase.h"
@@ -182,6 +183,16 @@ class DecoLogController : public QObject {
     Q_PROPERTY(bool decoLinkListening READ decoLinkListening NOTIFY decoLinkChanged)
     Q_PROPERTY(QString decoLinkError READ decoLinkError NOTIFY decoLinkChanged)
     Q_PROPERTY(QVariantList decoLinkClients READ decoLinkClients NOTIFY decoLinkChanged)
+
+    // ── HamHub (HH) su DecoPort: i QSO firmati verso il ponte di HamHub Log ─
+    Q_PROPERTY(bool hamHubLinkEnabled READ hamHubLinkEnabled WRITE setHamHubLinkEnabled NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(int hamHubLinkPort READ hamHubLinkPort WRITE setHamHubLinkPort NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(bool hamHubLinkListening READ hamHubLinkListening NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(bool hamHubLinkHasPassword READ hamHubLinkHasPassword NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(QString hamHubLinkError READ hamHubLinkError NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(int hamHubLinkClients READ hamHubLinkClients NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(int hamHubLinkSent READ hamHubLinkSent NOTIFY hamHubLinkChanged)
+    Q_PROPERTY(int hamHubLinkAcked READ hamHubLinkAcked NOTIFY hamHubLinkChanged)
 
     // ── Award ──────────────────────────────────────────────────────────────
     Q_PROPERTY(QVariantList awardSummary READ awardSummary NOTIFY awardsChanged)
@@ -409,6 +420,19 @@ public:
     QString decoLinkError() const { return m_decoLink.lastError(); }
     QVariantList decoLinkClients() const;
     void startDecoLink();
+
+    bool hamHubLinkEnabled() const { return m_hamHubLinkEnabled; }
+    void setHamHubLinkEnabled(bool enabled);
+    int hamHubLinkPort() const { return m_hamHubLinkPort; }
+    void setHamHubLinkPort(int port);
+    bool hamHubLinkListening() const { return m_hamHubLink.isListening(); }
+    bool hamHubLinkHasPassword() const { return m_hamHubLinkHasPassword; }
+    QString hamHubLinkError() const;
+    int hamHubLinkClients() const { return m_hamHubLink.clientCount(); }
+    int hamHubLinkSent() const { return m_hamHubLink.sentCount(); }
+    int hamHubLinkAcked() const { return m_hamHubLink.ackedCount(); }
+    // Dopo startDecoLink: legge la password dal portachiavi e apre la sessione.
+    void startHamHubLink();
     // La spia dei blocchi: un battito ogni quarto di secondo. Se fra due
     // battiti passa molto piu' tempo, vuol dire che il filo che disegna
     // l'interfaccia e' rimasto fermo — ed e' quello che si vede come finestre
@@ -766,6 +790,7 @@ signals:
     void callbookChanged();
     void awardsChanged();
     void decoLinkChanged();
+    void hamHubLinkChanged();
     void uiLanguageChanged();
     void newQsoSettingsChanged();
     void logColorsChanged();
@@ -795,6 +820,8 @@ private:
     // Contatto N1MM XML per HamConnect/HamAward: parte soltanto quando il QSO
     // viene registrato qui, non per i datagrammi WSJT-X gia' inoltrati.
     int broadcastN1mmQso(const core::AdifRecord& record, qint64 id, bool report = true);
+    // Il QSO appena scritto, ai programmi che lo prendono su DecoPort (HH).
+    void hamHubQso(const core::AdifRecord& record, qint64 id);
     // Applica al QSO quello che il callbook ha detto. Torna i campi riempiti.
     QStringList applyCallbookToQso(qint64 id, const QVariantMap& record);
     void refreshCallInfo();
@@ -887,6 +914,11 @@ private:
     core::CallbookClient m_callbook;
     core::AwardFilter m_awardFilter;
     core::DecoLinkServer m_decoLink;
+    core::DecoPortLogServer m_hamHubLink;
+    bool      m_hamHubLinkEnabled{true};
+    int       m_hamHubLinkPort{core::decoportlog::kDefaultSessionPort};
+    bool      m_hamHubLinkHasPassword{false};
+    QString   m_hamHubLinkNote;
     core::LotwClient  m_lotw;
     // Il periodo chiesto per il prossimo scarico LoTW, e se quello in corso e' per periodo.
     QDate m_lotwFrom;

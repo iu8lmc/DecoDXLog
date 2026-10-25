@@ -2906,6 +2906,21 @@ Labais klikšķis: mainīt</translation>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation>nav paroles: DecoPort nedarbojas bez paraksta</translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation>DecoPort: %1 tiek ignorēts %2 minūtes, nepareizs vai trūkstošs paraksts</translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation>DecoPort: QSO %1 nav nosūtīts, ieraksts ir tukšs vai pārāk garš</translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8689,6 +8704,30 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Apply</source>
         <translation>Piemērot</translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation>HamHub · QSO uz HH</translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation>Sūtīt QSO uz HH, izmantojot DecoPort</translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation>nav paroles</translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation>HH savienots</translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation>Katrs šeit reģistrētais QSO nonāk arī HH, HamHub Log tiltā, parakstīts ar DecoPort un tikai šajā datorā. %1 nosūtīti, %2 apstiprināti. Protokols: docs/DECOPORT-LOG.md.</translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation>Iestati zemāk paroli un to pašu HH sadaļā Konfigurēt. DecoPort paraksta katru paketi: bez paroles nekas nesākas.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11536,6 +11575,38 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>External result was rejected</source>
         <translation>Ārējais rezultāts tika noraidīts</translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation>HH savienots caur DecoPort</translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation>HH atvienots</translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation>HH neapstiprināja QSO #%1: tas netika piegādāts caur DecoPort</translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation>parole nav sistēmas atslēgu saišķī</translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation>Savienojums ar HH klausās uz 127.0.0.1:%1 (DecoPort)</translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation>Savienojums ar HH nevar klausīties uz %1: %2</translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation>%1 nosūtīts uz HH</translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation>Savienojums ar HH gaida paroli: iestati to iestatījumos sadaļā HamHub, to pašu, kas HH</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -13040,6 +13111,10 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Secret present in the keystore</source>
         <translation>Noslēpums ir atslēgu glabātuvē</translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation>QSO nonāk HH, HamHub Log tiltā, caur DecoPort. Ievadi to pašu paroli HH: bez tās nekas netiek sūtīts</translation>
     </message>
 </context>
 <context>

@@ -2888,6 +2888,21 @@ Right click: change it</source>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation>パスワードがありません: DecoPort は署名なしでは動作しません</translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation>DecoPort: %1 を %2 分間無視します（署名が正しくないか、ありません）</translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation>DecoPort: QSO %1 は送信されませんでした（レコードが空か長すぎます）</translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8645,6 +8660,30 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Apply</source>
         <translation>適用</translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation>HamHub · HH への QSO</translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation>DecoPort で QSO を HH に送信する</translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation>パスワードなし</translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation>HH 接続済み</translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation>ここで記録した QSO はすべて、HamHub Log へのブリッジである HH にも、DecoPort で署名してこのコンピューター内だけで送られます。送信 %1 件、確認 %2 件。プロトコル: docs/DECOPORT-LOG.md。</translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation>下でパスワードを設定し、HH の設定でも同じものを設定してください。DecoPort はすべてのパケットに署名するため、パスワードがないと何も始まりません。</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11438,6 +11477,38 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>External result was rejected</source>
         <translation>外部結果は拒否されました</translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation>DecoPort で HH に接続しました</translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation>HH が切断されました</translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation>HH が QSO #%1 を確認しませんでした: DecoPort で配信されていません</translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation>パスワードがシステムのキーストアにありません</translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation>HH との連携が 127.0.0.1:%1 で待ち受けています（DecoPort）</translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation>HH との連携がポート %1 で待ち受けできません: %2</translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation>%1 を HH に送信しました</translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation>HH との連携はパスワードを待っています。設定の HamHub で、HH と同じものを設定してください</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12910,6 +12981,10 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Secret present in the keystore</source>
         <translation>秘密は鍵束の中にあります</translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation>QSO は DecoPort で HH（HamHub Log へのブリッジ）に送られます。HH にも同じパスワードを入力してください。パスワードがないと何も送信されません</translation>
     </message>
 </context>
 <context>

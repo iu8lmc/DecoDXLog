@@ -2888,6 +2888,21 @@ Right click: change it</source>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation>没有密码：DecoPort 没有签名就无法运行</translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation>DecoPort：%1 被忽略 %2 分钟，签名错误或缺失</translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation>DecoPort：QSO %1 未发送，记录为空或过长</translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8645,6 +8660,30 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>Apply</source>
         <translation>应用</translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation>HamHub · 发往 HH 的 QSO</translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation>通过 DecoPort 将 QSO 发送到 HH</translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation>没有密码</translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation>HH 已连接</translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation>在此记录的每个 QSO 也会发给 HH（HamHub Log 的桥接程序），使用 DecoPort 签名，且只在这台电脑上传输。已发送 %1 个，已确认 %2 个。协议：docs/DECOPORT-LOG.md。</translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation>请在下方设置密码，并在 HH 的“配置”中设置相同的密码。DecoPort 会为每个数据包签名：没有密码就不会启动。</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11438,6 +11477,38 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>External result was rejected</source>
         <translation>外部结果被拒绝</translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation>HH 已通过 DecoPort 连接</translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation>HH 已断开</translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation>HH 没有确认 QSO #%1：它没有通过 DecoPort 送达</translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation>密码不在系统密钥库中</translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation>与 HH 的连接正在监听 127.0.0.1:%1（DecoPort）</translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation>与 HH 的连接无法监听 %1：%2</translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation>%1 已发送到 HH</translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation>与 HH 的连接正在等待密码：请在设置的 HamHub 部分设置，与 HH 中的相同</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12910,6 +12981,10 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>Secret present in the keystore</source>
         <translation>密钥库里有这个密钥</translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation>QSO 通过 DecoPort 发往 HH（HamHub Log 的桥接程序）。请在 HH 中输入相同的密码：没有它就不会发送任何内容</translation>
     </message>
 </context>
 <context>

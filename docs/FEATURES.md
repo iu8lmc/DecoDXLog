@@ -1,4 +1,4 @@
-# DecoDXLog 1.17.39 — funzioni / features
+# DecoDXLog 1.17.40 — funzioni / features
 
 Ogni voce è in italiano e in inglese: *italiano* / *English*.
 Quello che manca è in fondo.
@@ -580,6 +580,12 @@ Quello che manca è in fondo.
   monitor**: UDP, DecoLink and DecoPort announcements both ways, with filters, pause and
   detail; from there you reply to a decode, halt TX, send free text, locator, highlights and
   DecoLink lines. DecoPort is listen-only.
+- **QSO verso HH con DecoPort**: HH, il ponte di HamHub Log, si registra da solo e riceve ogni
+  QSO firmato (HMAC con una password condivisa) e confermato, solo su 127.0.0.1; senza conferma
+  il QSO si rimanda tre volte. Protocollo in `docs/DECOPORT-LOG.md`. / **QSOs to HH over
+  DecoPort**: HH, the HamHub Log bridge, registers by itself and receives every QSO signed (HMAC
+  with a shared password) and acknowledged, on 127.0.0.1 only; without an acknowledgement the QSO
+  is resent three times. Protocol in `docs/DECOPORT-LOG.md`.
 - **Pannello Decodium**: Full Spectrum e Signal RX di Decodium in un pannello compatto della
   lavagna (si sposta, si ridimensiona, si attacca ai bordi, si stacca), con le righe colorate
   secondo il log: nuovo DXCC, banda, nominativo. / **Decodium panel**: Decodium's Full Spectrum

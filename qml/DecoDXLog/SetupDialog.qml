@@ -867,6 +867,53 @@ DialogFrame {
                               : qsTr("Decodium receives the worked calls, confirmations and FT2 Award status from this log, and a confirmation for every QSO written. Only local connections are accepted. Protocol: docs/DECOLINK.md.")
                         color: decolog.decoLinkError.length && decolog.decoLinkEnabled ? Theme.errorColor : Theme.textSecondary
                     }
+
+                    SectionTitle { text: qsTr("HamHub · QSOs towards HH") }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        ToggleSwitch {
+                            text: qsTr("Send the QSOs to HH over DecoPort")
+                            checked: decolog.hamHubLinkEnabled
+                            onToggled: decolog.hamHubLinkEnabled = checked
+                        }
+                        LabeledField {
+                            label: qsTr("Port (127.0.0.1)")
+                            StyledTextField {
+                                Layout.preferredWidth: 100
+                                text: decolog.hamHubLinkPort
+                                validator: IntValidator { bottom: 1; top: 65535 }
+                                onEditingFinished: decolog.hamHubLinkPort = parseInt(text)
+                            }
+                        }
+                        Item { Layout.fillWidth: true }
+                        Pill {
+                            text: !decolog.hamHubLinkEnabled ? qsTr("off")
+                                : !decolog.hamHubLinkHasPassword ? qsTr("no password")
+                                : !decolog.hamHubLinkListening ? qsTr("error")
+                                : decolog.hamHubLinkClients > 0 ? qsTr("HH connected")
+                                : qsTr("waiting")
+                            tone: !decolog.hamHubLinkEnabled ? Theme.textSecondary
+                                : !decolog.hamHubLinkHasPassword || !decolog.hamHubLinkListening ? Theme.errorColor
+                                : decolog.hamHubLinkClients > 0 ? Theme.accentColor : Theme.textSecondary
+                        }
+                    }
+                    Note {
+                        text: !decolog.hamHubLinkEnabled ? ""
+                              : !decolog.hamHubLinkHasPassword
+                                ? qsTr("Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.")
+                              : decolog.hamHubLinkError.length ? decolog.hamHubLinkError
+                              : qsTr("Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.")
+                                    .arg(decolog.hamHubLinkSent).arg(decolog.hamHubLinkAcked)
+                        visible: text.length > 0
+                        color: decolog.hamHubLinkEnabled && (!decolog.hamHubLinkHasPassword || decolog.hamHubLinkError.length)
+                               ? Theme.errorColor : Theme.textSecondary
+                    }
+                    CredentialsList {
+                        Layout.fillWidth: true
+                        visible: decolog.hamHubLinkEnabled
+                        serviceIds: ["hamhub"]
+                    }
                     Item { Layout.fillHeight: true }
                 }
 

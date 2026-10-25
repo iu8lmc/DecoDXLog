@@ -1,5 +1,7 @@
 #include "core/DecoPortMonitor.h"
 
+#include "core/DecoPortLog.h"
+
 #include <QDataStream>
 #include <QNetworkDatagram>
 #include <QStringList>
@@ -23,6 +25,7 @@ QString typeName(quint8 type)
     case 7: return QStringLiteral("AUDIO_RX");
     case 8: return QStringLiteral("AUDIO_TX");
     case 9: return QStringLiteral("STATUS");
+    case 16: case 17: case 18: return decoportlog::typeName(type);
     default: return QStringLiteral("TYPE %1").arg(type);
     }
 }
@@ -150,6 +153,10 @@ Description describe(const QByteArray& packet)
     case 7: case 8:
         // PCM 16 bit: dieci millisecondi per pacchetto.
         body = QStringLiteral("%1 bytes of audio").arg(length);
+        break;
+    case 16: case 17: case 18:
+        // Il log (docs/DECOPORT-LOG.md): annuncio, QSO, conferma.
+        body = decoportlog::summarize(d.type, packet.mid(kHeaderBytes, length));
         break;
     default:
         break;

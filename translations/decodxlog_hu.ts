@@ -2888,6 +2888,21 @@ Jobb kattintás: módosítás</translation>
     </message>
 </context>
 <context>
+    <name>DecoPortLogServer</name>
+    <message>
+        <source>no password: DecoPort does not run unsigned</source>
+        <translation>nincs jelszó: a DecoPort aláírás nélkül nem működik</translation>
+    </message>
+    <message>
+        <source>DecoPort: %1 ignored for %2 minutes, wrong or missing signature</source>
+        <translation>DecoPort: %1 figyelmen kívül hagyva %2 percig, hibás vagy hiányzó aláírás</translation>
+    </message>
+    <message>
+        <source>DecoPort: QSO %1 not sent, the record is empty or too long</source>
+        <translation>DecoPort: a(z) %1 QSO nem lett elküldve, a rekord üres vagy túl hosszú</translation>
+    </message>
+</context>
+<context>
     <name>DecodeList</name>
     <message>
         <source>%1 rows</source>
@@ -8645,6 +8660,30 @@ A további mezők megmaradnak: %8</translation>
         <source>Apply</source>
         <translation>Alkalmaz</translation>
     </message>
+    <message>
+        <source>HamHub · QSOs towards HH</source>
+        <translation>HamHub · QSO-k a HH felé</translation>
+    </message>
+    <message>
+        <source>Send the QSOs to HH over DecoPort</source>
+        <translation>QSO-k küldése a HH-nak DecoPorton</translation>
+    </message>
+    <message>
+        <source>no password</source>
+        <translation>nincs jelszó</translation>
+    </message>
+    <message>
+        <source>HH connected</source>
+        <translation>HH csatlakozva</translation>
+    </message>
+    <message>
+        <source>Every QSO logged here also goes to HH, the HamHub Log bridge, signed with DecoPort and only on this computer. %1 sent, %2 confirmed. Protocol: docs/DECOPORT-LOG.md.</source>
+        <translation>Minden itt naplózott QSO a HH-hoz is megy, a HamHub Log hídjához, DecoPorttal aláírva és csak ezen a számítógépen. %1 elküldve, %2 megerősítve. Protokoll: docs/DECOPORT-LOG.md.</translation>
+    </message>
+    <message>
+        <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
+        <translation>Adj meg egy jelszót lent, és ugyanazt a HH-ban a Beállítás alatt. A DecoPort minden csomagot aláír: jelszó nélkül semmi sem indul el.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -11438,6 +11477,38 @@ A további mezők megmaradnak: %8</translation>
         <source>External result was rejected</source>
         <translation>A külső eredményt elutasították</translation>
     </message>
+    <message>
+        <source>HH connected over DecoPort</source>
+        <translation>HH csatlakozva DecoPorton</translation>
+    </message>
+    <message>
+        <source>HH disconnected</source>
+        <translation>HH lecsatlakozva</translation>
+    </message>
+    <message>
+        <source>HH did not confirm QSO #%1: it was not delivered over DecoPort</source>
+        <translation>A HH nem erősítette meg a(z) #%1 QSO-t: nem érkezett meg DecoPorton</translation>
+    </message>
+    <message>
+        <source>the password is not in the system keystore</source>
+        <translation>a jelszó nincs a rendszer kulcstartójában</translation>
+    </message>
+    <message>
+        <source>HH link listening on 127.0.0.1:%1 (DecoPort)</source>
+        <translation>A HH-kapcsolat a 127.0.0.1:%1 címen figyel (DecoPort)</translation>
+    </message>
+    <message>
+        <source>HH link cannot listen on %1: %2</source>
+        <translation>A HH-kapcsolat nem tud figyelni a(z) %1 porton: %2</translation>
+    </message>
+    <message>
+        <source>%1 sent to HH</source>
+        <translation>%1 elküldve a HH-nak</translation>
+    </message>
+    <message>
+        <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation>A HH-kapcsolat jelszóra vár: add meg a Beállításokban, a HamHub alatt, ugyanazt, mint a HH-ban</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12910,6 +12981,10 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Secret present in the keystore</source>
         <translation>A titok megvan a kulcstartóban</translation>
+    </message>
+    <message>
+        <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation>A QSO-k a HH-hoz, a HamHub Log hídjához mennek DecoPorton. Írd be ugyanazt a jelszót a HH-ban: nélküle semmi sem megy el</translation>
     </message>
 </context>
 <context>
