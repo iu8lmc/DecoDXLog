@@ -2686,10 +2686,6 @@ Clic dreapta: modific-o</translation>
         <translation>În față</translation>
     </message>
     <message>
-        <source>CW via this Yaesu CAT link is disabled to protect keyer memory 1: Hamlib would overwrite it with every message sent from DecoDXLog. The CAT remains available for frequency and mode. For CW, configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.</source>
-        <translation>CW prin această legătură CAT Yaesu este dezactivat pentru a proteja memoria 1 a manipulatorului: Hamlib ar suprascrie-o la fiecare mesaj trimis din DecoDXLog. CAT-ul rămâne disponibil pentru frecvență și mod. Pentru CW, configurează un manipulator serial separat sau un WinKeyer în Setări → Radio (CAT) → Manipulare pe un port serial.</translation>
-    </message>
-    <message>
         <source>This CAT link does not key CW: it reads the radio but it cannot send. Either connect rigctld to the radio itself, or — with Decodium holding the CAT — set up the keyer on a serial port of its own: Setup → Radio (CAT) → Keying on a serial port.</source>
         <translation>Această legătură CAT nu manipulează CW: citește stația, dar nu poate emite. Ori legi rigctld direct la stație, ori — cu Decodium ținând CAT-ul — pui manipulatorul pe un port serial al lui: Setări → Radio (CAT) → Manipulare pe un port serial.</translation>
     </message>
@@ -2892,6 +2888,10 @@ Clic dreapta: modific-o</translation>
     <message>
         <source>noise</source>
         <translation>zgomot</translation>
+    </message>
+    <message>
+        <source>CW via Yaesu CAT is enabled. Hamlib may overwrite keyer memory 1 with the transmitted text; its previous contents are not restored. Back up that memory before sending. To keep radio memories unchanged, use a separate serial keyer or WinKeyer.</source>
+        <translation>CW prin CAT Yaesu este activat. Hamlib poate suprascrie memoria 1 a keyer-ului cu textul transmis; conținutul anterior nu este restaurat. Fă o copie de rezervă a acelei memorii înainte de a transmite. Ca să lași neschimbate memoriile aparatului, folosește un keyer serial separat sau un WinKeyer.</translation>
     </message>
 </context>
 <context>
@@ -12257,10 +12257,6 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>CW decoder listening to %1</source>
         <translation>Decodorul CW ascultă %1</translation>
-    </message>
-    <message>
-        <source>CW via CAT was not sent: this Yaesu/Hamlib link would overwrite keyer memory 1. Your radio memories were left unchanged. Configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.</source>
-        <translation>CW prin CAT nu a fost trimis: această legătură Yaesu/Hamlib ar suprascrie memoria 1 a manipulatorului. Memoriile stației tale au rămas neschimbate. Configurează un manipulator serial separat sau un WinKeyer în Setări → Radio (CAT) → Manipulare pe un port serial.</translation>
     </message>
     <message>
         <source>Stop requested: keyer cleared and PTT release sent</source>

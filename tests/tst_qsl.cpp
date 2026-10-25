@@ -59,6 +59,26 @@ class TestQsl : public QObject {
     Q_OBJECT
 
 private slots:
+    void automaticServicesAreQueuedSequentially()
+    {
+        qsl::AutomaticUploadQueue queue;
+        queue.reset({QStringLiteral("lotw"), QStringLiteral("eqsl")});
+
+        QCOMPARE(queue.takeNext(false), QStringLiteral("lotw"));
+        // Mentre LoTW sta lavorando, eQSL non viene consumato ne' perso.
+        QVERIFY(queue.takeNext(true).isEmpty());
+        QCOMPARE(queue.takeNext(false), QStringLiteral("eqsl"));
+        QVERIFY(queue.takeNext(false).isEmpty());
+
+        // Una nuova raffica sostituisce il piano precedente, scarta voci
+        // vuote e doppie e conserva l'ordine dei servizi abilitati.
+        queue.reset({QStringLiteral("lotw"), QStringLiteral(""),
+                     QStringLiteral("eqsl"), QStringLiteral("lotw")});
+        QCOMPARE(queue.takeNext(false), QStringLiteral("lotw"));
+        QCOMPARE(queue.takeNext(false), QStringLiteral("eqsl"));
+        QVERIFY(queue.isEmpty());
+    }
+
     void tqslExitCodes()
     {
         auto r = qsl::resultFromTqslExit(0, "Sending to LoTW", 12);

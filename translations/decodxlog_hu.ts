@@ -2668,10 +2668,6 @@ Jobb kattintás: módosítás</translation>
         <translation>Elöl</translation>
     </message>
     <message>
-        <source>CW via this Yaesu CAT link is disabled to protect keyer memory 1: Hamlib would overwrite it with every message sent from DecoDXLog. The CAT remains available for frequency and mode. For CW, configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.</source>
-        <translation>A CW ezen a Yaesu CAT-kapcsolaton ki van kapcsolva, hogy védje a billentyű 1. memóriáját: a Hamlib a DecoDXLogból küldött minden üzenettel felülírná. A CAT továbbra is elérhető frekvenciához és üzemmódhoz. CW-hez állíts be külön soros billentyűt vagy WinKeyert itt: Beállítások → Rádió (CAT) → Manipulálás soros porton.</translation>
-    </message>
-    <message>
         <source>This CAT link does not key CW: it reads the radio but it cannot send. Either connect rigctld to the radio itself, or — with Decodium holding the CAT — set up the keyer on a serial port of its own: Setup → Radio (CAT) → Keying on a serial port.</source>
         <translation>Ez a CAT-kapcsolat nem ad CW-t: olvassa a rádiót, de adni nem tud. Vagy kösd a rigctld-t magára a rádióra, vagy — ha a CAT-ot a Decodium fogja — állítsd be a manipulátort saját soros porton: Beállítások → Rádió (CAT) → Manipulálás soros porton.</translation>
     </message>
@@ -2874,6 +2870,10 @@ Jobb kattintás: módosítás</translation>
     <message>
         <source>noise</source>
         <translation>zaj</translation>
+    </message>
+    <message>
+        <source>CW via Yaesu CAT is enabled. Hamlib may overwrite keyer memory 1 with the transmitted text; its previous contents are not restored. Back up that memory before sending. To keep radio memories unchanged, use a separate serial keyer or WinKeyer.</source>
+        <translation>A Yaesu CAT-on keresztüli CW engedélyezve van. A Hamlib felülírhatja a keyer 1. memóriáját az elküldött szöveggel; a korábbi tartalom nem áll vissza. Adás előtt mentsd el ezt a memóriát. Ha a rádió memóriáit változatlanul szeretnéd hagyni, használj különálló soros keyert vagy WinKeyert.</translation>
     </message>
 </context>
 <context>
@@ -12127,10 +12127,6 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>CW decoder listening to %1</source>
         <translation>A CW-dekóder ezt hallgatja: %1</translation>
-    </message>
-    <message>
-        <source>CW via CAT was not sent: this Yaesu/Hamlib link would overwrite keyer memory 1. Your radio memories were left unchanged. Configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.</source>
-        <translation>A CW CAT-on át nem lett elküldve: ez a Yaesu/Hamlib-kapcsolat felülírná a billentyű 1. memóriáját. A rádió memóriái változatlanok maradtak. Állíts be külön soros billentyűt vagy WinKeyert itt: Beállítások → Rádió (CAT) → Manipulálás soros porton.</translation>
     </message>
     <message>
         <source>Stop requested: keyer cleared and PTT release sent</source>

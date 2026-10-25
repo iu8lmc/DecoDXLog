@@ -40,6 +40,21 @@ class AdifRecord;
 
 namespace qsl {
 
+// I servizi di invio automatico condividono un solo controller. La coda
+// conserva l'ordine configurato e consegna il servizio successivo soltanto
+// quando quello precedente non e' piu' occupato: LoTW non deve far saltare
+// eQSL (o gli altri servizi) solo perche' parte per primo.
+class AutomaticUploadQueue {
+public:
+    void reset(const QStringList& services);
+    QString takeNext(bool busy);
+    void clear() { m_services.clear(); }
+    bool isEmpty() const { return m_services.isEmpty(); }
+
+private:
+    QStringList m_services;
+};
+
 // Il TQSL installato: dal registro di Windows, dalle cartelle solite o dal PATH.
 QString findTqsl();
 // Il rigctld di Hamlib, cercato allo stesso modo: e' lui che parla alle radio.

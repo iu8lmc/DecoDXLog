@@ -49,6 +49,11 @@ private slots:
     {
         QCoreApplication::setOrganizationName(QStringLiteral("DecoDXLogTest"));
         QCoreApplication::setApplicationName(QStringLiteral("tst_rigcontroller"));
+    }
+
+    void init()
+    {
+        // Never inherit an enabled serial rig/keyer from a preceding test.
         QSettings().clear();
     }
 
@@ -165,7 +170,7 @@ private slots:
         QCOMPARE(radio.sent, QStringList({QStringLiteral("?"), QStringLiteral("K")}));
     }
 
-    void serialYaesuCwDoesNotOverwriteKeyerMemoryOne()
+    void serialYaesuCwIsAllowedAndWarnsAboutMemoryOne()
     {
         QStringList activity;
         app::RigController::Context context;
@@ -174,17 +179,45 @@ private slots:
         };
         app::RigController controller(context);
         controller.setLink(QStringLiteral("serial"));
-        controller.setRigModel(1001); // Hamlib: Yaesu FT-847
+        controller.setRigModel(1037); // Hamlib: Yaesu FTDX-3000
         controller.setMacro(0, QStringLiteral("F1 CQ"), QStringLiteral("UP UP"));
 
-        QVERIFY(controller.cwMemoryProtected());
-        QVERIFY(!controller.canKeyCw());
+        QVERIFY(controller.cwUsesKeyerMemory());
+        QVERIFY(controller.canKeyCw());
+        QVERIFY(!controller.connected());
         controller.sendMacro(0, {});
 
-        QCOMPARE(controller.activeMacroIndex(), -1);
+        // The request now reaches RigControl. No radio is attached in this
+        // test: the error must be connectivity, not a memory-protection veto.
         QCOMPARE(activity.size(), 1);
-        QVERIFY(activity.constFirst().contains(QStringLiteral("memory 1")));
-        QVERIFY(activity.constFirst().contains(QStringLiteral("not sent")));
+        QVERIFY(activity.constFirst().contains(QStringLiteral("not connected")));
+        QVERIFY(!activity.constFirst().contains(QStringLiteral("memory 1")));
+    }
+
+    void yaesuMemoryWarningFollowsTheActualCwRoute()
+    {
+        FakeRig radio2;
+        core::RigLink* activeAlternate = nullptr;
+        app::RigController::Context context;
+        context.alternateRig = [&activeAlternate] { return activeAlternate; };
+        app::RigController controller(context);
+        controller.setRigModel(1037);
+        controller.setLink(QStringLiteral("serial"));
+        QVERIFY(controller.cwUsesKeyerMemory());
+
+        activeAlternate = &radio2;
+        QVERIFY(!controller.cwUsesKeyerMemory());
+        controller.sendText(QStringLiteral("?"), {});
+        QCOMPARE(radio2.sent, QStringList({QStringLiteral("?")}));
+
+        activeAlternate = nullptr;
+        controller.setLink(QStringLiteral("network"));
+        QVERIFY(!controller.cwUsesKeyerMemory()); // external rig model is unknown
+        QVERIFY(controller.canKeyCw());
+        controller.setLink(QStringLiteral("serial"));
+        controller.setRigModel(1); // non-Yaesu dummy
+        QVERIFY(!controller.cwUsesKeyerMemory());
+        QVERIFY(controller.canKeyCw());
     }
 
     void decoderToneAndSpeedLocksAreSavedAndAcceptAuto()

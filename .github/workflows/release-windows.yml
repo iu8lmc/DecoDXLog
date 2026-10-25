@@ -16,7 +16,7 @@ on:
       tag:
         description: Tag sorgente e release destinataria
         required: true
-        default: v1.17.37
+        default: v1.17.39
         type: string
       publish:
         description: Ho provato l'artefatto Windows e autorizzo la pubblicazione
@@ -39,9 +39,8 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v4
         with:
-          # The release tag contains the application snapshot; use the
-          # current fork main for the CI-only gate stabilization below.
-          ref: main
+          # Build exactly the same tagged snapshot as the other platforms.
+          ref: ${{ inputs.tag }}
 
       - name: Install MSYS2 MinGW and Qt
         uses: msys2/setup-msys2@v2

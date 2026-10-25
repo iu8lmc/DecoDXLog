@@ -595,6 +595,7 @@ void RigController::connectNow()
     // for an external/network rigctld whose radio model is unknown.
     m_hamlib.setEmergencyCatOffCommand(
         directYaesuCwUsesKeyerMemory() ? QStringLiteral("TX0;") : QString());
+    m_hamlib.setYaesuKeyerMemoryMode(directYaesuCwUsesKeyerMemory());
     if (m_link == QLatin1String("flrig") || m_link == QLatin1String("omnirig")) {
         // flrig o OmniRig: la radio la tiene un altro programma, noi chiediamo a lui.
         m_hamlib.disconnectFromRig();
@@ -1832,7 +1833,7 @@ bool RigController::directYaesuCwUsesKeyerMemory() const
     return m_link == QLatin1String("serial") && m_rigModel >= 1000 && m_rigModel < 1100;
 }
 
-bool RigController::cwMemoryProtected() const
+bool RigController::cwUsesKeyerMemory() const
 {
     if (!directYaesuCwUsesKeyerMemory() || keyerOn())
         return false;
@@ -1869,21 +1870,10 @@ void RigController::sendExpandedText(const QString& ready, bool typed)
         return;
     }
 
-    // Su queste Yaesu, send_morse non invia il testo direttamente: Hamlib lo
-    // scrive nella memoria 1 del keyer. Non proviamo a salvarla e riscriverla
-    // dopo, perche' non tutti i modelli consentono di leggerla e potremmo
-    // perdere comunque una memoria personale dell'operatore.
-    if (directYaesuCwUsesKeyerMemory()) {
-        setActiveMacroIndex(-1);
-        if (m_ctx.activity) {
-            m_ctx.activity(QStringLiteral("CW"),
-                           tr("CW via CAT was not sent: this Yaesu/Hamlib link would overwrite keyer memory 1. "
-                              "Your radio memories were left unchanged. Configure a separate serial keyer or "
-                              "WinKeyer in Setup → Radio (CAT) → Keying on a serial port."),
-                           QStringLiteral("warning"));
-        }
-        return;
-    }
+    // Il percorso CAT Yaesu e' consentito: il pannello avvisa che Hamlib
+    // riutilizza la memoria 1. Non tentiamo un ripristino non verificabile.
+    // connectNow configura il limite e i caratteri singoli solo quando
+    // il modello del rigctld locale e' noto (non per collegamenti esterni).
     m_cwRigInUse = m_rig;
     m_rig->sendMorse(ready);
 }

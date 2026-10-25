@@ -122,22 +122,21 @@ GlassPanel {
         anchors.fill: parent
         spacing: 6
 
-        // Il collegamento c'e' ma il CW non passa: lo si dice, invece di
-        // lasciare i tasti che non fanno niente.
+        // Il CAT resta utilizzabile, ma la memoria personale non e' protetta.
         Text {
             Layout.fillWidth: true
-            visible: root.rig.connected && root.rig.cwMemoryProtected
+            visible: root.rig.connected && root.rig.canKeyCw && root.rig.cwUsesKeyerMemory
             wrapMode: Text.Wrap
-            color: Theme.errorColor
+            color: Theme.warningColor
             font.pixelSize: 12
-            text: qsTr("CW via this Yaesu CAT link is disabled to protect keyer memory 1: Hamlib would overwrite "
-                       + "it with every message sent from DecoDXLog. The CAT remains available for frequency and mode. "
-                       + "For CW, configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.")
+            text: qsTr("CW via Yaesu CAT is enabled. Hamlib may overwrite keyer memory 1 with the transmitted text; "
+                       + "its previous contents are not restored. Back up that memory before sending. "
+                       + "To keep radio memories unchanged, use a separate serial keyer or WinKeyer.")
         }
 
         Text {
             Layout.fillWidth: true
-            visible: root.rig.connected && !root.rig.canKeyCw && !root.rig.cwMemoryProtected
+            visible: root.rig.connected && !root.rig.canKeyCw
             wrapMode: Text.Wrap
             color: Theme.errorColor
             font.pixelSize: 12

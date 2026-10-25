@@ -32,6 +32,23 @@ namespace decolog::core {
 
 namespace qsl {
 
+void AutomaticUploadQueue::reset(const QStringList& services)
+{
+    m_services.clear();
+    for (const QString& service : services) {
+        const QString id = service.trimmed();
+        if (!id.isEmpty() && !m_services.contains(id))
+            m_services.append(id);
+    }
+}
+
+QString AutomaticUploadQueue::takeNext(bool busy)
+{
+    if (busy || m_services.isEmpty())
+        return {};
+    return m_services.takeFirst();
+}
+
 QString tqslDataDirectory()
 {
     QStringList candidates;

@@ -59,6 +59,10 @@ public:
     void setSpeedWpm(int wpm) override;
     // Manda il testo in CW con il manipolatore della radio, e lo ferma.
     void sendMorse(const QString& text) override;
+    // Hamlib Yaesu uses memory 1 (50 characters); a single character is
+    // otherwise interpreted as a memory number, not as literal CW text.
+    // Only enable when the caller knows the local radio model.
+    void setYaesuKeyerMemoryMode(bool enabled) { m_yaesuKeyerMemoryMode = enabled; }
     // Il testo come lo vuole il manipolatore della radio: maiuscole, lettere,
     // cifre e i segni del CW.
     static QString morseText(const QString& text);
@@ -157,6 +161,7 @@ private:
     // una volta e non lo si chiede piu'.
     bool m_noStopMorse{false};
     bool m_morseInFlight{false};
+    bool m_yaesuKeyerMemoryMode{false};
     QString m_activeMorse;
     quint64 m_activeMorseToken{0};
     quint64 m_morseToken{0};

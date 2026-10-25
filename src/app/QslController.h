@@ -116,6 +116,7 @@ signals:
 
 private:
     void startNext();
+    void startNextAutomaticUpload();
     void uploadNextWeb();
     void finishBatch(const core::QslUploadResult& result);
     void markSent(qint64 id, const QString& service, const core::QslUploadResult& result);
@@ -159,6 +160,7 @@ private:
     qint64 m_deletingId{0};
     QTimer m_autoDelay;
     QList<qint64> m_autoQueue;
+    core::qsl::AutomaticUploadQueue m_automaticUploads;
     // I conti della pagina, tenuti qui: services() si legge a ogni changed(),
     // anche durante un invio, e contarli ogni volta su un log grande fermava
     // il programma per secondi.

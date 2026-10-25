@@ -3,7 +3,45 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.39 — 25 ottobre 2026
+
+**Allineata alla 1.17.38 di elisir80.** Porta il CW via CAT Yaesu di nuovo disponibile (anche FTDX-3000,
+con avviso sulla memoria 1 di Hamlib), il testo CW e l'arresto corretti, l'invio automatico LoTW ed eQSL
+in coda sequenziale e il runner Windows che costruisce il tag richiesto. La nostra 1.17.37 (pannelli
+indipendenti) aveva lo stesso numero della loro 1.17.37: sono due cose diverse.
+
+**Traduzioni.** L'avviso sul CW via CAT Yaesu (la memoria 1 del keyer) e' tradotto in tutte e 14 le lingue.
+
+## 1.17.38 — 24 ottobre 2026
+
+**CW via CAT Yaesu nuovamente disponibile.** Rimosso il blocco preventivo delle macro e del
+testo CW per le Yaesu collegate direttamente a rigctld, incluso il FTDX-3000. Resta un avviso
+nel pannello: Hamlib puo' sovrascrivere la memoria 1 della radio e il contenuto precedente
+non viene ripristinato. Per usare il keyer CAT la porta del manipolatore seriale deve essere
+su «nessuna»: un keyer seriale/WinKeyer aperto continua ad avere la precedenza.
+
+**Testo CW e arresto.** I singoli caratteri Yaesu vengono inviati come testo, non come richiami
+di memoria; le macro oltre 50 caratteri sono suddivise nella coda esistente senza troncamento.
+Il comando Ferma conserva lo svuotamento della coda, il rilascio PTT e la richiesta CAT RX
+di emergenza. Test automatici su instradamento, caratteri singoli, macro lunghe e arresto;
+la verifica RF sul FTDX-3000 dell'utente resta necessaria.
+
+**Provenienza dei pacchetti.** Il runner Windows usa ora il tag di rilascio richiesto,
+come i runner macOS e Linux, anziche' il ramo main in movimento.
+
 ## 1.17.37 — 24 ottobre 2026
+
+**Invio automatico LoTW ed eQSL corretto.** Quando entrambi i servizi erano attivi, LoTW partiva
+per primo e il controllo `busy()` faceva saltare eQSL. Ora i servizi automatici sono raccolti in
+una coda sequenziale: eQSL parte dopo la conclusione di LoTW, anche se LoTW restituisce un errore.
+La coda evita duplicati, conserva l'ordine dei servizi e riprende il servizio successivo anche
+dopo un errore o un problema temporaneo di rete.
+
+**Test.** Aggiunto un test mirato per LoTW+eQSL attivi, inclusi il comportamento durante l'upload
+del primo servizio, l'ordine sequenziale e la deduplicazione della coda. La suite completa resta
+verificata su macOS.
+
+## 1.17.37 (nostra, pubblicata prima della 1.17.37 di elisir80) — 24 ottobre 2026
 
 **Allineata alla 1.17.36 di elisir80.** Porta i pannelli staccati come vere finestre di primo livello
 (trascinabili su un altro monitor, non modali), la posizione e la dimensione salvate per tutti i

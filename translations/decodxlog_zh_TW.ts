@@ -2668,10 +2668,6 @@ Right click: change it</source>
         <translation>置頂</translation>
     </message>
     <message>
-        <source>CW via this Yaesu CAT link is disabled to protect keyer memory 1: Hamlib would overwrite it with every message sent from DecoDXLog. The CAT remains available for frequency and mode. For CW, configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.</source>
-        <translation>為保護電鍵記憶 1，已停用經此 Yaesu CAT 連線傳送 CW：Hamlib 會在 DecoDXLog 每傳一則訊息時覆寫它。CAT 仍可用於頻率和模式。傳送 CW 請在 設定 → 電台 (CAT) → 序列埠電鍵 中另行設定序列埠電鍵或 WinKeyer。</translation>
-    </message>
-    <message>
         <source>This CAT link does not key CW: it reads the radio but it cannot send. Either connect rigctld to the radio itself, or — with Decodium holding the CAT — set up the keyer on a serial port of its own: Setup → Radio (CAT) → Keying on a serial port.</source>
         <translation>這條 CAT 連線不能發 CW：它能讀電台，但不能發射。要麼把 rigctld 直接接到電台上，要麼 — 在 Decodium 佔著 CAT 的時候 — 把電鍵放到它自己的序列埠上：設定 → 電台 (CAT) → 序列埠電鍵。</translation>
     </message>
@@ -2874,6 +2870,10 @@ Right click: change it</source>
     <message>
         <source>noise</source>
         <translation>雜訊</translation>
+    </message>
+    <message>
+        <source>CW via Yaesu CAT is enabled. Hamlib may overwrite keyer memory 1 with the transmitted text; its previous contents are not restored. Back up that memory before sending. To keep radio memories unchanged, use a separate serial keyer or WinKeyer.</source>
+        <translation>已啟用透過 Yaesu CAT 發送 CW。Hamlib 可能會用所發送的文字覆寫鍵控器記憶 1，原有內容不會還原。發送前請先備份該記憶。若要保持電台記憶不變，請使用獨立的序列埠鍵控器或 WinKeyer。</translation>
     </message>
 </context>
 <context>
@@ -12127,10 +12127,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>CW decoder listening to %1</source>
         <translation>CW 解碼器正在聽 %1</translation>
-    </message>
-    <message>
-        <source>CW via CAT was not sent: this Yaesu/Hamlib link would overwrite keyer memory 1. Your radio memories were left unchanged. Configure a separate serial keyer or WinKeyer in Setup → Radio (CAT) → Keying on a serial port.</source>
-        <translation>未透過 CAT 傳送 CW：此 Yaesu/Hamlib 連線會覆寫電鍵記憶 1。電台的記憶保持不變。請在 設定 → 電台 (CAT) → 序列埠電鍵 中另行設定序列埠電鍵或 WinKeyer。</translation>
     </message>
     <message>
         <source>Stop requested: keyer cleared and PTT release sent</source>

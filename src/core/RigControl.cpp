@@ -299,7 +299,21 @@ void RigControl::sendMorse(const QString& text)
     const QString mode = m_mode.toUpper();
     if (!mode.isEmpty() && !mode.startsWith(QLatin1String("CW")))
         emit failed(tr("The radio is in %1: its keyer sends only in CW. Switch it to CW.").arg(m_mode));
-    m_morseQueue.enqueue(clean);
+    if (m_yaesuKeyerMemoryMode) {
+        // Non lasciare che Hamlib tronchi silenziosamente le macro a 50
+        // caratteri. Ogni parte attende la fine stimata della precedente.
+        // Conservare anche gli spazi mantiene la separazione delle parole.
+        QString remaining = clean;
+        while (remaining.size() > 50) {
+            const qsizetype space = remaining.lastIndexOf(QLatin1Char(' '), 49);
+            const qsizetype length = space > 0 ? space + 1 : 50;
+            m_morseQueue.enqueue(remaining.left(length));
+            remaining.remove(0, length);
+        }
+        m_morseQueue.enqueue(remaining);
+    } else {
+        m_morseQueue.enqueue(clean);
+    }
     startNextMorse();
 }
 
@@ -320,7 +334,10 @@ void RigControl::startNextMorse()
     m_morseInFlight = true;
     m_activeMorse = m_morseQueue.dequeue();
     m_activeMorseToken = ++m_morseToken;
-    send(QStringLiteral("morse"), QStringLiteral("b %1").arg(m_activeMorse), 0, m_activeMorse,
+    QString payload = m_activeMorse;
+    if (m_yaesuKeyerMemoryMode && payload.size() == 1)
+        payload += QLatin1Char(' '); // "? " is text; "1 " must not recall memory 1.
+    send(QStringLiteral("morse"), QStringLiteral("b %1").arg(payload), 0, m_activeMorse,
          m_activeMorseToken);
 }
 
@@ -355,8 +372,7 @@ void RigControl::finishMorse(const Pending& what, bool accepted)
     // rigctld conferma quando ha passato il testo alla radio, non quando la
     // radio ha finito di batterlo. Aspettare il tempo Morse stimato evita che
     // la macro seguente rimpiazzi il buffer interno prima della fine della
-    // precedente. La protezione della memoria 1 Yaesu e' responsabilita' del
-    // chiamante, che non deve usare questo percorso CAT diretto.
+    // precedente, comprese le parti di una macro Yaesu piu' lunga di 50 caratteri.
     const int wpm = m_wpm > 0 ? qBound(5, m_wpm, 60) : 20;
     const int estimated = CwKeyer::millisFor(what.text, wpm);
     m_morseTimer.start(qBound(150, estimated + 180, 120000));

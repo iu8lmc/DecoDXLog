@@ -148,11 +148,14 @@ QslController::QslController(Context context, QObject* parent)
     m_autoDelay.setInterval(20'000);
     connect(&m_autoDelay, &QTimer::timeout, this, [this] {
         m_autoQueue.clear();
+        QStringList services;
         for (const auto& info : kServices) {
             const QString id = QLatin1String(info.id);
-            if (m_auto.value(id) && !busy())
-                uploadPending(id, 0);
+            if (m_auto.value(id))
+                services.append(id);
         }
+        m_automaticUploads.reset(services);
+        startNextAutomaticUpload();
     });
 }
 
@@ -506,6 +509,23 @@ void QslController::uploadPending(const QString& service, int limit)
     startNext();
 }
 
+void QslController::startNextAutomaticUpload()
+{
+    // Un solo uploader alla volta. Il servizio successivo resta nella coda e
+    // viene ripreso da finishBatch(): in questo modo LoTW ed eQSL automatici
+    // vengono entrambi eseguiti, in sequenza, anche se il primo fallisce.
+    while (true) {
+        const QString service = m_automaticUploads.takeNext(busy());
+        if (service.isEmpty())
+            return;
+        // L'operatore puo' disattivare un servizio mentre il precedente e' in
+        // corso: non avviarlo usando una configurazione ormai superata.
+        if (!m_auto.value(service))
+            continue;
+        uploadPending(service, 0);
+    }
+}
+
 void QslController::startNext()
 {
     m_accepted = m_duplicates = m_rejected = m_removed = 0;
@@ -746,6 +766,10 @@ void QslController::finishBatch(const QslUploadResult& result)
     if (m_ctx.logChanged)
         m_ctx.logChanged();
     emit changed();
+    // Uscire prima completamente dal callback del servizio appena concluso;
+    // poi avviare il prossimo automatico. Evita di riusare nello stesso stack
+    // TQSL o il client HTTP che ha appena emesso finished().
+    QTimer::singleShot(0, this, &QslController::startNextAutomaticUpload);
 }
 
 void QslController::cancel()
@@ -757,6 +781,7 @@ void QslController::cancel()
     m_busyService.clear();
     m_batchMode = false;
     m_secret.clear();
+    m_automaticUploads.clear();
     emit changed();
 }
 

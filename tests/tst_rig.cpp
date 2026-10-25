@@ -15,6 +15,7 @@ namespace {
 class FakeRigctld : public QTcpServer {
 public:
     QStringList received;
+    QStringList rawReceived; // retain significant trailing spaces in Morse payloads
     qint64 frequency{14074000};
     QString mode{"CW"};
     int keyspd{22};
@@ -47,9 +48,12 @@ public:
             while (QTcpSocket* s = nextPendingConnection()) {
                 connect(s, &QTcpSocket::readyRead, s, [this, s] {
                     while (s->canReadLine()) {
-                        const QString line = QString::fromUtf8(s->readLine()).trimmed();
+                        QString raw = QString::fromUtf8(s->readLine());
+                        raw.chop(1); // LF only: trailing spaces are part of send_morse
+                        rawReceived << raw;
+                        const QString line = raw.trimmed();
                         received << line;
-                        s->write(answer(line).toUtf8());
+                        s->write(answer(raw).toUtf8());
                     }
                 });
                 connect(s, &QTcpSocket::disconnected, s, &QObject::deleteLater);
@@ -324,10 +328,79 @@ private slots:
         QCOMPARE(sent.at(1).at(0).toString(), QStringLiteral("K"));
     }
 
-    void stopDropsCwMessagesStillQueuedForTheRadio()
+    void yaesuSingleCharactersAreLiteralText_data()
     {
+        QTest::addColumn<QString>("text");
+        QTest::newRow("question-mark") << QStringLiteral("?");
+        QTest::newRow("letter-K") << QStringLiteral("K");
+        QTest::newRow("digit-1-not-memory-1") << QStringLiteral("1");
+        QTest::newRow("digit-5-not-memory-5") << QStringLiteral("5");
+    }
+
+    void yaesuSingleCharactersAreLiteralText()
+    {
+        QFETCH(QString, text);
         FakeRigctld rig;
         RigControl control;
+        control.setYaesuKeyerMemoryMode(true);
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_VERIFY_WITH_TIMEOUT(control.connected(), 5000);
+        QSignalSpy sent(&control, &RigControl::morseSent);
+        control.sendMorse(text);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 1, 5000);
+        QVERIFY(rig.rawReceived.contains(QStringLiteral("+b %1 ").arg(text)));
+        QVERIFY(!rig.rawReceived.contains(QStringLiteral("+b %1").arg(text)));
+        QCOMPARE(sent.first().at(0).toString(), text);
+
+        // Changing to a different backend must not retain Yaesu formatting.
+        control.stopMorse();
+        control.setYaesuKeyerMemoryMode(false);
+        control.sendMorse(text);
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 2, 5000);
+        QVERIFY(rig.rawReceived.contains(QStringLiteral("+b %1").arg(text)));
+    }
+
+    void longYaesuMacrosAreQueuedWithoutTruncation_data()
+    {
+        QTest::addColumn<QString>("firstChunk");
+        QTest::newRow("split-at-word-boundary") << (QString(49, QLatin1Char('E')) + QLatin1Char(' '));
+        QTest::newRow("long-word") << QString(50, QLatin1Char('E'));
+    }
+
+    void longYaesuMacrosAreQueuedWithoutTruncation()
+    {
+        QFETCH(QString, firstChunk);
+        FakeRigctld rig;
+        rig.keyspd = 60;
+        RigControl control;
+        control.setYaesuKeyerMemoryMode(true);
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE_WITH_TIMEOUT(control.speedWpm(), 60, 5000);
+        QSignalSpy sent(&control, &RigControl::morseSent);
+        control.sendMorse(firstChunk + QStringLiteral("K"));
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 1, 5000);
+        QCOMPARE(sent.first().at(0).toString(), firstChunk);
+        QVERIFY(rig.rawReceived.contains(QStringLiteral("+b ") + firstChunk));
+        QTest::qWait(100);
+        QVERIFY(!rig.rawReceived.contains(QStringLiteral("+b K ")));
+        QTRY_COMPARE_WITH_TIMEOUT(sent.count(), 2, 8000);
+        QCOMPARE(sent.at(0).at(0).toString() + sent.at(1).at(0).toString(), firstChunk + QStringLiteral("K"));
+        QVERIFY(rig.rawReceived.contains(QStringLiteral("+b K ")));
+    }
+
+    void stopDropsCwMessagesStillQueuedForTheRadio_data()
+    {
+        QTest::addColumn<bool>("yaesu");
+        QTest::newRow("generic") << false;
+        QTest::newRow("yaesu") << true;
+    }
+
+    void stopDropsCwMessagesStillQueuedForTheRadio()
+    {
+        QFETCH(bool, yaesu);
+        FakeRigctld rig;
+        RigControl control;
+        control.setYaesuKeyerMemoryMode(yaesu);
         control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
         QTRY_VERIFY_WITH_TIMEOUT(control.connected(), 5000);
         control.setSpeedWpm(20);
