@@ -3,6 +3,20 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.42 — 25 ottobre 2026
+
+**Compatibilità CAT condivisa e CW via ponte.** La CAT condivisa ora completa anche le
+risposte Hamlib di `get_lock_mode` e chiude correttamente le richieste non riconosciute,
+così i client come Decodium/rigctld non restano in attesa di una terminazione valida.
+Il controllo della velocità CW accetta sia il valore numerico semplice sia il formato
+etichettato `Level Value: 24.000000` usato da alcuni bridge rigctld. Il messaggio del
+keyer chiarisce che `send_morse` via CAT condivisa è supportato quando il server master
+consente la trasmissione; la manipolazione seriale diretta resta disponibile come fallback.
+
+**Test di regressione.** Aggiunte prove per la risposta `get_lock_mode`, per le risposte
+KEYSPD decimali etichettate e per la lettura della velocità attraverso un CAT condiviso.
+Le modifiche locali sono state mantenute nel rilascio e verificate sulla suite completa.
+
 ## 1.17.41 — 25 ottobre 2026
 
 **Elenchi nominativi e club (issue #3).** Nuova pagina Impostazioni → Elenchi

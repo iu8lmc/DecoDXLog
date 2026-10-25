@@ -31,6 +31,7 @@ public:
     // Il ponte CAT di Decodium risponde col valore e basta: niente eco del
     // comando, niente RPRT. DecoDXLog deve capire anche quello.
     bool plainAnswers{false};
+    bool labelledSpeed{false};
     // Split, VFO, RIT e XIT; una radio senza RIT risponde -11.
     bool split{false};
     qint64 txFrequency{0};
@@ -107,7 +108,9 @@ public:
         if (cmd == QLatin1String("m"))
             return QStringLiteral("get_mode:\nMode: %1\nPassband: 500\nRPRT 0\n").arg(mode);
         if (cmd == QLatin1String("l KEYSPD"))
-            return QStringLiteral("get_level: KEYSPD\n%1\nRPRT 0\n").arg(keyspd);
+            return labelledSpeed
+                ? QStringLiteral("get_level: KEYSPD\nLevel Value: %1.000000\nRPRT 0\n").arg(keyspd)
+                : QStringLiteral("get_level: KEYSPD\n%1\nRPRT 0\n").arg(keyspd);
         if (cmd.startsWith(QLatin1String("F "))) {
             frequency = cmd.mid(2).toLongLong();
             return QStringLiteral("set_freq: %1\nRPRT 0\n").arg(frequency);
@@ -165,6 +168,15 @@ class TestRig : public QObject {
     Q_OBJECT
 
 private slots:
+    void readsSharedCatSpeedWithLabelAndDecimalValue()
+    {
+        FakeRigctld rig;
+        rig.labelledSpeed = true;
+        rig.keyspd = 37;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE_WITH_TIMEOUT(control.speedWpm(), 37, 5000);
+    }
     void readsWhereTheRadioIs()
     {
         FakeRigctld rig;

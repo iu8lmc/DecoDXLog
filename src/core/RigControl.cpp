@@ -603,15 +603,15 @@ void RigControl::handleReply(const QStringList& lines)
             // manipolano, e i tasti si spengono.
             setStatus(tr("This CAT link does not key CW (rigctld: %1)").arg(result));
             emit morseUnsupported();
-            emit failed(tr("The radio did not take the CW text (rigctld: %1). Not every radio — and "
-                           "not every CAT bridge — can key CW: for the macros you need rigctld "
-                           "talking to the radio itself.").arg(result));
+            emit failed(tr("The CAT server or radio does not support sending CW text (rigctld: %1). "
+                           "For shared CAT, update the master application and enable its transmit permission. "
+                           "The radio must support a CAT CW keyer; a direct serial connection is not required.").arg(result));
         } else if (what.kind == QLatin1String("morse")) {
             finishMorse(what, false);
             // Un rifiuto di questo messaggio, non della radio: i tasti restano
             // accesi. Prima uno solo bastava a spegnerli fino al riavvio.
             emit failed(tr("The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), "
-                           "that break-in (BK-IN) is on, and that the CAT port is the radio's own.")
+                           "that break-in (BK-IN) is on, and that the CAT server allows transmission.")
                             .arg(result)
                             .arg(m_mode.isEmpty() ? QStringLiteral("?") : m_mode));
         } else if (what.kind == QLatin1String("stopmorse")) {
@@ -761,14 +761,14 @@ void RigControl::handleReply(const QStringList& lines)
             moved = true;
         }
     } else if (what.kind == QLatin1String("speed")) {
-        // Il livello torna come numero nudo, prima di RPRT.
-        for (const QString& line : lines) {
-            bool ok = false;
-            const int value = line.toInt(&ok);
-            if (ok && value > 0 && value != m_wpm) {
-                m_wpm = value;
-                moved = true;
-            }
+        // Both a plain integer and the extended Level Value field are legal.
+        // Bridges may format integer levels as e.g. 24.000000.
+        const QString text = first(QStringLiteral("Level Value"));
+        bool ok = false;
+        const double value = text.toDouble(&ok);
+        if (ok && value >= 5 && value <= 60 && value == int(value) && int(value) != m_wpm) {
+            m_wpm = int(value);
+            moved = true;
         }
     } else if (what.kind == QLatin1String("powerstat")) {
         const QString v = first(QStringLiteral("Power Status"));
