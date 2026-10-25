@@ -1229,6 +1229,10 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 <context>
     <name>ClusterPanel</name>
     <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>Utente LoTW (upload negli ultimi 365 giorni secondo la lista ARRL caricata). Non indica la conferma del QSO.</translation>
+    </message>
+    <message>
         <source>DX Cluster</source>
         <translation>DX Cluster</translation>
     </message>
@@ -7151,6 +7155,10 @@ Campi extra conservati: %8</translation>
 </context>
 <context>
     <name>SetupDialog</name>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Elenchi nominativi</translation>
+    </message>
     <message>
         <source>Setup</source>
         <translation>Impostazioni</translation>
@@ -13354,6 +13362,211 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: servono email, password, nominativo e chiave API</translation>
+    </message>
+</context>
+<context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Elenchi nominativi e club</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Caricamento degli elenchi locali…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Nessuna corrispondenza esatta negli elenchi disponibili e attivi.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Dati dagli elenchi importati, non verifica in tempo reale dell’iscrizione. Log e callbook non vengono modificati.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Elenchi nominativi e club</translation>
+    </message>
+    <message>
+        <source>Not mapped</source>
+        <translation>Non associata</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importa file locali CSV/TXT o N1MM Call History. Puoi attivare più elenchi anche fuori dalla modalità Contest. I risultati compaiono nella Scheda nominativo senza sostituire i campi di QSO, callbook o contest.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Le modifiche qui vengono salvate subito. Viene conservata una copia offline; Ricarica legge nuovamente il file originale.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 voci · importato il %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Ricarica</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Rimuovi</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Aggiungi un elenco…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Nome dell’elenco</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Per esempio: i miei club CW</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Separatore</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>Automatico</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Virgola</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Punto e virgola</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulazione</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Codifica</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automatica (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>La prima riga contiene i nomi delle colonne (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Anteprima / aggiorna colonne</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>Le colonne N1MM vengono lette da ogni direttiva !!Order!!. Tutte le appartenenze restano separate.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Colonna nominativo (obbligatoria)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Colonna nome</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Colonna club</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Colonna numero di iscrizione</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Colonna QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Anche i campi non associati e non vuoti vengono mostrati con il nome della colonna. La ricerca è esatta, senza distinzione tra maiuscole e minuscole; i suffissi portatili non vengono rimossi.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Importa elenco</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Importa un elenco nominativi</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Elenchi nominativi (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation>Tutti i file (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Rimuovi elenco</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Rimuovere questo elenco e la sua copia offline? Il file originale non verrà eliminato.</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Seleziona un file normale esistente.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>Il file supera 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Caricamento degli elenchi locali…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Non applicato: %1. Gli elenchi salvati non sono stati modificati.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>Impossibile creare la cartella degli elenchi.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Configurazione degli elenchi non valida.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Elenchi locali ripristinati dalle copie offline.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Seleziona un file locale.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Anteprima pronta. Controlla le colonne prima di importare.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>Il limite è di 64 elenchi.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>Importate %1 voci; %2 righe ignorate o duplicate.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Preferenze degli elenchi salvate.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Elenco rimosso. Il file originale non è stato eliminato.</translation>
     </message>
 </context>
 </TS>

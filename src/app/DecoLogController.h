@@ -21,6 +21,7 @@
 #include "app/TrafficMonitor.h"
 #include "app/ChatController.h"
 #include "app/SuperCheckController.h"
+#include "app/CallListController.h"
 #include "app/NetController.h"
 #include "app/So2rController.h"
 #include "app/VoiceKeyerController.h"
@@ -87,6 +88,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* chat READ chat CONSTANT)
     // Super Check Partial e N+1 per i contest.
     Q_PROPERTY(QObject* scp READ scp CONSTANT)
+    Q_PROPERTY(QObject* callLists READ callLists CONSTANT)
     // La rete della stazione multi-operatore.
     Q_PROPERTY(QObject* net READ net CONSTANT)
     // SO2R: la seconda radio e la scatola OTRSP.
@@ -311,6 +313,7 @@ public:
     QObject* worldClock() const { return m_worldClock; }
     QObject* chat() const { return m_chat; }
     QObject* scp() const { return m_scp; }
+    QObject* callLists() const { return m_callLists; }
     QObject* net() const { return m_net; }
     QObject* so2r() const { return m_so2r; }
     QObject* dvk() const { return m_dvk; }
@@ -1030,6 +1033,7 @@ private:
     WorldClockController* m_worldClock{nullptr};
     ChatController*      m_chat{nullptr};
     SuperCheckController* m_scp{nullptr};
+    CallListController* m_callLists{nullptr};
     NetController*       m_net{nullptr};
     So2rController*      m_so2r{nullptr};
     VoiceKeyerController* m_dvk{nullptr};

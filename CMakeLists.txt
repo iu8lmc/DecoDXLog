@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.40
+    VERSION 1.17.41
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -190,6 +190,8 @@ add_library(decolog_core STATIC
     src/core/ClubLogCty.h
     src/core/CallHistory.cpp
     src/core/CallHistory.h
+    src/core/CallList.cpp
+    src/core/CallList.h
     src/core/SharedSerials.cpp
     src/core/SharedSerials.h
     src/core/SerialPorts.cpp
@@ -371,6 +373,8 @@ qt_add_executable(decolog
     src/app/DecodeFeed.h
     src/app/SuperCheckController.cpp
     src/app/SuperCheckController.h
+    src/app/CallListController.cpp
+    src/app/CallListController.h
     src/app/ChatController.cpp
     src/app/ChatController.h
     src/app/WorldClockController.cpp
@@ -413,6 +417,8 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/LogbookPanel.qml
     qml/DecoDXLog/BandModeGrid.qml
     qml/DecoDXLog/CallInfoPanel.qml
+    qml/DecoDXLog/CallListSettings.qml
+    qml/DecoDXLog/CallListMatches.qml
     qml/DecoDXLog/Ft2AwardPanel.qml
     qml/DecoDXLog/BottomTabs.qml
     qml/DecoDXLog/MapPanel.qml
@@ -659,6 +665,11 @@ if(DECODXLOG_BUILD_TESTS)
         add_test(NAME ${name} COMMAND tst_${name})
     endforeach()
 
+    qt_add_executable(tst_rig_hamlib tests/tst_rig_hamlib.cpp)
+    target_link_libraries(tst_rig_hamlib PRIVATE decolog_core Qt6::Test)
+    set_target_properties(tst_rig_hamlib PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME rig_hamlib COMMAND tst_rig_hamlib)
+
     qt_add_executable(tst_stationprofile tests/tst_stationprofile.cpp src/app/StationProfileModel.cpp src/app/StationProfileModel.h)
     target_include_directories(tst_stationprofile PRIVATE src)
     target_link_libraries(tst_stationprofile PRIVATE decolog_core Qt6::Test Qt6::Gui)
@@ -721,6 +732,31 @@ if(DECODXLOG_BUILD_TESTS)
     target_link_libraries(tst_clustercontroller PRIVATE decolog_core Qt6::Multimedia Qt6::Test)
     set_target_properties(tst_clustercontroller PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME clustercontroller COMMAND tst_clustercontroller)
+    # Real QML cluster delegates, driven by a local spot model (no radio/network).
+    qt_add_executable(tst_calllists tests/tst_calllists.cpp
+        src/app/CallListController.cpp src/app/CallListController.h)
+    target_link_libraries(tst_calllists PRIVATE decolog_core Qt6::Test)
+    set_target_properties(tst_calllists PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME calllists COMMAND tst_calllists)
+
+    qt_add_executable(tst_calllistview tests/tst_calllistview.cpp
+        src/app/CallListController.cpp src/app/CallListController.h)
+    target_compile_definitions(tst_calllistview PRIVATE QML_DIR="${CMAKE_SOURCE_DIR}/qml/DecoDXLog")
+    target_link_libraries(tst_calllistview PRIVATE decolog_core Qt6::Test Qt6::Quick decodium_ui decodium_uiplugin)
+    set_target_properties(tst_calllistview PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME calllistview COMMAND tst_calllistview)
+    set_tests_properties(calllistview PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+
+    # Real QML cluster delegates, driven by a local spot model (no radio/network).
+    qt_add_executable(tst_clusterview tests/tst_clusterview.cpp
+        src/app/ClusterController.cpp src/app/ClusterController.h src/app/SpotModel.cpp src/app/SpotModel.h)
+    target_include_directories(tst_clusterview PRIVATE src)
+    target_compile_definitions(tst_clusterview PRIVATE QML_DIR="${CMAKE_SOURCE_DIR}/qml/DecoDXLog")
+    target_link_libraries(tst_clusterview PRIVATE decolog_core Qt6::Multimedia Qt6::Test
+        Qt6::Quick decodium_ui decodium_uiplugin)
+    set_target_properties(tst_clusterview PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME clusterview COMMAND tst_clusterview)
+    set_tests_properties(clusterview PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
     qt_add_executable(tst_traffic tests/tst_traffic.cpp src/app/TrafficMonitor.cpp src/app/TrafficMonitor.h)
     target_include_directories(tst_traffic PRIVATE src)
     target_link_libraries(tst_traffic PRIVATE decolog_core Qt6::Test)

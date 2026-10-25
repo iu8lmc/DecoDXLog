@@ -591,10 +591,12 @@ void RigController::connectNow()
     // Hamlib's Yaesu keyer starts a radio memory with KY, independently of an
     // RTS/DTR PTT route, and most of those backends have no stop_morse.  Our
     // local rigctld knows the actual model, so its emergency connection may
-    // additionally send the documented CAT receive command.  Never guess it
-    // for an external/network rigctld whose radio model is unknown.
+    // additionally send the documented CAT receive command for external PTT.
+    // With RIG/RIGMICDATA, T 0 already uses CAT: do not add a raw command.
+    // Never guess it for an external/network rigctld with an unknown model.
     m_hamlib.setEmergencyCatOffCommand(
-        directYaesuCwUsesKeyerMemory() ? QStringLiteral("TX0;") : QString());
+        directYaesuCwUsesKeyerMemory() && m_pttType != QLatin1String("RIG")
+            && m_pttType != QLatin1String("RIGMICDATA") ? QStringLiteral("TX0;") : QString());
     m_hamlib.setYaesuKeyerMemoryMode(directYaesuCwUsesKeyerMemory());
     if (m_link == QLatin1String("flrig") || m_link == QLatin1String("omnirig")) {
         // flrig o OmniRig: la radio la tiene un altro programma, noi chiediamo a lui.

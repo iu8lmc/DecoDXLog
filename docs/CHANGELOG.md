@@ -3,6 +3,37 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.41 — 25 ottobre 2026
+
+**Elenchi nominativi e club (issue #3).** Nuova pagina Impostazioni → Elenchi
+nominativi, indipendente dai contest: più CSV/TXT o file N1MM Call History,
+anteprima, associazione delle colonne, attivazione, ricaricamento e rimozione.
+La Scheda nominativo mostra separatamente fonte, data e tutte le appartenenze,
+senza sovrascrivere QSO, callbook o scambi contest. Lettura e indicizzazione su
+worker, copie offline persistenti e sostituzione atomica solo dopo importazione
+valida. CSV con virgolette, separatori virgola/punto e virgola/tab, UTF-8 e Latin-1;
+commenti e righe informative ignorati. Ricerca esatta, nessuna deduzione dei
+suffissi portatili. Test con dati inventati in directory temporanee, inclusi
+errori di lettura/scrittura, riavvio, liste multiple, grandi elenchi e viste QML.
+
+**Cluster: indicatore LoTW accanto al nominativo (issue #5).** Una piccola L verde
+identifica gli utenti LoTW anche senza attivare il filtro dedicato, nelle viste
+normale, compatta e contest e con la colonna Entita' nascosta. Usa lo stesso criterio
+del filtro: upload negli ultimi 365 giorni secondo la lista ARRL caricata. Il
+suggerimento distingue l'attivita' LoTW dalla conferma del QSO; l'assenza della L
+non prova che la stazione non abbia un account LoTW. Test sul modello e sulla vista
+QML per elenco misto, cambio di stato, filtro, colonne strette e clic sul badge.
+
+**CW: Ferma ripetuto.** Le pressioni ravvicinate condividono una sola richiesta di
+arresto. Quando il CAT risponde, PTT OFF e stop del keyer passano ordinatamente sulla
+connessione esistente; il canale separato resta un fallback per disconnessioni o
+risposte lente, legge gli esiti prima di chiudersi e non ripete uno `stop_morse`
+gia' dichiarato non supportato. Su Yaesu con PTT CAT non viene piu' aggiunto un
+secondo `TX0` raw. Restano lo svuotamento della coda CW e il rilascio PTT anche
+a pannello inattivo. Test di regressione per clic ripetuti, risposte tardive,
+fallback, errori transitori e macro successive; test opzionale con rigctld reale
+e simulatore TCP FTDX-3000. La conferma sulla radio fisica resta necessaria.
+
 ## 1.17.40 — 25 ottobre 2026
 
 **HH parla con DecoDXLog in modo nativo, con DecoPort.** HH, il programma di HamHub Log che
@@ -31,7 +62,6 @@ senza conferma, lo rimanda fino a tre volte e poi lo scrive nel registro attivit
   due vettori calcolati a parte con Python, e un giro completo tra il server C++ e HH.py veri ha
   consegnato un QSO e ricevuto la conferma.
 - **Traduzioni**: 18 stringhe nuove in tutte e 14 le lingue.
-
 
 ## 1.17.39 — 25 ottobre 2026
 

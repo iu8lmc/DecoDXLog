@@ -155,6 +155,23 @@ private slots:
         QCOMPARE(radio2.calls, QStringList({QStringLiteral("ptt-off"), QStringLiteral("stop")}));
     }
 
+    void repeatedStopNeverRetriggersTheLastMacro()
+    {
+        FakeRig radio;
+        app::RigController::Context context;
+        context.alternateRig = [&radio]() { return &radio; };
+        app::RigController controller(context);
+        controller.setMacro(0, QStringLiteral("F1 CQ"), QStringLiteral("CQ TEST"));
+        controller.sendMacro(0, {});
+        for (int i = 0; i < 20; ++i)
+            controller.stop();
+        QCOMPARE(controller.activeMacroIndex(), -1);
+        QCOMPARE(radio.sent, QStringList{QStringLiteral("CQ TEST")});
+        QCOMPARE(radio.stops, 20);
+        QCOMPARE(radio.pttStates.size(), 20);
+        QVERIFY(!radio.pttStates.contains(true));
+    }
+
     void oneCharacterMacroKeepsItsText()
     {
         FakeRig radio;

@@ -22,10 +22,10 @@ Specifica di partenza: [`docs/FASE0_SPEC.md`](docs/FASE0_SPEC.md).
 Licenza: GPL-3.0. Dentro `libs/ggmorse` c'e' ggmorse di Georgi Gerganov, licenza MIT,
 con la sua `LICENSE` accanto.
 
-## Stato: 1.17.40
+## Stato: 1.17.41
 
 La versione e le funzioni descritte qui corrispondono al manifest di build
-`CMakeLists.txt` (1.17.40). Le note incrementali sono in
+`CMakeLists.txt` (1.17.41). Le note incrementali sono in
 [`docs/CHANGELOG.md`](docs/CHANGELOG.md); le opzioni sperimentali o opzionali
 sono indicate esplicitamente nelle sezioni relative.
 

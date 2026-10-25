@@ -272,6 +272,12 @@ GlassPanel {
                 }
             }
 
+            CallListMatches {
+                Layout.fillWidth: true
+                controller: decolog.callLists
+                callsign: root.info.call || ""
+            }
+
             // ── Worked before ───────────────────────────────────────────────
             ColumnLayout {
                 visible: root.hasCall

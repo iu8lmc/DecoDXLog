@@ -982,6 +982,8 @@ bool DecoLogController::openDatabase(const QString& path)
         addActivity(category, text, level);
     };
     m_scp = new SuperCheckController(std::move(scpCtx), this);
+    m_callLists = new CallListController({}, this);
+    m_callLists->start();
 
     ChatController::Context chatCtx;
     chatCtx.credentials = m_credentials;
