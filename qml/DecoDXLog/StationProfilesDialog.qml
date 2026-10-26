@@ -13,6 +13,7 @@ DialogFrame {
     property var draft: ({})
     property int formRev: 0
     property bool edited: false
+    signal profileQsoRequested(var profileId)
     readonly property var awardConflicts: { root.formRev; return profiles.awardAccountConflicts() }
     readonly property var awardGroups: { root.formRev; return profiles.awardAccountGroups() }
 
@@ -198,6 +199,14 @@ DialogFrame {
             Layout.margins: 14
             spacing: 10
 
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.")
+                color: Theme.textSecondary
+                font.pixelSize: 11
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 10
@@ -362,6 +371,11 @@ DialogFrame {
                     text: qsTr("Use now")
                     enabled: root.draft.id > 0 && !root.draft.deleted && root.draft.id !== root.profiles.activeProfileId
                     onClicked: root.profiles.activeProfileId = root.draft.id
+                }
+                GlassButton {
+                    text: qsTr("Open QSO for this profile")
+                    enabled: root.draft.id > 0 && !root.draft.deleted
+                    onClicked: root.profileQsoRequested(root.draft.id)
                 }
                 Item { Layout.fillWidth: true }
                 GlassButton { text: qsTr("Cancel"); onClicked: root.edited ? root.select(root.selectedRow) : root.reject() }

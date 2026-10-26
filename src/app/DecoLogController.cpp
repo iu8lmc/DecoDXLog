@@ -2940,12 +2940,25 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
         isolated.message = QStringLiteral("diagnostic QSO is isolated and is not written to the log");
         return isolated;
     }
-    // Il profilo lo indica il nominativo di stazione del QSO; se non corrisponde a
-    // nessuno, vale quello attivo. I campi del profilo non si aggiungono: il QSO
-    // resta come l'ha mandato Decodium.
-    qint64 profileId = m_db.profileForCallsign(input.value(QStringLiteral("STATION_CALLSIGN")));
-    if (profileId == 0 && m_profiles)
+    // Il profilo viene risolto dall'identita' dichiarata dal programma esterno:
+    // prima STATION_CALLSIGN, poi OPERATOR. Se piu' profili hanno lo stesso
+    // operatore e manca il nominativo di stazione, il QSO resta senza profilo
+    // invece di finire in silenzio nel log sbagliato. Senza identita' si conserva
+    // il comportamento storico del profilo attivo.
+    const QString stationCall = input.value(QStringLiteral("STATION_CALLSIGN")).trimmed();
+    const QString operatorCall = input.value(QStringLiteral("OPERATOR")).trimmed();
+    qint64 profileId = m_db.profileForIdentity(stationCall, operatorCall);
+    const int liveProfiles = m_db.stationProfiles(false).size();
+    if (profileId == 0 && stationCall.isEmpty() && operatorCall.isEmpty() && m_profiles)
         profileId = m_profiles->activeProfileId();
+    else if (profileId == 0 && liveProfiles <= 1 && m_profiles)
+        profileId = m_profiles->activeProfileId();
+    if (profileId == 0 && (!stationCall.isEmpty() || !operatorCall.isEmpty()) && liveProfiles > 1) {
+        addActivity(QStringLiteral("LOG"),
+                    tr("Incoming QSO %1 has no unique station profile; it was kept unassigned")
+                        .arg(input.value(QStringLiteral("CALL")).toUpper()),
+                    QStringLiteral("warning"));
+    }
 
     // Decodium manda zone e locatore ma non il numero DXCC: senza, il QSO non
     // conta per l'FT2 Award.
@@ -3498,6 +3511,13 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     }
 
     qint64 profileId = m_profiles ? m_profiles->activeProfileId() : 0;
+    const qint64 requestedProfileId = fields.value(QStringLiteral("station_profile_id")).toLongLong();
+    if (requestedProfileId > 0) {
+        const auto requested = m_db.stationProfile(requestedProfileId);
+        if (!requested || requested->deleted)
+            return tr("The selected station profile is not available.");
+        profileId = requestedProfileId;
+    }
     if (m_activation->active() && m_activation->session().stationProfileId > 0)
         profileId = m_activation->session().stationProfileId;
     applyProfile(r, profileId);
@@ -6116,8 +6136,12 @@ DecoLogController::Recovered DecoLogController::saveRecoveredQso(const AdifRecor
     // Arrivato via UDP mentre si leggeva il file.
     if (m_db.knowsQso(input))
         return Recovered::Known;
-    qint64 profileId = m_db.profileForCallsign(input.value(QStringLiteral("STATION_CALLSIGN")));
-    if (profileId == 0 && m_profiles)
+    const QString stationCall = input.value(QStringLiteral("STATION_CALLSIGN")).trimmed();
+    const QString operatorCall = input.value(QStringLiteral("OPERATOR")).trimmed();
+    qint64 profileId = m_db.profileForIdentity(stationCall, operatorCall);
+    if (profileId == 0 && stationCall.isEmpty() && operatorCall.isEmpty() && m_profiles)
+        profileId = m_profiles->activeProfileId();
+    else if (profileId == 0 && m_db.stationProfiles(false).size() <= 1 && m_profiles)
         profileId = m_profiles->activeProfileId();
     AdifRecord enriched = input;
     adif::normalizeMode(enriched);

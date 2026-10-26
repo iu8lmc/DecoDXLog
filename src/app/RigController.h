@@ -16,6 +16,7 @@
 #include "core/FlrigControl.h"
 #include "core/OmniRigControl.h"
 #include "core/CatShare.h"
+#include "app/RadioProfileModel.h"
 
 #include <QAudioSource>
 #include <QMediaDevices>
@@ -160,6 +161,7 @@ class RigController : public QObject {
     // "RIG" = lo fa il CAT stesso, "RTS"/"DTR" = il piedino della seconda porta.
     Q_PROPERTY(QString pttType READ pttType WRITE setPttType NOTIFY changed)
     Q_PROPERTY(QString pttPort READ pttPort WRITE setPttPort NOTIFY changed)
+    Q_PROPERTY(RadioProfileModel* radioProfiles READ radioProfiles CONSTANT)
 
 public:
     struct Context {
@@ -388,6 +390,11 @@ public:
     // Le porte virtuali (com0com): quelle che DecoPort di Decodium offre, nel
     // dialetto della radio, a chi non puo' avere la seriale vera.
     Q_INVOKABLE QStringList virtualPorts() const;
+    Q_INVOKABLE bool selectRadioProfile(const QString& id);
+    Q_INVOKABLE QString createRadioProfile(const QString& name);
+    Q_INVOKABLE bool removeRadioProfile(const QString& id);
+    Q_INVOKABLE bool renameRadioProfile(const QString& id, const QString& name);
+    RadioProfileModel* radioProfiles() { return &m_radioProfiles; }
 
 signals:
     void changed();
@@ -427,6 +434,7 @@ private:
     core::FlrigControl m_flrig;
     core::OmniRigControl m_omniRig;
     core::CatShare m_share;
+    RadioProfileModel m_radioProfiles;
     QString m_flrigAddress{QStringLiteral("127.0.0.1:12345")};
     int m_omniRigNumber{1};
     core::RigLink* m_rig{&m_hamlib};
@@ -520,7 +528,13 @@ private:
     QString m_keyerPort;
     QString m_keyerLine{QStringLiteral("DTR")};
     void openKeyer();
+    QVariantMap captureRadioProfile() const;
+    void applyRadioProfile(const QVariantMap& profile);
+    void syncRadioProfile();
+    void writeLegacyRadioSettings() const;
     bool m_enabled{false};
+    bool m_applyingRadioProfile{false};
+    bool m_initializing{true};
 };
 
 } // namespace decolog::app

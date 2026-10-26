@@ -58,6 +58,46 @@ RoundedWindow {
     // perso. Il pulsante per ridurre non c'e' proprio, cosi' non ci si casca.
     property bool contestMode: false
     property bool pinned: true
+
+    // `QWindow.startSystemMove()` non e' implementato allo stesso modo da
+    // macOS, Windows e dai compositor Linux. Il pannello GlassPanel emette
+    // pero' gia' la posizione globale del mouse dalla sua maniglia: usiamo
+    // quella per un movimento esplicito della finestra. Cosi' il passaggio
+    // fra monitor usa le coordinate del desktop virtuale in ogni sistema.
+    property bool panelDragPending: false
+    property bool panelDragActive: false
+    property point panelDragAnchorGlobal: Qt.point(0, 0)
+    property point panelDragAnchorWindow: Qt.point(0, 0)
+
+    function beginPanelDrag() {
+        if (root.visibility === Window.Maximized || root.visibility === Window.FullScreen)
+            return
+        root.panelDragPending = true
+        root.panelDragActive = false
+    }
+
+    function movePanelDrag(globalX, globalY) {
+        if (!root.panelDragPending && !root.panelDragActive)
+            return
+        if (root.panelDragPending) {
+            root.panelDragAnchorGlobal = Qt.point(globalX, globalY)
+            root.panelDragAnchorWindow = Qt.point(root.x, root.y)
+            root.panelDragPending = false
+            root.panelDragActive = true
+            return
+        }
+        root.x = Math.round(root.panelDragAnchorWindow.x
+                            + globalX - root.panelDragAnchorGlobal.x)
+        root.y = Math.round(root.panelDragAnchorWindow.y
+                            + globalY - root.panelDragAnchorGlobal.y)
+    }
+
+    function endPanelDrag(globalX, globalY) {
+        root.movePanelDrag(globalX, globalY)
+        root.panelDragPending = false
+        root.panelDragActive = false
+        root.persistPlacement()
+    }
     // Niente barra di Windows: il titolo e' gia' nella testata del pannello, e
     // la barra sopra era spazio perso. Si sposta dalla testata, si ridimensiona
     // dai bordi (WindowChrome qui sotto).
@@ -146,6 +186,9 @@ RoundedWindow {
     Connections {
         target: holder.item
         ignoreUnknownSignals: true
+        function onMoveStarted() { root.beginPanelDrag() }
+        function onMoveMoved(globalX, globalY) { root.movePanelDrag(globalX, globalY) }
+        function onMoveEnded(globalX, globalY) { root.endPanelDrag(globalX, globalY) }
         function onAttachRequested() { root.attachRequested() }
         function onCloseRequested() { root.closeRequested() }
         function onOpenQso(id) { if (id > 0) qsoDialog.openFor(id) }

@@ -3553,6 +3553,36 @@ qint64 LogDatabase::profileForCallsign(const QString& stationCallsign) const
     return 0;
 }
 
+qint64 LogDatabase::profileForIdentity(const QString& stationCallsign, const QString& operatorCall) const
+{
+    const QString station = stationCallsign.trimmed();
+    if (!station.isEmpty()) {
+        const qint64 byStation = profileForCallsign(station);
+        if (byStation > 0)
+            return byStation;
+    }
+
+    const QString op = operatorCall.trimmed();
+    if (op.isEmpty())
+        return 0;
+
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral(
+        "SELECT id FROM station_profile WHERE deleted = 0 AND operator = ? COLLATE NOCASE "
+        "ORDER BY id"));
+    q.addBindValue(op.toUpper());
+    if (!q.exec())
+        return 0;
+
+    qint64 only = 0;
+    int matches = 0;
+    while (q.next()) {
+        only = q.value(0).toLongLong();
+        ++matches;
+    }
+    return matches == 1 ? only : 0;
+}
+
 // ── Impostazioni e manutenzione ────────────────────────────────────────────────
 
 QString LogDatabase::setting(const QString& key, const QString& fallback) const

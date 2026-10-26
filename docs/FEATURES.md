@@ -1,4 +1,4 @@
-# DecoDXLog 1.17.43 — funzioni / features
+# DecoDXLog 1.17.44 — funzioni / features
 
 Ogni voce è in italiano e in inglese: *italiano* / *English*.
 Quello che manca è in fondo.
@@ -21,8 +21,12 @@ Quello che manca è in fondo.
   30 days or the whole file.
 - **FT2 di prima classe**: `MODE=MFSK`, `SUBMODE=FT2`, e "FT2" ovunque nell'interfaccia. /
   **FT2 as a first-class mode**: `MODE=MFSK`, `SUBMODE=FT2`, shown as "FT2" everywhere.
-- **Profilo stazione dal nominativo** del QSO, altrimenti quello attivo. / **Station profile
-  from the QSO callsign**, otherwise the active one.
+- **Routing multi-operatore**: ogni QSO ricevuto da Decodium/WSJT-X, N1MM, API o rete viene
+  assegnato al profilo con `STATION_CALLSIGN`, poi a quello con un solo `OPERATOR`; se
+  l'identita' e' ambigua non viene assegnato silenziosamente al profilo sbagliato. / **Multi-
+  operator routing**: QSOs received from Decodium/WSJT-X, N1MM, the API or the station
+  network use `STATION_CALLSIGN`, then a unique `OPERATOR`; ambiguous identities are left
+  unassigned instead of silently contaminating another operator's log.
 - **Entità DXCC aggiunta al volo** (DXCC, paese, zone, continente). / **DXCC entity filled
   on the fly** (DXCC, country, zones, continent).
 - **Finestra dei duplicati** configurabile, diversa per QSO digitali e a mano. / **Duplicate
@@ -175,6 +179,15 @@ Quello che manca è in fondo.
   event) with callsign, operator, grid, zones, rig, antenna, power, LoTW station location.
 - **Profilo predefinito e profilo attivo**, duplicazione, conteggio dei QSO. / **Default and
   active profile**, duplication, QSO count.
+- **Finestre QSO dedicate per profilo**: dalla scheda dei profili si apre una finestra per
+  YL3GBC e una per YL3AUG; ciascuna scrive nel proprio log senza cambiare il profilo globale.
+  / **Profile-specific QSO windows**: open one window for YL3GBC and one for YL3AUG; each
+  writes to its own log without changing the global profile.
+- **Profili CAT persistenti**: ogni profilo radio conserva collegamento Hamlib/TCI/flrig/OmniRig,
+  modello, seriale, PTT, keyer e audio decoder; le modifiche vengono salvate automaticamente e
+  l'ultimo profilo usato viene ripristinato all'avvio. / **Persistent CAT profiles**: each radio
+  profile stores its link, model, serial, PTT, keyer and decoder audio settings; changes are saved
+  automatically and the last profile is restored at startup.
 - **Primo profilo creato da Decodium** al primo avvio. / **First profile created from
   Decodium** on the first run.
 

@@ -30,6 +30,45 @@ Rectangle {
             root.window.close()
     }
 
+    // Movimento esplicito in coordinate globali. Su alcune piattaforme
+    // `startSystemMove()` non avvia il drag di una finestra frameless; usare
+    // direttamente x/y mantiene lo stesso comportamento anche attraversando
+    // il confine fra due monitor.
+    property bool manualDragPending: false
+    property bool manualDragActive: false
+    property point manualDragAnchorGlobal: Qt.point(0, 0)
+    property point manualDragAnchorWindow: Qt.point(0, 0)
+
+    function beginManualDrag() {
+        if (!root.window || root.window.visibility === Window.Maximized
+                || root.window.visibility === Window.FullScreen)
+            return
+        root.manualDragPending = true
+        root.manualDragActive = false
+    }
+
+    function moveManualDrag(globalX, globalY) {
+        if (!root.window || (!root.manualDragPending && !root.manualDragActive))
+            return
+        if (root.manualDragPending) {
+            root.manualDragAnchorGlobal = Qt.point(globalX, globalY)
+            root.manualDragAnchorWindow = Qt.point(root.window.x, root.window.y)
+            root.manualDragPending = false
+            root.manualDragActive = true
+            return
+        }
+        root.window.x = Math.round(root.manualDragAnchorWindow.x
+                                   + globalX - root.manualDragAnchorGlobal.x)
+        root.window.y = Math.round(root.manualDragAnchorWindow.y
+                                   + globalY - root.manualDragAnchorGlobal.y)
+    }
+
+    function endManualDrag(globalX, globalY) {
+        root.moveManualDrag(globalX, globalY)
+        root.manualDragPending = false
+        root.manualDragActive = false
+    }
+
     implicitHeight: Theme.panelHeight
     color: "transparent"
 
@@ -51,6 +90,45 @@ Rectangle {
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         height: 1
         color: Theme.borderSoft
+    }
+
+    // Sta dietro ai controlli, quindi non ruba i clic sui semafori o sui
+    // comandi; prende soltanto la parte libera della barra del titolo.
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        acceptedButtons: Qt.LeftButton
+        onPressed: {
+            const p = mapToGlobal(mouse.x, mouse.y)
+            root.beginManualDrag()
+            root.manualDragAnchorGlobal = p
+            root.manualDragAnchorWindow = root.window
+                    ? Qt.point(root.window.x, root.window.y) : Qt.point(0, 0)
+            root.manualDragPending = false
+            root.manualDragActive = !!root.window
+        }
+        onPositionChanged: {
+            if (!pressed)
+                return
+            const p = mapToGlobal(mouse.x, mouse.y)
+            root.moveManualDrag(p.x, p.y)
+        }
+        onReleased: {
+            const p = mapToGlobal(mouse.x, mouse.y)
+            root.endManualDrag(p.x, p.y)
+        }
+        onCanceled: {
+            root.manualDragPending = false
+            root.manualDragActive = false
+        }
+        onDoubleClicked: {
+            if (root.window) {
+                if (root.window.visibility === Window.Maximized)
+                    root.window.showNormal()
+                else
+                    root.window.showMaximized()
+            }
+        }
     }
 
     component TrafficLight: Rectangle {

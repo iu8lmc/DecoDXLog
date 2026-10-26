@@ -7,6 +7,7 @@
 // DXCC aggiunto dal cty.csv. Il programma racconta cosa fa sul registro
 // attivita', che con DECODXLOG_TRACE_ACTIVITY=1 esce anche su stderr.
 #include "core/WsjtxProtocol.h"
+#include "core/LogDatabase.h"
 
 #include <QDir>
 #include <QElapsedTimer>
@@ -68,7 +69,8 @@ QByteArray decodiumRecord(const QString& call, const QDateTime& off)
         .toUtf8();
 }
 
-QByteArray adifFor(const QString& call, const QString& grid, const QString& time, const char* program)
+QByteArray adifFor(const QString& call, const QString& grid, const QString& time, const char* program,
+                   const QString& stationCall = QStringLiteral("IU8LMC"))
 {
     const auto field = [](const char* name, const QString& value) {
         return QStringLiteral("<%1:%2>%3 ").arg(QLatin1String(name)).arg(value.size()).arg(value);
@@ -77,7 +79,7 @@ QByteArray adifFor(const QString& call, const QString& grid, const QString& time
                      + field("submode", QStringLiteral("FT2")) + field("rst_sent", QStringLiteral("-10"))
                      + field("rst_rcvd", QStringLiteral("-05")) + field("qso_date", QStringLiteral("20260917"))
                      + field("time_on", time) + field("band", QStringLiteral("20m"))
-                     + field("freq", QStringLiteral("14.084000")) + field("station_callsign", QStringLiteral("IU8LMC"))
+                     + field("freq", QStringLiteral("14.084000")) + field("station_callsign", stationCall)
                      + QStringLiteral("<EOR>");
     const QString header = QStringLiteral("\n<adif_ver:5>3.1.0\n<programid:%1>%2\n<EOH>\n")
                                .arg(qstrlen(program))
@@ -134,6 +136,13 @@ class TestUdpPipeline : public QObject {
             .toString();
     }
 
+    qint64 profileForCall(const QString& call)
+    {
+        return scalar(QStringLiteral("SELECT IFNULL(station_profile_id, 0) FROM qso WHERE deleted = 0 AND call = '%1'")
+                          .arg(call))
+            .toLongLong();
+    }
+
     bool waitFor(const std::function<bool()>& condition, int ms)
     {
         QElapsedTimer t;
@@ -151,6 +160,30 @@ private slots:
     {
         QVERIFY(m_dir.isValid());
         m_db = m_dir.filePath(QStringLiteral("log.sqlite"));
+
+        // Due profili reali di prova: i QSO che arriveranno via UDP devono
+        // essere verificati anche nel database dell'app, non solo nel resolver.
+        {
+            LogDatabase seed;
+            QVERIFY(seed.open(m_db));
+            StationProfile gbc;
+            gbc.name = QStringLiteral("YL3GBC");
+            gbc.stationCallsign = QStringLiteral("YL3GBC");
+            gbc.operatorCall = QStringLiteral("YL3GBC");
+            gbc.isDefault = true;
+            QVERIFY(seed.saveStationProfile(gbc) > 0);
+            StationProfile aug;
+            aug.name = QStringLiteral("YL3AUG");
+            aug.stationCallsign = QStringLiteral("YL3AUG");
+            aug.operatorCall = QStringLiteral("YL3AUG");
+            QVERIFY(seed.saveStationProfile(aug) > 0);
+            StationProfile legacy;
+            legacy.name = QStringLiteral("Legacy");
+            legacy.stationCallsign = QStringLiteral("IU8LMC");
+            legacy.operatorCall = QStringLiteral("IU8LMC");
+            QVERIFY(seed.saveStationProfile(legacy) > 0);
+            seed.close();
+        }
 
         // Una porta libera, presa e lasciata subito.
         {
@@ -300,6 +333,25 @@ private slots:
         send(again);
         QTest::qWait(2500);
         QCOMPARE(countCall(QStringLiteral("DL1AB")), 1);
+    }
+
+    void twoClientsRouteQsosToSeparateProfiles()
+    {
+        // A/B reale sul processo: due client UDP diversi, due identita' di
+        // stazione, due righe con station_profile_id differenti.
+        send(wsjtx::buildLoggedAdif(QStringLiteral("Decodium-YL3GBC"),
+                                    adifFor(QStringLiteral("K1GBC"), QStringLiteral("FN31"), QStringLiteral("110000"),
+                                            "Decodium", QStringLiteral("YL3GBC"))));
+        send(wsjtx::buildLoggedAdif(QStringLiteral("Decodium-YL3AUG"),
+                                    adifFor(QStringLiteral("K1AUG"), QStringLiteral("FN32"), QStringLiteral("110100"),
+                                            "Decodium", QStringLiteral("YL3AUG"))));
+        QVERIFY(waitFor([&] { return countCall(QStringLiteral("K1GBC")) == 1
+                                   && countCall(QStringLiteral("K1AUG")) == 1; }, 15000));
+        const qint64 gbcId = scalar(QStringLiteral("SELECT id FROM station_profile WHERE station_callsign = 'YL3GBC'")).toLongLong();
+        const qint64 augId = scalar(QStringLiteral("SELECT id FROM station_profile WHERE station_callsign = 'YL3AUG'")).toLongLong();
+        QVERIFY(gbcId > 0 && augId > 0 && gbcId != augId);
+        QCOMPARE(profileForCall(QStringLiteral("K1GBC")), gbcId);
+        QCOMPARE(profileForCall(QStringLiteral("K1AUG")), augId);
     }
 
     void heartbeatAndStatusDoNotLog()

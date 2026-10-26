@@ -1912,6 +1912,62 @@ DialogFrame {
                             : decolog.rig.link === "omnirig" ? qsTr("Radio via OmniRig")
                             : qsTr("Radio via Hamlib (rigctld)")
                     }
+                    SectionTitle { text: qsTr("CAT profiles") }
+                    RowLayout {
+                        spacing: 12
+                        LabeledField {
+                            label: qsTr("Radio profile")
+                            StyledComboBox {
+                                id: radioProfileBox
+                                Layout.preferredWidth: 260
+                                model: decolog.rig.radioProfiles
+                                textRole: "name"
+                                currentIndex: Math.max(0, decolog.rig.radioProfiles.rowForId(decolog.rig.radioProfiles.activeId))
+                                onActivated: {
+                                    const selected = decolog.rig.radioProfiles.get(currentIndex)
+                                    if (selected.id)
+                                        decolog.rig.selectRadioProfile(selected.id)
+                                }
+                                Connections {
+                                    target: decolog.rig.radioProfiles
+                                    function onActiveChanged() {
+                                        radioProfileBox.currentIndex = Math.max(0,
+                                            decolog.rig.radioProfiles.rowForId(decolog.rig.radioProfiles.activeId))
+                                        radioProfileName.text = decolog.rig.radioProfiles.activeName
+                                    }
+                                }
+                            }
+                        }
+                        StyledTextField {
+                            id: radioProfileName
+                            Layout.preferredWidth: 180
+                            placeholderText: qsTr("Profile name")
+                            text: decolog.rig.radioProfiles.activeName
+                        }
+                        GlassButton {
+                            text: qsTr("New")
+                            onClicked: {
+                                const id = decolog.rig.createRadioProfile(radioProfileName.text)
+                                if (id.length > 0)
+                                    radioProfileName.text = decolog.rig.radioProfiles.activeName
+                            }
+                        }
+                        GlassButton {
+                            text: qsTr("Rename")
+                            enabled: radioProfileName.text.trim().length > 0
+                            onClicked: decolog.rig.renameRadioProfile(decolog.rig.radioProfiles.activeId,
+                                                                       radioProfileName.text)
+                        }
+                        GlassButton {
+                            text: qsTr("Delete")
+                            tone: Theme.errorColor
+                            enabled: decolog.rig.radioProfiles.count > 1
+                            onClicked: decolog.rig.removeRadioProfile(decolog.rig.radioProfiles.activeId)
+                        }
+                    }
+                    Note {
+                        text: qsTr("Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.")
+                    }
                     Note {
                         visible: decolog.rig.link === "network" || decolog.rig.link === "serial"
                         text: qsTr("Every radio is spoken to by Hamlib, not by DecoDXLog. With the serial cable "
