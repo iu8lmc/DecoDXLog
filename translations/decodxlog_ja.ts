@@ -1169,6 +1169,156 @@ Decodium が交信しているコールサインは、ここにひとりでに�
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>コールサインとクラブのリスト</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>ローカルリストを読み込み中…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>利用可能で有効なリストに完全一致はありません。</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>インポートしたリストの情報であり、会員資格のリアルタイム確認ではありません。ログとコールブックのデータは変更されません。</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>未割り当て</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>コールサインとクラブのリスト</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>ローカルの CSV/TXT または N1MM Call History ファイルをインポートします。Contest モード以外でも、複数のリストを同時に有効にできます。結果はコールサイン情報に表示され、QSO・コールブック・コンテストの項目を置き換えることはありません。</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>ここでの変更はすぐに保存されます。オフラインコピーが保持され、「再読み込み」で元のファイルを読み直します。</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 件 · インポート日時 %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>再読み込み</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">外す</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>リストを追加…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>リスト名</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>例: 私の CW クラブ</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>区切り文字</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">自動</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>カンマ</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>セミコロン</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>タブ</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>エンコード</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>自動 (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>1 行目に列名が含まれる (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>プレビュー / 列を更新</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>N1MM の列は各 !!Order!! ディレクティブから読み取られます。すべての会員情報は別々に保持されます。</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>コールサイン列 (必須)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>名前列</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>クラブ列</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>会員番号列</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>QTH 列</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>割り当てられていない空でない項目も、列名とともに表示されます。照合は大文字小文字を区別せず完全一致で行い、ポータブルのサフィックスは取り除きません。</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>リストをインポート</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>コールサインリストをインポート</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>コールサインリスト (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">すべてのファイル (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>リストを削除</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>このリストとそのオフラインコピーを削除しますか？元のファイルは削除されません。</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1495,6 +1645,10 @@ Decodium が交信しているコールサインは、ここにひとりでに�
     <message>
         <source>DX Assistant available antennas</source>
         <translation>DX アシスタントの利用可能なアンテナ</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW ユーザー (読み込んだ ARRL リストによる、過去 365 日以内のアップロード)。QSO の確認ではありません。</translation>
     </message>
 </context>
 <context>
@@ -8684,6 +8838,10 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>下でパスワードを設定し、HH の設定でも同じものを設定してください。DecoPort はすべてのパケットに署名するため、パスワードがないと何も始まりません。</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>コールサインリスト</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10105,6 +10263,61 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Exchange</source>
         <translation>交換</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>既存の通常ファイルを選択してください。</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>ファイルが 32 MiB を超えています。</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>ローカルリストを読み込み中…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>適用されませんでした: %1。保存済みのリストは変更されていません。</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>リストの保存先フォルダーを作成できません。</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>リストの設定が無効です。</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>ローカルリストをオフラインコピーから復元しました。</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>ローカルファイルを選択してください。</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>プレビューの準備ができました。インポート前に列を確認してください。</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>上限は 64 リストです。</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>%1 件をインポートしました。%2 行はスキップまたは重複です。</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>リストの設定を保存しました。</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>リストを削除しました。元のファイルは削除されていません。</translation>
     </message>
 </context>
 <context>
@@ -13074,14 +13287,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>この CAT では CW を打てません (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>無線機が CW の文を受け取りませんでした (rigctld: %1)。どの無線機でも — どの CAT の橋渡しでも — CW を打てるわけではありません。マクロには、無線機そのものと話す rigctld が要ります。</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>無線機が CW テキストを受け付けませんでした（rigctld: %1）。CW になっているか（現在 %2）、ブレークイン（BK-IN）がオンか、CAT ポートが無線機のものかを確認してください。</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>この無線機は CAT で CW を止められません。メッセージは最後まで送信されます。途中で止めるには無線機かシリアルキーヤーを使ってください。</translation>
     </message>
@@ -13128,6 +13333,18 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>無線機が出力/チューナーの CAT コマンドを拒否しました (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>CW 停止が確認されませんでした。無線機の送信状態を確認してください。</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>CAT サーバーまたは無線機が CW テキストの送信に対応していません (rigctld: %1)。共有 CAT の場合は、マスターアプリを更新し、その送信許可を有効にしてください。無線機が CAT CW キーヤーに対応している必要があります。シリアルの直接接続は不要です。</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>無線機が CW テキストを拒否しました (rigctld: %1)。CW モードになっているか (現在 %2)、ブレークイン (BK-IN) がオンか、CAT サーバーが送信を許可しているかを確認してください。</translation>
     </message>
 </context>
 <context>

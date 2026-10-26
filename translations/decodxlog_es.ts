@@ -1173,6 +1173,156 @@ El indicativo que Decodium está trabajando aparece aquí solo.</translation>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Listas de indicativos y clubes</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Cargando las listas locales…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Ninguna coincidencia exacta en las listas disponibles y activadas.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Datos de las listas importadas, no una verificación en tiempo real de la afiliación. Los datos del log y del callbook no se modifican.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Sin asignar</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Listas de indicativos y clubes</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importa archivos locales CSV/TXT o N1MM Call History. Puedes activar varias listas a la vez, también fuera del modo Contest. Los resultados aparecen en la ficha del indicativo y nunca sustituyen los campos del QSO, del callbook ni del contest.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Los cambios se guardan al instante. Se conserva una copia sin conexión; «Recargar» vuelve a leer el archivo original.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 entradas · importada el %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Recargar</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Quitar</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Añadir una lista…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Nombre de la lista</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Por ejemplo: mis clubes de CW</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Separador</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Coma</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Punto y coma</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulación</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Codificación</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automática (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>La primera fila contiene los nombres de las columnas (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Vista previa / actualizar columnas</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>Las columnas de N1MM se leen de cada directiva !!Order!!. Todas las afiliaciones se conservan por separado.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Columna del indicativo (obligatoria)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Columna del nombre</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Columna del club</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Columna del número de socio</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Columna del QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Los campos sin asignar y no vacíos también se muestran con el nombre de su columna. La búsqueda es exacta, sin distinguir mayúsculas de minúsculas; los sufijos portátiles no se eliminan.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Importar lista</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Importar una lista de indicativos</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Listas de indicativos (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Eliminar lista</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>¿Eliminar esta lista y su copia sin conexión? El archivo original no se borrará.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1499,6 +1649,10 @@ El indicativo que Decodium está trabajando aparece aquí solo.</translation>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Antenas disponibles para el asistente DX</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>Usuario de LoTW (subida en los últimos 365 días según la lista de la ARRL cargada). No es una confirmación de QSO.</translation>
     </message>
 </context>
 <context>
@@ -8706,6 +8860,10 @@ Campos extra conservados: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Define abajo una contraseña y la misma en HH, en Configurar. DecoPort firma cada paquete: sin contraseña no arranca nada.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Listas de indicativos</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10131,6 +10289,61 @@ Campos extra conservados: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Intercambio</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Selecciona un archivo normal existente.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>El archivo supera los 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Cargando las listas locales…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>No aplicado: %1. Las listas guardadas no se han modificado.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>No se puede crear la carpeta de almacenamiento de las listas.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Configuración de listas no válida.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Listas locales restauradas desde sus copias sin conexión.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Selecciona un archivo local.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Vista previa lista. Comprueba las columnas antes de importar.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>El límite es de 64 listas.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>%1 entradas importadas; %2 filas omitidas o duplicadas.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Preferencias de las listas guardadas.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Lista eliminada. El archivo original no se borró.</translation>
     </message>
 </context>
 <context>
@@ -13139,14 +13352,6 @@ Campos extra conservados: %8</translation>
         <translation>Este enlace CAT no manipula el CW (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>La radio no ha aceptado el texto en CW (rigctld: %1). No todas las radios — ni todos los puentes CAT — saben manipular: para las macros hace falta rigctld hablando con la propia radio.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>La radio rechazó el texto CW (rigctld: %1). Comprueba que esté en CW (ahora %2), que el break-in (BK-IN) esté activado y que el puerto CAT sea el de la radio.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Esta radio no sabe parar el CW por CAT: el mensaje termina solo. Para cortarlo usa la radio o un manipulador serie.</translation>
     </message>
@@ -13193,6 +13398,18 @@ Campos extra conservados: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>La radio rechazó el comando CAT de potencia/acoplador (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>La parada de CW no fue confirmada. Comprueba el estado de TX de la radio.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>El servidor CAT o la radio no admite el envío de texto CW (rigctld: %1). Con CAT compartido, actualiza la aplicación maestra y activa su permiso de transmisión. La radio debe admitir un manipulador CW por CAT; no hace falta una conexión serie directa.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>La radio rechazó el texto CW (rigctld: %1). Comprueba que esté en CW (ahora %2), que el break-in (BK-IN) esté activado y que el servidor CAT permita transmitir.</translation>
     </message>
 </context>
 <context>

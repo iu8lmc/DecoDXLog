@@ -1173,6 +1173,156 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Opkaldssignal- og klublister</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Indlæser lokale lister…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Ingen præcis match i de tilgængelige, aktive lister.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Oplysninger fra importerede lister, ikke en live-kontrol af medlemskab. Log- og callbook-data er uændrede.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Ikke tilknyttet</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Opkaldssignal- og klublister</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importér lokale CSV/TXT- eller N1MM Call History-filer. Flere lister kan være aktive samtidigt, også uden for Contest-tilstand. Resultaterne vises i opkaldssignalets oplysninger og erstatter aldrig QSO-, callbook- eller contestfelter.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Ændringer gemmes med det samme. Der gemmes en offlinekopi; »Genindlæs« læser den oprindelige fil igen.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 poster · importeret %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Genindlæs</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Fjern</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Tilføj en liste…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Listens navn</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>For eksempel: mine CW-klubber</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Separator</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Komma</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Semikolon</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulator</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Kodning</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automatisk (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>Første række indeholder kolonnenavne (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Eksempelvisning / opdater kolonner</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>N1MM-kolonnerne læses fra hvert !!Order!!-direktiv. Alle medlemskaber gemmes hver for sig.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Kolonne med opkaldssignal (påkrævet)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Kolonne med navn</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Kolonne med klub</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Kolonne med medlemsnummer</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Kolonne med QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Ikke-tilknyttede felter, der ikke er tomme, vises også med deres kolonnenavn. Søgningen er nøjagtig uden hensyn til store og små bogstaver; portable-suffikser fjernes ikke.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Importér liste</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Importér en liste med opkaldssignaler</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Lister med opkaldssignaler (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Alle filer (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Fjern liste</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Vil du fjerne denne liste og dens offlinekopi? Den oprindelige fil slettes ikke.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1499,6 +1649,10 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Tilgængelige antenner til DX-assistenten</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW-bruger (uploadet inden for de seneste 365 dage ifølge den indlæste ARRL-liste). Det er ikke en QSO-bekræftelse.</translation>
     </message>
 </context>
 <context>
@@ -8706,6 +8860,10 @@ Ekstra felter bevares: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Angiv en adgangskode nedenfor og den samme i HH under Konfigurer. DecoPort signerer hver pakke: uden adgangskode starter intet.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Lister med opkaldssignaler</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10131,6 +10289,61 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Rapport</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Vælg en eksisterende almindelig fil.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>Filen er større end 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Indlæser lokale lister…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Ikke anvendt: %1. De gemte lister er ikke ændret.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>Mappen til listerne kan ikke oprettes.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Ugyldig listekonfiguration.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Lokale lister gendannet fra deres offlinekopier.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Vælg en lokal fil.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Eksempelvisningen er klar. Kontrollér kolonnerne før import.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>Grænsen er 64 lister.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>%1 poster importeret; %2 rækker sprunget over eller dubletter.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Listeindstillinger gemt.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Listen er fjernet. Den oprindelige fil blev ikke slettet.</translation>
     </message>
 </context>
 <context>
@@ -13139,14 +13352,6 @@ Ekstra felter bevares: %8</translation>
         <translation>Denne CAT-forbindelse kan ikke nøgle CW (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>Radioen tog ikke imod CW-teksten (rigctld: %1). Ikke enhver radio — og ikke enhver CAT-bro — kan nøgle CW: til makroerne skal rigctld tale med selve radioen.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>Radioen afviste CW-teksten (rigctld: %1). Kontrollér at den er i CW (nu %2), at break-in (BK-IN) er slået til, og at CAT-porten er radioens egen.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Denne radio kan ikke stoppe CW via CAT: beskeden slutter af sig selv. Brug radioen eller en seriel keyer for at afbryde den.</translation>
     </message>
@@ -13193,6 +13398,18 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>Radioen afviste CAT-kommandoen for effekt/tuner (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>CW-stoppet blev ikke bekræftet. Kontrollér radioens TX-tilstand.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>CAT-serveren eller radioen understøtter ikke afsendelse af CW-tekst (rigctld: %1). Ved delt CAT skal du opdatere masterprogrammet og aktivere dets sendetilladelse. Radioen skal understøtte en CAT-CW-keyer; en direkte seriel forbindelse er ikke nødvendig.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>Radioen afviste CW-teksten (rigctld: %1). Kontrollér, at den står i CW (nu %2), at break-in (BK-IN) er slået til, og at CAT-serveren tillader sending.</translation>
     </message>
 </context>
 <context>

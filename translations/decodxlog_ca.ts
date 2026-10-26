@@ -1173,6 +1173,156 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Llistes d’indicatius i clubs</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>S’estan carregant les llistes locals…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Cap coincidència exacta a les llistes disponibles i activades.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Dades de les llistes importades, no una verificació en temps real de l’afiliació. Les dades del log i del callbook no es modifiquen.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Sense assignar</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Llistes d’indicatius i clubs</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importa fitxers locals CSV/TXT o N1MM Call History. Pots activar diverses llistes alhora, també fora del mode Contest. Els resultats apareixen a la fitxa de l’indicatiu i mai no substitueixen els camps del QSO, del callbook ni del contest.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Els canvis es desen a l’instant. Es conserva una còpia fora de línia; «Recarrega» torna a llegir el fitxer original.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 entrades · importada el %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Recarrega</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Treu</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Afegeix una llista…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Nom de la llista</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Per exemple: els meus clubs de CW</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Separador</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Coma</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Punt i coma</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulació</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Codificació</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automàtica (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>La primera fila conté els noms de les columnes (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Previsualització / actualitza les columnes</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>Les columnes de N1MM es llegeixen de cada directiva !!Order!!. Totes les afiliacions es conserven per separat.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Columna de l’indicatiu (obligatòria)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Columna del nom</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Columna del club</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Columna del número de soci</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Columna del QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Els camps sense assignar i no buits també es mostren amb el nom de la columna. La cerca és exacta, sense distingir majúscules de minúscules; els sufixos portàtils no se suprimeixen.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Importa la llista</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Importa una llista d’indicatius</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Llistes d’indicatius (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Tots els fitxers (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Elimina la llista</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Vols eliminar aquesta llista i la còpia fora de línia? El fitxer original no se suprimirà.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1499,6 +1649,10 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Antenes disponibles per a l&apos;assistent DX</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>Usuari de LoTW (pujada en els darrers 365 dies segons la llista de l’ARRL carregada). No és una confirmació de QSO.</translation>
     </message>
 </context>
 <context>
@@ -8706,6 +8860,10 @@ Camps extra conservats: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Defineix a sota una contrasenya i la mateixa a HH, a Configura. DecoPort signa cada paquet: sense contrasenya no arrenca res.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Llistes d’indicatius</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10131,6 +10289,61 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Intercanvi</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Selecciona un fitxer normal existent.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>El fitxer supera els 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>S’estan carregant les llistes locals…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>No aplicat: %1. Les llistes desades no s’han modificat.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>No es pot crear la carpeta d’emmagatzematge de les llistes.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Configuració de les llistes no vàlida.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Llistes locals restaurades des de les còpies fora de línia.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Selecciona un fitxer local.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Previsualització llesta. Comprova les columnes abans d’importar.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>El límit és de 64 llistes.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>S’han importat %1 entrades; %2 files omeses o duplicades.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Preferències de les llistes desades.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Llista eliminada. El fitxer original no s’ha suprimit.</translation>
     </message>
 </context>
 <context>
@@ -13139,14 +13352,6 @@ Camps extra conservats: %8</translation>
         <translation>Aquest enllaç CAT no manipula CW (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>La ràdio no ha acceptat el text en CW (rigctld: %1). No totes les ràdios — ni tots els ponts CAT — poden manipular CW: per a les macros cal el rigctld parlant amb la ràdio mateixa.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>La ràdio ha rebutjat el text CW (rigctld: %1). Comprova que sigui en CW (ara %2), que el break-in (BK-IN) estigui activat i que el port CAT sigui el de la ràdio.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Aquesta ràdio no sap aturar el CW per CAT: el missatge acaba sol. Per interrompre&apos;l fes servir la ràdio o un manipulador sèrie.</translation>
     </message>
@@ -13193,6 +13398,18 @@ Camps extra conservats: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>La ràdio ha rebutjat l&apos;ordre CAT de potència/acoblador (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>L’aturada de CW no s’ha confirmat. Comprova l’estat de TX de la ràdio.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>El servidor CAT o la ràdio no admet l’enviament de text CW (rigctld: %1). Amb CAT compartit, actualitza l’aplicació mestra i activa’n el permís de transmissió. La ràdio ha d’admetre un manipulador CW per CAT; no cal una connexió sèrie directa.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>La ràdio ha rebutjat el text CW (rigctld: %1). Comprova que sigui en CW (ara %2), que el break-in (BK-IN) estigui activat i que el servidor CAT permeti transmetre.</translation>
     </message>
 </context>
 <context>

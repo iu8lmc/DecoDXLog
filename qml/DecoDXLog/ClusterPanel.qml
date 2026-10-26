@@ -35,6 +35,7 @@ GlassPanel {
     readonly property var recommendations: { model.count; return cluster.assistantRecommendations() }
     readonly property var quickBands: ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m", "6m"]
     readonly property var quickModes: ["FT2", "FT8", "FT4", "CW", "SSB"]
+    readonly property string lotwHint: qsTr("LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.")
 
     // ── Le colonne ──────────────────────────────────────────────────────────
     // Si scelgono e si mettono in ordine come nel log: dal chip "colonne" o
@@ -477,10 +478,11 @@ GlassPanel {
                 clip: true
                 model: root.recommendations
                 delegate: Rectangle {
+                    required property int index
                     required property var modelData
                     width: ListView.view.width
                     height: 58
-                    color: index % 2 ? Theme.bgMedium : Theme.bgDark
+                    color: index % 2 ? Theme.bgMedium : Theme.bgDeep
                     RowLayout {
                         anchors.fill: parent
                         anchors.margins: 8
@@ -939,7 +941,33 @@ GlassPanel {
                     id: callCell
                     RowLayout {
                         spacing: 4
+                        clip: true
+                        // Independent of the Entity column and the LoTW-only
+                        // filter: also visible in compact and contest layouts.
+                        Rectangle {
+                            objectName: "clusterLotwBadge"
+                            visible: line.lotw
+                            Layout.preferredWidth: 16
+                            Layout.preferredHeight: 16
+                            radius: 3
+                            color: Qt.rgba(Theme.successColor.r, Theme.successColor.g, Theme.successColor.b, 0.14)
+                            border.color: Theme.successColor
+                            Accessible.role: Accessible.StaticText
+                            Accessible.name: root.lotwHint
+                            Text {
+                                anchors.centerIn: parent
+                                text: "L"
+                                color: Theme.successColor
+                                font.family: Theme.monoFamily
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
+                        }
                         Text {
+                            objectName: "clusterCallText"
+                            Layout.fillWidth: true
+                            Layout.minimumWidth: 0
+                            elide: Text.ElideRight
                             text: line.call
                             color: (line.status & 32) ? Theme.textSecondary : Theme.textPrimary
                             font.family: Theme.monoFamily
@@ -953,7 +981,6 @@ GlassPanel {
                             font.family: Theme.monoFamily
                             font.pixelSize: 10
                         }
-                        Item { Layout.fillWidth: true }
                     }
                 }
                 Component {
@@ -1044,9 +1071,11 @@ GlassPanel {
                             root.cluster.lookupSpot(line.spotKey)
                     }
                     onDoubleClicked: root.cluster.tune(line.spotKey)
-                    ToolTip.visible: containsMouse && line.spotCount > 1
+                    ToolTip.visible: containsMouse && (line.lotw || line.spotCount > 1)
                     ToolTip.delay: 700
-                    ToolTip.text: qsTr("Spotted by %1").arg(line.spotters)
+                    ToolTip.text: (line.lotw ? root.lotwHint : "")
+                                  + (line.lotw && line.spotCount > 1 ? "\n" : "")
+                                  + (line.spotCount > 1 ? qsTr("Spotted by %1").arg(line.spotters) : "")
                 }
             }
 

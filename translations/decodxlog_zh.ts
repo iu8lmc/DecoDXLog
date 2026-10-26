@@ -1169,6 +1169,156 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>呼号和俱乐部列表</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>正在加载本地列表…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>在可用且已启用的列表中没有完全匹配项。</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>信息来自已导入的列表，并非实时的会员资格验证。日志和呼号库数据不会改变。</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>未映射</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>呼号和俱乐部列表</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>导入本地 CSV/TXT 或 N1MM Call History 文件。可同时启用多个列表，在非 Contest 模式下也一样。结果显示在呼号信息中，绝不会替换 QSO、呼号库或比赛字段。</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>此处的更改会立即保存。系统会保留一份离线副本；“重新加载”会再次读取原始文件。</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 条记录 · 导入于 %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>重新加载</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">移除</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>添加列表…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>列表名称</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>例如：我的 CW 俱乐部</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>分隔符</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">自动</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>逗号</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>分号</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>制表符</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>编码</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>自动 (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>第一行包含列名 (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>预览 / 刷新列</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>N1MM 的列从每条 !!Order!! 指令中读取。所有会员资格分别保留。</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>呼号列（必填）</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>姓名列</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>俱乐部列</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>会员编号列</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>QTH 列</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>未映射的非空字段也会连同其列名一起显示。匹配为精确匹配，不区分大小写；不会去除便携后缀。</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>导入列表</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>导入呼号列表</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>呼号列表 (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">所有文件 (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>删除列表</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>删除此列表及其离线副本？原始文件不会被删除。</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1495,6 +1645,10 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>DX 助手可用天线</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW 用户（根据已加载的 ARRL 列表，在过去 365 天内上传过）。这不是 QSO 确认。</translation>
     </message>
 </context>
 <context>
@@ -8684,6 +8838,10 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>请在下方设置密码，并在 HH 的“配置”中设置相同的密码。DecoPort 会为每个数据包签名：没有密码就不会启动。</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>呼号列表</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10105,6 +10263,61 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>Exchange</source>
         <translation>交换</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>请选择一个现有的普通文件。</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>文件超过 32 MiB。</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>正在加载本地列表…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>未应用：%1。已保存的列表没有更改。</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>无法创建列表存储文件夹。</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>列表配置无效。</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>已从离线副本恢复本地列表。</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>请选择一个本地文件。</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>预览已就绪。导入前请检查各列。</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>上限为 64 个列表。</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>已导入 %1 条记录；%2 行被跳过或重复。</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>列表首选项已保存。</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>列表已删除。原始文件未被删除。</translation>
     </message>
 </context>
 <context>
@@ -13074,14 +13287,6 @@ QSL 状态：%6 · UTC 不完整：%7。
         <translation>这条 CAT 连接不能发 CW (rigctld：%1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>电台没有接下这段 CW 文字 (rigctld：%1)。不是每台电台 — 也不是每个 CAT 桥接 — 都能发 CW：要用宏，就得让 rigctld 直接和电台说话。</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>电台拒绝了 CW 文本（rigctld：%1）。请检查是否处于 CW（当前 %2）、是否开启插入（BK-IN），以及 CAT 端口是否为电台本身的端口。</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>此电台无法通过 CAT 停止 CW：消息会自行发完。要中断请使用电台或串口电键。</translation>
     </message>
@@ -13128,6 +13333,18 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>电台拒绝了功率/天调的 CAT 命令 (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>CW 停止未得到确认。请检查电台的发射状态。</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>CAT 服务器或电台不支持发送 CW 文本 (rigctld: %1)。使用共享 CAT 时，请更新主应用程序并启用其发射权限。电台必须支持 CAT CW 键控器；不需要直接串口连接。</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>电台拒绝了 CW 文本 (rigctld: %1)。请检查它是否处于 CW 模式（当前为 %2）、break-in (BK-IN) 是否已开启，以及 CAT 服务器是否允许发射。</translation>
     </message>
 </context>
 <context>

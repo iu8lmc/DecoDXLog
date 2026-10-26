@@ -1177,6 +1177,156 @@ The call Decodium is working shows up here by itself.</source>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Списки позывных и клубов</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Загрузка локальных списков…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Точных совпадений в доступных включённых списках нет.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Данные из импортированных списков, а не проверка членства в реальном времени. Данные журнала и callbook не меняются.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Не сопоставлено</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Списки позывных и клубов</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Импорт локальных файлов CSV/TXT или N1MM Call History. Одновременно могут быть активны несколько списков, в том числе вне режима Contest. Результаты появляются в карточке позывного и никогда не заменяют поля QSO, callbook или contest.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Изменения здесь сохраняются сразу. Автономная копия сохраняется; «Перезагрузить» заново читает исходный файл.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>Записей: %1 · импортирован %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Перезагрузить</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Убрать</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Добавить список…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Название списка</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Например: мои CW-клубы</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Разделитель</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Авто</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Запятая</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Точка с запятой</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Табуляция</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Кодировка</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Автоматически (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>Первая строка содержит названия столбцов (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Предпросмотр / обновить столбцы</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>Столбцы N1MM читаются из каждой директивы !!Order!!. Все членства хранятся отдельно.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Столбец позывного (обязательный)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Столбец имени</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Столбец клуба</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Столбец номера члена</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Столбец QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Несопоставленные непустые поля тоже показываются под названиями своих столбцов. Поиск точный, без учёта регистра; суффиксы портативной работы не удаляются.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Импортировать список</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Импорт списка позывных</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Списки позывных (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Все файлы (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Удалить список</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Удалить этот список и его автономную копию? Исходный файл удалён не будет.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1503,6 +1653,10 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Доступные антенны для DX-ассистента</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>Пользователь LoTW (загрузка за последние 365 дней по загруженному списку ARRL). Это не подтверждение QSO.</translation>
     </message>
 </context>
 <context>
@@ -8728,6 +8882,10 @@ Extra fields are preserved: %8</source>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Задай ниже пароль и такой же в HH, в «Настройке». DecoPort подписывает каждый пакет: без пароля ничего не запустится.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Списки позывных</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10157,6 +10315,61 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Exchange</source>
         <translation>Обмен</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Выбери существующий обычный файл.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>Файл превышает 32 МиБ.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Загрузка локальных списков…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Не применено: %1. Сохранённые списки не изменены.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>Не удаётся создать папку для хранения списков.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Недопустимая конфигурация списков.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Локальные списки восстановлены из автономных копий.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Выбери локальный файл.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Предпросмотр готов. Проверь столбцы перед импортом.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>Ограничение — 64 списка.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>Импортировано записей: %1; пропущено или дубликатов строк: %2.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Настройки списков сохранены.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Список удалён. Исходный файл не был удалён.</translation>
     </message>
 </context>
 <context>
@@ -13204,14 +13417,6 @@ Extra fields are preserved: %8</source>
         <translation>Эта связь по CAT не манипулирует CW (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>Трансивер не принял текст CW (rigctld: %1). Не всякий трансивер — и не всякий мост CAT — умеет манипулировать: для макросов нужен rigctld, говорящий с самим трансивером.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>Трансивер отказался от CW-текста (rigctld: %1). Проверьте, что он в CW (сейчас %2), что включён break-in (BK-IN) и что CAT-порт — порт самого трансивера.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Этот трансивер не умеет останавливать CW по CAT: сообщение закончится само. Чтобы прервать, используйте трансивер или последовательный ключ.</translation>
     </message>
@@ -13258,6 +13463,18 @@ Extra fields are preserved: %8</source>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>Радиостанция отклонила CAT-команду мощности/тюнера (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>Остановка CW не подтверждена. Проверь состояние передачи (TX) радиостанции.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>CAT-сервер или радиостанция не поддерживает отправку CW-текста (rigctld: %1). При общем CAT обнови главное приложение и включи в нём разрешение на передачу. Радиостанция должна поддерживать CAT CW-ключ; прямое последовательное подключение не требуется.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>Радиостанция отклонила CW-текст (rigctld: %1). Проверь, что она в режиме CW (сейчас %2), включён break-in (BK-IN) и CAT-сервер разрешает передачу.</translation>
     </message>
 </context>
 <context>

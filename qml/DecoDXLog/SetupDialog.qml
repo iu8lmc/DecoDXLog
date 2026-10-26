@@ -29,7 +29,7 @@ DialogFrame {
 
     readonly property var pages: [qsTr("General"), qsTr("Theme & density"), qsTr("Decodium link"),
                                   qsTr("Sync & Cloud"), qsTr("QSL services"), qsTr("Callbook"),
-                                  qsTr("Radio (CAT)"), qsTr("Rotor"), qsTr("Backup")]
+                                  qsTr("Radio (CAT)"), qsTr("Rotor"), qsTr("Backup"), qsTr("Callsign lists")]
 
     // Per le prove: la meta' di sotto di una pagina lunga si vede solo
     // scorrendo, e una prova non ha un dito da passare sulla rotella.
@@ -3022,6 +3022,7 @@ DialogFrame {
                     Note { text: qsTr("A consistent copy made with SQLite VACUUM INTO, even while DecoDXLog is logging. If the PC is off at the chosen time, the copy is made as soon as DecoDXLog is open.") }
                     Item { Layout.fillHeight: true }
                 }
+                CallListSettings { controller: decolog.callLists }
             }
             }
         }

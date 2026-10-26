@@ -60,6 +60,7 @@ private slots:
         share.setRigProvider([&rig]() -> RigLink* { return &rig; });
         QCOMPARE(share.handleLine("\\get_powerstat"), QString("1\n"));
         QCOMPARE(share.handleLine("\\chk_vfo"), QString("0\n"));       // non "CHKVFO 0"
+        QCOMPARE(share.handleLine("\\get_lock_mode"), QString("0\nRPRT 0\n"));
         QVERIFY(share.handleLine("\\dump_state").endsWith("done\n"));
         QVERIFY(share.handleLine("\\dump_state").startsWith("1\n1\n2\n"));
         QCOMPARE(share.handleLine("f"), QString("14074000\n"));

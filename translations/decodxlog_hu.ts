@@ -1169,6 +1169,156 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Hívójel- és klublisták</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Helyi listák betöltése…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Nincs pontos egyezés az elérhető, engedélyezett listákban.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Az importált listákból származó adatok, nem élő tagságellenőrzés. A napló és a callbook adatai változatlanok maradnak.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Nincs hozzárendelve</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Hívójel- és klublisták</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Helyi CSV/TXT vagy N1MM Call History fájlok importálása. Több lista is aktív lehet egyszerre, a Contest módon kívül is. Az eredmények a hívójel-adatlapon jelennek meg; soha nem írják felül a QSO-, callbook- vagy contest-mezőket.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>A módosítások azonnal mentésre kerülnek. Egy offline másolat megmarad; az Újratöltés újra beolvassa az eredeti fájlt.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 bejegyzés · importálva: %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Újratöltés</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Eltávolítás</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Lista hozzáadása…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>A lista neve</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Például: a CW klubjaim</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Elválasztó</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Vessző</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Pontosvessző</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulátor</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Kódolás</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automatikus (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>Az első sor az oszlopneveket tartalmazza (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Előnézet / oszlopok frissítése</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>Az N1MM oszlopait minden !!Order!! direktívából olvassa be. Az összes tagság külön marad.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Hívójel oszlop (kötelező)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Név oszlop</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Klub oszlop</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Tagsági szám oszlop</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>QTH oszlop</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>A nem hozzárendelt, nem üres mezők is megjelennek az oszlopnevükkel. Az egyezés pontos, a kis- és nagybetűk között nem tesz különbséget; a hordozható utótagokat nem távolítja el.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Lista importálása</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Hívójellista importálása</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Hívójellisták (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Minden fájl (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Lista eltávolítása</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Eltávolítod ezt a listát és az offline másolatát? Az eredeti fájl nem törlődik.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1495,6 +1645,10 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Elérhető antennák a DX-asszisztenshez</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW-felhasználó (feltöltés az elmúlt 365 napban a betöltött ARRL-lista szerint). Ez nem QSO-megerősítés.</translation>
     </message>
 </context>
 <context>
@@ -8684,6 +8838,10 @@ A további mezők megmaradnak: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Adj meg egy jelszót lent, és ugyanazt a HH-ban a Beállítás alatt. A DecoPort minden csomagot aláír: jelszó nélkül semmi sem indul el.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Hívójellisták</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10105,6 +10263,61 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Csere</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Válassz egy létező, hagyományos fájlt.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>A fájl meghaladja a 32 MiB-ot.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Helyi listák betöltése…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Nem alkalmazva: %1. A mentett listák nem változtak.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>Nem hozható létre a listák tárolómappája.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Érvénytelen listakonfiguráció.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>A helyi listák visszaállítva az offline másolatokból.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Válassz egy helyi fájlt.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Az előnézet kész. Importálás előtt ellenőrizd az oszlopokat.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>A korlát 64 lista.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>%1 bejegyzés importálva; %2 sor kihagyva vagy duplikált.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>A listabeállítások elmentve.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>A lista eltávolítva. Az eredeti fájl nem lett törölve.</translation>
     </message>
 </context>
 <context>
@@ -13074,14 +13287,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>Ez a CAT-kapcsolat nem ad CW-t (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>A rádió nem vette át a CW-szöveget (rigctld: %1). Nem minden rádió — és nem minden CAT-híd — tud CW-t adni: a makrókhoz olyan rigctld kell, amelyik magával a rádióval beszél.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>A rádió elutasította a CW szöveget (rigctld: %1). Ellenőrizd, hogy CW-ben van-e (most %2), be van-e kapcsolva a break-in (BK-IN), és hogy a CAT-port a rádióé-e.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Ez a rádió CAT-on nem tudja leállítani a CW-t: az üzenet magától ér véget. A megszakításhoz használd a rádiót vagy egy soros billentyűzőt.</translation>
     </message>
@@ -13128,6 +13333,18 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>A rádió elutasította a teljesítmény/antennahangoló CAT-parancsot (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>A CW-leállítás nem lett visszaigazolva. Ellenőrizd a rádió adás állapotát.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>A CAT-szerver vagy a rádió nem támogatja a CW-szöveg küldését (rigctld: %1). Megosztott CAT esetén frissítsd a fő alkalmazást, és engedélyezd benne az adást. A rádiónak támogatnia kell a CAT CW-kulcsot; közvetlen soros kapcsolat nem szükséges.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>A rádió elutasította a CW-szöveget (rigctld: %1). Ellenőrizd, hogy CW módban van-e (most: %2), be van-e kapcsolva a break-in (BK-IN), és engedélyezi-e a CAT-szerver az adást.</translation>
     </message>
 </context>
 <context>

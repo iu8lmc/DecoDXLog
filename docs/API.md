@@ -26,7 +26,7 @@ Tutte le risposte sono JSON.
 
 ### `GET /api/v1/status`
 
-    {"app":"DecoDXLog","version":"1.17.40","log":"decodxlog","qsos":26497,
+    {"app":"DecoDXLog","version":"1.17.43","log":"decodxlog","qsos":26497,
      "station":"IU8LMC","decodium":true}
 
 ### `GET /api/v1/worked?call=K1ABC&band=20m&mode=FT8`

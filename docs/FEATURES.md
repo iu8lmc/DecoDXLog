@@ -1,4 +1,4 @@
-# DecoDXLog 1.17.40 — funzioni / features
+# DecoDXLog 1.17.43 — funzioni / features
 
 Ogni voce è in italiano e in inglese: *italiano* / *English*.
 Quello che manca è in fondo.
@@ -374,6 +374,35 @@ Quello che manca è in fondo.
   formato N1MM e **progressivi distribuiti** in rete. / **Per-edition rules**, time on the
   air and breaks as the rules say, **call history** in N1MM format and **serial numbers
   shared** on the network.
+
+### Elenchi nominativi e club / Callsign and club lists
+
+- **Impostazioni → Elenchi nominativi**, anche senza contest: aggiungi più file
+  locali CSV/TXT (virgola, punto e virgola o tab) o N1MM Call History con direttive
+  `!!Order!!`. Anteprima, scelta della codifica UTF-8/Latin-1 e associazione delle
+  colonne; solo il nominativo è obbligatorio. Nei CSV senza intestazione disattiva
+  «La prima riga contiene i nomi delle colonne». / **Setup → Callsign lists**, also
+  outside contests: multiple local CSV/TXT files or N1MM Call History with
+  `!!Order!!`, preview, encoding and column mapping; only callsign is required.
+- Attiva/disattiva, ricarica dal file originale o rimuovi ogni elenco. Le modifiche
+  vengono salvate subito (non dipendono da Applica). Le copie offline restano
+  utilizzabili dopo riavvio o spostamento dell'originale; un import non valido non
+  sostituisce la copia precedente. La rimozione non cancella l'originale. /
+  Enable, reload or remove each list. Changes save immediately, independently of
+  Apply. Offline copies survive restart and missing originals; failed imports
+  preserve the previous copy. Removing a list never deletes its original file.
+- La **Scheda nominativo** mostra tutte le appartenenze con fonte e data importazione.
+  Ricerca esatta senza distinzione di maiuscole/minuscole: `/P` e altri suffissi
+  non vengono rimossi. I dati non certificano iscrizioni attuali e non modificano
+  QSO, callbook, scambi contest o conteggi dei diplomi. / **Call info** shows all
+  memberships with source and import date. Matching is exact and case-insensitive;
+  portable suffixes are not stripped. Imported data is not live verification and
+  never changes QSOs, callbook fields, contest exchanges or award counts.
+- Fino a 64 elenchi, 32 MiB per file, 500.000 righe, 64 colonne e 4096 caratteri per
+  campo. Lettura/indicizzazione su worker. Nessun download automatico o filtro club
+  nel cluster. / Up to 64 lists, 32 MiB per file, 500,000 rows, 64 columns and 4096
+  characters per field, loaded/indexed off the GUI thread. No automatic downloads
+  or club-based cluster filters.
 
 ## 10d. Propagazione / Propagation
 

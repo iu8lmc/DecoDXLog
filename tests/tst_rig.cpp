@@ -24,9 +24,14 @@ public:
     // testo) o -11 (ENAVAIL, la radio non manipola).
     int morseError{-1};
     bool stopWorks{true};
+    int stopError{-11};
+    int connections{0};
+    int replyDelayMs{0};
+    int repliesLostOnDisconnect{0};
     // Il ponte CAT di Decodium risponde col valore e basta: niente eco del
     // comando, niente RPRT. DecoDXLog deve capire anche quello.
     bool plainAnswers{false};
+    bool labelledSpeed{false};
     // Split, VFO, RIT e XIT; una radio senza RIT risponde -11.
     bool split{false};
     qint64 txFrequency{0};
@@ -46,6 +51,7 @@ public:
     {
         connect(this, &QTcpServer::newConnection, this, [this] {
             while (QTcpSocket* s = nextPendingConnection()) {
+                ++connections;
                 connect(s, &QTcpSocket::readyRead, s, [this, s] {
                     while (s->canReadLine()) {
                         QString raw = QString::fromUtf8(s->readLine());
@@ -53,7 +59,18 @@ public:
                         rawReceived << raw;
                         const QString line = raw.trimmed();
                         received << line;
-                        s->write(answer(raw).toUtf8());
+                        const QByteArray reply = answer(raw).toUtf8();
+                        if (replyDelayMs == 0) {
+                            s->write(reply);
+                        } else {
+                            const QPointer<QTcpSocket> socket(s);
+                            QTimer::singleShot(replyDelayMs, this, [this, socket, reply] {
+                                if (socket && socket->state() == QAbstractSocket::ConnectedState)
+                                    socket->write(reply);
+                                else
+                                    ++repliesLostOnDisconnect;
+                            });
+                        }
                     }
                 });
                 connect(s, &QTcpSocket::disconnected, s, &QObject::deleteLater);
@@ -91,7 +108,9 @@ public:
         if (cmd == QLatin1String("m"))
             return QStringLiteral("get_mode:\nMode: %1\nPassband: 500\nRPRT 0\n").arg(mode);
         if (cmd == QLatin1String("l KEYSPD"))
-            return QStringLiteral("get_level: KEYSPD\n%1\nRPRT 0\n").arg(keyspd);
+            return labelledSpeed
+                ? QStringLiteral("get_level: KEYSPD\nLevel Value: %1.000000\nRPRT 0\n").arg(keyspd)
+                : QStringLiteral("get_level: KEYSPD\n%1\nRPRT 0\n").arg(keyspd);
         if (cmd.startsWith(QLatin1String("F "))) {
             frequency = cmd.mid(2).toLongLong();
             return QStringLiteral("set_freq: %1\nRPRT 0\n").arg(frequency);
@@ -138,7 +157,7 @@ public:
         if (cmd.startsWith(QLatin1String("b ")))
             return QStringLiteral("send_morse: %1\nRPRT %2\n").arg(cmd.mid(2)).arg(morseWorks ? 0 : morseError);
         if (cmd.contains(QLatin1String("stop_morse")))
-            return QStringLiteral("stop_morse:\nRPRT %1\n").arg(stopWorks ? 0 : -11);
+            return QStringLiteral("stop_morse:\nRPRT %1\n").arg(stopWorks ? 0 : stopError);
         return QStringLiteral("%1:\nRPRT 0\n").arg(cmd);
     }
 };
@@ -149,6 +168,15 @@ class TestRig : public QObject {
     Q_OBJECT
 
 private slots:
+    void readsSharedCatSpeedWithLabelAndDecimalValue()
+    {
+        FakeRigctld rig;
+        rig.labelledSpeed = true;
+        rig.keyspd = 37;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE_WITH_TIMEOUT(control.speedWpm(), 37, 5000);
+    }
     void readsWhereTheRadioIs()
     {
         FakeRigctld rig;
@@ -415,8 +443,7 @@ private slots:
         QVERIFY(!rig.received.contains(QStringLiteral("+b ?")));
     }
 
-    // Il dekey e' il primo comando di Ferma. Il secondo collegamento urgente
-    // puo' duplicare i due comandi, ma non puo' invertire quell'ordine.
+    // Il dekey e' il primo comando di Ferma, anche sulla connessione di fallback.
     void emergencyStopReleasesPttBeforeStoppingMorse()
     {
         FakeRigctld rig;
@@ -469,12 +496,181 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+\\stop_morse")), 5000);
         const int configuredPttOff = rig.received.indexOf(QStringLiteral("+T 0"));
         const int catPttOff = rig.received.indexOf(QStringLiteral("+w TX0;"));
-        // The normal CAT socket also sends an idempotent stop before the
-        // emergency socket connects.  The last stop belongs to the complete
-        // emergency sequence and must follow its raw Yaesu TX0 command.
-        const int stopMorse = rig.received.lastIndexOf(QStringLiteral("+\\stop_morse"));
+        const int stopMorse = rig.received.indexOf(QStringLiteral("+\\stop_morse"));
         QVERIFY(configuredPttOff < catPttOff);
         QVERIFY(catPttOff < stopMorse);
+    }
+
+    void repeatedStopUsesOneOrderedConnectionAndNeverResendsTheMacro()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.setYaesuKeyerMemoryMode(true);
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        QSignalSpy sent(&control, &RigControl::morseSent);
+        control.sendMorse(QStringLiteral("CQ TEST"));
+        QTRY_COMPARE(sent.count(), 1);
+        control.sendMorse(QStringLiteral("UP UP"));
+
+        // Rapid double/triple clicks while a stop reply is still in flight.
+        rig.replyDelayMs = 80;
+        for (int i = 0; i < 20; ++i)
+            control.emergencyStop();
+        QTest::qWait(400);
+        QCOMPARE(rig.connections, 1);
+        QCOMPARE(rig.received.count(QStringLiteral("+T 0")), 1);
+        QCOMPARE(rig.received.count(QStringLiteral("+\\stop_morse")), 1);
+
+        // Further clicks after completion must still release PTT, without CW.
+        rig.replyDelayMs = 0;
+        control.emergencyStop();
+        QTRY_COMPARE(rig.received.count(QStringLiteral("+T 0")), 2);
+        QTest::qWait(1800);
+        QCOMPARE(rig.connections, 1);
+        QCOMPARE(rig.received.filter(QStringLiteral("+b ")),
+                 QStringList{QStringLiteral("+b CQ TEST")});
+        QCOMPARE(sent.count(), 1);
+
+        // Only an explicit new Send may start a new message.
+        control.sendMorse(QStringLiteral("TU"));
+        QTRY_COMPARE(sent.count(), 2);
+        QCOMPARE(rig.received.filter(QStringLiteral("+b ")),
+                 QStringList({QStringLiteral("+b CQ TEST"), QStringLiteral("+b TU")}));
+    }
+
+    void emergencyConnectionWaitsForRepliesAndCoalescesRepeatedClicks()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        control.disconnectFromRig();
+        rig.received.clear();
+        rig.replyDelayMs = 100;
+        for (int i = 0; i < 20; ++i)
+            control.emergencyStop();
+        QTRY_VERIFY(rig.received.contains(QStringLiteral("+\\stop_morse")));
+        QTest::qWait(300);
+        QCOMPARE(rig.connections, 2); // the old normal socket + one emergency
+        QCOMPARE(rig.received.count(QStringLiteral("+T 0")), 1);
+        QCOMPARE(rig.received.count(QStringLiteral("+\\stop_morse")), 1);
+        QCOMPARE(rig.repliesLostOnDisconnect, 0);
+    }
+
+    void unsupportedMorseStopIsNotRetriedByTheEmergencyConnection()
+    {
+        FakeRigctld rig;
+        rig.stopWorks = false; // FTDX-3000 backend: no native stop_morse
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        QSignalSpy failed(&control, &RigControl::failed);
+        control.emergencyStop();
+        QTRY_COMPARE(failed.count(), 1);
+        QTest::qWait(100);
+        control.disconnectFromRig();
+        control.emergencyStop();
+        QTest::qWait(300);
+        QCOMPARE(rig.received.count(QStringLiteral("+\\stop_morse")), 1);
+        QCOMPARE(rig.received.count(QStringLiteral("+T 0")), 2);
+    }
+
+    void stalledNormalConnectionStillGetsOneEmergencyFallback()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        rig.replyDelayMs = 900; // longer than the normal stop's fallback timer
+        for (int i = 0; i < 20; ++i)
+            control.emergencyStop();
+        QTRY_COMPARE(rig.connections, 2);
+        // New explicit CW must wait until both stop paths have drained.
+        control.sendMorse(QStringLiteral("TU"));
+        QVERIFY(!rig.received.contains(QStringLiteral("+b TU")));
+        QTRY_VERIFY(rig.received.contains(QStringLiteral("+b TU")));
+        QCOMPARE(rig.received.count(QStringLiteral("+T 0")), 2);
+        QCOMPARE(rig.received.count(QStringLiteral("+\\stop_morse")), 2);
+        QCOMPARE(rig.connections, 2);
+        QCOMPARE(rig.repliesLostOnDisconnect, 0);
+    }
+
+    void lateMorseAcknowledgementCannotReviveStoppedQueue()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.setYaesuKeyerMemoryMode(true);
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        rig.replyDelayMs = 150;
+        QSignalSpy sent(&control, &RigControl::morseSent);
+        control.sendMorse(QStringLiteral("CQ TEST"));
+        control.sendMorse(QStringLiteral("UP UP"));
+        QTRY_VERIFY(rig.received.contains(QStringLiteral("+b CQ TEST")));
+        for (int i = 0; i < 10; ++i)
+            control.emergencyStop();
+        QTest::qWait(1600);
+        QCOMPARE(sent.count(), 0);
+        QCOMPARE(rig.received.filter(QStringLiteral("+b ")),
+                 QStringList{QStringLiteral("+b CQ TEST")});
+        QCOMPARE(rig.connections, 1);
+    }
+
+    void temporaryStopErrorCanBeRetried()
+    {
+        FakeRigctld rig;
+        rig.stopWorks = false;
+        rig.stopError = -5; // I/O failure is not an unsupported command
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        QSignalSpy failed(&control, &RigControl::failed);
+        control.emergencyStop();
+        QTRY_COMPARE(failed.count(), 1);
+        control.emergencyStop();
+        QTRY_COMPARE(failed.count(), 2);
+        QCOMPARE(rig.received.count(QStringLiteral("+\\stop_morse")), 2);
+    }
+
+    void unacknowledgedEmergencyStopDoesNotBlockTheNextAttempt()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        control.disconnectFromRig();
+        rig.replyDelayMs = 4000;
+        QSignalSpy failed(&control, &RigControl::failed);
+        control.emergencyStop();
+        QTRY_VERIFY_WITH_TIMEOUT(!failed.isEmpty(), 5000);
+        QVERIFY(failed.last().first().toString().contains(QStringLiteral("not acknowledged")));
+        rig.replyDelayMs = 0;
+        control.emergencyStop();
+        QTRY_COMPARE(rig.received.count(QStringLiteral("+T 0")), 2);
+    }
+
+    void changingEndpointCancelsOldStopAndResetsUnsupportedCapability()
+    {
+        FakeRigctld oldRig;
+        oldRig.stopWorks = false;
+        FakeRigctld newRig;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), oldRig.serverPort());
+        QTRY_COMPARE(control.speedWpm(), 22);
+        QSignalSpy failed(&control, &RigControl::failed);
+        control.emergencyStop();
+        QTRY_COMPARE(failed.count(), 1);
+        oldRig.replyDelayMs = 800;
+        control.emergencyStop();
+        QTRY_COMPARE(oldRig.received.count(QStringLiteral("+T 0")), 2);
+        control.connectTo(QStringLiteral("127.0.0.1"), newRig.serverPort());
+        QTRY_VERIFY(control.connected());
+        control.emergencyStop();
+        QTRY_COMPARE(newRig.received.count(QStringLiteral("+\\stop_morse")), 1);
+        QTest::qWait(900);
+        QCOMPARE(oldRig.connections, 1); // old fallback timer was cancelled
+        QCOMPARE(newRig.connections, 1);
     }
 
     // rigctld risponde a "get_level" col valore nudo e *poi* con RPRT. Il

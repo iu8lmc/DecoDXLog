@@ -1177,6 +1177,156 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Izsaukuma zīmju un klubu saraksti</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Notiek vietējo sarakstu ielāde…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Pieejamajos, ieslēgtajos sarakstos nav precīzas atbilstības.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Dati no importētajiem sarakstiem, nevis dalības pārbaude reāllaikā. Žurnāla un callbook dati netiek mainīti.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Nav piesaistīts</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Izsaukuma zīmju un klubu saraksti</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importē vietējos CSV/TXT vai N1MM Call History failus. Vienlaikus var būt aktīvi vairāki saraksti, arī ārpus Contest režīma. Rezultāti parādās izsaukuma zīmes kartītē un nekad neaizstāj QSO, callbook vai contest laukus.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Izmaiņas tiek saglabātas uzreiz. Tiek glabāta bezsaistes kopija; „Pārlādēt” vēlreiz nolasa oriģinālo failu.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 ieraksti · importēts %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Pārlādēt</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Noņemt</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Pievienot sarakstu…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Saraksta nosaukums</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Piemēram: mani CW klubi</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Atdalītājs</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Komats</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Semikols</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulācija</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Kodējums</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automātiski (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>Pirmajā rindā ir kolonnu nosaukumi (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Priekšskatījums / atjaunināt kolonnas</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>N1MM kolonnas tiek nolasītas no katras !!Order!! direktīvas. Visas dalības tiek glabātas atsevišķi.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Izsaukuma zīmes kolonna (obligāta)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Vārda kolonna</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Kluba kolonna</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Dalībnieka numura kolonna</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>QTH kolonna</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Nepiesaistītie, netukšie lauki arī tiek rādīti ar savu kolonnas nosaukumu. Meklēšana ir precīza, neņemot vērā burtu reģistru; portable piedēkļi netiek noņemti.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Importēt sarakstu</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Importēt izsaukuma zīmju sarakstu</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Izsaukuma zīmju saraksti (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Visi faili (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Noņemt sarakstu</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Vai noņemt šo sarakstu un tā bezsaistes kopiju? Oriģinālais fails netiks dzēsts.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1503,6 +1653,10 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
     <message>
         <source>DX Assistant available antennas</source>
         <translation>DX asistenta pieejamās antenas</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW lietotājs (augšupielāde pēdējo 365 dienu laikā pēc ielādētā ARRL saraksta). Tas nav QSO apstiprinājums.</translation>
     </message>
 </context>
 <context>
@@ -8728,6 +8882,10 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Iestati zemāk paroli un to pašu HH sadaļā Konfigurēt. DecoPort paraksta katru paketi: bez paroles nekas nesākas.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Izsaukuma zīmju saraksti</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10157,6 +10315,61 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Apmaiņa</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Izvēlies esošu parastu failu.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>Fails pārsniedz 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Notiek vietējo sarakstu ielāde…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Nav lietots: %1. Saglabātie saraksti nav mainīti.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>Nevar izveidot sarakstu glabāšanas mapi.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Nederīga sarakstu konfigurācija.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Vietējie saraksti atjaunoti no bezsaistes kopijām.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Izvēlies vietējo failu.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Priekšskatījums gatavs. Pirms importēšanas pārbaudi kolonnas.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>Ierobežojums ir 64 saraksti.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>Importēti %1 ieraksti; %2 rindas izlaistas vai dublētas.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Sarakstu preferences saglabātas.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Saraksts noņemts. Oriģinālais fails netika dzēsts.</translation>
     </message>
 </context>
 <context>
@@ -13204,14 +13417,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Šis CAT savienojums CW nemanipulē (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>Radio CW tekstu nepieņēma (rigctld: %1). Ne katra radio — un ne katrs CAT tilts — spēj manipulēt CW: makro vajag rigctld, kas runā ar pašu radio.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>Radio atteica CW tekstu (rigctld: %1). Pārbaudi, vai tas ir CW režīmā (tagad %2), vai ir ieslēgts break-in (BK-IN) un vai CAT ports ir paša radio.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Šis radio nevar apturēt CW pa CAT: ziņojums beidzas pats. Lai to pārtrauktu, izmanto radio vai seriālo manipulatoru.</translation>
     </message>
@@ -13258,6 +13463,18 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>Radio noraidīja CAT jaudas/tjūnera komandu (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>CW apturēšana netika apstiprināta. Pārbaudi radio TX stāvokli.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>CAT serveris vai radio neatbalsta CW teksta sūtīšanu (rigctld: %1). Koplietotam CAT atjaunini galveno lietotni un ieslēdz tās pārraides atļauju. Radio jāatbalsta CAT CW taustiņš; tiešs seriālais savienojums nav nepieciešams.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>Radio noraidīja CW tekstu (rigctld: %1). Pārbaudi, vai tas ir CW režīmā (tagad %2), vai break-in (BK-IN) ir ieslēgts un vai CAT serveris atļauj pārraidi.</translation>
     </message>
 </context>
 <context>

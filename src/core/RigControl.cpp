@@ -18,6 +18,7 @@ constexpr int kRetryMs = 5000;
 // Quanto si aspetta prima di chiedere se lo split e' stato preso: la radio (o
 // Decodium, se il CAT passa da li') ci mette un momento a confermarlo.
 constexpr int kSplitCheckMs = 3000;
+constexpr int kStopFallbackMs = 500;
 } // namespace
 
 RigControl::RigControl(QObject* parent)
@@ -53,6 +54,8 @@ RigControl::RigControl(QObject* parent)
     connect(m_socket, &QTcpSocket::disconnected, this, [this] {
         cancelMorseQueue();
         m_poll.stop();
+        if (m_stopInFlight)
+            sendEmergencyStop();
         if (m_wanted)
             m_retry.start();
         emit changed();
@@ -77,6 +80,10 @@ RigControl::RigControl(QObject* parent)
         m_activeMorseToken = 0;
         startNextMorse();
     });
+
+    m_stopFallback.setSingleShot(true);
+    m_stopFallback.setInterval(kStopFallbackMs);
+    connect(&m_stopFallback, &QTimer::timeout, this, &RigControl::sendEmergencyStop);
 }
 
 bool RigControl::connected() const
@@ -87,6 +94,8 @@ bool RigControl::connected() const
 void RigControl::connectTo(const QString& host, quint16 port)
 {
     cancelMorseQueue();
+    resetStopRequest();
+    m_noStopMorse = false;
     m_host = host.trimmed().isEmpty() ? QStringLiteral("127.0.0.1") : host.trimmed();
     m_port = port > 0 ? port : 4532;
     m_wanted = true;
@@ -328,7 +337,7 @@ void RigControl::stopMorse()
 
 void RigControl::startNextMorse()
 {
-    if (m_morseInFlight || m_morseQueue.isEmpty() || !connected())
+    if (m_stopInFlight || m_morseInFlight || m_morseQueue.isEmpty() || !connected())
         return;
 
     m_morseInFlight = true;
@@ -380,19 +389,27 @@ void RigControl::finishMorse(const Pending& what, bool accepted)
 
 void RigControl::emergencyStop()
 {
-    // Il PTT va giu' prima di tutto quando la socket ordinaria e' disponibile.
-    // Se la connessione e' gia' caduta, non si puo' usare quella coda, ma il
-    // canale di emergenza qui sotto puo' ancora raggiungere rigctld e la radio.
-    // Il vecchio return lasciava proprio questi utenti in TX.
-    if (connected()) {
-        // Non mettere stop_morse prima del dekey: su alcune radio il comando CW
-        // resta occupato finche' non finisce la memoria interna.
-        setPtt(false);
-        stopMorse();
-    } else {
-        cancelMorseQueue();
+    cancelMorseQueue();
+    // One transaction, even on double clicks. Never create competing CAT
+    // sessions per click: raw reads on those sessions can consume replies
+    // belonging to an in-flight Hamlib command. Once finished, another Stop
+    // still sends PTT OFF (the rig may be keying independently of our UI).
+    if (m_stopInFlight)
+        return;
+    m_stopInFlight = true;
+    if (!connected()) {
+        sendEmergencyStop();
+        return;
     }
-    sendEmergencyStop();
+    send(QStringLiteral("set"), QStringLiteral("T 0"), 0);
+    if (!m_emergencyCatOffCommand.isEmpty())
+        send(QStringLiteral("set"), QStringLiteral("w %1").arg(m_emergencyCatOffCommand), 0);
+    if (!m_noStopMorse)
+        send(QStringLiteral("stopmorse"), QStringLiteral("\\stop_morse"), 0);
+    m_stopLastSeq = m_seq;
+    // Keep an emergency path for a stalled/disconnected CAT, without
+    // duplicating every healthy transaction on a second socket.
+    m_stopFallback.start();
 }
 
 void RigControl::setEmergencyCatOffCommand(const QString& command)
@@ -406,8 +423,13 @@ void RigControl::setEmergencyCatOffCommand(const QString& command)
 
 void RigControl::sendEmergencyStop()
 {
-    if (m_host.isEmpty() || m_port == 0)
+    if (!m_stopInFlight || m_emergencySocket)
         return;
+    m_stopFallback.stop();
+    if (m_host.isEmpty() || m_port == 0) {
+        finishStopRequest(false);
+        return;
+    }
 
     // La socket normale puo' avere davanti interrogazioni CAT o una risposta
     // lenta. Una seconda connessione a rigctld non partecipa alla sua coda
@@ -415,26 +437,92 @@ void RigControl::sendEmergencyStop()
     QByteArray commands = QByteArrayLiteral("+T 0\n");
     if (!m_emergencyCatOffCommand.isEmpty())
         commands += QByteArrayLiteral("+w ") + m_emergencyCatOffCommand.toLatin1() + '\n';
-    commands += QByteArrayLiteral("+\\stop_morse\n");
+    const bool requestMorseStop = !m_noStopMorse;
+    if (requestMorseStop)
+        commands += QByteArrayLiteral("+\\stop_morse\n");
 
     auto* emergency = new QTcpSocket(this);
+    m_emergencySocket = emergency;
     connect(emergency, &QTcpSocket::connected, emergency, [emergency, commands] {
         emergency->write(commands);
         emergency->flush();
     });
-    connect(emergency, &QTcpSocket::bytesWritten, emergency, [emergency](qint64) {
-        if (emergency->bytesToWrite() == 0)
-            emergency->disconnectFromHost();
+    // bytesWritten only confirms delivery to the OS, not that rigctld has
+    // processed the commands. Drain every RPRT before closing the connection.
+    connect(emergency, &QTcpSocket::readyRead, this,
+            [this, emergency, requestMorseStop, remaining = commands.count('\n')]() mutable {
+        while (emergency->canReadLine()) {
+            const QByteArray line = emergency->readLine().trimmed();
+            if (!line.startsWith("RPRT "))
+                continue;
+            const int result = line.mid(5).toInt();
+            if (--remaining == 0 && requestMorseStop)
+                handleStopMorseReply(result);
+            else if (result != 0)
+                emit failed(tr("The radio answered with an error (rigctld: %1)").arg(result));
+            if (remaining == 0) {
+                m_emergencySocket.clear();
+                emergency->disconnectFromHost();
+                finishStopRequest();
+                break;
+            }
+        }
     });
-    connect(emergency, &QTcpSocket::disconnected, emergency, &QObject::deleteLater);
-    connect(emergency, &QTcpSocket::errorOccurred, emergency,
-            [emergency](QAbstractSocket::SocketError) { emergency->deleteLater(); });
-    // Anche un rigctld irraggiungibile non deve lasciare una socket appesa.
-    QTimer::singleShot(1000, emergency, [emergency] {
-        emergency->abort();
+    const auto incomplete = [this, emergency] {
+        if (m_emergencySocket == emergency) {
+            m_emergencySocket.clear();
+            finishStopRequest(false);
+            emit failed(tr("CW stop was not acknowledged. Check the radio's TX state."));
+        }
         emergency->deleteLater();
+    };
+    connect(emergency, &QTcpSocket::disconnected, this, incomplete);
+    connect(emergency, &QTcpSocket::errorOccurred, this,
+            [incomplete](QAbstractSocket::SocketError) { incomplete(); });
+    // Anche un rigctld irraggiungibile non deve lasciare una socket appesa.
+    QTimer::singleShot(3000, emergency, [emergency, incomplete] {
+        emergency->abort();
+        incomplete();
     });
     emergency->connectToHost(m_host, m_port);
+}
+
+void RigControl::finishStopRequest(bool allowNewMorse)
+{
+    m_stopFallback.stop();
+    m_stopInFlight = false;
+    m_stopLastSeq = 0;
+    if (allowNewMorse)
+        QTimer::singleShot(0, this, &RigControl::startNextMorse);
+    else
+        cancelMorseQueue();
+}
+
+void RigControl::resetStopRequest()
+{
+    finishStopRequest(false);
+    if (m_emergencySocket) {
+        QTcpSocket* socket = m_emergencySocket.data();
+        m_emergencySocket.clear();
+        socket->disconnect(this);
+        socket->abort();
+        socket->deleteLater();
+    }
+}
+
+void RigControl::handleStopMorseReply(int result)
+{
+    if (result == -11 || result == -4) {
+        if (m_noStopMorse)
+            return;
+        m_noStopMorse = true;
+        emit failed(tr("This radio cannot stop the CW from CAT: the message ends by itself. "
+                       "To cut it short use the radio, or a serial keyer."));
+    } else if (result != 0) {
+        // A timeout/I/O error is not a permanent lack of support: next Stop
+        // must be allowed to retry.
+        emit failed(tr("The radio answered with an error (rigctld: %1)").arg(result));
+    }
 }
 
 void RigControl::readFromRig()
@@ -498,6 +586,14 @@ void RigControl::handleReply(const QStringList& lines)
     const Pending what = m_pending.dequeue();
     const int result = lines.last().mid(4).trimmed().toInt();
 
+    if (m_stopInFlight && what.seq == m_stopLastSeq) {
+        m_stopFallback.stop();
+        m_stopLastSeq = 0;
+        // If fallback has started, finish draining it before allowing new CW.
+        if (!m_emergencySocket)
+            finishStopRequest();
+    }
+
     if (result != 0) {
         // -1 e' "questa radio non lo sa fare": per il CW vuol dire che il
         // manipolatore della radio non si comanda da qui.
@@ -507,21 +603,19 @@ void RigControl::handleReply(const QStringList& lines)
             // manipolano, e i tasti si spengono.
             setStatus(tr("This CAT link does not key CW (rigctld: %1)").arg(result));
             emit morseUnsupported();
-            emit failed(tr("The radio did not take the CW text (rigctld: %1). Not every radio — and "
-                           "not every CAT bridge — can key CW: for the macros you need rigctld "
-                           "talking to the radio itself.").arg(result));
+            emit failed(tr("The CAT server or radio does not support sending CW text (rigctld: %1). "
+                           "For shared CAT, update the master application and enable its transmit permission. "
+                           "The radio must support a CAT CW keyer; a direct serial connection is not required.").arg(result));
         } else if (what.kind == QLatin1String("morse")) {
             finishMorse(what, false);
             // Un rifiuto di questo messaggio, non della radio: i tasti restano
             // accesi. Prima uno solo bastava a spegnerli fino al riavvio.
             emit failed(tr("The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), "
-                           "that break-in (BK-IN) is on, and that the CAT port is the radio's own.")
+                           "that break-in (BK-IN) is on, and that the CAT server allows transmission.")
                             .arg(result)
                             .arg(m_mode.isEmpty() ? QStringLiteral("?") : m_mode));
         } else if (what.kind == QLatin1String("stopmorse")) {
-            m_noStopMorse = true;
-            emit failed(tr("This radio cannot stop the CW from CAT: the message ends by itself. "
-                           "To cut it short use the radio, or a serial keyer."));
+            handleStopMorseReply(result);
         } else if (what.kind == QLatin1String("powerstat") || what.kind == QLatin1String("swr")
                    || what.kind == QLatin1String("alc")
                    || what.kind == QLatin1String("powerwatts") || what.kind == QLatin1String("tuner")) {
@@ -667,14 +761,14 @@ void RigControl::handleReply(const QStringList& lines)
             moved = true;
         }
     } else if (what.kind == QLatin1String("speed")) {
-        // Il livello torna come numero nudo, prima di RPRT.
-        for (const QString& line : lines) {
-            bool ok = false;
-            const int value = line.toInt(&ok);
-            if (ok && value > 0 && value != m_wpm) {
-                m_wpm = value;
-                moved = true;
-            }
+        // Both a plain integer and the extended Level Value field are legal.
+        // Bridges may format integer levels as e.g. 24.000000.
+        const QString text = first(QStringLiteral("Level Value"));
+        bool ok = false;
+        const double value = text.toDouble(&ok);
+        if (ok && value >= 5 && value <= 60 && value == int(value) && int(value) != m_wpm) {
+            m_wpm = int(value);
+            moved = true;
         }
     } else if (what.kind == QLatin1String("powerstat")) {
         const QString v = first(QStringLiteral("Power Status"));

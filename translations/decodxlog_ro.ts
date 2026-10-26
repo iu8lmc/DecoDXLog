@@ -1177,6 +1177,156 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Liste de indicative și cluburi</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Se încarcă listele locale…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Nicio potrivire exactă în listele disponibile și activate.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Informații din listele importate, nu o verificare în timp real a afilierii. Datele din jurnal și din callbook rămân neschimbate.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Neasociat</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Liste de indicative și cluburi</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importă fișiere locale CSV/TXT sau N1MM Call History. Mai multe liste pot fi active în același timp, inclusiv în afara modului Contest. Rezultatele apar în fișa indicativului și nu înlocuiesc niciodată câmpurile QSO, callbook sau contest.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Modificările se salvează imediat. Se păstrează o copie offline; „Reîncarcă” citește din nou fișierul original.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 intrări · importată la %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Reîncarcă</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Adaugă o listă…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Numele listei</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>De exemplu: cluburile mele CW</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Separator</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Virgulă</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Punct și virgulă</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tabulator</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Codare</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automată (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>Primul rând conține numele coloanelor (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Previzualizare / actualizează coloanele</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>Coloanele N1MM sunt citite din fiecare directivă !!Order!!. Toate afilierile sunt păstrate separat.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Coloana indicativului (obligatorie)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Coloana numelui</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Coloana clubului</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Coloana numărului de membru</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Coloana QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Câmpurile neasociate și nevide sunt afișate și ele, cu numele coloanei. Căutarea este exactă, fără deosebire între majuscule și minuscule; sufixele portabile nu sunt eliminate.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Importă lista</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Importă o listă de indicative</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Liste de indicative (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Toate fișierele (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Elimină lista</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Elimini această listă și copia ei offline? Fișierul original nu va fi șters.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1503,6 +1653,10 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Antene disponibile pentru asistentul DX</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>Utilizator LoTW (încărcare în ultimele 365 de zile conform listei ARRL încărcate). Nu este o confirmare a QSO-ului.</translation>
     </message>
 </context>
 <context>
@@ -8728,6 +8882,10 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Setează mai jos o parolă și aceeași în HH, la Configurare. DecoPort semnează fiecare pachet: fără parolă nu pornește nimic.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Liste de indicative</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10157,6 +10315,61 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Schimb</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Selectează un fișier obișnuit existent.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>Fișierul depășește 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Se încarcă listele locale…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Neaplicat: %1. Listele salvate nu au fost modificate.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>Nu se poate crea dosarul de stocare a listelor.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Configurație de liste nevalidă.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Listele locale au fost restaurate din copiile offline.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Selectează un fișier local.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Previzualizarea este gata. Verifică coloanele înainte de import.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>Limita este de 64 de liste.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>%1 intrări importate; %2 rânduri omise sau duplicate.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Preferințele listelor au fost salvate.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Lista a fost eliminată. Fișierul original nu a fost șters.</translation>
     </message>
 </context>
 <context>
@@ -13204,14 +13417,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Această legătură CAT nu manipulează CW (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>Stația nu a luat textul CW (rigctld: %1). Nu orice stație — și nu orice punte CAT — poate manipula CW: pentru macrouri ai nevoie de rigctld care vorbește direct cu stația.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>Aparatul a refuzat textul CW (rigctld: %1). Verifică să fie în CW (acum %2), să fie pornit break-in (BK-IN) și ca portul CAT să fie al aparatului.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Acest aparat nu poate opri CW-ul prin CAT: mesajul se termină singur. Ca să-l întrerupi folosește aparatul sau un manipulator serial.</translation>
     </message>
@@ -13258,6 +13463,18 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>Aparatul a refuzat comanda CAT de putere/cuplor (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>Oprirea CW nu a fost confirmată. Verifică starea TX a stației radio.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>Serverul CAT sau stația nu acceptă trimiterea textului CW (rigctld: %1). Cu CAT partajat, actualizează aplicația principală și activează permisiunea ei de transmisie. Stația trebuie să accepte un manipulator CW prin CAT; o conexiune serială directă nu este necesară.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>Stația a refuzat textul CW (rigctld: %1). Verifică dacă este în CW (acum %2), dacă break-in (BK-IN) este activat și dacă serverul CAT permite transmisia.</translation>
     </message>
 </context>
 <context>

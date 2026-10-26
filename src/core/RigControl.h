@@ -14,6 +14,7 @@
 
 #include <QObject>
 #include <QHash>
+#include <QPointer>
 #include <QQueue>
 #include <QString>
 #include <QTcpSocket>
@@ -103,10 +104,12 @@ private:
     void startNextMorse();
     void cancelMorseQueue();
     void finishMorse(const Pending& what, bool accepted);
-    // Connessione breve separata: il PTT di emergenza non deve aspettare le
-    // richieste di polling o una risposta lenta del keyer sulla connessione
-    // normale di rigctld.
+    // Single fallback connection if the ordinary stop is not acknowledged
+    // promptly. Never launch a competing connection on every button click.
     void sendEmergencyStop();
+    void finishStopRequest(bool allowNewMorse = true);
+    void resetStopRequest();
+    void handleStopMorseReply(int result);
     void readFromRig();
     void handleReply(const QStringList& lines);
     void setStatus(const QString& text);
@@ -115,6 +118,10 @@ private:
     QTimer m_poll;
     QTimer m_retry;
     QTimer m_morseTimer;
+    QTimer m_stopFallback;
+    QPointer<QTcpSocket> m_emergencySocket;
+    bool m_stopInFlight{false};
+    quint64 m_stopLastSeq{0};
     QQueue<Pending> m_pending;
     QQueue<QString> m_morseQueue;
     QStringList m_lines;             // righe della risposta in arrivo, fino a RPRT

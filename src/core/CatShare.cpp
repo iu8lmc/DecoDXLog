@@ -118,6 +118,7 @@ void CatShare::onReadyRead(QTcpSocket* s)
             continue;
         const QString reply = handleLine(line);
         if (reply.isNull()) {
+            s->write(kOk);
             s->disconnectFromHost();
             return;
         }
@@ -185,7 +186,7 @@ QString CatShare::handleLine(const QString& line)
     if (cmd == QLatin1String("\\chk_vfo"))
         return QStringLiteral("0\n");
     if (cmd == QLatin1String("\\get_lock_mode"))
-        return QStringLiteral("0\n");
+        return QStringLiteral("0\nRPRT 0\n");
 
     RigLink* rig = m_rig ? m_rig() : nullptr;
     const bool up = rig && rig->connected();

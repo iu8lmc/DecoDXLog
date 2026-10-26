@@ -1173,6 +1173,156 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Roepletter- en clublijsten</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Lokale lijsten laden…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>Geen exacte overeenkomst in de beschikbare, ingeschakelde lijsten.</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>Gegevens uit geïmporteerde lijsten, geen live controle van het lidmaatschap. Log- en callbookgegevens blijven ongewijzigd.</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>Niet gekoppeld</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>Roepletter- en clublijsten</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>Importeer lokale CSV/TXT- of N1MM Call History-bestanden. Meerdere lijsten kunnen tegelijk actief zijn, ook buiten de Contestmodus. De resultaten verschijnen in de roepletterinfo; ze vervangen nooit QSO-, callbook- of contestvelden.</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>Wijzigingen worden direct opgeslagen. Er blijft een offlinekopie bewaard; ‘Opnieuw laden’ leest het oorspronkelijke bestand opnieuw.</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 items · geïmporteerd op %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>Opnieuw laden</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">Verwijderen</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>Lijst toevoegen…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>Naam van de lijst</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>Bijvoorbeeld: mijn CW-clubs</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>Scheidingsteken</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">Auto</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>Komma</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>Puntkomma</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>Tab</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>Codering</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>Automatisch (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>Eerste rij bevat kolomnamen (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>Voorbeeld / kolommen vernieuwen</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>De N1MM-kolommen worden gelezen uit elke !!Order!!-instructie. Alle lidmaatschappen blijven apart bewaard.</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>Kolom roepletters (verplicht)</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>Kolom naam</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>Kolom club</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>Kolom lidnummer</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>Kolom QTH</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>Niet-gekoppelde velden die niet leeg zijn, worden ook getoond met hun kolomnaam. Zoeken is exact, zonder onderscheid tussen hoofd- en kleine letters; portable-achtervoegsels worden niet verwijderd.</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>Lijst importeren</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>Een roepletterlijst importeren</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>Roepletterlijsten (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">Alle bestanden (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>Lijst verwijderen</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>Deze lijst en de offlinekopie verwijderen? Het oorspronkelijke bestand wordt niet verwijderd.</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1499,6 +1649,10 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
     <message>
         <source>DX Assistant available antennas</source>
         <translation>Beschikbare antennes voor de DX-assistent</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW-gebruiker (upload in de laatste 365 dagen volgens de geladen ARRL-lijst). Dit is geen QSO-bevestiging.</translation>
     </message>
 </context>
 <context>
@@ -8706,6 +8860,10 @@ Extra velden blijven behouden: %8</translation>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>Stel hieronder een wachtwoord in en hetzelfde in HH, onder Configureren. DecoPort ondertekent elk pakket: zonder wachtwoord start er niets.</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>Roepletterlijsten</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10131,6 +10289,61 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>Exchange</source>
         <translation>Rapport</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>Selecteer een bestaand regulier bestand.</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>Het bestand is groter dan 32 MiB.</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>Lokale lijsten laden…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>Niet toegepast: %1. De opgeslagen lijsten zijn niet gewijzigd.</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>De opslagmap voor de lijsten kan niet worden aangemaakt.</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>Ongeldige lijstconfiguratie.</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>Lokale lijsten hersteld uit hun offlinekopieën.</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>Selecteer een lokaal bestand.</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>Voorbeeld klaar. Controleer de kolommen vóór het importeren.</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>De limiet is 64 lijsten.</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>%1 items geïmporteerd; %2 rijen overgeslagen of dubbel.</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>Voorkeuren voor lijsten opgeslagen.</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>Lijst verwijderd. Het oorspronkelijke bestand is niet verwijderd.</translation>
     </message>
 </context>
 <context>
@@ -13139,14 +13352,6 @@ Extra velden blijven behouden: %8</translation>
         <translation>Deze CAT-verbinding seint geen CW (rigctld: %1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>De radio nam de CW-tekst niet aan (rigctld: %1). Niet elke radio — en niet elke CAT-brug — kan CW seinen: voor de macro&apos;s heb je rigctld nodig dat met de radio zelf praat.</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>De radio weigerde de CW-tekst (rigctld: %1). Controleer dat hij in CW staat (nu %2), dat break-in (BK-IN) aan staat en dat de CAT-poort die van de radio is.</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>Deze radio kan CW via CAT niet stoppen: het bericht eindigt vanzelf. Gebruik de radio of een seriële keyer om het af te breken.</translation>
     </message>
@@ -13193,6 +13398,18 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>De radio weigerde het CAT-commando voor vermogen/tuner (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>De CW-stop is niet bevestigd. Controleer de TX-status van de radio.</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>De CAT-server of radio ondersteunt het verzenden van CW-tekst niet (rigctld: %1). Werk bij gedeelde CAT de masterapplicatie bij en schakel de zendtoestemming ervan in. De radio moet een CAT-CW-keyer ondersteunen; een directe seriële verbinding is niet nodig.</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>De radio weigerde de CW-tekst (rigctld: %1). Controleer of hij op CW staat (nu %2), of break-in (BK-IN) aan staat en of de CAT-server zenden toestaat.</translation>
     </message>
 </context>
 <context>

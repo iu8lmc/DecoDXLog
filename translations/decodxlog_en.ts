@@ -1172,6 +1172,156 @@ The call Decodium is working shows up here by itself.</source>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1497,6 +1647,10 @@ The call Decodium is working shows up here by itself.</source>
     </message>
     <message>
         <source>DX Assistant available antennas</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -8699,6 +8853,10 @@ Extra fields are preserved: %8</source>
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10124,6 +10282,61 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Exchange</source>
         <translation>Exchange</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -13132,14 +13345,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -13185,6 +13390,18 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

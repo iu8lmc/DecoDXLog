@@ -3,6 +3,59 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.43 — 26 ottobre 2026
+
+**Allineata alla 1.17.42 di elisir80** (la nostra era la 1.17.40). Dalle loro 1.17.41 e 1.17.42 arrivano
+gli elenchi nominativi e club (CSV/TXT e N1MM Call History) con le appartenenze nella Scheda
+nominativo, la «L» verde degli utenti LoTW nel cluster, il «Ferma» CW ripetuto più robusto e la
+CAT condivisa che completa `get_lock_mode` e accetta la velocità CW etichettata dei bridge rigctld.
+Nessuna funzione nostra toccata: l'unione è automatica, senza conflitti.
+
+## 1.17.42 — 25 ottobre 2026
+
+**Compatibilità CAT condivisa e CW via ponte.** La CAT condivisa ora completa anche le
+risposte Hamlib di `get_lock_mode` e chiude correttamente le richieste non riconosciute,
+così i client come Decodium/rigctld non restano in attesa di una terminazione valida.
+Il controllo della velocità CW accetta sia il valore numerico semplice sia il formato
+etichettato `Level Value: 24.000000` usato da alcuni bridge rigctld. Il messaggio del
+keyer chiarisce che `send_morse` via CAT condivisa è supportato quando il server master
+consente la trasmissione; la manipolazione seriale diretta resta disponibile come fallback.
+
+**Test di regressione.** Aggiunte prove per la risposta `get_lock_mode`, per le risposte
+KEYSPD decimali etichettate e per la lettura della velocità attraverso un CAT condiviso.
+Le modifiche locali sono state mantenute nel rilascio e verificate sulla suite completa.
+
+## 1.17.41 — 25 ottobre 2026
+
+**Elenchi nominativi e club (issue #3).** Nuova pagina Impostazioni → Elenchi
+nominativi, indipendente dai contest: più CSV/TXT o file N1MM Call History,
+anteprima, associazione delle colonne, attivazione, ricaricamento e rimozione.
+La Scheda nominativo mostra separatamente fonte, data e tutte le appartenenze,
+senza sovrascrivere QSO, callbook o scambi contest. Lettura e indicizzazione su
+worker, copie offline persistenti e sostituzione atomica solo dopo importazione
+valida. CSV con virgolette, separatori virgola/punto e virgola/tab, UTF-8 e Latin-1;
+commenti e righe informative ignorati. Ricerca esatta, nessuna deduzione dei
+suffissi portatili. Test con dati inventati in directory temporanee, inclusi
+errori di lettura/scrittura, riavvio, liste multiple, grandi elenchi e viste QML.
+
+**Cluster: indicatore LoTW accanto al nominativo (issue #5).** Una piccola L verde
+identifica gli utenti LoTW anche senza attivare il filtro dedicato, nelle viste
+normale, compatta e contest e con la colonna Entita' nascosta. Usa lo stesso criterio
+del filtro: upload negli ultimi 365 giorni secondo la lista ARRL caricata. Il
+suggerimento distingue l'attivita' LoTW dalla conferma del QSO; l'assenza della L
+non prova che la stazione non abbia un account LoTW. Test sul modello e sulla vista
+QML per elenco misto, cambio di stato, filtro, colonne strette e clic sul badge.
+
+**CW: Ferma ripetuto.** Le pressioni ravvicinate condividono una sola richiesta di
+arresto. Quando il CAT risponde, PTT OFF e stop del keyer passano ordinatamente sulla
+connessione esistente; il canale separato resta un fallback per disconnessioni o
+risposte lente, legge gli esiti prima di chiudersi e non ripete uno `stop_morse`
+gia' dichiarato non supportato. Su Yaesu con PTT CAT non viene piu' aggiunto un
+secondo `TX0` raw. Restano lo svuotamento della coda CW e il rilascio PTT anche
+a pannello inattivo. Test di regressione per clic ripetuti, risposte tardive,
+fallback, errori transitori e macro successive; test opzionale con rigctld reale
+e simulatore TCP FTDX-3000. La conferma sulla radio fisica resta necessaria.
+
 ## 1.17.40 — 25 ottobre 2026
 
 **HH parla con DecoDXLog in modo nativo, con DecoPort.** HH, il programma di HamHub Log che
@@ -31,7 +84,6 @@ senza conferma, lo rimanda fino a tre volte e poi lo scrive nel registro attivit
   due vettori calcolati a parte con Python, e un giro completo tra il server C++ e HH.py veri ha
   consegnato un QSO e ricevuto la conferma.
 - **Traduzioni**: 18 stringhe nuove in tutte e 14 le lingue.
-
 
 ## 1.17.39 — 25 ottobre 2026
 

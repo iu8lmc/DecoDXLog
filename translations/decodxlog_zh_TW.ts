@@ -1169,6 +1169,156 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
     </message>
 </context>
 <context>
+    <name>CallListMatches</name>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>呼號與俱樂部清單</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>正在載入本機清單…</translation>
+    </message>
+    <message>
+        <source>No exact match in the available enabled lists.</source>
+        <translation>在可用且已啟用的清單中沒有完全相符的項目。</translation>
+    </message>
+    <message>
+        <source>Information from imported lists, not live membership verification. Log and callbook data are unchanged.</source>
+        <translation>資訊來自已匯入的清單，並非即時的會員資格驗證。日誌與呼號資料庫的資料不會變更。</translation>
+    </message>
+</context>
+<context>
+    <name>CallListSettings</name>
+    <message>
+        <source>Not mapped</source>
+        <translation>未對應</translation>
+    </message>
+    <message>
+        <source>Callsign &amp; club lists</source>
+        <translation>呼號與俱樂部清單</translation>
+    </message>
+    <message>
+        <source>Import local CSV/TXT or N1MM Call History files. Several lists can be active together, outside Contest Mode too. Results appear in Call info; they never replace QSO, callbook or contest fields.</source>
+        <translation>匯入本機 CSV/TXT 或 N1MM Call History 檔案。可同時啟用多個清單，在非 Contest 模式下也一樣。結果顯示在呼號資訊中，絕不會取代 QSO、呼號資料庫或比賽欄位。</translation>
+    </message>
+    <message>
+        <source>Changes here are saved immediately. An offline copy is kept; Reload reads the original file again.</source>
+        <translation>此處的變更會立即儲存。系統會保留一份離線副本；「重新載入」會再次讀取原始檔案。</translation>
+    </message>
+    <message>
+        <source>%1 entries · imported %2</source>
+        <translation>%1 筆記錄 · 匯入於 %2</translation>
+    </message>
+    <message>
+        <source>Reload</source>
+        <translation>重新載入</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation type="unfinished">移除</translation>
+    </message>
+    <message>
+        <source>Add a list…</source>
+        <translation>新增清單…</translation>
+    </message>
+    <message>
+        <source>List name</source>
+        <translation>清單名稱</translation>
+    </message>
+    <message>
+        <source>For example: my CW clubs</source>
+        <translation>例如：我的 CW 俱樂部</translation>
+    </message>
+    <message>
+        <source>Separator</source>
+        <translation>分隔符號</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation type="unfinished">自動</translation>
+    </message>
+    <message>
+        <source>Comma</source>
+        <translation>逗號</translation>
+    </message>
+    <message>
+        <source>Semicolon</source>
+        <translation>分號</translation>
+    </message>
+    <message>
+        <source>Tab</source>
+        <translation>定位字元</translation>
+    </message>
+    <message>
+        <source>Encoding</source>
+        <translation>編碼</translation>
+    </message>
+    <message>
+        <source>Auto (UTF-8 / Latin-1)</source>
+        <translation>自動 (UTF-8 / Latin-1)</translation>
+    </message>
+    <message>
+        <source>First row contains column names (CSV)</source>
+        <translation>第一列包含欄名 (CSV)</translation>
+    </message>
+    <message>
+        <source>Preview / refresh columns</source>
+        <translation>預覽 / 重新整理欄位</translation>
+    </message>
+    <message>
+        <source>N1MM columns are read from each !!Order!! directive. All memberships are kept separately.</source>
+        <translation>N1MM 的欄位從每個 !!Order!! 指令中讀取。所有會員資格分別保留。</translation>
+    </message>
+    <message>
+        <source>Callsign column (required)</source>
+        <translation>呼號欄（必填）</translation>
+    </message>
+    <message>
+        <source>Name column</source>
+        <translation>姓名欄</translation>
+    </message>
+    <message>
+        <source>Club column</source>
+        <translation>俱樂部欄</translation>
+    </message>
+    <message>
+        <source>Membership number column</source>
+        <translation>會員編號欄</translation>
+    </message>
+    <message>
+        <source>QTH column</source>
+        <translation>QTH 欄</translation>
+    </message>
+    <message>
+        <source>Unmapped non-empty fields are also displayed, using their column names. Matching is exact, ignoring letter case; portable suffixes are not removed.</source>
+        <translation>未對應的非空白欄位也會連同欄名一起顯示。比對為精確比對，不分大小寫；不會移除可攜式字尾。</translation>
+    </message>
+    <message>
+        <source>Import list</source>
+        <translation>匯入清單</translation>
+    </message>
+    <message>
+        <source>Import a callsign list</source>
+        <translation>匯入呼號清單</translation>
+    </message>
+    <message>
+        <source>Call lists (*.csv *.txt *.tsv)</source>
+        <translation>呼號清單 (*.csv *.txt *.tsv)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation type="unfinished">所有檔案 (*)</translation>
+    </message>
+    <message>
+        <source>Remove list</source>
+        <translation>移除清單</translation>
+    </message>
+    <message>
+        <source>Remove this list and its offline copy? The original file will not be deleted.</source>
+        <translation>移除此清單及其離線副本？原始檔案不會被刪除。</translation>
+    </message>
+</context>
+<context>
     <name>Callbook</name>
     <message>
         <source>Unexpected answer from QRZ.com</source>
@@ -1495,6 +1645,10 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
     <message>
         <source>DX Assistant available antennas</source>
         <translation>DX 助理可用天線</translation>
+    </message>
+    <message>
+        <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
+        <translation>LoTW 使用者（根據已載入的 ARRL 清單，在過去 365 天內上傳過）。這不是 QSO 確認。</translation>
     </message>
 </context>
 <context>
@@ -8684,6 +8838,10 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>Set a password below and the same one in HH, under Configure. DecoPort signs every packet: without a password nothing starts.</source>
         <translation>請在下方設定密碼，並在 HH 的「設定」中設定相同的密碼。DecoPort 會為每個封包簽章：沒有密碼就不會啟動。</translation>
     </message>
+    <message>
+        <source>Callsign lists</source>
+        <translation>呼號清單</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -10105,6 +10263,61 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Exchange</source>
         <translation>交換</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::app::CallListController</name>
+    <message>
+        <source>Select an existing regular file.</source>
+        <translation>請選擇一個現有的一般檔案。</translation>
+    </message>
+    <message>
+        <source>File exceeds 32 MiB.</source>
+        <translation>檔案超過 32 MiB。</translation>
+    </message>
+    <message>
+        <source>Loading local lists…</source>
+        <translation>正在載入本機清單…</translation>
+    </message>
+    <message>
+        <source>Not applied: %1. The saved lists have not been changed.</source>
+        <translation>未套用：%1。已儲存的清單沒有變更。</translation>
+    </message>
+    <message>
+        <source>Cannot create the list storage directory.</source>
+        <translation>無法建立清單儲存資料夾。</translation>
+    </message>
+    <message>
+        <source>Invalid list configuration.</source>
+        <translation>清單設定無效。</translation>
+    </message>
+    <message>
+        <source>Local lists restored from their offline copies.</source>
+        <translation>已從離線副本還原本機清單。</translation>
+    </message>
+    <message>
+        <source>Select a local file.</source>
+        <translation>請選擇一個本機檔案。</translation>
+    </message>
+    <message>
+        <source>Preview ready. Check the columns before importing.</source>
+        <translation>預覽已就緒。匯入前請檢查各欄。</translation>
+    </message>
+    <message>
+        <source>The limit is 64 lists.</source>
+        <translation>上限為 64 個清單。</translation>
+    </message>
+    <message>
+        <source>Imported %1 entries; %2 skipped or duplicate rows.</source>
+        <translation>已匯入 %1 筆記錄；%2 列被略過或重複。</translation>
+    </message>
+    <message>
+        <source>List preferences saved.</source>
+        <translation>清單偏好設定已儲存。</translation>
+    </message>
+    <message>
+        <source>List removed. The original file was not deleted.</source>
+        <translation>清單已移除。原始檔案未被刪除。</translation>
     </message>
 </context>
 <context>
@@ -13074,14 +13287,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>這條 CAT 連線不能發 CW (rigctld：%1)</translation>
     </message>
     <message>
-        <source>The radio did not take the CW text (rigctld: %1). Not every radio — and not every CAT bridge — can key CW: for the macros you need rigctld talking to the radio itself.</source>
-        <translation>電台沒有接下這段 CW 文字 (rigctld：%1)。不是每台電台 — 也不是每個 CAT 橋接 — 都能發 CW：要用巨集，就得讓 rigctld 直接和電台說話。</translation>
-    </message>
-    <message>
-        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT port is the radio&apos;s own.</source>
-        <translation>電台拒絕了 CW 文字（rigctld：%1）。請檢查是否處於 CW（目前 %2）、是否開啟插入（BK-IN），以及 CAT 連接埠是否為電台本身的連接埠。</translation>
-    </message>
-    <message>
         <source>This radio cannot stop the CW from CAT: the message ends by itself. To cut it short use the radio, or a serial keyer.</source>
         <translation>此電台無法透過 CAT 停止 CW：訊息會自行送完。要中斷請使用電台或序列電鍵。</translation>
     </message>
@@ -13128,6 +13333,18 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>The radio refused the CAT power/tuner command (rigctld: %1)</source>
         <translation>電台拒絕了功率/天調的 CAT 指令 (rigctld: %1)</translation>
+    </message>
+    <message>
+        <source>CW stop was not acknowledged. Check the radio&apos;s TX state.</source>
+        <translation>CW 停止未獲確認。請檢查電台的發射狀態。</translation>
+    </message>
+    <message>
+        <source>The CAT server or radio does not support sending CW text (rigctld: %1). For shared CAT, update the master application and enable its transmit permission. The radio must support a CAT CW keyer; a direct serial connection is not required.</source>
+        <translation>CAT 伺服器或電台不支援傳送 CW 文字 (rigctld: %1)。使用共用 CAT 時，請更新主應用程式並啟用其發射權限。電台必須支援 CAT CW 鍵控器；不需要直接序列連線。</translation>
+    </message>
+    <message>
+        <source>The radio refused the CW text (rigctld: %1). Check that it is in CW (now %2), that break-in (BK-IN) is on, and that the CAT server allows transmission.</source>
+        <translation>電台拒絕了 CW 文字 (rigctld: %1)。請檢查它是否處於 CW 模式（目前為 %2）、break-in (BK-IN) 是否已開啟，以及 CAT 伺服器是否允許發射。</translation>
     </message>
 </context>
 <context>
