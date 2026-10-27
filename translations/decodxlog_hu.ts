@@ -8842,6 +8842,34 @@ A további mezők megmaradnak: %8</translation>
         <source>Callsign lists</source>
         <translation>Hívójellisták</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>CAT-profilok</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>Rádióprofil</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">Profil neve</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Új</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>Átnevezés</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">Törlés</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>Minden profil tárolja a CAT-kapcsolatot, a rádió típusát, a soros paramétereket, a PTT-/keyer-portokat és a dekóder hangeszközét. A módosítások automatikusan mentésre kerülnek. A kiválasztott profil a DecoDXLog következő indításakor visszaáll.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9165,6 +9193,14 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Award account groups: %1</source>
         <translation>A díjfiók csoportjai: %1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>Minden profil külön logikai napló. A UDP-n, N1MM-en, API-n és hálózaton érkező QSO-kat először a STATION_CALLSIGN, majd egy egyedi OPERATOR alapján rendeli hozzá. Nyiss minden családtagnak külön QSO-ablakot a kézi rögzítéshez, a globális aktív profil módosítása nélkül.</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>QSO megnyitása ehhez a profilhoz</translation>
     </message>
 </context>
 <context>
@@ -11721,6 +11757,14 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>A HH-kapcsolat jelszóra vár: add meg a Beállításokban, a HamHub alatt, ugyanazt, mint a HH-ban</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>A beérkező %1 QSO-hoz nincs egyedi állomásprofil; hozzárendelés nélkül maradt</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>A kiválasztott állomásprofil nem érhető el.</translation>
     </message>
 </context>
 <context>

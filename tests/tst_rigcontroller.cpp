@@ -57,6 +57,54 @@ private slots:
         QSettings().clear();
     }
 
+    void radioProfilesKeepAAndBSeparateAndRestoreTheLastOne()
+    {
+        QString firstId;
+        QString secondId;
+        {
+            app::RigController controller{app::RigController::Context{}};
+            QCOMPARE(controller.radioProfiles()->count(), 1);
+            firstId = controller.radioProfiles()->activeId();
+            QVERIFY(!firstId.isEmpty());
+            QVERIFY(controller.renameRadioProfile(firstId, QStringLiteral("Radio A")));
+            controller.setLink(QStringLiteral("network"));
+            controller.setHost(QStringLiteral("radio-a.local"));
+            controller.setPort(4532);
+
+            secondId = controller.createRadioProfile(QStringLiteral("Radio B"));
+            QVERIFY(!secondId.isEmpty());
+            QVERIFY(secondId != firstId);
+            controller.setHost(QStringLiteral("radio-b.local"));
+            controller.setPort(4534);
+            controller.setLink(QStringLiteral("tci"));
+            controller.setTciAddress(QStringLiteral("radio-b.local:40001"));
+
+            // A e B devono restare distinti: cambiare profilo non deve
+            // riscrivere i parametri dell'altro.
+            QVERIFY(controller.selectRadioProfile(firstId));
+            QCOMPARE(controller.host(), QStringLiteral("radio-a.local"));
+            QCOMPARE(controller.port(), 4532);
+            QCOMPARE(controller.link(), QStringLiteral("network"));
+            QVERIFY(controller.selectRadioProfile(secondId));
+            QCOMPARE(controller.host(), QStringLiteral("radio-b.local"));
+            QCOMPARE(controller.port(), 4534);
+            QCOMPARE(controller.link(), QStringLiteral("tci"));
+            QCOMPARE(controller.tciAddress(), QStringLiteral("radio-b.local:40001"));
+        }
+
+        // B era l'ultimo usato: un nuovo controller deve ripristinare B senza
+        // dover riconfigurare o riselezionare la radio.
+        app::RigController restored{app::RigController::Context{}};
+        QCOMPARE(restored.radioProfiles()->activeId(), secondId);
+        QCOMPARE(restored.radioProfiles()->activeName(), QStringLiteral("Radio B"));
+        QCOMPARE(restored.host(), QStringLiteral("radio-b.local"));
+        QCOMPARE(restored.port(), 4534);
+        QCOMPARE(restored.link(), QStringLiteral("tci"));
+        QCOMPARE(restored.tciAddress(), QStringLiteral("radio-b.local:40001"));
+        QCOMPARE(restored.radioProfiles()->byId(firstId).value(QStringLiteral("host")).toString(),
+                 QStringLiteral("radio-a.local"));
+    }
+
     // L'elenco delle radio di Hamlib arriva da un processo a parte: chiederlo non ferma la
     // finestra (prima si aspettava rigctld fino a 8 secondi nel filo della UI).
     void rigModelsDoNotBlockTheWindow()

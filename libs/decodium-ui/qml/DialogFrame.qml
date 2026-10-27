@@ -59,6 +59,11 @@ RoundedWindow {
     minimumHeight: 260
     visible: false
     surfaceColor: Theme.bgDeep
+    readableSurface: true
+    // Una finestra modale deve privilegiare la lettura: il vetro resta nella
+    // cornice e nella testata, ma il contenuto non lascia filtrare la
+    // dashboard sottostante. Il 97% conserva appena la profondita' del tema.
+    surfaceOpacity: Theme.isGlassTheme ? 0.97 : 1.0
     // Una finestra di dialogo: sta sopra a quella che l'ha aperta, ma si sposta
     // dove si vuole — anche su un altro schermo — si ingrandisce, si riduce a
     // icona e si chiude come tutte le altre.

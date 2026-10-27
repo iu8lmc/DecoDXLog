@@ -8886,6 +8886,34 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>Callsign lists</source>
         <translation>Liste de indicative</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>Profiluri CAT</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>Profil radio</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">Numele profilului</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Nou</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>Redenumește</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">Șterge</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>Fiecare profil păstrează legătura CAT, modelul stației, parametrii seriali, porturile PTT/manipulator și dispozitivul audio al decodorului. Modificările se salvează automat. Profilul selectat este restaurat la următoarea pornire a DecoDXLog.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9209,6 +9237,14 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Award account groups: %1</source>
         <translation>Grupurile contului de diplomă: %1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>Fiecare profil este un jurnal logic separat. QSO-urile primite prin UDP, N1MM, API și rețea sunt atribuite după STATION_CALLSIGN, apoi după un OPERATOR unic. Deschide o fereastră QSO dedicată pentru fiecare membru al familiei, pentru introducere manuală fără a schimba profilul activ global.</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>Deschide QSO pentru acest profil</translation>
     </message>
 </context>
 <context>
@@ -11819,6 +11855,14 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>Legătura cu HH așteaptă o parolă: setează-o în Setări, la HamHub, aceeași ca în HH</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>QSO-ul primit %1 nu are un profil de stație unic; a rămas neatribuit</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>Profilul de stație selectat nu este disponibil.</translation>
     </message>
 </context>
 <context>

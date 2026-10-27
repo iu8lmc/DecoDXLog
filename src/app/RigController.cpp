@@ -125,11 +125,17 @@ RigController::RigController(Context context, QObject* parent)
     connect(&m_keyer, &core::CwKeyer::finished, this, [this] {
         setActiveMacroIndex(-1);
     });
-    if (!m_keyerPort.isEmpty())
-        QTimer::singleShot(0, this, [this] { openKeyer(); });
     m_pttPort = s.value(QStringLiteral("rig/pttPort")).toString();
     m_audioInput = s.value(QStringLiteral("cw/audioInput")).toString();
     m_audioInputId = s.value(QStringLiteral("cw/audioInputId")).toString();
+    if (m_radioProfiles.count() == 0) {
+        const QString id = m_radioProfiles.create(QStringLiteral("Radio 1"), captureRadioProfile());
+        m_radioProfiles.setActiveId(id);
+    } else {
+        applyRadioProfile(m_radioProfiles.byId(m_radioProfiles.activeId()));
+    }
+    if (!m_keyerPort.isEmpty())
+        QTimer::singleShot(0, this, [this] { openKeyer(); });
     m_decoderToneLock = s.value(QStringLiteral("cw/decoderToneLock"), 0).toInt();
     // Le versioni vecchie non hanno questa chiave; valori fuori dal campo
     // utile tornano automaticamente alla ricerca del tono.
@@ -170,6 +176,7 @@ RigController::RigController(Context context, QObject* parent)
                 m_ctx.activity(QStringLiteral("CW"), tr("Sent: %1").arg(text), QStringLiteral("info"));
         });
     }
+    m_initializing = false;
 }
 
 void RigController::start()
@@ -232,6 +239,7 @@ void RigController::setHost(const QString& host)
     QSettings().setValue(QStringLiteral("rig/host"), clean);
     if (m_enabled)
         connectNow();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -243,6 +251,7 @@ void RigController::setPort(int port)
     QSettings().setValue(QStringLiteral("rig/port"), port);
     if (m_enabled)
         connectNow();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -470,6 +479,7 @@ void RigController::setPttType(const QString& type)
     m_pttType = clean;
     QSettings().setValue(QStringLiteral("rig/pttType"), clean);
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -480,6 +490,7 @@ void RigController::setPttPort(const QString& port)
     m_pttPort = port.trimmed();
     QSettings().setValue(QStringLiteral("rig/pttPort"), m_pttPort);
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -776,6 +787,7 @@ void RigController::setLink(const QString& link)
     QSettings().setValue(QStringLiteral("rig/link"), clean);
     if (m_enabled)
         connectNow();
+    syncRadioProfile();
     emit changed();
     emit stateChanged();
 }
@@ -789,6 +801,7 @@ void RigController::setTciAddress(const QString& address)
     QSettings().setValue(QStringLiteral("rig/tciAddress"), clean);
     if (m_enabled && m_link == QLatin1String("tci"))
         connectNow();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -801,6 +814,7 @@ void RigController::setFlrigAddress(const QString& address)
     QSettings().setValue(QStringLiteral("rig/flrigAddress"), clean);
     if (m_enabled && m_link == QLatin1String("flrig"))
         connectNow();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -813,6 +827,7 @@ void RigController::setOmniRigNumber(int number)
     QSettings().setValue(QStringLiteral("rig/omniRigNumber"), clean);
     if (m_enabled && m_link == QLatin1String("omnirig"))
         connectNow();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -861,6 +876,7 @@ void RigController::useSharedCat(const QString& host, int port)
     s.setValue(QStringLiteral("rig/link"), m_link);
     s.setValue(QStringLiteral("rig/enabled"), true);
     connectNow();
+    syncRadioProfile();
     emit changed();
     emit stateChanged();
 }
@@ -883,6 +899,7 @@ void RigController::setTciTrx(int trx)
     QSettings().setValue(QStringLiteral("rig/tciTrx"), clean);
     if (m_enabled && m_link == QLatin1String("tci"))
         connectNow();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -893,6 +910,7 @@ void RigController::setSerialPort(const QString& port)
     m_serialPort = port.trimmed();
     QSettings().setValue(QStringLiteral("rig/serialPort"), m_serialPort);
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -908,6 +926,7 @@ void RigController::setReservedPorts(const QString& ports)
         return;
     core::setUserReservedSerialPorts(list);
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -922,6 +941,7 @@ void RigController::setLeaveDecodiumPort(bool on)
         return;
     core::setLeaveDecodiumPort(on);
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -949,6 +969,7 @@ void RigController::setRigModel(int model)
     QSettings().setValue(QStringLiteral("rig/model"), model);
     refreshSerialCapabilities();
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
     emit stateChanged();
 }
@@ -960,6 +981,7 @@ void RigController::setBaud(int baud)
     m_baud = baud;
     QSettings().setValue(QStringLiteral("rig/baud"), baud);
     scheduleSerialRestart();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -1101,49 +1123,239 @@ void RigController::setDataBits(const QString& value)
 {
     const QString clean = value == QLatin1String("7") || value == QLatin1String("8") ? value : QStringLiteral("Default");
     if (clean == m_dataBits) return;
-    m_dataBits = clean; QSettings().setValue(QStringLiteral("rig/dataBits"), clean); scheduleSerialRestart(); emit changed();
+    m_dataBits = clean; QSettings().setValue(QStringLiteral("rig/dataBits"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
 }
 
 void RigController::setStopBits(const QString& value)
 {
     const QString clean = value == QLatin1String("1") || value == QLatin1String("2") ? value : QStringLiteral("Default");
     if (clean == m_stopBits) return;
-    m_stopBits = clean; QSettings().setValue(QStringLiteral("rig/stopBits"), clean); scheduleSerialRestart(); emit changed();
+    m_stopBits = clean; QSettings().setValue(QStringLiteral("rig/stopBits"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
 }
 
 void RigController::setParity(const QString& value)
 {
     const QString clean = QStringList{QStringLiteral("None"), QStringLiteral("Odd"), QStringLiteral("Even"), QStringLiteral("Mark"), QStringLiteral("Space")}.contains(value) ? value : QStringLiteral("Default");
     if (clean == m_parity) return;
-    m_parity = clean; QSettings().setValue(QStringLiteral("rig/parity"), clean); scheduleSerialRestart(); emit changed();
+    m_parity = clean; QSettings().setValue(QStringLiteral("rig/parity"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
 }
 
 void RigController::setHandshake(const QString& value)
 {
     const QString clean = QStringList{QStringLiteral("None"), QStringLiteral("XONXOFF"), QStringLiteral("Hardware")}.contains(value) ? value : QStringLiteral("Default");
     if (clean == m_handshake) return;
-    m_handshake = clean; QSettings().setValue(QStringLiteral("rig/handshake"), clean); scheduleSerialRestart(); emit changed();
+    m_handshake = clean; QSettings().setValue(QStringLiteral("rig/handshake"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
 }
 
 void RigController::setDtrState(const QString& value)
 {
     const QString clean = QStringList{QStringLiteral("ON"), QStringLiteral("OFF")}.contains(value) ? value : QStringLiteral("Unset");
     if (clean == m_dtrState) return;
-    m_dtrState = clean; QSettings().setValue(QStringLiteral("rig/dtrState"), clean); scheduleSerialRestart(); emit changed();
+    m_dtrState = clean; QSettings().setValue(QStringLiteral("rig/dtrState"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
 }
 
 void RigController::setRtsState(const QString& value)
 {
     const QString clean = QStringList{QStringLiteral("ON"), QStringLiteral("OFF")}.contains(value) ? value : QStringLiteral("Unset");
     if (clean == m_rtsState) return;
-    m_rtsState = clean; QSettings().setValue(QStringLiteral("rig/rtsState"), clean); scheduleSerialRestart(); emit changed();
+    m_rtsState = clean; QSettings().setValue(QStringLiteral("rig/rtsState"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
 }
 
 void RigController::setCivAddress(const QString& value)
 {
     const QString clean = value.trimmed();
     if (clean == m_civAddress) return;
-    m_civAddress = clean; QSettings().setValue(QStringLiteral("rig/civAddress"), clean); scheduleSerialRestart(); emit changed();
+    m_civAddress = clean; QSettings().setValue(QStringLiteral("rig/civAddress"), clean); scheduleSerialRestart(); syncRadioProfile(); emit changed();
+}
+
+QVariantMap RigController::captureRadioProfile() const
+{
+    return {
+        {QStringLiteral("name"), m_radioProfiles.activeName()},
+        {QStringLiteral("link"), m_link},
+        {QStringLiteral("host"), m_host},
+        {QStringLiteral("port"), m_port},
+        {QStringLiteral("tciAddress"), m_tciAddress},
+        {QStringLiteral("tciTrx"), m_tciTrx},
+        {QStringLiteral("flrigAddress"), m_flrigAddress},
+        {QStringLiteral("omniRigNumber"), m_omniRigNumber},
+        {QStringLiteral("serialPort"), m_serialPort},
+        {QStringLiteral("rigModel"), m_rigModel},
+        {QStringLiteral("baud"), m_baud},
+        {QStringLiteral("dataBits"), m_dataBits},
+        {QStringLiteral("stopBits"), m_stopBits},
+        {QStringLiteral("parity"), m_parity},
+        {QStringLiteral("handshake"), m_handshake},
+        {QStringLiteral("dtrState"), m_dtrState},
+        {QStringLiteral("rtsState"), m_rtsState},
+        {QStringLiteral("civAddress"), m_civAddress},
+        {QStringLiteral("pttType"), m_pttType},
+        {QStringLiteral("pttPort"), m_pttPort},
+        {QStringLiteral("keyerPort"), m_keyerPort},
+        {QStringLiteral("keyerLine"), m_keyerLine},
+        {QStringLiteral("audioInput"), m_audioInput},
+        {QStringLiteral("audioInputId"), m_audioInputId},
+        {QStringLiteral("reservedPorts"), reservedPorts()},
+        {QStringLiteral("leaveDecodiumPort"), leaveDecodiumPort()},
+    };
+}
+
+void RigController::writeLegacyRadioSettings() const
+{
+    QSettings settings;
+    settings.setValue(QStringLiteral("rig/link"), m_link);
+    settings.setValue(QStringLiteral("rig/host"), m_host);
+    settings.setValue(QStringLiteral("rig/port"), m_port);
+    settings.setValue(QStringLiteral("rig/tciAddress"), m_tciAddress);
+    settings.setValue(QStringLiteral("rig/tciTrx"), m_tciTrx);
+    settings.setValue(QStringLiteral("rig/flrigAddress"), m_flrigAddress);
+    settings.setValue(QStringLiteral("rig/omniRigNumber"), m_omniRigNumber);
+    settings.setValue(QStringLiteral("rig/serialPort"), m_serialPort);
+    settings.setValue(QStringLiteral("rig/model"), m_rigModel);
+    settings.setValue(QStringLiteral("rig/baud"), m_baud);
+    settings.setValue(QStringLiteral("rig/dataBits"), m_dataBits);
+    settings.setValue(QStringLiteral("rig/stopBits"), m_stopBits);
+    settings.setValue(QStringLiteral("rig/parity"), m_parity);
+    settings.setValue(QStringLiteral("rig/handshake"), m_handshake);
+    settings.setValue(QStringLiteral("rig/dtrState"), m_dtrState);
+    settings.setValue(QStringLiteral("rig/rtsState"), m_rtsState);
+    settings.setValue(QStringLiteral("rig/civAddress"), m_civAddress);
+    settings.setValue(QStringLiteral("rig/pttType"), m_pttType);
+    settings.setValue(QStringLiteral("rig/pttPort"), m_pttPort);
+    settings.setValue(QStringLiteral("rig/keyerPort"), m_keyerPort);
+    settings.setValue(QStringLiteral("rig/keyerLine"), m_keyerLine);
+    settings.setValue(QStringLiteral("cw/audioInput"), m_audioInput);
+    settings.setValue(QStringLiteral("cw/audioInputId"), m_audioInputId);
+    const QStringList reserved = reservedPorts().split(QRegularExpression(QStringLiteral("[,;\\s]+")),
+                                                        Qt::SkipEmptyParts);
+    core::setUserReservedSerialPorts(reserved);
+    core::setLeaveDecodiumPort(leaveDecodiumPort());
+}
+
+void RigController::applyRadioProfile(const QVariantMap& profile)
+{
+    if (profile.isEmpty())
+        return;
+    const bool reconnect = m_enabled && !m_initializing;
+    const bool restartAudio = profile.value(QStringLiteral("audioInput"), m_audioInput).toString()
+                                  != m_audioInput
+                              || profile.value(QStringLiteral("audioInputId"), m_audioInputId).toString()
+                                     != m_audioInputId;
+    if (reconnect) {
+        ++m_launchGeneration;
+        m_hamlib.disconnectFromRig();
+        m_tci.disconnectFromRig();
+        m_flrig.disconnectFromRig();
+        m_omniRig.disconnectFromRig();
+        stopChildProcess(m_rigctld);
+    }
+
+    m_applyingRadioProfile = true;
+    const auto value = [&profile](const QString& key, const QVariant& fallback) {
+        return profile.contains(key) ? profile.value(key) : fallback;
+    };
+    m_link = value(QStringLiteral("link"), m_link).toString();
+    if (m_link != QLatin1String("serial") && m_link != QLatin1String("tci")
+        && m_link != QLatin1String("flrig") && m_link != QLatin1String("omnirig"))
+        m_link = QStringLiteral("network");
+    m_host = value(QStringLiteral("host"), m_host).toString().trimmed();
+    if (m_host.isEmpty())
+        m_host = QStringLiteral("127.0.0.1");
+    m_port = value(QStringLiteral("port"), m_port).toInt();
+    if (m_port <= 0 || m_port > 65535)
+        m_port = 4532;
+    m_tciAddress = value(QStringLiteral("tciAddress"), m_tciAddress).toString().trimmed();
+    if (m_tciAddress.isEmpty())
+        m_tciAddress = QStringLiteral("127.0.0.1:40001");
+    m_tciTrx = qBound(0, value(QStringLiteral("tciTrx"), m_tciTrx).toInt(), 7);
+    m_flrigAddress = value(QStringLiteral("flrigAddress"), m_flrigAddress).toString().trimmed();
+    if (m_flrigAddress.isEmpty())
+        m_flrigAddress = QStringLiteral("127.0.0.1:12345");
+    m_omniRigNumber = value(QStringLiteral("omniRigNumber"), m_omniRigNumber).toInt() == 2 ? 2 : 1;
+    m_serialPort = value(QStringLiteral("serialPort"), m_serialPort).toString().trimmed();
+    m_rigModel = qMax(0, value(QStringLiteral("rigModel"), m_rigModel).toInt());
+    m_baud = qMax(1, value(QStringLiteral("baud"), m_baud).toInt());
+    m_dataBits = value(QStringLiteral("dataBits"), m_dataBits).toString();
+    m_stopBits = value(QStringLiteral("stopBits"), m_stopBits).toString();
+    m_parity = value(QStringLiteral("parity"), m_parity).toString();
+    m_handshake = value(QStringLiteral("handshake"), m_handshake).toString();
+    m_dtrState = value(QStringLiteral("dtrState"), m_dtrState).toString();
+    m_rtsState = value(QStringLiteral("rtsState"), m_rtsState).toString();
+    m_civAddress = value(QStringLiteral("civAddress"), m_civAddress).toString().trimmed();
+    m_pttType = value(QStringLiteral("pttType"), m_pttType).toString().trimmed().toUpper();
+    if (m_pttType != QLatin1String("RIG") && m_pttType != QLatin1String("RTS")
+        && m_pttType != QLatin1String("DTR") && m_pttType != QLatin1String("NONE"))
+        m_pttType = QStringLiteral("RIG");
+    m_pttPort = value(QStringLiteral("pttPort"), m_pttPort).toString().trimmed();
+    m_keyerPort = value(QStringLiteral("keyerPort"), m_keyerPort).toString().trimmed();
+    m_keyerLine = value(QStringLiteral("keyerLine"), m_keyerLine).toString().trimmed().toUpper();
+    if (m_keyerLine != QLatin1String("RTS") && m_keyerLine != QLatin1String("WINKEYER"))
+        m_keyerLine = QStringLiteral("DTR");
+    m_audioInput = value(QStringLiteral("audioInput"), m_audioInput).toString();
+    m_audioInputId = value(QStringLiteral("audioInputId"), m_audioInputId).toString();
+    const QString reservedText = value(QStringLiteral("reservedPorts"), reservedPorts()).toString();
+    core::setUserReservedSerialPorts(reservedText.split(QRegularExpression(QStringLiteral("[,;\\s]+")),
+                                                        Qt::SkipEmptyParts));
+    core::setLeaveDecodiumPort(value(QStringLiteral("leaveDecodiumPort"), leaveDecodiumPort()).toBool());
+    m_capabilitiesForModel = 0;
+    m_serialCapabilities.clear();
+    m_applyingRadioProfile = false;
+    writeLegacyRadioSettings();
+    if (restartAudio && m_decoderOn) {
+        stopAudio();
+        startAudio();
+    }
+    openKeyer();
+    emit serialCapabilitiesChanged();
+    emit audioSelectionChanged();
+    emit changed();
+    emit stateChanged();
+    if (reconnect)
+        connectNow();
+}
+
+void RigController::syncRadioProfile()
+{
+    if (m_applyingRadioProfile || m_initializing || m_radioProfiles.activeId().isEmpty())
+        return;
+    m_radioProfiles.update(m_radioProfiles.activeId(), captureRadioProfile());
+}
+
+bool RigController::selectRadioProfile(const QString& id)
+{
+    const QVariantMap profile = m_radioProfiles.byId(id);
+    if (profile.isEmpty())
+        return false;
+    if (!m_radioProfiles.setActiveId(id))
+        return false;
+    applyRadioProfile(profile);
+    return true;
+}
+
+QString RigController::createRadioProfile(const QString& name)
+{
+    const QString id = m_radioProfiles.create(name, captureRadioProfile(), true);
+    applyRadioProfile(m_radioProfiles.byId(id));
+    return id;
+}
+
+bool RigController::removeRadioProfile(const QString& id)
+{
+    const bool removingActive = id == m_radioProfiles.activeId();
+    if (!m_radioProfiles.remove(id))
+        return false;
+    if (!removingActive)
+        return true;
+    return selectRadioProfile(m_radioProfiles.activeId());
+}
+
+bool RigController::renameRadioProfile(const QString& id, const QString& name)
+{
+    QVariantMap profile = m_radioProfiles.byId(id);
+    if (profile.isEmpty() || name.trimmed().isEmpty())
+        return false;
+    profile.insert(QStringLiteral("name"), name.trimmed());
+    return m_radioProfiles.update(id, profile);
 }
 
 QVariantList RigController::rigModels()
@@ -1255,6 +1467,7 @@ void RigController::chooseAudioInput(int row)
             emit decoderChanged();
     }
     emit audioSelectionChanged();
+    syncRadioProfile();
 }
 
 void RigController::setAudioInput(const QString& name)
@@ -1273,6 +1486,7 @@ void RigController::setAudioInput(const QString& name)
     }
     emit audioSelectionChanged();
     emit decoderChanged();
+    syncRadioProfile();
 }
 
 void RigController::setDecoderOn(bool on)
@@ -1969,6 +2183,7 @@ void RigController::setKeyerPort(const QString& port)
     m_keyerPort = clean;
     QSettings().setValue(QStringLiteral("rig/keyerPort"), m_keyerPort);
     openKeyer();
+    syncRadioProfile();
     emit changed();
 }
 
@@ -1983,6 +2198,7 @@ void RigController::setKeyerLine(const QString& line)
     m_keyerLine = clean;
     QSettings().setValue(QStringLiteral("rig/keyerLine"), m_keyerLine);
     openKeyer();
+    syncRadioProfile();
     emit changed();
 }
 

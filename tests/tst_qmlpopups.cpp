@@ -224,6 +224,36 @@ private slots:
         }
     }
 
+    void detachedPanelsUseGlobalCoordinateMovement()
+    {
+        const QDir qmlDir(QStringLiteral(QML_DIR));
+        const QString panel = readFile(qmlDir.filePath(QStringLiteral("PanelWindow.qml")));
+        const QString titleBar = readFile(QStringLiteral(UI_QML_DIR) + QStringLiteral("/WindowTitleBar.qml"));
+
+        // A: the generic detached panel consumes the GlassPanel global drag
+        // signals instead of depending only on the platform window manager.
+        for (const QString& expression : {
+                 QStringLiteral("property bool panelDragPending: false"),
+                 QStringLiteral("property bool panelDragActive: false"),
+                 QStringLiteral("function movePanelDrag(globalX, globalY)"),
+                 QStringLiteral("root.x = Math.round(root.panelDragAnchorWindow.x"),
+                 QStringLiteral("root.y = Math.round(root.panelDragAnchorWindow.y"),
+                 QStringLiteral("function onMoveStarted() { root.beginPanelDrag() }"),
+                 QStringLiteral("function onMoveMoved(globalX, globalY) { root.movePanelDrag(globalX, globalY) }"),
+                 QStringLiteral("function onMoveEnded(globalX, globalY) { root.endPanelDrag(globalX, globalY) }")})
+            QVERIFY2(panel.contains(expression), qPrintable(expression));
+
+        // B: dedicated windows use the same global-coordinate fallback in the
+        // custom title bar, including the cross-monitor delta.
+        for (const QString& expression : {
+                 QStringLiteral("property bool manualDragActive: false"),
+                 QStringLiteral("function moveManualDrag(globalX, globalY)"),
+                 QStringLiteral("root.window.x = Math.round(root.manualDragAnchorWindow.x"),
+                 QStringLiteral("root.window.y = Math.round(root.manualDragAnchorWindow.y"),
+                 QStringLiteral("onPositionChanged:")})
+            QVERIFY2(titleBar.contains(expression), qPrintable(expression));
+    }
+
     void everyPanelHasARealDetachableWindowRoute()
     {
         const QDir qmlDir(QStringLiteral(QML_DIR));
@@ -421,6 +451,61 @@ private slots:
         QVERIFY(settings.contains(QStringLiteral("resetNewQsoPanelSettings")));
         QVERIFY(settings.contains(QStringLiteral("CUSTOM ADIF FIELDS")));
         QVERIFY(settings.contains(QStringLiteral("STATE and TX_PWR")));
+    }
+
+    void multipleOperatorQsoWindowsKeepTheirProfile()
+    {
+        const QDir qmlDir(QStringLiteral(QML_DIR));
+        const QString dialog = readFile(qmlDir.filePath(QStringLiteral("NewQsoDialog.qml")));
+        const QString profiles = readFile(qmlDir.filePath(QStringLiteral("StationProfilesDialog.qml")));
+        const QString main = readFile(qmlDir.filePath(QStringLiteral("Main.qml")));
+
+        // A: una finestra dedicata porta il proprio profilo fino al salvataggio.
+        QVERIFY(dialog.contains(QStringLiteral("property int profileId: 0")));
+        QVERIFY(dialog.contains(QStringLiteral("station_profile_id: root.profileId")));
+        QVERIFY(dialog.contains(QStringLiteral("profileDialogKey")));
+        // B: la finestra dei profili apre una sessione distinta, senza cambiare
+        // il profilo attivo globale della dashboard.
+        QVERIFY(profiles.contains(QStringLiteral("profileQsoRequested")));
+        QVERIFY(profiles.contains(QStringLiteral("Open QSO for this profile")));
+        QVERIFY(main.contains(QStringLiteral("openProfileQso(profileId)")));
+        QVERIFY(main.contains(QStringLiteral("newqso-profile-")));
+    }
+
+    void radioProfilesAreExposedInCatSetup()
+    {
+        const QDir qmlDir(QStringLiteral(QML_DIR));
+        const QString setup = readFile(qmlDir.filePath(QStringLiteral("SetupDialog.qml")));
+
+        // A: il selettore carica e cambia il profilo CAT persistente.
+        QVERIFY(setup.contains(QStringLiteral("model: decolog.rig.radioProfiles")));
+        QVERIFY(setup.contains(QStringLiteral("selectRadioProfile(selected.id)")));
+        QVERIFY(setup.contains(QStringLiteral("activeId")));
+        // B: la UI permette di creare, rinominare e rimuovere profili senza
+        // confonderli con i profili stazione/QSO.
+        QVERIFY(setup.contains(QStringLiteral("createRadioProfile")));
+        QVERIFY(setup.contains(QStringLiteral("renameRadioProfile")));
+        QVERIFY(setup.contains(QStringLiteral("removeRadioProfile")));
+        QVERIFY(setup.contains(QStringLiteral("selected profile is restored")));
+    }
+
+    void liquidGlassDialogsKeepTheirContentReadable()
+    {
+        const QDir uiDir(QStringLiteral(UI_QML_DIR));
+        const QString roundedWindow = readFile(uiDir.filePath(QStringLiteral("RoundedWindow.qml")));
+        const QString dialogFrame = readFile(uiDir.filePath(QStringLiteral("DialogFrame.qml")));
+
+        // A: RoundedWindow provides an in-layer surface, so the transparent
+        // macOS frame cannot expose the log through a modal dialog.
+        QVERIFY(roundedWindow.contains(QStringLiteral("property real surfaceOpacity")));
+        QVERIFY(roundedWindow.contains(QStringLiteral("renderedSurfaceColor")));
+        QVERIFY(roundedWindow.contains(QStringLiteral("z: -1000")));
+
+        // B: every DialogFrame opts into the readable Liquid Glass opacity;
+        // classic themes remain fully opaque.
+        QVERIFY(roundedWindow.contains(QStringLiteral("property bool readableSurface")));
+        QVERIFY(dialogFrame.contains(QStringLiteral("readableSurface: true")));
+        QVERIFY(dialogFrame.contains(QStringLiteral("surfaceOpacity: Theme.isGlassTheme ? 0.97 : 1.0")));
     }
 
     void awardExtensionControlsHaveAccessibleNames()

@@ -8864,6 +8864,34 @@ Champs supplémentaires conservés : %8</translation>
         <source>Callsign lists</source>
         <translation>Listes d’indicatifs</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>Profils CAT</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>Profil de radio</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">Nom du profil</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Nouveau</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>Renommer</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">Supprimer</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>Chaque profil enregistre la liaison CAT, le modèle de radio, les paramètres série, les ports PTT/manipulateur et le périphérique audio du décodeur. Les modifications sont enregistrées automatiquement. Le profil sélectionné est restauré au prochain démarrage de DecoDXLog.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9187,6 +9215,14 @@ Champs supplémentaires conservés : %8</translation>
     <message>
         <source>Award account groups: %1</source>
         <translation>Groupes du compte de diplôme : %1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>Chaque profil est un journal logique distinct. Les QSO entrants par UDP, N1MM, API et réseau sont attribués d’après STATION_CALLSIGN, puis d’après un OPERATOR unique. Ouvre une fenêtre QSO dédiée pour chaque membre de la famille afin de saisir à la main sans changer le profil actif global.</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>Ouvrir un QSO pour ce profil</translation>
     </message>
 </context>
 <context>
@@ -11770,6 +11806,14 @@ Champs supplémentaires conservés : %8</translation>
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>La liaison avec HH attend un mot de passe : définis-le dans les Réglages, sous HamHub, le même que dans HH</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>Le QSO entrant %1 n’a pas de profil de station unique ; il est resté non attribué</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>Le profil de station sélectionné n’est pas disponible.</translation>
     </message>
 </context>
 <context>

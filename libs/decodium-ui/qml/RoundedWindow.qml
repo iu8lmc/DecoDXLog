@@ -13,6 +13,15 @@ ApplicationWindow {
     id: root
 
     property color surfaceColor: Theme.bgDeep
+    // Le finestre modali non devono lasciare passare il contenuto della
+    // dashboard dietro a testi e campi. La cornice resta Liquid Glass, ma la
+    // superficie interna puo' avere un'opacita' controllata e leggibile.
+    property bool readableSurface: false
+    property real surfaceOpacity: 1.0
+    readonly property color renderedSurfaceColor: Qt.rgba(surfaceColor.r,
+                                                           surfaceColor.g,
+                                                           surfaceColor.b,
+                                                           Math.max(0.0, Math.min(1.0, surfaceOpacity)))
     // La finestra principale mantiene la sua decorazione nativa: macOS le
     // fornisce gia' forma e ombra corrette. Le finestre staccate, invece,
     // impostano la loro superficie trasparente per disegnare gli angoli veri.
@@ -39,7 +48,7 @@ ApplicationWindow {
 
     // `color` e' il colore della QQuickWindow, non solo uno sfondo QML: deve
     // essere trasparente perche' macOS possa mostrare gli angoli veri.
-    color: root.transparentCorners ? "transparent" : root.surfaceColor
+    color: root.transparentCorners ? "transparent" : root.renderedSurfaceColor
 
     background: Item {
         // The classic themes remain a flat, pixel-stable surface.  Liquid
@@ -54,7 +63,7 @@ ApplicationWindow {
             radius: root.frameRadius
             antialiasing: root.frameRadius > 0
             gradient: Gradient {
-                GradientStop { position: 0.0; color: root.surfaceColor }
+                GradientStop { position: 0.0; color: root.renderedSurfaceColor }
                 GradientStop {
                     position: 0.48
                     color: Theme.isGlassTheme
@@ -101,6 +110,19 @@ ApplicationWindow {
             maskSpreadAtMin: 0.02
             maskThresholdMax: 1.0
             maskSpreadAtMax: 0.0
+        }
+
+        // Questa superficie e' dentro lo stesso layer mascherato del
+        // contenuto: su macOS resta trasparente solo negli angoli reali,
+        // mentre il corpo della finestra modale non diventa un vetro che
+        // rende il testo illeggibile sopra il log sottostante.
+        Rectangle {
+            anchors.fill: parent
+            z: -1000
+            visible: root.readableSurface
+            color: root.renderedSurfaceColor
+            radius: root.frameRadius
+            antialiasing: root.frameRadius > 0
         }
     }
 

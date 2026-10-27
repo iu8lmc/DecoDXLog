@@ -8842,6 +8842,34 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Callsign lists</source>
         <translation>コールサインリスト</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>CAT プロファイル</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>無線機プロファイル</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">プロファイル名</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>新規</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>名前の変更</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">削除</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>各プロファイルには、CAT 接続、無線機のモデル、シリアルのパラメーター、PTT／キーヤーのポート、デコーダーのオーディオデバイスが保存されます。変更は自動的に保存されます。選択したプロファイルは、DecoDXLog を再起動したときに復元されます。</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9165,6 +9193,14 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Award account groups: %1</source>
         <translation>アワードのアカウントのグループ: %1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>各プロファイルは独立した論理ログです。UDP、N1MM、API、ネットワークから届く QSO は、まず STATION_CALLSIGN、次に一意の OPERATOR で振り分けられます。家族ごとに専用の QSO ウィンドウを開けば、グローバルのアクティブなプロファイルを変えずに手入力できます。</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>このプロファイルで QSO を開く</translation>
     </message>
 </context>
 <context>
@@ -11721,6 +11757,14 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>HH との連携はパスワードを待っています。設定の HamHub で、HH と同じものを設定してください</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>受信した QSO %1 には一意のステーションプロファイルがないため、未割り当てのままです</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>選択したステーションプロファイルは利用できません。</translation>
     </message>
 </context>
 <context>

@@ -8842,6 +8842,34 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>Callsign lists</source>
         <translation>呼號清單</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>CAT 設定檔</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>電台設定檔</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">設定檔名稱</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>新增</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>重新命名</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">刪除</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>每個設定檔會儲存 CAT 連線、電台型號、序列埠參數、PTT／鍵控器連接埠以及解碼器的音訊裝置。變更會自動儲存。所選設定檔會在 DecoDXLog 再次啟動時還原。</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9165,6 +9193,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Award account groups: %1</source>
         <translation>獎狀帳戶分組：%1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>每個設定檔都是獨立的邏輯日誌。透過 UDP、N1MM、API 和網路傳入的 QSO 先依 STATION_CALLSIGN 分配，再依唯一的 OPERATOR 分配。可為每位家庭成員開啟專用的 QSO 視窗手動輸入，而不必變更全域使用中的設定檔。</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>為此設定檔開啟 QSO</translation>
     </message>
 </context>
 <context>
@@ -11721,6 +11757,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>與 HH 的連線正在等待密碼：請在設定的 HamHub 部分設定，與 HH 中的相同</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>傳入的 QSO %1 沒有唯一的電台設定檔；已維持未分配</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>所選電台設定檔無法使用。</translation>
     </message>
 </context>
 <context>

@@ -8857,6 +8857,34 @@ Extra fields are preserved: %8</source>
         <source>Callsign lists</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9179,6 +9207,14 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Award account groups: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -11762,6 +11798,14 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

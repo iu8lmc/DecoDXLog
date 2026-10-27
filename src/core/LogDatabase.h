@@ -496,6 +496,11 @@ public:
     bool deleteStationProfile(qint64 id);
     // Il profilo che corrisponde a un nominativo di stazione (il predefinito, se piu' d'uno).
     qint64 profileForCallsign(const QString& stationCallsign) const;
+    // Risolve l'identita' dichiarata da un QSO ricevuto da un programma esterno.
+    // Prima usa STATION_CALLSIGN, poi OPERATOR se identifica un solo profilo.
+    // In caso di ambiguita' torna 0: un QSO non deve finire in silenzio nel log
+    // di un altro operatore.
+    qint64 profileForIdentity(const QString& stationCallsign, const QString& operatorCall) const;
 
     // ── Impostazioni e manutenzione ──────────────────────────────────────────
     QString setting(const QString& key, const QString& fallback = {}) const;

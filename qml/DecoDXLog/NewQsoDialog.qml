@@ -8,15 +8,22 @@ import Decodium.UI
 DialogFrame {
     id: root
 
+    // 0 = profilo attivo, >0 = finestra dedicata a quel profilo.
+    property int profileId: 0
+    property string profileDialogKey: ""
+    readonly property var stationProfile: profileId > 0
+                                           ? decolog.stationProfiles.byId(profileId)
+                                           : decolog.stationProfiles.activeProfile
+
     readonly property var lookup: decolog.callInfo
     readonly property bool matchesCall: (lookup.call || "") === callField.text.trim().toUpperCase()
                                         && callField.text.trim().length > 0
 
     title: qsTr("New QSO")
     dotColor: Theme.accentColor
-    info: decolog.stationProfiles.activeProfile.name
-          ? qsTr("Station: %1").arg(decolog.stationProfiles.activeProfile.name) : qsTr("No station profile")
-    dialogKey: "newqso"
+    info: root.stationProfile.name
+          ? qsTr("Station: %1").arg(root.stationProfile.name) : qsTr("No station profile")
+    dialogKey: root.profileDialogKey.length > 0 ? root.profileDialogKey : "newqso"
     width: 760
     height: 660
 
@@ -128,7 +135,8 @@ DialogFrame {
             comment: commentField.text, tags: tagsField.text,
             country: countryField.text, address: addressField.text, state: stateField.text,
             cnty: cntyField.text, cont: contField.text, cqz: cqzField.text, ituz: ituzField.text,
-            dxcc: dxccField.text, qsl_via: qslViaField.text
+            dxcc: dxccField.text, qsl_via: qslViaField.text,
+            station_profile_id: root.profileId
         })
         errorText.text = error
         if (error.length > 0)
@@ -149,7 +157,7 @@ DialogFrame {
         clearAll()
         if (decolog.shownFrequency.length)
             freqField.text = decolog.shownFrequency
-        const pwr = decolog.stationProfiles.activeProfile.defaultTxPwr
+        const pwr = root.stationProfile.defaultTxPwr
         pwrField.text = pwr > 0 ? String(pwr) : ""
     }
 

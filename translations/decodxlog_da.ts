@@ -8864,6 +8864,34 @@ Ekstra felter bevares: %8</translation>
         <source>Callsign lists</source>
         <translation>Lister med opkaldssignaler</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>CAT-profiler</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>Radioprofil</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">Profilnavn</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Ny</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>Omdøb</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">Slet</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>Hver profil gemmer CAT-forbindelsen, radiomodellen, de serielle parametre, PTT-/keyerportene og dekoderens lydenhed. Ændringer gemmes automatisk. Den valgte profil gendannes, når DecoDXLog starter igen.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9187,6 +9215,14 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Award account groups: %1</source>
         <translation>Grupper i diplomkontoen: %1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>Hver profil er en separat logisk log. Indgående QSO’er via UDP, N1MM, API og netværk tildeles efter STATION_CALLSIGN og derefter efter en entydig OPERATOR. Åbn et dedikeret QSO-vindue til hvert familiemedlem for at indtaste manuelt uden at skifte den globale aktive profil.</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>Åbn QSO for denne profil</translation>
     </message>
 </context>
 <context>
@@ -11770,6 +11806,14 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>Forbindelsen til HH venter på en adgangskode: angiv den under Indstillinger, ved HamHub, den samme som i HH</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>Det indgående QSO %1 har ingen entydig stationsprofil; det blev ikke tildelt</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>Den valgte stationsprofil er ikke tilgængelig.</translation>
     </message>
 </context>
 <context>

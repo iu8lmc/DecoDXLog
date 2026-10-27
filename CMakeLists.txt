@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.43
+    VERSION 1.17.45
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -359,6 +359,8 @@ qt_add_executable(decolog
     src/app/CloudController.cpp
     src/app/CloudController.h
     src/app/RigController.cpp
+    src/app/RadioProfileModel.cpp
+    src/app/RadioProfileModel.h
     src/app/VoiceKeyerController.cpp
     src/app/VoiceKeyerController.h
     src/app/So2rController.cpp
@@ -718,7 +720,9 @@ if(DECODXLOG_BUILD_TESTS)
     # I popup in una finestra sua col campo di testo senza il fuoco non ricevono i tasti:
     # la prova legge i QML, non c'e' niente da avviare.
     qt_add_executable(tst_qmlpopups tests/tst_qmlpopups.cpp)
-    target_compile_definitions(tst_qmlpopups PRIVATE QML_DIR="${CMAKE_SOURCE_DIR}/qml/DecoDXLog")
+    target_compile_definitions(tst_qmlpopups PRIVATE
+        QML_DIR="${CMAKE_SOURCE_DIR}/qml/DecoDXLog"
+        UI_QML_DIR="${CMAKE_SOURCE_DIR}/libs/decodium-ui/qml")
     target_link_libraries(tst_qmlpopups PRIVATE Qt6::Test)
     set_target_properties(tst_qmlpopups PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME qmlpopups COMMAND tst_qmlpopups)
@@ -777,6 +781,7 @@ if(DECODXLOG_BUILD_TESTS)
     # inviata la macro: in SO2R puo' essere la radio 2.
     qt_add_executable(tst_rigcontroller tests/tst_rigcontroller.cpp
         src/app/RigController.cpp src/app/RigController.h
+        src/app/RadioProfileModel.cpp src/app/RadioProfileModel.h
         src/app/AudioDevices.cpp src/app/AudioDevices.h)
     target_include_directories(tst_rigcontroller PRIVATE src)
     target_link_libraries(tst_rigcontroller PRIVATE decolog_core Qt6::Multimedia Qt6::Test)

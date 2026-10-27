@@ -8886,6 +8886,34 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Callsign lists</source>
         <translation>Izsaukuma zīmju saraksti</translation>
     </message>
+    <message>
+        <source>CAT profiles</source>
+        <translation>CAT profili</translation>
+    </message>
+    <message>
+        <source>Radio profile</source>
+        <translation>Radio profils</translation>
+    </message>
+    <message>
+        <source>Profile name</source>
+        <translation type="unfinished">Profila nosaukums</translation>
+    </message>
+    <message>
+        <source>New</source>
+        <translation>Jauns</translation>
+    </message>
+    <message>
+        <source>Rename</source>
+        <translation>Pārdēvēt</translation>
+    </message>
+    <message>
+        <source>Delete</source>
+        <translation type="unfinished">Dzēst</translation>
+    </message>
+    <message>
+        <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation>Katrs profils saglabā CAT savienojumu, radio modeli, seriālos parametrus, PTT/taustiņa portus un dekodera audio ierīci. Izmaiņas tiek saglabātas automātiski. Izvēlētais profils tiek atjaunots, kad DecoDXLog tiek startēts atkārtoti.</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -9209,6 +9237,14 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Award account groups: %1</source>
         <translation>Diploma konta grupas: %1</translation>
+    </message>
+    <message>
+        <source>Each profile is a separate logical log. Incoming UDP, N1MM, API and network QSOs are routed by STATION_CALLSIGN, then by a unique OPERATOR. Open a dedicated QSO window for each family member to enter manually without changing the global active profile.</source>
+        <translation>Katrs profils ir atsevišķs loģisks žurnāls. Ienākošie QSO no UDP, N1MM, API un tīkla tiek piešķirti pēc STATION_CALLSIGN, tad pēc unikāla OPERATOR. Atver atsevišķu QSO logu katram ģimenes loceklim, lai ievadītu manuāli, nemainot globālo aktīvo profilu.</translation>
+    </message>
+    <message>
+        <source>Open QSO for this profile</source>
+        <translation>Atvērt QSO šim profilam</translation>
     </message>
 </context>
 <context>
@@ -11819,6 +11855,14 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>HH link is waiting for a password: set it under HamHub in Setup, the same one as in HH</source>
         <translation>Savienojums ar HH gaida paroli: iestati to iestatījumos sadaļā HamHub, to pašu, kas HH</translation>
+    </message>
+    <message>
+        <source>Incoming QSO %1 has no unique station profile; it was kept unassigned</source>
+        <translation>Ienākošajam QSO %1 nav unikāla stacijas profila; tas palika nepiešķirts</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available.</source>
+        <translation>Izvēlētais stacijas profils nav pieejams.</translation>
     </message>
 </context>
 <context>

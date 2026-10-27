@@ -3,6 +3,38 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.45 — 27 ottobre 2026
+
+**Allineata alla 1.17.44 di elisir80** (la nostra era la 1.17.43). Dalla loro 1.17.44 arrivano
+il multi-operatore (QSO assegnati prima da `STATION_CALLSIGN`, poi da `OPERATOR` se identifica un
+solo profilo; finestre Nuovo QSO dedicate a un profilo), i profili radio CAT persistenti con
+ripristino all'avvio, il trascinamento dei pannelli staccati su coordinate globali tra più monitor
+e le finestre modali Liquid Glass con superficie opaca. Nessuna funzione nostra toccata: l'unione
+è automatica, senza conflitti.
+
+## 1.17.44 — 26 ottobre 2026
+
+**Multi-operatore e profili CAT persistenti.** I QSO ricevuti da Decodium, WSJT-X, N1MM,
+dall'API o dalla rete vengono ora assegnati prima usando `STATION_CALLSIGN`, poi usando
+`OPERATOR` solo quando identifica un unico profilo. In caso di ambiguità restano non assegnati
+e viene registrato un avviso, evitando di contaminare silenziosamente il log di un altro
+operatore. Dalla gestione dei profili stazione si possono aprire finestre Nuovo QSO dedicate:
+ogni finestra salva nel profilo scelto senza cambiare quello globale della dashboard.
+
+La configurazione CAT può essere salvata in più profili radio persistenti, con collegamento,
+modello, seriale, PTT, keyer, audio decoder e parametri tecnici. Il profilo usato per ultimo
+viene ripristinato al riavvio; i vecchi valori `QSettings` restano aggiornati per compatibilità.
+
+**Finestre multipiattaforma e Liquid Glass.** Il trascinamento manuale dei pannelli staccati
+usa coordinate globali del desktop virtuale, così il passaggio verso un altro monitor non dipende
+dal comportamento variabile di `startSystemMove()` dei compositor. Le posizioni vengono salvate
+alla fine del trascinamento. Le finestre modali Liquid Glass ricevono una superficie interna
+opaca e leggibile, mentre il tema classico resta invariato.
+
+**Verifica.** Aggiunti test per il routing A/B di due operatori via UDP, la persistenza e il
+ripristino di due profili CAT, le finestre QSO per profilo, il trascinamento multipiattaforma e
+la leggibilità dei dialoghi Liquid Glass. Build macOS e test mirati superati prima del rilascio.
+
 ## 1.17.43 — 26 ottobre 2026
 
 **Allineata alla 1.17.42 di elisir80** (la nostra era la 1.17.40). Dalle loro 1.17.41 e 1.17.42 arrivano

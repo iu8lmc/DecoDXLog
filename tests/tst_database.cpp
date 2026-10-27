@@ -653,6 +653,70 @@ private slots:
         QCOMPARE(db.stationProfile(homeId)->qsoCount, 1);
     }
 
+    void routesSimultaneousOperatorQsosToSeparateProfiles()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+
+        StationProfile gbc;
+        gbc.name = QStringLiteral("YL3GBC");
+        gbc.stationCallsign = QStringLiteral("YL3GBC");
+        gbc.operatorCall = QStringLiteral("YL3GBC");
+        const qint64 gbcId = db.saveStationProfile(gbc);
+        QVERIFY(gbcId > 0);
+
+        StationProfile aug;
+        aug.name = QStringLiteral("YL3AUG");
+        aug.stationCallsign = QStringLiteral("YL3AUG");
+        aug.operatorCall = QStringLiteral("YL3AUG");
+        const qint64 augId = db.saveStationProfile(aug);
+        QVERIFY(augId > 0);
+
+        // A/B: due identita' esterne contemporanee, due profili diversi.
+        QCOMPARE(db.profileForIdentity(QStringLiteral("YL3GBC"), QString()), gbcId);
+        QCOMPARE(db.profileForIdentity(QStringLiteral("YL3AUG"), QString()), augId);
+        QCOMPARE(db.profileForIdentity(QString(), QStringLiteral("YL3AUG")), augId);
+
+        const auto a = db.insertQso({{"CALL", "K1GBC"}, {"QSO_DATE", "20261026"},
+                                     {"TIME_ON", "100000"}, {"BAND", "20m"}, {"MODE", "CW"},
+                                     {"STATION_CALLSIGN", "YL3GBC"}},
+                                    QStringLiteral("udp_decodium"), QStringLiteral("Decodium"), false, gbcId);
+        const auto b = db.insertQso({{"CALL", "K1AUG"}, {"QSO_DATE", "20261026"},
+                                     {"TIME_ON", "100100"}, {"BAND", "20m"}, {"MODE", "CW"},
+                                     {"STATION_CALLSIGN", "YL3AUG"}},
+                                    QStringLiteral("udp_decodium"), QStringLiteral("Decodium"), false, augId);
+        QCOMPARE(a.status, InsertResult::Status::Inserted);
+        QCOMPARE(b.status, InsertResult::Status::Inserted);
+        QCOMPARE(db.meta(a.id)->stationProfileId, gbcId);
+        QCOMPARE(db.meta(b.id)->stationProfileId, augId);
+        QCOMPARE(db.stationProfile(gbcId)->qsoCount, 1);
+        QCOMPARE(db.stationProfile(augId)->qsoCount, 1);
+    }
+
+    void refusesAmbiguousOperatorRouting()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        StationProfile home;
+        home.name = QStringLiteral("Home");
+        home.stationCallsign = QStringLiteral("YL3GBC");
+        home.operatorCall = QStringLiteral("YL3GBC");
+        const qint64 homeId = db.saveStationProfile(home);
+        QVERIFY(homeId > 0);
+        StationProfile portable = home;
+        portable.id = 0;
+        portable.uuid.clear();
+        portable.name = QStringLiteral("Portable");
+        portable.stationCallsign = QStringLiteral("YL3GBC/P");
+        QVERIFY(db.saveStationProfile(portable) > 0);
+
+        // Con il solo OPERATOR non si conosce il luogo: mai scegliere in modo
+        // arbitrario un profilo, mentre il nominativo completo resta risolvibile.
+        QCOMPARE(db.profileForIdentity(QString(), QStringLiteral("YL3GBC")), qint64(0));
+        QCOMPARE(db.profileForIdentity(QStringLiteral("YL3GBC/P"), QStringLiteral("YL3GBC")),
+                 db.profileForCallsign(QStringLiteral("YL3GBC/P")));
+    }
+
     void awardStatsAndBackup()
     {
         LogDatabase db;

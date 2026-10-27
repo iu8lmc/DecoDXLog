@@ -1372,7 +1372,43 @@ RoundedWindow {
 
     NewQsoDialog { id: newQsoDialog }
     QsoDetailDialog { id: qsoDialog }
-    StationProfilesDialog { id: profilesDialog }
+    property var profileQsoDialogs: []
+    function openProfileQso(profileId) {
+        const profile = decolog.stationProfiles.byId(profileId)
+        if (!profile || !profile.id)
+            return
+        for (let i = 0; i < profileQsoDialogs.length; ++i) {
+            if (profileQsoDialogs[i] && profileQsoDialogs[i].profileId === profileId) {
+                profileQsoDialogs[i].raise()
+                profileQsoDialogs[i].requestActivate()
+                return
+            }
+        }
+        const component = Qt.createComponent("NewQsoDialog.qml")
+        if (component.status !== Component.Ready) {
+            console.warn("Cannot create profile QSO window: " + component.errorString())
+            return
+        }
+        const dialog = component.createObject(window, {
+            profileId: profileId,
+            profileDialogKey: "newqso-profile-" + profileId,
+            transientParent: window
+        })
+        if (!dialog)
+            return
+        profileQsoDialogs.push(dialog)
+        dialog.closed.connect(function() {
+            const index = profileQsoDialogs.indexOf(dialog)
+            if (index >= 0)
+                profileQsoDialogs.splice(index, 1)
+            dialog.destroy()
+        })
+        dialog.open()
+    }
+    StationProfilesDialog {
+        id: profilesDialog
+        onProfileQsoRequested: (profileId) => window.openProfileQso(profileId)
+    }
     AboutDialog { id: aboutDialog }
     // Il riepilogo delle conferme scaricate: si apre da solo dopo uno scarico
     // chiesto a mano che ha portato qualcosa, e dalla scheda QSL.
