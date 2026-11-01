@@ -255,6 +255,14 @@ GlassPanel {
             width: qslScroll.availableWidth
             spacing: 6
 
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                color: Theme.textSecondary
+                font.pixelSize: 11
+                text: qsTr("LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.")
+            }
+
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 0

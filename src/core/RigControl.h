@@ -94,6 +94,7 @@ private:
         // Le risposte del CW arrivano anche dopo Ferma: questo numero evita
         // che una risposta vecchia riapra la coda nuova.
         quint64 cwToken{0};
+        QString command; // Identifica la richiesta fallita, senza testo CW.
     };
 
     void send(const QString& kind, const QString& command, int values, const QString& text = {},

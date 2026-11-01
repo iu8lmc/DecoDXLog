@@ -729,13 +729,17 @@ void QslController::finishBatch(const QslUploadResult& result)
 {
     countsDirty();
     const QString service = m_busyService;
+    if (service == QLatin1String("lotw") && result.requiresReconciliation && m_auto.value(service)) {
+        setAutoUpload(service, false);
+        note(tr("LoTW automatic upload paused: check the batch in LoTW before retrying"), QStringLiteral("warning"));
+    }
     if (m_batchMode) {
         if (result.ok) {
             for (qint64 id : m_batch)
                 markSent(id, service, result.duplicates > 0 && result.accepted == 0
                                           ? [] { QslUploadResult r; r.ok = true; r.duplicates = 1; return r; }()
                                           : [] { QslUploadResult r; r.ok = true; r.accepted = 1; return r; }());
-        } else {
+        } else if (service != QLatin1String("lotw")) {
             for (qint64 id : m_batch) {
                 QslUploadResult failed = result;
                 failed.accepted = failed.duplicates = 0;
@@ -755,7 +759,9 @@ void QslController::finishBatch(const QslUploadResult& result)
     m_batchMode = false;
 
     QString summary = result.ok
-        ? tr("%1: %2 sent, %3 already there, %4 rejected").arg(service).arg(m_accepted).arg(m_duplicates).arg(m_rejected)
+        ? (service == QLatin1String("lotw")
+               ? tr("LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity").arg(m_accepted)
+               : tr("%1: %2 sent, %3 already there, %4 rejected").arg(service).arg(m_accepted).arg(m_duplicates).arg(m_rejected))
         : result.message;
     if (result.ok && m_removed > 0)
         summary += tr(", %n deleted", nullptr, m_removed);

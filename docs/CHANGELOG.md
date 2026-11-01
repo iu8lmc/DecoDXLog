@@ -3,6 +3,19 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.46 — 2 novembre 2026
+
+**LoTW e TQSL.** Corretta l'interpretazione dei codici di uscita TQSL: gli esiti
+parziali o ambigui non segnano l'intero blocco come inviato e sospendono l'invio
+automatico in attesa di verifica. La scheda QSL chiarisce il limite di 500 QSO per
+invio e distingue il caricamento dall'elaborazione su LoTW. Lo stato dei QSO già
+segnati come inviati non viene riconciliato automaticamente.
+
+**Log e diagnostica CAT.** Dopo l'inserimento di un QSO, la tabella notifica alle
+viste l'aggiornamento completo delle righe spostate. Diagnostica CAT facoltativa
+con richieste e risposte marcate nel tempo e output dettagliato di rigctld; la
+riapertura della seriale da parte di Hamlib dopo un timeout resta da correggere.
+
 ## 1.17.45 — 27 ottobre 2026
 
 **Allineata alla 1.17.44 di elisir80** (la nostra era la 1.17.43). Dalla loro 1.17.44 arrivano

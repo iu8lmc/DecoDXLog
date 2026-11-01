@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.45
+    VERSION 1.17.46
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 

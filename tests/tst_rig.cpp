@@ -27,6 +27,7 @@ public:
     int stopError{-11};
     int connections{0};
     int replyDelayMs{0};
+    bool failFrequencyWrite{false};
     int repliesLostOnDisconnect{0};
     // Il ponte CAT di Decodium risponde col valore e basta: niente eco del
     // comando, niente RPRT. DecoDXLog deve capire anche quello.
@@ -112,6 +113,8 @@ public:
                 ? QStringLiteral("get_level: KEYSPD\nLevel Value: %1.000000\nRPRT 0\n").arg(keyspd)
                 : QStringLiteral("get_level: KEYSPD\n%1\nRPRT 0\n").arg(keyspd);
         if (cmd.startsWith(QLatin1String("F "))) {
+            if (failFrequencyWrite)
+                return QStringLiteral("set_freq:\nRPRT -5\n");
             frequency = cmd.mid(2).toLongLong();
             return QStringLiteral("set_freq: %1\nRPRT 0\n").arg(frequency);
         }
@@ -168,6 +171,21 @@ class TestRig : public QObject {
     Q_OBJECT
 
 private slots:
+    void errorReportsTheFailedCommand()
+    {
+        FakeRigctld rig;
+        rig.failFrequencyWrite = true;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_VERIFY(control.connected());
+        QSignalSpy failed(&control, &RigControl::failed);
+        control.setFrequency(7025000);
+        QTRY_VERIFY(!failed.isEmpty());
+        const QString message = failed.last().at(0).toString();
+        QVERIFY(message.contains(QStringLiteral("-5")));
+        QVERIFY(message.contains(QStringLiteral("CAT: F 7025000")));
+    }
+
     void readsSharedCatSpeedWithLabelAndDecimalValue()
     {
         FakeRigctld rig;

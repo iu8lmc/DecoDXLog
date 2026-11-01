@@ -171,28 +171,26 @@ QslUploadResult resultFromTqslExit(int exitCode, const QString& output, int qsoC
 {
     QslUploadResult r;
     r.message = output.trimmed();
-    // I codici di TQSL (tqsl --help): 0 tutto caricato, 7 tutti duplicati,
-    // 8 caricati con qualche duplicato, 9 nessun QSO nell'intervallo.
+    // I codici sono quelli dell'interfaccia a riga di comando di TQSL.
+    // I codici 8 e 9 non identificano quali QSO sono stati ignorati: non
+    // possiamo quindi marcare l'intero blocco come inviato.
     switch (exitCode) {
     case 0:
         r.ok = true;
         r.accepted = qsoCount;
         if (r.message.isEmpty())
-            r.message = QCoreApplication::translate("Qsl", "%n QSO sent to LoTW", nullptr, qsoCount);
+            r.message = QCoreApplication::translate("Qsl", "TQSL uploaded %n QSO; check processing in LoTW Your Activity", nullptr, qsoCount);
         break;
     case 7:
-        r.ok = true;
-        r.duplicates = qsoCount;
-        r.message = QCoreApplication::translate("Qsl", "LoTW already had these QSOs");
+        r.message = QCoreApplication::translate("Qsl", "TQSL: cannot open the output file (%1)").arg(r.message);
         break;
     case 8:
-        r.ok = true;
-        r.accepted = qsoCount;
-        r.message = QCoreApplication::translate("Qsl", "Sent to LoTW, some were already there");
+        r.requiresReconciliation = true;
+        r.message = QCoreApplication::translate("Qsl", "TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)").arg(r.message);
         break;
     case 9:
-        r.ok = true;
-        r.message = QCoreApplication::translate("Qsl", "No QSO to send");
+        r.requiresReconciliation = true;
+        r.message = QCoreApplication::translate("Qsl", "TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)").arg(r.message);
         break;
     case 1:
         r.message = QCoreApplication::translate("Qsl", "TQSL: cancelled");
@@ -202,10 +200,11 @@ QslUploadResult resultFromTqslExit(int exitCode, const QString& output, int qsoC
         r.message = QCoreApplication::translate("Qsl", "LoTW rejected the file: %1").arg(r.message);
         break;
     case 5:
-    case 6:
-        r.message = QCoreApplication::translate("Qsl", "TQSL: certificate or station location problem (%1)").arg(r.message);
+        r.message = QCoreApplication::translate("Qsl", "TQSL library error (%1)").arg(r.message);
         break;
     case 10:
+        r.message = QCoreApplication::translate("Qsl", "TQSL: command syntax error (%1)").arg(r.message);
+        break;
     case 11:
         r.retryLater = true;
         r.message = QCoreApplication::translate("Qsl", "TQSL: cannot reach LoTW (%1)").arg(r.message);
