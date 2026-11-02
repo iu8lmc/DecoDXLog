@@ -141,6 +141,11 @@ GlassPanel {
     Connections {
         target: decolog
         function onTuningChanged() {
+            // Un errore o un tentativo CAT fallito emette comunque un cambio
+            // di stato. Non usare l'ultima frequenza/modo di Decodium rimasti
+            // in memoria quando nessuna sorgente e' realmente collegata.
+            if (!decolog.rig.connected && !decolog.clientConnected)
+                return
             if (Date.now() - root.lastQsy < 2500 || freqField.activeFocus)
                 return
             const f = decolog.shownFrequency || ""
@@ -455,6 +460,7 @@ GlassPanel {
                         label: qsTr("Mode")
                         StyledComboBox {
                             id: modeBox
+                            objectName: "newQsoMode"
                             onEditTextChanged: root.applyDefaultReports()
                             Layout.fillWidth: true
                             editable: true
@@ -469,6 +475,7 @@ GlassPanel {
                         label: qsTr("Freq")
                         StyledTextField {
                             id: freqField
+                            objectName: "newQsoFrequency"
                             Layout.fillWidth: true
                             text: decolog.shownFrequency
                             onTextChanged: {

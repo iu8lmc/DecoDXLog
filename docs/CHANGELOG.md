@@ -3,6 +3,14 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.48 — 2 novembre 2026
+
+**Mappa.** Corretti i selettori dei livelli, che ora rispecchiano il loro stato e consentono di riattivare i livelli. Aggiunta la regolazione persistente dell'intensità della notte nel renderer completo; il renderer compatibile non dispone del livello notte.
+
+**Nuovo QSO.** In assenza di radio e Decodium collegati, i tentativi CAT falliti non sostituiscono più modo e frequenza inseriti manualmente con valori precedenti. Le sorgenti collegate continuano ad aggiornare il pannello.
+
+**Verifiche.** Aggiunti test QML per livelli della mappa e sintonia manuale, inclusi casi con sorgenti collegate e scollegate.
+
 ## 1.17.47 — 2 novembre 2026
 
 **Allineata alla 1.17.46 di elisir80** (la nostra era la 1.17.45). Dalla loro 1.17.46 arrivano
