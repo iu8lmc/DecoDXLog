@@ -34,6 +34,7 @@ struct QslUploadResult {
     QString message;
     QString remoteId;       // QRZ: il numero del QSO nel logbook
     bool    retryLater{false};   // problema di rete o servizio giu': si riprova
+    bool    requiresReconciliation{false}; // esito parziale: non ritentare automaticamente
 };
 
 class AdifRecord;

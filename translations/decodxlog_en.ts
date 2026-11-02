@@ -1024,6 +1024,10 @@
         <source>JSON files (*.json)</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5382,35 +5386,12 @@ Extra fields are preserved: %8</source>
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <source>LoTW rejected the file: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5531,6 +5512,33 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -12280,6 +12288,14 @@ Extra fields are preserved: %8</source>
             <numerusform>, %n deleted</numerusform>
             <numerusform>, %n deleted</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>

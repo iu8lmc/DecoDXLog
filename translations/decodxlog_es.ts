@@ -1024,6 +1024,10 @@
         <source>JSON files (*.json)</source>
         <translation>Archivos JSON (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: cada clic envía como máximo 500 QSO con TQSL. Una subida aún no es una confirmación de LoTW; comprueba el procesamiento en «Your Activity» de LoTW.</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5389,25 +5393,6 @@ Campos extra conservados: %8</translation>
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>%n QSO enviado a LoTW</numerusform>
-            <numerusform>%n QSO enviados a LoTW</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>LoTW ya tenía estos QSO</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>Enviados a LoTW, algunos ya estaban</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>Ningún QSO que enviar</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL: cancelado</translation>
@@ -5415,10 +5400,6 @@ Campos extra conservados: %8</translation>
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW ha rechazado el fichero: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: problema de certificado o de ubicación de estación (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5539,6 +5520,33 @@ Campos extra conservados: %8</translation>
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL no envió la imagen de la tarjeta de este QSO (encontrado: %1)</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>TQSL subió %n QSO; comprueba el procesamiento en «Your Activity» de LoTW</numerusform>
+            <numerusform>TQSL subió %n QSO; comprueba el procesamiento en «Your Activity» de LoTW</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: no se puede abrir el archivo de salida (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL no procesó ningún QSO: duplicados o fuera del rango de fechas; verifica en LoTW antes de reintentar (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL solo procesó una parte del lote; se desconoce el estado de cada QSO. Verifica en LoTW antes de reintentar (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>Error de la biblioteca de TQSL (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: error de sintaxis del comando (%1)</translation>
     </message>
 </context>
 <context>
@@ -12287,6 +12295,14 @@ Campos extra conservados: %8</translation>
             <numerusform>, %n borrado</numerusform>
             <numerusform>, %n borrados</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>Subida automática a LoTW en pausa: revisa el lote en LoTW antes de reintentar</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: TQSL subió %1 QSO; comprueba el procesamiento en «Your Activity» de LoTW</translation>
     </message>
 </context>
 <context>

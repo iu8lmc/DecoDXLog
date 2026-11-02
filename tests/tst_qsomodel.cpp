@@ -4,6 +4,7 @@
 #include "core/LogDatabase.h"
 
 #include <QTemporaryDir>
+#include <QSignalSpy>
 #include <QTest>
 #include <QTimeZone>
 
@@ -39,6 +40,49 @@ class TestQsoModel : public QObject {
     Q_OBJECT
 
 private slots:
+    void insertedRowsKeepAllExistingValuesAligned()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        auto add = [&db](const char* call, const char* date, const char* time, const char* band,
+                         const char* mode, const char* country) {
+            return db.insertQso({{"CALL", call}, {"QSO_DATE", date}, {"TIME_ON", time},
+                                 {"BAND", band}, {"MODE", mode}, {"COUNTRY", country}}, "manual").id;
+        };
+        const qint64 older = add("TA2PYZ", "20261027", "2252", "40m", "FT8", "Turkey");
+        const qint64 previous = add("ON1DGN", "20261027", "2255", "40m", "FT8", "Belgium");
+        QsoTableModel model(&db);
+        const QString previousTime = model.valueAt(0, QsoTableModel::Utc);
+        const QString olderTime = model.valueAt(1, QsoTableModel::Utc);
+        QCOMPARE(model.callAt(0), QString("ON1DGN"));
+        QCOMPARE(model.callAt(1), QString("TA2PYZ"));
+
+        QSignalSpy changed(&model, &QAbstractItemModel::dataChanged);
+        const qint64 first = add("4X6TT", "20261101", "1456", "20m", "SSB", "Israel");
+        model.insertQso(first);
+        const qint64 second = add("IT9KVW", "20261101", "1457", "20m", "SSB", "Italy");
+        model.insertQso(second);
+        QCOMPARE(model.callAt(0), QString("IT9KVW"));
+        QCOMPARE(model.callAt(1), QString("4X6TT"));
+        QCOMPARE(model.callAt(2), QString("ON1DGN"));
+        QCOMPARE(model.callAt(3), QString("TA2PYZ"));
+        QCOMPARE(model.rowForId(previous), 2);
+        QCOMPARE(model.rowForId(older), 3);
+        QCOMPARE(model.valueAt(2, QsoTableModel::Utc), previousTime);
+        QCOMPARE(model.valueAt(3, QsoTableModel::Utc), olderTime);
+        QCOMPARE(model.valueAt(2, QsoTableModel::Country), QString("Belgium"));
+        QCOMPARE(model.valueAt(3, QsoTableModel::Country), QString("Turkey"));
+        bool allRolesInvalidated = false;
+        for (const auto& signal : changed) {
+            const QModelIndex firstIndex = qvariant_cast<QModelIndex>(signal.at(0));
+            const QModelIndex lastIndex = qvariant_cast<QModelIndex>(signal.at(1));
+            const auto roles = qvariant_cast<QList<int>>(signal.at(2));
+            if (firstIndex.row() == 1 && lastIndex.row() == 3 && roles.isEmpty())
+                allRolesInvalidated = true;
+        }
+        QVERIFY(allRolesInvalidated);
+    }
+
     // Le categorie delle righe, come i colori di Decodium 4.
     void rowCategories()
     {

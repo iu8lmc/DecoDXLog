@@ -1028,6 +1028,10 @@
         <source>JSON files (*.json)</source>
         <translation>Файлы JSON (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: каждый щелчок отправляет не более 500 QSO через TQSL. Загрузка ещё не является подтверждением LoTW; проверь обработку в разделе «Your Activity» на LoTW.</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5401,26 +5405,6 @@ Extra fields are preserved: %8</source>
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>%n QSO отправлено в LoTW</numerusform>
-            <numerusform>%n QSO отправлено в LoTW</numerusform>
-            <numerusform>%n QSO отправлено в LoTW</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>В LoTW эти QSO уже были</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>Отправлено в LoTW, часть уже была там</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>Нет QSO для отправки</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL: отменено</translation>
@@ -5428,10 +5412,6 @@ Extra fields are preserved: %8</source>
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW отклонил файл: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: беда с сертификатом или station location (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5552,6 +5532,34 @@ Extra fields are preserved: %8</source>
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL не прислал изображение карточки для этого QSO (найдено: %1)</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>TQSL загрузил QSO: %n; проверь обработку в разделе «Your Activity» на LoTW</numerusform>
+            <numerusform>TQSL загрузил QSO: %n; проверь обработку в разделе «Your Activity» на LoTW</numerusform>
+            <numerusform>TQSL загрузил QSO: %n; проверь обработку в разделе «Your Activity» на LoTW</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: не удаётся открыть выходной файл (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL не обработал ни одного QSO: дубликаты или вне диапазона дат; проверь на LoTW, прежде чем повторять (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL обработал только часть пакета; состояние отдельных QSO неизвестно. Проверь на LoTW, прежде чем повторять (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>Ошибка библиотеки TQSL (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: синтаксическая ошибка команды (%1)</translation>
     </message>
 </context>
 <context>
@@ -12351,6 +12359,14 @@ Extra fields are preserved: %8</source>
             <numerusform>, %n удалено</numerusform>
             <numerusform>, %n удалено</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>Автоматическая отправка в LoTW приостановлена: проверь пакет на LoTW, прежде чем повторять</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: TQSL загрузил QSO: %1; проверь обработку в разделе «Your Activity» на LoTW</translation>
     </message>
 </context>
 <context>

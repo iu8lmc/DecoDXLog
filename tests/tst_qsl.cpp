@@ -85,27 +85,36 @@ private slots:
         QVERIFY(r.ok);
         QCOMPARE(r.accepted, 12);
 
-        r = qsl::resultFromTqslExit(7, "All QSOs were duplicates", 5);
-        QVERIFY(r.ok);
-        QCOMPARE(r.duplicates, 5);
+        r = qsl::resultFromTqslExit(7, "cannot open output", 5);
+        QVERIFY(!r.ok);
+        QCOMPARE(r.duplicates, 0);
         QCOMPARE(r.accepted, 0);
 
-        r = qsl::resultFromTqslExit(8, "Some QSOs were duplicates", 5);
-        QVERIFY(r.ok);
-        QCOMPARE(r.accepted, 5);
+        r = qsl::resultFromTqslExit(8, "No QSOs processed", 5);
+        QVERIFY(!r.ok);
+        QVERIFY(r.requiresReconciliation);
+        QCOMPARE(r.accepted, 0);
+        r = qsl::resultFromTqslExit(9, "Some QSOs processed", 5);
+        QVERIFY(!r.ok);
+        QVERIFY(r.requiresReconciliation);
+        QCOMPARE(r.accepted, 0);
+        QVERIFY(r.message.contains("individual QSO status is unknown"));
 
         r = qsl::resultFromTqslExit(2, "rejected", 3);
         QVERIFY(!r.ok);
         QCOMPARE(r.rejected, 3);
         QVERIFY(!r.retryLater);
 
-        r = qsl::resultFromTqslExit(10, "connection failed", 3);
+        r = qsl::resultFromTqslExit(10, "syntax error", 3);
+        QVERIFY(!r.ok);
+        QVERIFY(!r.retryLater);
+        r = qsl::resultFromTqslExit(11, "connection failed", 3);
         QVERIFY(!r.ok);
         QVERIFY(r.retryLater);
 
         r = qsl::resultFromTqslExit(5, "no station location", 3);
         QVERIFY(!r.ok);
-        QVERIFY(r.message.contains("station location"));
+        QVERIFY(r.message.contains("library error"));
     }
 
     void qrzAnswers()

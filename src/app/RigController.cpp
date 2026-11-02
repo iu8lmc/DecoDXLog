@@ -724,11 +724,20 @@ void RigController::launchRigctld(quint64 generation)
     m_host = QStringLiteral("127.0.0.1");
     m_port = chosen;
     m_rigctld = std::make_unique<QProcess>();
-    const QStringList arguments = localRigctldArguments(m_serialPort, m_baud, chosen);
+    QStringList arguments = localRigctldArguments(m_serialPort, m_baud, chosen);
+    const bool catDebug = qEnvironmentVariableIntValue("DECODXLOG_CAT_DIAGNOSTIC") > 0;
+    if (catDebug) {
+        arguments << QStringLiteral("-vvvv");
+        qInfo().noquote() << "CAT-DIAG" << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+                          << "starting rigctld" << exe << arguments.join(QLatin1Char(' '));
+    }
     m_rigctld->setProcessChannelMode(QProcess::MergedChannels);
     QProcess* process = m_rigctld.get();
-    connect(process, &QProcess::readyReadStandardOutput, this, [this, process] {
+    connect(process, &QProcess::readyReadStandardOutput, this, [this, process, catDebug] {
         const QString text = QString::fromUtf8(process->readAll());
+        if (catDebug)
+            qInfo().noquote() << "CAT-DIAG" << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+                              << "hamlib" << text.trimmed();
         for (const QString& line : text.split(QLatin1Char('\n'))) {
             // Le righe che contano sono quelle dove Hamlib dice che non ce la fa.
             if ((line.contains(QLatin1String("error"), Qt::CaseInsensitive)

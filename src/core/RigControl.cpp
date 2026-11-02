@@ -2,6 +2,7 @@
 #include "core/CwKeyer.h"
 
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDebug>
 
 #include <cstdlib>
@@ -135,7 +136,12 @@ void RigControl::send(const QString& kind, const QString& command, int values, c
 {
     if (!connected())
         return;
-    m_pending.enqueue({kind, text, values, ++m_seq, cwToken});
+    const QString diagnostic = kind == QLatin1String("morse")
+        ? command.section(QLatin1Char(' '), 0, 0) : command;
+    m_pending.enqueue({kind, text, values, ++m_seq, cwToken, diagnostic});
+    if (qEnvironmentVariableIntValue("DECODXLOG_CAT_DIAGNOSTIC") > 0)
+        qInfo().noquote() << "CAT-DIAG" << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+                          << "request" << m_seq << diagnostic;
     m_socket->write(QStringLiteral("+%1\n").arg(command).toUtf8());
 }
 
@@ -585,6 +591,9 @@ void RigControl::handleReply(const QStringList& lines)
         return;
     const Pending what = m_pending.dequeue();
     const int result = lines.last().mid(4).trimmed().toInt();
+    if (qEnvironmentVariableIntValue("DECODXLOG_CAT_DIAGNOSTIC") > 0)
+        qInfo().noquote() << "CAT-DIAG" << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+                          << "reply" << what.seq << what.command << "result" << result;
 
     if (m_stopInFlight && what.seq == m_stopLastSeq) {
         m_stopFallback.stop();
@@ -654,7 +663,8 @@ void RigControl::handleReply(const QStringList& lines)
                 emit failed(tr("The radio does not take XIT from here (rigctld: %1)").arg(result));
             emit changed();
         } else if (what.kind != QLatin1String("speed")) {
-            emit failed(tr("The radio answered with an error (rigctld: %1)").arg(result));
+            emit failed(tr("The radio answered with an error (rigctld: %1)").arg(result)
+                        + QStringLiteral(" [CAT: %1]").arg(what.command));
         }
         return;
     }

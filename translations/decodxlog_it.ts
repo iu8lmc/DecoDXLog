@@ -841,6 +841,10 @@
 <context>
     <name>BottomTabs</name>
     <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: ogni clic invia al massimo 500 QSO tramite TQSL. L&apos;invio non è ancora una conferma LoTW; controlla l&apos;elaborazione in Your Activity su LoTW.</translation>
+    </message>
+    <message>
         <source>Awards</source>
         <translation>Diplomi</translation>
     </message>
@@ -5390,23 +5394,31 @@ Campi extra conservati: %8</translation>
 <context>
     <name>Qsl</name>
     <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
         <translation>
-            <numerusform>%n QSO inviato a LoTW</numerusform>
-            <numerusform>%n QSO inviati a LoTW</numerusform>
+            <numerusform>TQSL ha caricato %n QSO; controlla l&apos;elaborazione in Your Activity su LoTW</numerusform>
+            <numerusform>TQSL ha caricato %n QSO; controlla l&apos;elaborazione in Your Activity su LoTW</numerusform>
         </translation>
     </message>
     <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>LoTW aveva già questi QSO</translation>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: impossibile aprire il file di uscita (%1)</translation>
     </message>
     <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>Inviati a LoTW, qualcuno c&apos;era già</translation>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL non ha elaborato QSO: duplicati o fuori intervallo; verifica su LoTW prima di riprovare (%1)</translation>
     </message>
     <message>
-        <source>No QSO to send</source>
-        <translation>Nessun QSO da inviare</translation>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL ha elaborato solo una parte del blocco; lo stato dei singoli QSO non è noto. Verifica su LoTW prima di riprovare (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>Errore della libreria TQSL (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: errore nella sintassi del comando (%1)</translation>
     </message>
     <message>
         <source>TQSL: cancelled</source>
@@ -5415,10 +5427,6 @@ Campi extra conservati: %8</translation>
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW ha rifiutato il file: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: problema di certificato o di station location (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -12115,6 +12123,14 @@ Campi extra conservati: %8</translation>
 </context>
 <context>
     <name>decolog::app::QslController</name>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>Invio automatico LoTW sospeso: verifica il blocco su LoTW prima di riprovare</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: TQSL ha caricato %1 QSO; controlla l&apos;elaborazione in Your Activity su LoTW</translation>
+    </message>
     <message>
         <source>Wavelog: %1</source>
         <translation>Wavelog: %1</translation>

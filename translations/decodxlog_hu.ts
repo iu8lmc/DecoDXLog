@@ -1020,6 +1020,10 @@
         <source>JSON files (*.json)</source>
         <translation>JSON fájlok (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: minden kattintás legfeljebb 500 QSO-t küld a TQSL-lel. A feltöltés még nem LoTW-megerősítés; ellenőrizd a feldolgozást a LoTW „Your Activity” oldalán.</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5377,24 +5381,6 @@ A további mezők megmaradnak: %8</translation>
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>%n QSO elküldve a LoTW-be</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>A LoTW-ben ezek a QSO-k már megvoltak</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>Elküldve a LoTW-be, néhány már ott volt</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>Nincs küldendő QSO</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL: megszakítva</translation>
@@ -5402,10 +5388,6 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>A LoTW visszautasította a fájlt: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: baj van a tanúsítvánnyal vagy a station locationnel (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5526,6 +5508,32 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>Az eQSL nem küldött kártyaképet ehhez a QSO-hoz (talált: %1)</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>A TQSL %n QSO-t töltött fel; ellenőrizd a feldolgozást a LoTW „Your Activity” oldalán</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: a kimeneti fájl nem nyitható meg (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>A TQSL egyetlen QSO-t sem dolgozott fel: duplikátumok vagy a dátumtartományon kívül; újrapróbálás előtt ellenőrizd a LoTW-n (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>A TQSL csak a köteg egy részét dolgozta fel; az egyes QSO-k állapota ismeretlen. Újrapróbálás előtt ellenőrizd a LoTW-n (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>TQSL-könyvtárhiba (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: szintaktikai hiba a parancsban (%1)</translation>
     </message>
 </context>
 <context>
@@ -12223,6 +12231,14 @@ A további mezők megmaradnak: %8</translation>
         <translation>
             <numerusform>, %n törölve</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>Az automatikus LoTW-feltöltés szünetel: újrapróbálás előtt ellenőrizd a köteget a LoTW-n</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: a TQSL %1 QSO-t töltött fel; ellenőrizd a feldolgozást a LoTW „Your Activity” oldalán</translation>
     </message>
 </context>
 <context>

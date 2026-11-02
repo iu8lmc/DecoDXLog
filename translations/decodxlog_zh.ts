@@ -1020,6 +1020,10 @@
         <source>JSON files (*.json)</source>
         <translation>JSON 文件 (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW：每次点击通过 TQSL 最多发送 500 条 QSO。上传还不等于 LoTW 确认；请在 LoTW 的“Your Activity”中查看处理情况。</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5377,24 +5381,6 @@ QSL 状态：%6 · UTC 不完整：%7。
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>已向 LoTW 发送 %n 个 QSO</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>LoTW 里已经有这些 QSO 了</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>已送到 LoTW，有些原本就在</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>没有要发送的 QSO</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL：已取消</translation>
@@ -5402,10 +5388,6 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW 拒绝了这个文件：%1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL：证书或 station location 有问题 (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5526,6 +5508,32 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL 没有为此 QSO 发送卡片图片（找到：%1）</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>TQSL 已上传 %n 条 QSO；请在 LoTW 的“Your Activity”中查看处理情况</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL：无法打开输出文件 (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL 没有处理任何 QSO：重复或超出日期范围；重试前请先在 LoTW 中核实 (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL 只处理了该批次的一部分；各条 QSO 的状态未知。重试前请先在 LoTW 中核实 (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>TQSL 库错误 (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL：命令语法错误 (%1)</translation>
     </message>
 </context>
 <context>
@@ -12223,6 +12231,14 @@ QSL 状态：%6 · UTC 不完整：%7。
         <translation>
             <numerusform>, 已删除 %n 个</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>LoTW 自动上传已暂停：重试前请先在 LoTW 中检查该批次</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW：TQSL 已上传 %1 条 QSO；请在 LoTW 的“Your Activity”中查看处理情况</translation>
     </message>
 </context>
 <context>

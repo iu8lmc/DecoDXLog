@@ -1028,6 +1028,10 @@
         <source>JSON files (*.json)</source>
         <translation>JSON faili (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: katrs klikšķis nosūta ne vairāk kā 500 QSO ar TQSL. Augšupielāde vēl nav LoTW apstiprinājums; pārbaudi apstrādi LoTW sadaļā „Your Activity”.</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5401,26 +5405,6 @@ Papildu lauki tiek saglabāti: %8</translation>
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>%n QSO nosūtīts uz LoTW</numerusform>
-            <numerusform>%n QSO nosūtīti uz LoTW</numerusform>
-            <numerusform>%n QSO nosūtīti uz LoTW</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>LoTW šie QSO jau bija</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>Nosūtīti uz LoTW, daži tur jau bija</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>Nav neviena nosūtāma QSO</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL: atcelts</translation>
@@ -5428,10 +5412,6 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW noraidīja failu: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: problēma ar sertifikātu vai station location (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5552,6 +5532,34 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL šim QSO nav atsūtījis kartītes attēlu (atrasts: %1)</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>TQSL augšupielādēja %n QSO; pārbaudi apstrādi LoTW sadaļā „Your Activity”</numerusform>
+            <numerusform>TQSL augšupielādēja %n QSO; pārbaudi apstrādi LoTW sadaļā „Your Activity”</numerusform>
+            <numerusform>TQSL augšupielādēja %n QSO; pārbaudi apstrādi LoTW sadaļā „Your Activity”</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: nevar atvērt izvades failu (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL neapstrādāja nevienu QSO: dublikāti vai ārpus datumu diapazona; pirms atkārtošanas pārbaudi LoTW (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL apstrādāja tikai daļu partijas; atsevišķu QSO stāvoklis nav zināms. Pirms atkārtošanas pārbaudi LoTW (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>TQSL bibliotēkas kļūda (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: komandas sintakses kļūda (%1)</translation>
     </message>
 </context>
 <context>
@@ -12351,6 +12359,14 @@ Papildu lauki tiek saglabāti: %8</translation>
             <numerusform>, %n dzēsts</numerusform>
             <numerusform>, %n dzēsti</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>Automātiskā LoTW augšupielāde apturēta: pirms atkārtošanas pārbaudi partiju LoTW</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: TQSL augšupielādēja %1 QSO; pārbaudi apstrādi LoTW sadaļā „Your Activity”</translation>
     </message>
 </context>
 <context>

@@ -1028,6 +1028,10 @@
         <source>JSON files (*.json)</source>
         <translation>Fișiere JSON (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: fiecare clic trimite cel mult 500 de QSO-uri cu TQSL. O încărcare nu este încă o confirmare LoTW; verifică procesarea în „Your Activity” din LoTW.</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5401,26 +5405,6 @@ Câmpuri suplimentare păstrate: %8</translation>
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>%n QSO trimis la LoTW</numerusform>
-            <numerusform>%n QSO-uri trimise la LoTW</numerusform>
-            <numerusform>%n de QSO-uri trimise la LoTW</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>LoTW avea deja aceste QSO-uri</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>Trimise la LoTW, unele erau deja acolo</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>Niciun QSO de trimis</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL: anulat</translation>
@@ -5428,10 +5412,6 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW a respins fișierul: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: problemă cu certificatul sau cu station location (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5552,6 +5532,34 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL nu a trimis imaginea cărții pentru acest QSO (găsit: %1)</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>TQSL a încărcat %n QSO; verifică procesarea în „Your Activity” din LoTW</numerusform>
+            <numerusform>TQSL a încărcat %n QSO; verifică procesarea în „Your Activity” din LoTW</numerusform>
+            <numerusform>TQSL a încărcat %n QSO; verifică procesarea în „Your Activity” din LoTW</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: fișierul de ieșire nu poate fi deschis (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL nu a procesat niciun QSO: duplicate sau în afara intervalului de date; verifică în LoTW înainte de a reîncerca (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL a procesat doar o parte din lot; starea fiecărui QSO este necunoscută. Verifică în LoTW înainte de a reîncerca (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>Eroare a bibliotecii TQSL (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: eroare de sintaxă a comenzii (%1)</translation>
     </message>
 </context>
 <context>
@@ -12351,6 +12359,14 @@ Câmpuri suplimentare păstrate: %8</translation>
             <numerusform>, %n șterse</numerusform>
             <numerusform>, %n șterse</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>Încărcarea automată în LoTW este în pauză: verifică lotul în LoTW înainte de a reîncerca</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: TQSL a încărcat %1 QSO; verifică procesarea în „Your Activity” din LoTW</translation>
     </message>
 </context>
 <context>

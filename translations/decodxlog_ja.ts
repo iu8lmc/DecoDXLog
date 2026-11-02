@@ -1020,6 +1020,10 @@
         <source>JSON files (*.json)</source>
         <translation>JSON ファイル (*.json)</translation>
     </message>
+    <message>
+        <source>LoTW: each click sends at most 500 QSOs using TQSL. An upload is not yet a LoTW confirmation; check processing in LoTW Your Activity.</source>
+        <translation>LoTW: 1 回のクリックで TQSL により最大 500 件の QSO を送信します。アップロードはまだ LoTW の確認ではありません。LoTW の「Your Activity」で処理状況を確認してください。</translation>
+    </message>
 </context>
 <context>
     <name>BulkEditDialog</name>
@@ -5377,24 +5381,6 @@ QSL の状態: %6 · UTC が不完全: %7。
 </context>
 <context>
     <name>Qsl</name>
-    <message numerus="yes">
-        <source>%n QSO sent to LoTW</source>
-        <translation>
-            <numerusform>%n 件の QSO を LoTW に送りました</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>LoTW already had these QSOs</source>
-        <translation>LoTW にはもうこれらの QSO がありました</translation>
-    </message>
-    <message>
-        <source>Sent to LoTW, some were already there</source>
-        <translation>LoTW に送りました。いくつかはもうありました</translation>
-    </message>
-    <message>
-        <source>No QSO to send</source>
-        <translation>送る QSO がありません</translation>
-    </message>
     <message>
         <source>TQSL: cancelled</source>
         <translation>TQSL: やめました</translation>
@@ -5402,10 +5388,6 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>LoTW rejected the file: %1</source>
         <translation>LoTW がファイルを受け付けませんでした: %1</translation>
-    </message>
-    <message>
-        <source>TQSL: certificate or station location problem (%1)</source>
-        <translation>TQSL: 証明書か station location に問題があります (%1)</translation>
     </message>
     <message>
         <source>TQSL: cannot reach LoTW (%1)</source>
@@ -5526,6 +5508,32 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL はこの QSO のカード画像を送ってきませんでした (見つかったもの: %1)</translation>
+    </message>
+    <message numerus="yes">
+        <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
+        <translation>
+            <numerusform>TQSL が %n 件の QSO をアップロードしました。LoTW の「Your Activity」で処理状況を確認してください</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>TQSL: cannot open the output file (%1)</source>
+        <translation>TQSL: 出力ファイルを開けません (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed no QSOs: duplicates or out of date range; verify in LoTW before retrying (%1)</source>
+        <translation>TQSL は QSO を 1 件も処理しませんでした: 重複または日付範囲外です。再試行する前に LoTW で確認してください (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)</source>
+        <translation>TQSL はバッチの一部しか処理しませんでした。個々の QSO の状態は不明です。再試行する前に LoTW で確認してください (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL library error (%1)</source>
+        <translation>TQSL ライブラリのエラー (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: command syntax error (%1)</source>
+        <translation>TQSL: コマンドの構文エラー (%1)</translation>
     </message>
 </context>
 <context>
@@ -12223,6 +12231,14 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>
             <numerusform>, %n 件削除</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
+        <translation>LoTW の自動アップロードを一時停止しました。再試行する前に LoTW でバッチを確認してください</translation>
+    </message>
+    <message>
+        <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation>LoTW: TQSL が %1 件の QSO をアップロードしました。LoTW の「Your Activity」で処理状況を確認してください</translation>
     </message>
 </context>
 <context>

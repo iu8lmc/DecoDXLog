@@ -1385,6 +1385,11 @@ void QsoTableModel::insertQso(qint64 id)
     // Le righe dopo si sono spostate di una: le pagine si rileggono.
     dropPages();
     endInsertRows();
+    // TableView puo' conservare delegate gia' visibili dopo lo spostamento:
+    // rilegge tutte le colonne e i ruoli delle righe interessate, non solo
+    // l'evidenziazione del precedente QSO nuovo.
+    if (pos + 1 < rowCount() && columns() > 0)
+        emit dataChanged(index(pos + 1, 0), index(rowCount() - 1, columns() - 1));
     if (oldFresh >= 0) {
         const int moved = oldFresh >= pos ? oldFresh + 1 : oldFresh;
         emit dataChanged(index(moved, 0), index(moved, columns() - 1), {IsNewRole});
