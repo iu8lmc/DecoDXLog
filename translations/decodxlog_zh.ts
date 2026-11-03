@@ -4731,6 +4731,14 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>%1 spots</source>
         <translation>%1 条点报</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>夜间强度: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>夜间强度</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

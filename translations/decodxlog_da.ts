@@ -4742,6 +4742,14 @@ Ekstra felter bevares: %8</translation>
         <source>%1 spots</source>
         <translation>%1 spots</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Nattens intensitet: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Nattens intensitet</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

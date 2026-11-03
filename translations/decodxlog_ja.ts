@@ -4731,6 +4731,14 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>%1 spots</source>
         <translation>%1 件のスポット</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>夜間の濃淡: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>夜間の濃淡</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

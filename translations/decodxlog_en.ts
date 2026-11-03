@@ -4735,6 +4735,14 @@ Extra fields are preserved: %8</source>
         <source>%1 spots</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

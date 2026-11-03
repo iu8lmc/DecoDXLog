@@ -4731,6 +4731,14 @@ A további mezők megmaradnak: %8</translation>
         <source>%1 spots</source>
         <translation>%1 spot</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Éjszakai intenzitás: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Éjszakai intenzitás</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

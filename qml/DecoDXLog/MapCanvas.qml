@@ -8,6 +8,7 @@ Rectangle {
 
     property bool showCoast: true
     property bool showNight: true
+    property real nightOpacity: 0.30
     property bool showGrids: true
     property bool showSpots: true
     property bool showRotor: true
@@ -65,7 +66,7 @@ Rectangle {
 
             if (root.showNight) {
                 const sun = sunPosition(new Date())
-                ctx.fillStyle = Qt.rgba(0, 0, 0, 0.30)
+                ctx.fillStyle = Qt.rgba(0, 0, 0, Math.max(0, Math.min(1, root.nightOpacity)))
                 const step = 2
                 for (let x = 0; x < width; x += step) {
                     const lon = x / width * 360 - 180

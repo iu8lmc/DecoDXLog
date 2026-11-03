@@ -4742,6 +4742,14 @@ Extra velden blijven behouden: %8</translation>
         <source>%1 spots</source>
         <translation>%1 spots</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Nachtintensiteit: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Nachtintensiteit</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

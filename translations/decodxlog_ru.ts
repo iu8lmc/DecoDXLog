@@ -4753,6 +4753,14 @@ Extra fields are preserved: %8</source>
         <source>%1 spots</source>
         <translation>%1 спотов</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Интенсивность ночи: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Интенсивность ночи</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

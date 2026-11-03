@@ -4,6 +4,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtCore
 import Decodium.UI
 
 GlassPanel {
@@ -11,6 +12,7 @@ GlassPanel {
 
     property bool showCoast: true
     property bool showNight: true
+    property alias nightOpacity: mapSettings.nightOpacity
     property bool showGrids: true
     property bool showSpots: true
     property bool showRotor: true
@@ -22,21 +24,28 @@ GlassPanel {
     property var coastline: []
     property var land: []
 
+    Settings {
+        id: mapSettings
+        category: "Map"
+        property real nightOpacity: 0.30
+    }
+    onNightOpacityChanged: root.repaintBackground()
+
     // Impostato dal C++ prima del caricamento QML. Su Linux e con il renderer
     // software e' vero per impostazione predefinita; --map-renderer canvas lo
     // puo' cambiare esplicitamente per chi ha un driver gia' verificato.
     readonly property bool useSafeMap: mapUsesSafeRenderer === true
 
     function repaintAll() {
-        if (mapRenderer.item && typeof mapRenderer.item.repaintAll === "function")
+        if (mapRenderer && mapRenderer.item && typeof mapRenderer.item.repaintAll === "function")
             mapRenderer.item.repaintAll()
     }
     function repaintBackground() {
-        if (mapRenderer.item && typeof mapRenderer.item.repaintAll === "function")
+        if (mapRenderer && mapRenderer.item && typeof mapRenderer.item.repaintBackground === "function")
             mapRenderer.item.repaintBackground()
     }
     function repaintOverlay() {
-        if (mapRenderer.item && typeof mapRenderer.item.repaintAll === "function")
+        if (mapRenderer && mapRenderer.item && typeof mapRenderer.item.repaintOverlay === "function")
             mapRenderer.item.repaintOverlay()
     }
     function reloadSpots() {
@@ -95,32 +104,75 @@ GlassPanel {
         }
     ]
 
+    // Il valore e' proprieta' del pannello; MenuItem non deve conservarne
+    // una seconda copia modificabile al clic.
+    component LayerMenuItem: StyledMenuItem {
+        id: layerItem
+        property bool layerVisible: false
+        checkable: false
+        indicator: Text {
+            x: 8
+            anchors.verticalCenter: parent.verticalCenter
+            text: layerItem.layerVisible ? "✓" : ""
+            color: Theme.accentColor
+            font.pixelSize: 12
+            font.bold: true
+        }
+    }
+
     StyledMenu {
         id: layerMenu
         // La carta compatibile rende le terre emerse come geometria vettoriale
         // statica: non richiede Canvas, ma puo' comunque mostrare o nascondere
         // i contorni della costa.
-        StyledMenuItem {
-            text: qsTr("Coastlines"); checkable: true; checked: root.showCoast
-            onTriggered: { root.showCoast = checked; root.repaintBackground() }
+        LayerMenuItem {
+            objectName: "mapLayerCoast"
+            text: qsTr("Coastlines"); layerVisible: root.showCoast
+            onTriggered: { root.showCoast = !root.showCoast; root.repaintBackground() }
         }
-        StyledMenuItem {
+        LayerMenuItem {
+            objectName: "mapLayerNight"
             visible: !root.useSafeMap
-            text: qsTr("Night"); checkable: true; checked: root.showNight
-            onTriggered: { root.showNight = checked; root.repaintBackground() }
+            text: qsTr("Night"); layerVisible: root.showNight
+            onTriggered: { root.showNight = !root.showNight; root.repaintBackground() }
         }
-        StyledMenuItem {
-            text: qsTr("Worked grids"); checkable: true; checked: root.showGrids
-            onTriggered: { root.showGrids = checked; root.repaintAll() }
+        MenuItem {
+            visible: !root.useSafeMap
+            enabled: root.showNight
+            implicitWidth: 240
+            implicitHeight: 64
+            contentItem: ColumnLayout {
+                spacing: 0
+                Text {
+                    text: qsTr("Night intensity: %1%").arg(Math.round(root.nightOpacity * 100))
+                    color: Theme.textSecondary
+                    font.pixelSize: 11
+                }
+                Slider {
+                    objectName: "mapNightOpacity"
+                    Layout.fillWidth: true
+                    from: 0; to: 0.9; stepSize: 0.05
+                    value: Math.max(from, Math.min(to, root.nightOpacity))
+                    onMoved: root.nightOpacity = value
+                    Accessible.name: qsTr("Night intensity")
+                }
+            }
         }
-        StyledMenuItem {
-            text: qsTr("Cluster spots"); checkable: true; checked: root.showSpots
-            onTriggered: { root.showSpots = checked; root.reloadSpots() }
+        LayerMenuItem {
+            objectName: "mapLayerGrids"
+            text: qsTr("Worked grids"); layerVisible: root.showGrids
+            onTriggered: { root.showGrids = !root.showGrids; root.repaintAll() }
         }
-        StyledMenuItem {
-            text: qsTr("Antenna heading"); checkable: true; checked: root.showRotor
+        LayerMenuItem {
+            objectName: "mapLayerSpots"
+            text: qsTr("Cluster spots"); layerVisible: root.showSpots
+            onTriggered: { root.showSpots = !root.showSpots; root.reloadSpots() }
+        }
+        LayerMenuItem {
+            objectName: "mapLayerRotor"
+            text: qsTr("Antenna heading"); layerVisible: root.showRotor
             enabled: decolog.rotor.enabled
-            onTriggered: { root.showRotor = checked; root.repaintOverlay() }
+            onTriggered: { root.showRotor = !root.showRotor; root.repaintOverlay() }
         }
     }
 
@@ -161,6 +213,7 @@ GlassPanel {
 
     Loader {
         id: mapRenderer
+        objectName: "mapRenderer"
         anchors.fill: parent
         sourceComponent: root.useSafeMap ? safeMapComponent : canvasMapComponent
         onLoaded: root.repaintAll()
@@ -185,6 +238,7 @@ GlassPanel {
         MapCanvas {
             showCoast: root.showCoast
             showNight: root.showNight
+            nightOpacity: root.nightOpacity
             showGrids: root.showGrids
             showSpots: root.showSpots
             showRotor: root.showRotor

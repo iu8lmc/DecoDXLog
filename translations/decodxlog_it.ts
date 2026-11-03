@@ -4719,6 +4719,14 @@ Campi extra conservati: %8</translation>
         <translation>Notte</translation>
     </message>
     <message>
+        <source>Night intensity: %1%</source>
+        <translation>Intensità notte: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Intensità notte</translation>
+    </message>
+    <message>
         <source>Worked grids</source>
         <translation>Locatori lavorati</translation>
     </message>

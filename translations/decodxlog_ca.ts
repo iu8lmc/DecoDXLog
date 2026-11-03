@@ -4742,6 +4742,14 @@ Camps extra conservats: %8</translation>
         <source>%1 spots</source>
         <translation>%1 spots</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Intensitat nocturna: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Intensitat nocturna</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

@@ -4742,6 +4742,14 @@ Zusatzfelder bleiben erhalten: %8</translation>
         <source>%1 spots</source>
         <translation>%1 Spots</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Nachtintensität: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Nachtintensität</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

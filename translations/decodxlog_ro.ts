@@ -4753,6 +4753,14 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>%1 spots</source>
         <translation>%1 spoturi</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Intensitatea nopții: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Intensitatea nopții</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.47
+    VERSION 1.17.49
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -659,7 +659,7 @@ endif()
 # ── Tests ─────────────────────────────────────────────────────────────────────
 if(DECODXLOG_BUILD_TESTS)
     enable_testing()
-    find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Qt6 REQUIRED COMPONENTS Test QuickTest)
     foreach(name adif protocol database countries credentials callbook awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc)
         qt_add_executable(tst_${name} tests/tst_${name}.cpp)
         target_link_libraries(tst_${name} PRIVATE decolog_core Qt6::Test)
@@ -717,6 +717,13 @@ if(DECODXLOG_BUILD_TESTS)
     target_link_libraries(tst_qsomodel PRIVATE decolog_core Qt6::Test)
     set_target_properties(tst_qsomodel PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME qsomodel COMMAND tst_qsomodel)
+    qt_add_executable(tst_maplayers tests/tst_maplayers.cpp)
+    target_link_libraries(tst_maplayers PRIVATE Qt6::QuickTest Qt6::Quick decodium_ui decodium_uiplugin)
+    set_target_properties(tst_maplayers PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME maplayers COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_maplayers.qml)
+    set_tests_properties(maplayers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
+    add_test(NAME newqsotuning COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_newqsotuning.qml)
+    set_tests_properties(newqsotuning PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
     # I popup in una finestra sua col campo di testo senza il fuoco non ricevono i tasti:
     # la prova legge i QML, non c'e' niente da avviare.
     qt_add_executable(tst_qmlpopups tests/tst_qmlpopups.cpp)

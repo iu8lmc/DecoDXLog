@@ -4753,6 +4753,14 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>%1 spots</source>
         <translation>%1 spoti</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>Nakts intensitāte: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>Nakts intensitāte</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>

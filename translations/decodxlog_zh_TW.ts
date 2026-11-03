@@ -4731,6 +4731,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>%1 spots</source>
         <translation>%1 筆點報</translation>
     </message>
+    <message>
+        <source>Night intensity: %1%</source>
+        <translation>夜間強度: %1%</translation>
+    </message>
+    <message>
+        <source>Night intensity</source>
+        <translation>夜間強度</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoDialog</name>
