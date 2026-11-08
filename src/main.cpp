@@ -1,6 +1,7 @@
 // DecoDXLog — il log di stazione della famiglia Decodium.
 
 #include "CrashLog.h"
+#include "WarningLog.h"
 #include "StartupTrace.h"
 #include "app/DecoLogController.h"
 #include "core/Dates.h"
@@ -483,6 +484,13 @@ int main(int argc, char* argv[])
             ? rawArguments.at(settingsAt + 1)
             : QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)).filePath(QStringLiteral("crash")),
         QStringLiteral(DECODXLOG_VERSION));
+
+    // Gli avvisi di Qt e di QML finiscono anche in un file accanto al biglietto
+    // di crash: se un menu o le impostazioni si bloccano, lasciano una traccia.
+    decolog::warninglog::install(
+        settingsAt >= 0 && settingsAt + 1 < rawArguments.size()
+            ? rawArguments.at(settingsAt + 1)
+            : QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)).filePath(QStringLiteral("crash")));
 
     // Lingua dell'interfaccia: quella scelta, o quella del sistema. L'inglese e'
     // la lingua dei sorgenti, quindi non ha un file da caricare.

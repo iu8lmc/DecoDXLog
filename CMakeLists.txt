@@ -348,6 +348,8 @@ qt_add_executable(decolog
     src/main.cpp
     src/CrashLog.cpp
     src/CrashLog.h
+    src/WarningLog.cpp
+    src/WarningLog.h
     src/app/QsoTableModel.cpp
     src/app/QsoTableModel.h
     src/app/DecoLogController.cpp

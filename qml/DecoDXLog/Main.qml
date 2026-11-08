@@ -2165,6 +2165,28 @@ RoundedWindow {
     Shortcut { sequence: "Ctrl+N"; onActivated: newQsoDialog.open() }
     Shortcut { sequence: "Ctrl+F"; onActivated: window.focusSearch() }
     Shortcut { sequence: "Ctrl+,"; onActivated: setupDialog.open() }
+    // Se il menu ⚙ o le impostazioni non si aprono piu', questo chiude i popup
+    // rimasti aperti sopra la finestra e lascia nel registro (avvisi.log) cosa
+    // c'era: e' la traccia che serve per trovare la causa.
+    Shortcut {
+        sequence: "Ctrl+Shift+Esc"
+        onActivated: {
+            const overlay = window.contentItem.Overlay.overlay
+            let closed = 0
+            const lists = [overlay ? overlay.children : [], overlay ? overlay.data : []]
+            for (const list of lists) {
+                for (let i = 0; i < list.length; ++i) {
+                    const c = list[i]
+                    if (c && c.opened === true && typeof c.close === "function") {
+                        console.warn("sblocco: popup aperto", c.objectName || String(c), "modale", c.modal)
+                        c.close()
+                        closed++
+                    }
+                }
+            }
+            console.warn("sblocco: chiusi", closed, "popup")
+        }
+    }
     Shortcut { sequence: "Ctrl+I"; onActivated: importDialog.open() }
     Shortcut { sequence: "Ctrl+E"; onActivated: exportDialog.open() }
     Shortcut { sequence: "Ctrl+K"; onActivated: window.openCluster(0) }
