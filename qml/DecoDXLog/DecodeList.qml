@@ -100,6 +100,19 @@ Item {
             verticalLayoutDirection: root.newestOnTop ? ListView.TopToBottom : ListView.BottomToTop
             ScrollBar.vertical: PanelScrollBar {}
 
+            // Nelle raffiche di decodifiche la vista lasciava una riga vecchia
+            // sotto quella nuova, finche' non si ridimensionava la finestra: dopo
+            // ogni raffica si fa ricalcolare il layout delle righe.
+            Connections {
+                target: root.model
+                function onCountChanged() { relayoutTimer.restart() }
+            }
+            Timer {
+                id: relayoutTimer
+                interval: 150
+                onTriggered: list.forceLayout()
+            }
+
             delegate: Rectangle {
                 id: line
                 required property int index
