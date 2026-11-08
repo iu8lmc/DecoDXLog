@@ -3,6 +3,14 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.50 — 8 novembre 2026
+
+**Diagnostica dei blocchi.** Quando il menu ⚙ e le impostazioni non si aprono più dopo un po' di tempo,
+il programma ora lascia una traccia. Gli avvisi di Qt e di QML finiscono in `avvisi.log`, nella stessa
+cartella dei `crash-*.txt`, con ora, livello e sorgente; il file si ruota a 1 MB e i segreti vengono
+redatti come nella diagnostica. La scorciatoia **Ctrl+Shift+Esc** chiude i popup rimasti aperti sopra
+la finestra e scrive nel registro quali erano. Non cambia nulla nel funzionamento normale.
+
 ## 1.17.49 — 3 novembre 2026
 
 **Allineata alla 1.17.48 di elisir80** (la nostra era la 1.17.47). Dalla loro 1.17.48 arrivano
