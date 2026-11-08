@@ -72,6 +72,29 @@ private slots:
         const auto us = m_countries.lookup("W1AW");
         QVERIFY(us->lon < -60);
     }
+
+    // Le eccezioni dell'utente vincono sul cty.csv, sia per nominativo esatto
+    // sia per prefisso; le righe sbagliate si saltano senza rompere le altre.
+    void exceptionsWin()
+    {
+        Countries copy = m_countries;
+        QCOMPARE(copy.lookup("E51MWA")->name, QString("South Cook Islands"));
+        const int applied = copy.addExceptions(
+            "# commento\n"
+            "=E51MWA 191\n"
+            "XX9ZZ 999999\n"       // DXCC sconosciuto: saltata
+            "bogus\n"              // una sola colonna: saltata
+            "=E51WL 230 extra\n"   // troppe colonne: saltata
+            "ZZ1 248  # prefisso\n");
+        QCOMPARE(applied, 2);
+        const auto north = copy.lookup("E51MWA");
+        QVERIFY(north);
+        QCOMPARE(north->dxcc, 191);
+        QCOMPARE(north->name, QString("North Cook Islands"));
+        QCOMPARE(copy.lookup("ZZ1ABC")->dxcc, 248);
+        QCOMPARE(copy.lookup("E51XYZ")->dxcc, 234); // il resto del prefisso resta com'era
+        QCOMPARE(m_countries.lookup("E51MWA")->dxcc, 234); // l'originale non cambia
+    }
 };
 
 QTEST_GUILESS_MAIN(TestCountries)

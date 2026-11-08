@@ -1,4 +1,4 @@
-# DecoDXLog 1.17.50 — funzioni / features
+# DecoDXLog 1.17.51 — funzioni / features
 
 Ogni voce è in italiano e in inglese: *italiano* / *English*.
 Quello che manca è in fondo.

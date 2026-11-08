@@ -35,6 +35,12 @@ public:
     // Versione del file (es. "VER20260915"), vuota se non dichiarata.
     QString version() const { return m_version; }
 
+    // Eccezioni dell'utente, nel formato del cty.csv: "=NOMINATIVO 191" per un
+    // nominativo esatto, "PREFISSO 191" per un prefisso, con il numero DXCC.
+    // Vincono sul cty.csv. Le righe non valide (o con un DXCC sconosciuto) si
+    // saltano; restituisce quante ne ha applicate.
+    int addExceptions(const QByteArray& text);
+
     // L'entità del nominativo, o nullopt per /MM, /AM e nominativi sconosciuti.
     std::optional<DxccEntity> lookup(const QString& callsign) const;
     // Il nome dell'entità dal numero ADIF.

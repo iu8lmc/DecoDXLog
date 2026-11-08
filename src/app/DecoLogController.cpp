@@ -1997,6 +1997,30 @@ QString countriesOverridePath()
     return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)).filePath(QStringLiteral("cty.csv"));
 }
 
+// Le eccezioni dell'utente sopravvivono agli aggiornamenti del cty.csv: stanno
+// in un file a parte, che si crea la prima volta con un esempio.
+QString countriesExceptionsPath()
+{
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation))
+        .filePath(QStringLiteral("cty-eccezioni.txt"));
+}
+
+void ensureCountriesExceptionsFile()
+{
+    const QString path = countriesExceptionsPath();
+    if (QFileInfo::exists(path))
+        return;
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+        return;
+    file.write("# Eccezioni ai paesi, una per riga, nel formato del cty.csv.\n"
+               "# =NOMINATIVO numero-DXCC per un nominativo esatto; PREFISSO numero-DXCC per un prefisso.\n"
+               "# Si applicano all'avvio del programma. Esempio: E51MWA e' North Cook Islands (DXCC 191),\n"
+               "# ma il cty.csv lo da' a South Cook Islands.\n"
+               "=E51MWA 191\n");
+}
+
 } // namespace
 
 // Il cty.csv delle risorse, o quello nella cartella dei dati se e' piu' recente:
@@ -2018,6 +2042,10 @@ void DecoLogController::loadCountries()
         m_countries = fromResources;
         m_countriesSource = tr("built-in");
     }
+    ensureCountriesExceptionsFile();
+    QFile exceptions(countriesExceptionsPath());
+    if (exceptions.open(QIODevice::ReadOnly))
+        m_countries.addExceptions(exceptions.readAll());
     emit countriesChanged();
 }
 

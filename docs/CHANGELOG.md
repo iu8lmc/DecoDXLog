@@ -3,6 +3,15 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.51 — 9 novembre 2026
+
+**Paesi: eccezioni dell'utente.** Alcuni nominativi finivano nel paese sbagliato, perché il cty.csv di AD1C
+li assegna per prefisso: E51MWA, spedizione dalle North Cook Islands, risultava South Cook Islands. Ora
+il file `cty-eccezioni.txt`, nella cartella dati di DecoDXLog, aggiunge le correzioni proprie: `=NOMINATIVO`
+per un nominativo esatto, `PREFISSO` per un prefisso, con il numero DXCC. Il file si crea alla prima apertura
+con l'esempio di E51MWA, e sopravvive agli aggiornamenti del cty.csv. Le eccezioni si applicano all'avvio:
+dopo una modifica bisogna riavviare il programma.
+
 ## 1.17.50 — 8 novembre 2026
 
 **Diagnostica dei blocchi.** Quando il menu ⚙ e le impostazioni non si aprono più dopo un po' di tempo,

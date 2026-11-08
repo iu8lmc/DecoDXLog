@@ -100,6 +100,48 @@ bool Countries::load(const QByteArray& csv)
     return !m_entities.isEmpty();
 }
 
+int Countries::addExceptions(const QByteArray& text)
+{
+    int applied = 0;
+    for (const QByteArray& raw : text.split('\n')) {
+        QString line = QString::fromUtf8(raw).trimmed();
+        if (const int hash = line.indexOf(QLatin1Char('#')); hash >= 0)
+            line = line.left(hash).trimmed();
+        const QStringList fields = line.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        if (fields.size() != 2)
+            continue;
+        bool ok = false;
+        const int dxcc = fields.at(1).toInt(&ok);
+        if (!ok)
+            continue;
+        // La prima voce di ogni entita' DXCC e' quella che conta.
+        int index = -1;
+        for (int i : m_primary) {
+            if (m_entities.at(i).dxcc == dxcc) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0)
+            continue;
+
+        Match m;
+        m.entityIndex = index;
+        QString key = fields.at(0).toUpper();
+        if (key.startsWith(QLatin1Char('='))) {
+            key.remove(0, 1);
+            if (key.isEmpty())
+                continue;
+            m_exact.insert(key, m);
+        } else {
+            m_prefixes.insert(key, m);
+            m_longestPrefix = qMax(m_longestPrefix, static_cast<int>(key.size()));
+        }
+        ++applied;
+    }
+    return applied;
+}
+
 int Countries::entityCount() const
 {
     return static_cast<int>(m_names.size());

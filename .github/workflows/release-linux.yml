@@ -12,7 +12,7 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v1.17.50
+        default: v1.17.51
 
 permissions:
   contents: write
