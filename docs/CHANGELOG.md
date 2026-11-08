@@ -3,6 +3,13 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.52 — 10 novembre 2026
+
+**Lista decodifiche.** Durante le raffiche di decodifiche una riga vecchia restava disegnata sotto
+quella nuova, finché non si ridimensionava la finestra. Ora, a ogni variazione del numero di righe,
+la lista ricalcola il layout dopo una breve pausa, così le righe restano in ordine anche con tante
+decodifiche ravvicinate. Nessun cambiamento nei dati né nel log.
+
 ## 1.17.51 — 9 novembre 2026
 
 **Paesi: eccezioni dell'utente.** Alcuni nominativi finivano nel paese sbagliato, perché il cty.csv di AD1C
