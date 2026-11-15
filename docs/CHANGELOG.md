@@ -3,6 +3,10 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.53 — 15 novembre 2026
+
+Nuova build dello stato attuale, già allineato a elisir80; nessuna modifica funzionale rispetto alla 1.17.52.
+
 ## 1.17.52 — 10 novembre 2026
 
 **Lista decodifiche.** Durante le raffiche di decodifiche una riga vecchia restava disegnata sotto
