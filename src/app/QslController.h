@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/QslUpload.h"
+#include "core/ClubLogOqrsClient.h"
 
 #include <QDir>
 #include <QHash>
@@ -34,6 +35,11 @@ class QslController : public QObject {
     Q_PROPERTY(QString tqslLocation READ tqslLocation WRITE setTqslLocation NOTIFY changed)
     Q_PROPERTY(bool tqslReady READ tqslReady NOTIFY changed)
     Q_PROPERTY(QString clubLogApiKey READ clubLogApiKey WRITE setClubLogApiKey NOTIFY changed)
+    Q_PROPERTY(QString clubLogPendingState READ clubLogPendingState NOTIFY changed)
+    Q_PROPERTY(QVariantMap clubLogPendingInfo READ clubLogPendingInfo NOTIFY changed)
+    Q_PROPERTY(QVariantList clubLogOqrsRequests READ clubLogOqrsRequests NOTIFY changed)
+    Q_PROPERTY(QString clubLogOqrsStatus READ clubLogOqrsStatus NOTIFY changed)
+    Q_PROPERTY(bool clubLogOqrsBusy READ clubLogOqrsBusy NOTIFY changed)
     // CRX Logbook: in quale logbook dell'account si scrive, e da che giorno.
     Q_PROPERTY(qint64 crxLogId READ crxLogId WRITE setCrxLogId NOTIFY changed)
     Q_PROPERTY(QString crxLogName READ crxLogName NOTIFY changed)
@@ -72,6 +78,13 @@ public:
     bool tqslReady() const;
     QString clubLogApiKey() const { return m_clubLogApiKey; }
     void setClubLogApiKey(const QString& key);
+    QString clubLogPendingState() const;
+    QVariantMap clubLogPendingInfo() const;
+    Q_INVOKABLE void resumeClubLogPendingUpload();
+    QVariantList clubLogOqrsRequests() const;
+    QString clubLogOqrsStatus() const;
+    bool clubLogOqrsBusy() const { return m_oqrsBusy; }
+    Q_INVOKABLE void fetchClubLogOqrs();
     QString tqslStatus() const;
     qint64 crxLogId() const { return m_crxLogId; }
     void setCrxLogId(qint64 id);
@@ -115,17 +128,26 @@ signals:
     void changed();
 
 private:
+    friend class QslControllerTest;
     void startNext();
     void startNextAutomaticUpload();
     void uploadNextWeb();
     void finishBatch(const core::QslUploadResult& result);
-    void markSent(qint64 id, const QString& service, const core::QslUploadResult& result);
+    bool markSent(qint64 id, const QString& service, const core::QslUploadResult& result);
+    bool reconcileClubLogBatch(const QHash<qint64, QString>& identities, const QVariantList& rows);
+    void reconcileClubLogPresence(const core::QslUploadResult& pending);
+    bool clubLogCheckpointMatches() const;
     void note(const QString& text, const QString& level);
     void readSecret(const QString& service, std::function<void(const QString&, const QString&)> done);
 
     Context m_ctx;
     core::TqslUploader m_tqsl;
     core::WebQslUploader m_web;
+    core::ClubLogOqrsClient m_oqrs;
+    QVariantList m_oqrsRequests;
+    QString m_oqrsStatus, m_oqrsCall, m_oqrsResultCall;
+    quint64 m_oqrsGeneration{0}, m_oqrsRequestGeneration{0};
+    bool m_oqrsBusy{false};
     QString m_tqslPath;
     QString m_clubLogApiKey;
     qint64 m_crxLogId{0};
@@ -142,6 +164,10 @@ private:
     QString m_tqslLocation;
     QString m_busyService;
     QList<qint64> m_batch;          // i QSO dell'invio in corso
+    bool m_clubLogRestJournalThisRun{false};
+    QString m_clubLogRestStage;
+    QString m_clubLogRestCall;
+    QString m_clubLogJournalNonce;
     bool m_batchMode{false};        // LoTW e Club Log: tutto il blocco in una volta
     QQueue<qint64> m_pending;       // per QRZ ed eQSL, uno alla volta
     QString m_secret;               // credenziale del servizio in corso, solo durante l'invio
@@ -159,6 +185,7 @@ private:
     QList<QPair<qint64, QString>> m_deletions;
     qint64 m_deletingId{0};
     QTimer m_autoDelay;
+    QTimer m_clubLogRecheck;
     QList<qint64> m_autoQueue;
     core::qsl::AutomaticUploadQueue m_automaticUploads;
     // I conti della pagina, tenuti qui: services() si legge a ogni changed(),

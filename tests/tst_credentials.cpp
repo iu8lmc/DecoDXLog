@@ -83,6 +83,86 @@ private slots:
         QSettings().remove(QStringLiteral("credentials/qrzlogbook@3"));
     }
 
+    void pendingClubLogReplacementCannotReadAnOldToken()
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("credentials/clublog/stored"), true);
+        settings.setValue(QStringLiteral("credentials/clublog/replacementPending"), true);
+        settings.sync();
+        QVERIFY(!m_store->hasSecret(QStringLiteral("clublog")));
+        bool done = false;
+        QString value, error;
+        m_store->readSecret(QStringLiteral("clublog"), [&](const QString& secret, const QString& failure) {
+            value = secret; error = failure; done = true;
+        });
+        QVERIFY(done);
+        QVERIFY(value.isEmpty());
+        QVERIFY(!error.isEmpty());
+        settings.remove(QStringLiteral("credentials/clublog"));
+    }
+
+    void overlappingClubLogChangesAreRejected()
+    {
+        const QString service = QStringLiteral("clublog");
+        QSettings settings;
+        settings.setValue(QStringLiteral("credentials/clublog/account"), QStringLiteral("old-account"));
+        settings.setValue(QStringLiteral("credentials/clublog/stored"), true);
+        settings.sync();
+        m_store->setBusy(service, true);
+        QSignalSpy spy(m_store, &CredentialStore::finished);
+        m_store->save(service, QStringLiteral("new-account"), QStringLiteral("cl_fixture"));
+        QCOMPARE(spy.size(), 1);
+        QVERIFY(!spy.takeFirst().at(1).toBool());
+        m_store->remove(service);
+        QCOMPARE(spy.size(), 1);
+        QVERIFY(!spy.takeFirst().at(1).toBool());
+        QCOMPARE(m_store->account(service), QStringLiteral("old-account"));
+        QVERIFY(m_store->hasSecret(service));
+        QVERIFY(!settings.value(QStringLiteral("credentials/clublog/replacementPending")).toBool());
+        m_store->setBusy(service, false);
+        settings.remove(QStringLiteral("credentials/clublog"));
+    }
+
+    void removedClubLogCredentialCannotBeReadFromCache()
+    {
+        const QString service = QStringLiteral("clublog");
+        QSettings settings;
+        settings.remove(QStringLiteral("credentials/clublog"));
+        settings.sync();
+        m_store->m_secretCache.insert(service, QStringLiteral("cl_old_fixture"));
+        bool done = false;
+        m_store->readSecret(service, [&](const QString& secret, const QString& error) {
+            QVERIFY(secret.isEmpty());
+            QVERIFY(!error.isEmpty());
+            done = true;
+        });
+        QVERIFY(done);
+        m_store->m_secretCache.remove(service);
+    }
+
+    void deletingClubLogCredentialBlocksReadsBeforeKeystoreCompletes()
+    {
+        const QString service = QStringLiteral("clublog");
+        QSettings settings;
+        settings.setValue(QStringLiteral("credentials/clublog/stored"), true);
+        settings.sync();
+        CredentialStore isolated(QStringLiteral("DecoDXLog-test-delete-%1").arg(QCoreApplication::applicationPid()));
+        isolated.m_secretCache.insert(service, QStringLiteral("cl_old_fixture"));
+        isolated.remove(service);
+        settings.sync();
+        QVERIFY(settings.value(QStringLiteral("credentials/clublog/replacementPending")).toBool());
+        QVERIFY(!isolated.hasSecret(service));
+        bool done = false;
+        isolated.readSecret(service, [&](const QString& secret, const QString& error) {
+            QVERIFY(secret.isEmpty());
+            QVERIFY(!error.isEmpty());
+            done = true;
+        });
+        QVERIFY(done);
+        settings.remove(QStringLiteral("credentials/clublog"));
+        settings.sync();
+    }
+
     void saveReadRemove()
     {
         if (!m_store->available())

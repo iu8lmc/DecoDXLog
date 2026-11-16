@@ -3,6 +3,12 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.53 — 16 novembre 2026
+
+**Club Log REST.** Token personale nel portachiavi di sistema, ricerca DXCC e aggiornamento CTY; richieste OQRS dirette paginate e mostrate separatamente dalle conferme QSL. I nuovi QSO singoli e i piccoli gruppi usano le chiamate REST in tempo reale; gli arretrati sono inviati in ADIF. Gli invii incerti sono conservati e verificati nel log remoto senza bloccare i nuovi QSO, evitando reinvii automatici ambigui. La verifica distingue le stazioni e conserva gli identificativi dei contatti. I limiti del servizio e i rifiuti di autenticazione interrompono le richieste secondo le indicazioni di Club Log; la precedente API resta disponibile.
+
+**Credenziali e interfaccia.** Il token REST non richiede email e la scheda mostra il nominativo del profilo di stazione attivo. Le credenziali non vengono salvate in chiaro se il portachiavi non è disponibile. Corretto il contenuto vuoto di alcune finestre macOS con rendering software. Aggiunte traduzioni italiane e prove su upload, riconciliazione, credenziali e interfaccia.
+
 ## 1.17.52 — 10 novembre 2026
 
 **Lista decodifiche.** Durante le raffiche di decodifiche una riga vecchia restava disegnata sotto

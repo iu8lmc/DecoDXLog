@@ -2,6 +2,8 @@
 #include "core/QslUpload.h"
 
 #include "core/Adif.h"
+#include "core/ClubLogAccessGuard.h"
+#include "core/ClubLogRestBatchProtocol.h"
 #include "core/NetworkError.h"
 
 #include <QCoreApplication>
@@ -12,6 +14,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTimeZone>
+#include <QTimer>
+#include <QSet>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -783,15 +787,413 @@ void WebQslUploader::setClubLogEndpoints(const QUrl& realtime, const QUrl& batch
     m_clubLogBatchUrl = batch;
 }
 
+void WebQslUploader::submitClubLogRealtimeBatch(const QString& callsign, const QString& token,
+                                                  const QByteArray& adifDocument, int expectedCount)
+{
+    if (m_busy) return;
+    const QString restriction = ClubLogAccessGuard::restriction(token);
+    if (!restriction.isEmpty()) { QslUploadResult failed; failed.message = restriction; emit finished(failed); return; }
+    const QString call = callsign.trimmed().toUpper();
+    const auto document = adif::parse(adifDocument);
+    const QRegularExpression safeCall(QStringLiteral("^[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
+    if (!safeCall.match(call).hasMatch() || !token.startsWith(QLatin1String("cl_"))
+        || expectedCount < 1 || expectedCount > 100 || document.records.size() != expectedCount) {
+        QslUploadResult failed; failed.message = tr("Club Log: invalid real-time batch"); emit finished(failed); return;
+    }
+    QJsonArray qsos;
+    for (const auto& record : document.records)
+        qsos.append(QJsonObject{{QStringLiteral("call"), call}, {QStringLiteral("adif"), adif::writeRecord(record)}});
+    QNetworkRequest request(m_clubLogRestBatchBaseUrl.resolved(QUrl(QStringLiteral("qso/batch"))));
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    request.setTransferTimeout(30000);
+    m_busy = true;
+    QNetworkReply* reply = m_net->post(request, QJsonDocument(QJsonObject{{QStringLiteral("qsos"), qsos}}).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, token, expectedCount] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        ClubLogAccessGuard::record(token, status, reply->rawHeader("Retry-After"));
+        QJsonParseError error;
+        const auto document = QJsonDocument::fromJson(reply->readAll(), &error);
+        reply->deleteLater(); m_busy = false;
+        QslUploadResult result; result.httpStatus = status;
+        result.requiresReconciliation = status == 0 || status >= 500 || (status >= 200 && status < 300);
+        const QJsonValue results = document.object().value(QStringLiteral("results"));
+        if (status == 200 && error.error == QJsonParseError::NoError && results.isArray()
+            && results.toArray().size() == expectedCount) {
+            bool valid = true;
+            for (const auto& value : results.toArray()) {
+                if (!value.isObject()) { valid = false; break; }
+                const auto row = value.toObject();
+                const QString outcome = row.value(QStringLiteral("status")).toString();
+                if (outcome != QLatin1String("created") && outcome != QLatin1String("updated")
+                    && outcome != QLatin1String("duplicate") && outcome != QLatin1String("rejected")) { valid = false; break; }
+                result.clubLogBatchRecords.append(ClubLogAccessGuard::redactValue(row.toVariantMap(), token));
+            }
+            if (!valid) result.clubLogBatchRecords.clear();
+        }
+        result.message = result.clubLogBatchRecords.isEmpty()
+            ? tr("Club Log: real-time batch HTTP %1; verify contacts before retrying").arg(status)
+            : tr("Club Log: checking the result of each contact");
+        emit finished(result);
+    });
+}
+
+void WebQslUploader::submitClubLogRestBatch(const QString& callsign, const QString& token,
+                                               const QByteArray& adifDocument,
+                                               std::function<bool(const QString&)> checkpoint)
+{
+    if (m_busy) return;
+    const QString restriction = ClubLogAccessGuard::restriction(token);
+    if (!restriction.isEmpty()) {
+        QslUploadResult failed; failed.message = restriction; emit finished(failed); return;
+    }
+    const QString cleanCall = callsign.trimmed().toUpper();
+    const QRegularExpression safeCall(QStringLiteral("^[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
+    if (!safeCall.match(cleanCall).hasMatch() || !token.startsWith(QStringLiteral("cl_"))
+        || adifDocument.isEmpty() || !checkpoint) {
+        QslUploadResult failed;
+        failed.message = tr("Club Log REST: invalid callsign, token, ADIF or checkpoint");
+        emit finished(failed);
+        return;
+    }
+    const QString encodedCall = QString::fromLatin1(QUrl::toPercentEncoding(cleanCall, "/"));
+    const QUrl url = m_clubLogRestBatchBaseUrl.resolved(QUrl(QStringLiteral("logs/") + encodedCall + QStringLiteral("/uploads")));
+    auto* multipart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
+    QHttpPart file;
+    file.setHeader(QNetworkRequest::ContentDispositionHeader, QStringLiteral("form-data; name=\"file\"; filename=\"decodxlog.adi\""));
+    file.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/octet-stream"));
+    file.setBody(adifDocument);
+    multipart->append(file);
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    request.setTransferTimeout(120000);
+    m_busy = true;
+    QNetworkReply* reply = m_net->post(request, multipart);
+    multipart->setParent(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, token, checkpoint = std::move(checkpoint)] {
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        ClubLogAccessGuard::record(token, status, reply->rawHeader("Retry-After"));
+        const auto envelope = parseClubLogBatchEnvelope(status, reply->readAll(), true);
+        reply->deleteLater();
+        m_busy = false;
+        QslUploadResult result;
+        if (envelope.state == ClubLogBatchEnvelope::State::Queued) {
+            result.remoteId = envelope.uploadId;
+            result.requiresReconciliation = true;
+            result.message = checkpoint(envelope.uploadId)
+                ? tr("Club Log: upload queued; final processing and reconciliation are still required")
+                : tr("Club Log: upload queued but its identifier could not be saved; reconcile manually");
+        } else {
+            // Never infer success from a malformed or test-mode response. A
+            // transport/server failure might have followed a successful POST.
+            result.requiresReconciliation = status == 0 || status == 409 || status >= 500 || (status >= 200 && status < 300);
+            result.message = tr("Club Log upload: HTTP %1").arg(status);
+            if (!envelope.message.isEmpty())
+                result.message += QStringLiteral(": ") + ClubLogAccessGuard::redact(envelope.message, token);
+        }
+        emit finished(result);
+    });
+}
+
+void WebQslUploader::pollClubLogRestBatch(const QString& callsign, const QString& token,
+                                             const QString& uploadId, int expectedCount)
+{
+    if (m_busy) return;
+    const QString restriction = ClubLogAccessGuard::restriction(token);
+    if (!restriction.isEmpty()) {
+        QslUploadResult pending; pending.requiresReconciliation = true;
+        pending.remoteId = uploadId; pending.message = restriction; emit finished(pending); return;
+    }
+    const QString cleanCall = callsign.trimmed().toUpper();
+    const QRegularExpression safeCall(QStringLiteral("^[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
+    bool idOk = false;
+    const qlonglong numericId = uploadId.toLongLong(&idOk);
+    if (!safeCall.match(cleanCall).hasMatch() || !token.startsWith(QStringLiteral("cl_"))
+        || !idOk || numericId <= 0 || expectedCount <= 0) {
+        QslUploadResult result;
+        result.requiresReconciliation = true;
+        result.message = tr("Club Log: invalid parameters for pending upload");
+        emit finished(result);
+        return;
+    }
+    struct PollState {
+        QString call, token, uploadId, cursor;
+        QSet<QString> cursors;
+        QVariantList records;
+        int polls {0};
+        int queuedPolls {0};
+        int expected {0};
+    };
+    auto state = std::make_shared<PollState>();
+    state->call = cleanCall; state->token = token; state->uploadId = uploadId; state->expected = expectedCount;
+    m_busy = true;
+    auto poll = std::make_shared<std::function<void()>>();
+    std::weak_ptr<std::function<void()>> weakPoll = poll;
+    *poll = [this, state, weakPoll] {
+        const QString encodedCall = QString::fromLatin1(QUrl::toPercentEncoding(state->call, "/"));
+        QUrl url = m_clubLogRestBatchBaseUrl.resolved(QUrl(QStringLiteral("logs/") + encodedCall
+                   + QStringLiteral("/uploads/") + state->uploadId));
+        QUrlQuery query;
+        if (!state->cursor.isEmpty()) query.addQueryItem(QStringLiteral("cursor"), state->cursor);
+        url.setQuery(query);
+        QNetworkRequest request(url);
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + state->token.toUtf8());
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        request.setTransferTimeout(30000);
+        QNetworkReply* reply = m_net->get(request);
+        // Keep the callback alive only while a reply or scheduled timer exists.
+        const auto keepPoll = weakPoll.lock();
+        connect(reply, &QNetworkReply::finished, this, [this, state, reply, keepPoll] {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            ClubLogAccessGuard::record(state->token, status, reply->rawHeader("Retry-After"));
+            const auto envelope = parseClubLogBatchEnvelope(status, reply->readAll(), false);
+            reply->deleteLater();
+            auto finishPending = [this, state, status](const QString& message) {
+                m_busy = false;
+                QslUploadResult result;
+                result.remoteId = state->uploadId;
+                result.requiresReconciliation = true;
+                result.httpStatus = status;
+                result.message = ClubLogAccessGuard::redact(message, state->token);
+                emit finished(result);
+            };
+            if (++state->polls > 10000) {
+                finishPending(tr("Club Log: upload polling limit reached; resume reconciliation later"));
+                return;
+            }
+            if (envelope.state == ClubLogBatchEnvelope::State::Queued) {
+                if (++state->queuedPolls > 120) {
+                    finishPending(tr("Club Log: upload still queued; resume reconciliation later"));
+                    return;
+                }
+                if (!keepPoll) { finishPending(tr("Club Log: polling interrupted")); return; }
+                QTimer::singleShot(m_clubLogRestPollIntervalMs, this, [keepPoll] { (*keepPoll)(); });
+                return;
+            }
+            if (envelope.state != ClubLogBatchEnvelope::State::Finished) {
+                QString message = tr("Club Log: status HTTP %1").arg(status);
+                if (!envelope.message.isEmpty()) message += QStringLiteral(": ") + envelope.message;
+                else message += tr("; resume later");
+                finishPending(message);
+                return;
+            }
+            const QJsonValue rows = envelope.body.value(QStringLiteral("records"));
+            if (!rows.isArray()) { finishPending(tr("Club Log: final status lacks record results")); return; }
+            for (const QJsonValue& row : rows.toArray()) {
+                if (!row.isObject() || state->records.size() >= state->expected) {
+                    finishPending(tr("Club Log: invalid or excessive result records")); return;
+                }
+                state->records.append(ClubLogAccessGuard::redactValue(row.toObject().toVariantMap(), state->token));
+            }
+            const QJsonValue cursor = envelope.body.value(QStringLiteral("next_cursor"));
+            if (!cursor.isUndefined() && !cursor.isNull() && !cursor.isString()) {
+                finishPending(tr("Club Log: invalid result cursor")); return;
+            }
+            const QString next = cursor.toString();
+            if (!state->token.isEmpty() && next.contains(state->token, Qt::CaseInsensitive)) {
+                finishPending(tr("Club Log: invalid result cursor")); return;
+            }
+            if (!next.isEmpty()) {
+                if (state->cursors.contains(next) || !keepPoll) { finishPending(tr("Club Log: repeated result cursor")); return; }
+                state->cursors.insert(next); state->cursor = next;
+                QTimer::singleShot(0, this, [keepPoll] { (*keepPoll)(); });
+                return;
+            }
+            if (state->records.size() != state->expected) {
+                finishPending(tr("Club Log: incomplete individual results; reconciliation required"));
+                return;
+            }
+            m_busy = false;
+            QslUploadResult result;
+            result.remoteId = state->uploadId;
+            result.clubLogBatchRecords = state->records;
+            result.requiresReconciliation = true;
+            int accepted = 0, duplicates = 0, rejected = 0, unknown = 0;
+            for (const QVariant& value : std::as_const(state->records)) {
+                const QString status = value.toMap().value(QStringLiteral("status")).toString().toLower();
+                if (status == QLatin1String("created") || status == QLatin1String("updated")) ++accepted;
+                else if (status == QLatin1String("duplicate")) ++duplicates;
+                else if (status == QLatin1String("rejected")) ++rejected;
+                else ++unknown;
+            }
+            result.message = tr("Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required")
+                                 .arg(accepted).arg(duplicates).arg(rejected).arg(unknown);
+            emit finished(result);
+        });
+    };
+    (*poll)();
+}
+
+void WebQslUploader::resolveClubLogBatchIdentities(
+    const QString& callsign, const QString& token, const QList<QJsonObject>& filters,
+    const QSet<qint64>& expectedIds, std::function<void(const QList<QString>&, const QString&)> done,
+    bool resolvePresence)
+{
+    const QString restriction = ClubLogAccessGuard::restriction(token);
+    if (!restriction.isEmpty()) { done({}, restriction); return; }
+    const QString cleanCall = callsign.trimmed().toUpper();
+    const QRegularExpression safeCall(QStringLiteral("^[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
+    if (m_busy || !safeCall.match(cleanCall).hasMatch() || !token.startsWith(QLatin1String("cl_"))
+        || filters.isEmpty() || expectedIds.size() > filters.size()) {
+        done({}, tr("Club Log: cannot resolve batch identities"));
+        return;
+    }
+    struct ResolveState {
+        QList<QJsonObject> filters;
+        QSet<qint64> expected, used;
+        QList<QString> resolved;
+        QString call, token;
+        int offset {0};
+        bool resolvePresence {false};
+        std::function<void(const QList<QString>&, const QString&)> done;
+    };
+    auto state = std::make_shared<ResolveState>();
+    state->filters = filters; state->expected = expectedIds; state->resolvePresence = resolvePresence;
+    state->call = cleanCall; state->token = token; state->done = std::move(done);
+    QSet<QByteArray> filterKeys;
+    for (const QJsonObject& filter : filters) {
+        const QByteArray key = QJsonDocument(filter).toJson(QJsonDocument::Compact);
+        if (filter.isEmpty() || filterKeys.contains(key)) {
+            state->done({}, tr("Club Log: multiple local contacts have the same identity"));
+            return;
+        }
+        filterKeys.insert(key);
+    }
+    m_busy = true;
+    auto queryNext = std::make_shared<std::function<void()>>();
+    std::weak_ptr<std::function<void()>> weakNext = queryNext;
+    *queryNext = [this, state, weakNext] {
+        const int count = qMin(100, int(state->filters.size()) - state->offset);
+        QJsonArray requested;
+        QHash<QByteArray, int> positions;
+        for (int i = 0; i < count; ++i) {
+            const QJsonObject filter = state->filters.at(state->offset + i);
+            requested.append(filter);
+            positions.insert(QJsonDocument(filter).toJson(QJsonDocument::Compact), i);
+        }
+        const QString path = QStringLiteral("logs/")
+            + QString::fromLatin1(QUrl::toPercentEncoding(state->call, "/"))
+            + QStringLiteral("/qsos/query");
+        QNetworkRequest request(m_clubLogRestBatchBaseUrl.resolved(QUrl(path)));
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + state->token.toUtf8());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        request.setTransferTimeout(30000);
+        QNetworkReply* reply = m_net->post(request, QJsonDocument(QJsonObject{{QStringLiteral("filters"), requested}}).toJson(QJsonDocument::Compact));
+        const auto keepNext = weakNext.lock();
+        connect(reply, &QNetworkReply::finished, this, [this, state, reply, count, positions, keepNext] {
+            const int http = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            ClubLogAccessGuard::record(state->token, http, reply->rawHeader("Retry-After"));
+            QJsonParseError parseError;
+            const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll(), &parseError);
+            reply->deleteLater();
+            auto fail = [this, state](const QString& message) {
+                m_busy = false;
+                state->done({}, message);
+            };
+            if (http != 200 || parseError.error != QJsonParseError::NoError || !doc.isObject()
+                || !doc.object().value(QStringLiteral("results")).isArray()) {
+                fail(tr("Club Log: identity query failed (HTTP %1); reconciliation remains pending").arg(http));
+                return;
+            }
+            const QJsonArray results = doc.object().value(QStringLiteral("results")).toArray();
+            if (results.size() != count) { fail(tr("Club Log: incomplete identity query")); return; }
+            QList<QString> chunk;
+            chunk.resize(count);
+            QSet<int> seenFilters;
+            for (const QJsonValue& value : results) {
+                const QJsonObject result = value.toObject();
+                const QByteArray key = QJsonDocument(result.value(QStringLiteral("filter")).toObject()).toJson(QJsonDocument::Compact);
+                const int position = positions.value(key, -1);
+                const QJsonValue qsosValue = result.value(QStringLiteral("qsos"));
+                if (position < 0 || seenFilters.contains(position) || !qsosValue.isArray()
+                    || qsosValue.toArray().size() >= 100) {
+                    fail(tr("Club Log: ambiguous identity query")); return;
+                }
+                seenFilters.insert(position);
+                QSet<qint64> candidates;
+                for (const QJsonValue& qso : qsosValue.toArray()) {
+                    bool ok = false;
+                    const qint64 id = qso.toObject().value(QStringLiteral("qsoid")).toVariant().toLongLong(&ok);
+                    if (state->resolvePresence && (!qso.isObject() || !ok || id <= 0)) {
+                        fail(tr("Club Log: invalid contact identity")); return;
+                    }
+                    if (ok && id > 0 && (state->resolvePresence || state->expected.contains(id))) candidates.insert(id);
+                }
+                if (candidates.size() > 1 && state->resolvePresence) continue;
+                if (candidates.size() > 1 || (!candidates.isEmpty() && state->used.contains(*candidates.cbegin()))) {
+                    fail(tr("Club Log: contact identity is not unique")); return;
+                }
+                if (!candidates.isEmpty()) {
+                    const qint64 id = *candidates.cbegin();
+                    state->used.insert(id);
+                    chunk[position] = QString::number(id);
+                }
+            }
+            state->resolved.append(chunk);
+            state->offset += count;
+            if (state->offset == state->filters.size()) {
+                if (!state->resolvePresence && state->used != state->expected) {
+                    fail(tr("Club Log: incomplete contact identities")); return;
+                }
+                m_busy = false;
+                state->done(state->resolved, {});
+            } else if (keepNext) {
+                QTimer::singleShot(0, this, [keepNext] { (*keepNext)(); });
+            } else {
+                fail(tr("Club Log: identity query interrupted"));
+            }
+        });
+    };
+    (*queryNext)();
+}
+
 void WebQslUploader::uploadClubLog(const ClubLogAuth& auth, const QByteArray& adifDocument, int qsoCount)
 {
     if (m_busy)
         return;
+    if (auth.password.startsWith(QStringLiteral("cl_"))) {
+        const QString restriction = ClubLogAccessGuard::restriction(auth.password);
+        if (!restriction.isEmpty()) {
+            QslUploadResult failed; failed.message = restriction; emit finished(failed); return;
+        }
+        const auto document = adif::parse(adifDocument);
+        if (auth.callsign.isEmpty() || qsoCount != 1 || document.records.size() != 1) {
+            QslUploadResult failed;
+            failed.message = tr("Club Log REST: exactly one QSO and a station callsign are required");
+            emit finished(failed);
+            return;
+        }
+        QJsonObject body{{QStringLiteral("call"), auth.callsign},
+                         {QStringLiteral("adif"), adif::writeRecord(document.records.first())}};
+        QNetworkRequest request(m_clubLogRestUrl);
+        network::useHttp11(request);
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + auth.password.toUtf8());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        request.setTransferTimeout(30000);
+        m_busy = true;
+        watch(m_net->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact)), Service::ClubLogRest, 1);
+        return;
+    }
     if (!auth.complete()) {
         QslUploadResult missing;
         missing.message = tr("Club Log: email, password, callsign and API key are all needed");
         emit finished(missing);
         return;
+    }
+
+    // A refused legacy credential must stay blocked across restarts. Keep only
+    // a fingerprint of the complete configuration, never credentials in settings.
+    const QByteArray legacyIdentity = QJsonDocument(QJsonArray{auth.email, auth.password, auth.callsign, auth.apiKey})
+                                          .toJson(QJsonDocument::Compact);
+    const QString guardKey = QStringLiteral("legacy-") + QString::fromLatin1(
+        QCryptographicHash::hash(legacyIdentity, QCryptographicHash::Sha256).toHex());
+    const QString restriction = ClubLogAccessGuard::restriction(guardKey);
+    if (!restriction.isEmpty()) {
+        QslUploadResult failed; failed.message = restriction; emit finished(failed); return;
     }
 
     if (qsoCount <= 1) {
@@ -809,7 +1211,9 @@ void WebQslUploader::uploadClubLog(const ClubLogAuth& auth, const QByteArray& ad
         request.setHeader(QNetworkRequest::UserAgentHeader,
                           QStringLiteral("DecoDXLog/%1").arg(QCoreApplication::applicationVersion()));
         request.setTransferTimeout(30'000);
-        watch(m_net->post(request, form.toString(QUrl::FullyEncoded).toUtf8()), Service::ClubLog, 1);
+        QNetworkReply* reply = m_net->post(request, form.toString(QUrl::FullyEncoded).toUtf8());
+        reply->setProperty("clubLogLegacyGuard", guardKey);
+        watch(reply, Service::ClubLog, 1);
         return;
     }
 
@@ -842,6 +1246,7 @@ void WebQslUploader::uploadClubLog(const ClubLogAuth& auth, const QByteArray& ad
                       QStringLiteral("DecoDXLog/%1").arg(QCoreApplication::applicationVersion()));
     request.setTransferTimeout(120'000);   // un blocco grosso ci mette di piu'
     QNetworkReply* reply = m_net->post(request, multi);
+    reply->setProperty("clubLogLegacyGuard", guardKey);
     multi->setParent(reply);
     watch(reply, Service::ClubLog, qsoCount);
 }
@@ -946,7 +1351,39 @@ void WebQslUploader::watch(QNetworkReply* reply, Service service, int qsoCount)
             emit finished(qsl::parseCrxResponse(status, answer));
             return;
         }
+        if (service == Service::ClubLogRest) {
+            const QByteArray authorization = reply->request().rawHeader("Authorization");
+            const QString token = authorization.startsWith("Bearer ") ? QString::fromUtf8(authorization.mid(7)) : QString();
+            if (authorization.startsWith("Bearer "))
+                ClubLogAccessGuard::record(QString::fromUtf8(authorization.mid(7)), status, reply->rawHeader("Retry-After"));
+            QslUploadResult result;
+            const QJsonObject object = QJsonDocument::fromJson(answer).object();
+            const QString outcome = object.value(QStringLiteral("status")).toString();
+            result.message = ClubLogAccessGuard::redact(clubLogResponseMessage(object), token);
+            const QString qsoId = object.value(QStringLiteral("qsoid")).toVariant().toString();
+            const bool validQsoId = qsoId.toLongLong() > 0;
+            if (validQsoId && ((status == 201 && outcome == QLatin1String("created")) ||
+                (status == 200 && (outcome == QLatin1String("updated") || outcome == QLatin1String("duplicate"))))) {
+                result.ok = true;
+                result.accepted = outcome == QLatin1String("duplicate") ? 0 : 1;
+                result.duplicates = outcome == QLatin1String("duplicate") ? 1 : 0;
+                result.remoteId = qsoId;
+            } else {
+                result.rejected = 1;
+                // A transport error after submission has an ambiguous outcome;
+                // do not automatically resend a QSO that may already exist.
+                result.requiresReconciliation = status == 0 || status >= 500 || (status >= 200 && status < 300);
+                if (result.message.isEmpty())
+                    result.message = tr("Club Log REST: HTTP %1 (%2)").arg(status).arg(ClubLogAccessGuard::redact(outcome, token));
+                else
+                    result.message = tr("Club Log REST: HTTP %1: %2").arg(status).arg(result.message);
+            }
+            emit finished(result);
+            return;
+        }
         if (service == Service::ClubLog) {
+            if (status == 403)
+                ClubLogAccessGuard::record(reply->property("clubLogLegacyGuard").toString(), status, {});
             // Club Log dice il motivo nel corpo anche quando risponde 403, e
             // quel motivo serve all'operatore piu' del codice.
             if (reply->error() != QNetworkReply::NoError && status == 0) {

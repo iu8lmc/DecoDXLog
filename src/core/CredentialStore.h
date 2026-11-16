@@ -15,6 +15,9 @@
 #include <QVariantList>
 #include <functional>
 
+class TestCredentials;
+namespace decolog::app { class QslControllerTest; }
+
 namespace decolog::core {
 
 struct CredentialService {
@@ -81,6 +84,8 @@ signals:
     void finished(const QString& service, bool ok, const QString& message);
 
 private:
+    friend class ::TestCredentials;
+    friend class decolog::app::QslControllerTest;
     QString settingsKey(const QString& service, const char* field) const;
     void setError(const QString& service, const QString& error);
     void setBusy(const QString& service, bool busy);
@@ -89,6 +94,7 @@ private:
     QHash<QString, QString> m_errors;
     QHash<QString, bool> m_busy;
     QHash<QString, QString> m_secretCache;
+    QHash<QString, quint64> m_secretGeneration;
 };
 
 } // namespace decolog::core

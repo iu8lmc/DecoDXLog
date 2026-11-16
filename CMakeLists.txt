@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.52
+    VERSION 1.17.53
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -173,6 +173,8 @@ add_library(decolog_core STATIC
     src/core/Contests.h
     src/core/NetworkError.h
     src/core/QslUpload.cpp
+    src/core/ClubLogOqrsClient.cpp
+    src/core/ClubLogOqrsClient.h
     src/core/QslUpload.h
     src/core/ReleaseSignature.cpp
     src/core/ReleaseSignature.h
@@ -662,6 +664,22 @@ endif()
 if(DECODXLOG_BUILD_TESTS)
     enable_testing()
     find_package(Qt6 REQUIRED COMPONENTS Test QuickTest)
+    qt_add_executable(clublog_live50 tests/tools/clublog_live50.cpp)
+    target_link_libraries(clublog_live50 PRIVATE decolog_core Qt6::Core Qt6::Network)
+    set_target_properties(clublog_live50 PROPERTIES WIN32_EXECUTABLE OFF)
+    qt_add_executable(clublog_stage_existing tests/tools/clublog_stage_existing.cpp)
+    target_link_libraries(clublog_stage_existing PRIVATE decolog_core Qt6::Core)
+    set_target_properties(clublog_stage_existing PROPERTIES WIN32_EXECUTABLE OFF)
+    qt_add_executable(clublog_oqrs_probe tests/tools/clublog_oqrs_probe.cpp)
+    target_link_libraries(clublog_oqrs_probe PRIVATE decolog_core Qt6::Core Qt6::Network)
+    set_target_properties(clublog_oqrs_probe PROPERTIES WIN32_EXECUTABLE OFF)
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME clublog_live50_simulation COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/tools/test_clublog_live50_simulation.py
+            $<TARGET_FILE:clublog_live50> $<TARGET_FILE:clublog_stage_existing>)
+        set_tests_properties(clublog_live50_simulation PROPERTIES TIMEOUT 60)
+    endif()
     foreach(name adif protocol database countries credentials callbook awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc)
         qt_add_executable(tst_${name} tests/tst_${name}.cpp)
         target_link_libraries(tst_${name} PRIVATE decolog_core Qt6::Test)
@@ -712,6 +730,11 @@ if(DECODXLOG_BUILD_TESTS)
     target_link_libraries(tst_qslcardcontroller PRIVATE decolog_core Qt6::Test Qt6::Gui)
     set_target_properties(tst_qslcardcontroller PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME qslcardcontroller COMMAND tst_qslcardcontroller)
+    qt_add_executable(tst_qslcontroller tests/tst_qslcontroller.cpp src/app/QslController.cpp src/app/QslController.h)
+    target_include_directories(tst_qslcontroller PRIVATE src)
+    target_link_libraries(tst_qslcontroller PRIVATE decolog_core Qt6::Test)
+    set_target_properties(tst_qslcontroller PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME qslcontroller COMMAND tst_qslcontroller)
     set_tests_properties(qslcardcontroller PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     # La tabella del log sta nell'applicazione, ma i suoi filtri sono SQL da provare.
     qt_add_executable(tst_qsomodel tests/tst_qsomodel.cpp src/app/QsoTableModel.cpp src/app/QsoTableModel.h)
@@ -726,6 +749,8 @@ if(DECODXLOG_BUILD_TESTS)
     set_tests_properties(maplayers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
     add_test(NAME newqsotuning COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_newqsotuning.qml)
     set_tests_properties(newqsotuning PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
+    add_test(NAME clublogcredentials COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_clublogcredentials.qml)
+    set_tests_properties(clublogcredentials PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
     # I popup in una finestra sua col campo di testo senza il fuoco non ricevono i tasti:
     # la prova legge i QML, non c'e' niente da avviare.
     qt_add_executable(tst_qmlpopups tests/tst_qmlpopups.cpp)
@@ -735,6 +760,14 @@ if(DECODXLOG_BUILD_TESTS)
     target_link_libraries(tst_qmlpopups PRIVATE Qt6::Test)
     set_target_properties(tst_qmlpopups PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME qmlpopups COMMAND tst_qmlpopups)
+
+    if(APPLE)
+        qt_add_executable(tst_softwaresettings tests/tst_softwaresettings.cpp)
+        target_compile_definitions(tst_softwaresettings PRIVATE DECOLOG_APP="$<TARGET_FILE:decolog>")
+        target_link_libraries(tst_softwaresettings PRIVATE Qt6::Test Qt6::Gui)
+        add_dependencies(tst_softwaresettings decolog)
+        add_test(NAME softwaresettings COMMAND tst_softwaresettings)
+    endif()
 
     qt_add_executable(tst_performance tests/tst_performance.cpp)
     target_link_libraries(tst_performance PRIVATE decolog_core Qt6::Test)

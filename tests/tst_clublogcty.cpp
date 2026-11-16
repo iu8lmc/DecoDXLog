@@ -3,11 +3,13 @@
 // operazioni che non valgono, le zone che cambiano, i suffissi e i prefissi
 // davanti al nominativo, e il file compresso come lo manda Club Log.
 #include "core/ClubLogCty.h"
+#include "core/ClubLogCtyRequest.h"
 
 #include <QFile>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimeZone>
+#include <QUrlQuery>
 
 using namespace decolog::core;
 
@@ -59,6 +61,33 @@ class TestClubLogCty : public QObject {
     ClubLogCty m_cty;
 
 private slots:
+    void legacyAndPersonalAuthentication()
+    {
+        const QNetworkRequest legacy = clubLogCtyRequest(QStringLiteral("legacy-password"), QStringLiteral("old-api-key"));
+        QCOMPARE(legacy.url().host(), QStringLiteral("cdn.clublog.org"));
+        QCOMPARE(QUrlQuery(legacy.url()).queryItemValue(QStringLiteral("api")), QStringLiteral("old-api-key"));
+        QVERIFY(legacy.rawHeader("Authorization").isEmpty());
+        const QNetworkRequest modern = clubLogCtyRequest(QStringLiteral("cl_fixture"), QStringLiteral("old-api-key"));
+        QCOMPARE(modern.url().toString(), QStringLiteral("https://clublog.org/api/v1/reference/cty"));
+        QCOMPARE(modern.rawHeader("Authorization"), QByteArray("Bearer cl_fixture"));
+        QCOMPARE(modern.attribute(QNetworkRequest::RedirectPolicyAttribute).toInt(), int(QNetworkRequest::ManualRedirectPolicy));
+        QVERIFY(!modern.url().toString().contains(QStringLiteral("cl_fixture")));
+        QVERIFY(clubLogCtyRequest({}, {}).url().isEmpty());
+    }
+
+    void liveReferenceFileWhenProvided()
+    {
+        const QString path = qEnvironmentVariable("DECODXLOG_TEST_CLUBLOG_CTY");
+        if (path.isEmpty()) QSKIP("No downloaded reference file supplied");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QString error;
+        const QByteArray data = ClubLogCty::gunzip(file.readAll(), &error);
+        QVERIFY2(!data.isEmpty(), qPrintable(error));
+        ClubLogCty cty;
+        QVERIFY2(cty.load(data, &error), qPrintable(error));
+        QVERIFY(cty.entityCount() > 300);
+    }
     void initTestCase()
     {
         QString error;

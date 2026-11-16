@@ -2,14 +2,19 @@
 #include "app/QslController.h"
 
 #include "core/CredentialStore.h"
+#include "core/ClubLogBatchReconcile.h"
+#include "core/ClubLogUploadJournal.h"
 #include "core/LogDatabase.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QMetaObject>
 #include <QPointer>
 #include <QSettings>
+#include <QSet>
+#include <QSqlDatabase>
 #include <QStandardPaths>
 #include <algorithm>
 #include <array>
@@ -58,12 +63,58 @@ QslController::QslController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
 {
+    if (m_ctx.credentials) {
+        connect(m_ctx.credentials, &CredentialStore::changed, this, [this] {
+            ++m_oqrsGeneration;
+            if (!m_oqrsResultCall.isEmpty())
+                m_oqrsStatus = tr("Credentials changed; refresh the OQRS requests");
+            m_oqrsRequests.clear();
+            m_oqrsResultCall.clear();
+            emit changed();
+        });
+    }
+    connect(&m_oqrs, &ClubLogOqrsClient::finished, this,
+            [this](bool ok, const QVariantList& rows, const QString& error) {
+        m_oqrsBusy = false;
+        const QString current = m_ctx.stationCallsign ? m_ctx.stationCallsign().trimmed().toUpper() : QString();
+        if (current != m_oqrsCall || m_oqrsGeneration != m_oqrsRequestGeneration) {
+            m_oqrsStatus = tr("Club Log account or station changed; refresh the OQRS requests");
+        } else if (!ok) {
+            m_oqrsStatus = error;
+        } else {
+            m_oqrsRequests = rows;
+            m_oqrsResultCall = current;
+            m_oqrsStatus = tr("%n direct OQRS request(s); these are not QSL confirmations", nullptr, int(rows.size()));
+        }
+        emit changed();
+    });
     QSettings s;
     m_tqslPath = s.value(QStringLiteral("qsl/tqslPath")).toString();
     if (m_tqslPath.isEmpty())
         m_tqslPath = qsl::findTqsl();
     m_tqslLocation = s.value(QStringLiteral("qsl/tqslLocation")).toString();
     m_clubLogApiKey = s.value(QStringLiteral("qsl/clubLogApiKey")).toString();
+    if (m_clubLogApiKey.trimmed().startsWith(QStringLiteral("cl_"))) {
+        // Older configurations may contain a personal token in the legacy
+        // key field. Remove the plaintext first and migrate only if doing so
+        // will not overwrite an already configured secure credential.
+        const QString misplacedToken = m_clubLogApiKey.trimmed();
+        m_clubLogApiKey.clear();
+        s.remove(QStringLiteral("qsl/clubLogApiKey"));
+        s.sync();
+        if (s.status() != QSettings::NoError)
+            note(tr("Club Log: could not remove the personal token from the old settings file; check its permissions"),
+                 QStringLiteral("error"));
+        if (m_ctx.credentials && !m_ctx.credentials->hasSecret(QStringLiteral("clublog"))) {
+            m_ctx.credentials->save(QStringLiteral("clublog"),
+                                    m_ctx.credentials->account(QStringLiteral("clublog")), misplacedToken);
+            note(tr("Club Log personal token was removed from the legacy key field and is being moved to secure storage"),
+                 QStringLiteral("warning"));
+        } else {
+            note(tr("Club Log personal token was removed from the legacy key field; check the secure credential"),
+                 QStringLiteral("warning"));
+        }
+    }
     m_crxLogId = s.value(QStringLiteral("qsl/crxLogId"), 0).toLongLong();
     m_crxLogName = s.value(QStringLiteral("qsl/crxLogName")).toString();
     m_crxSince = QDate::fromString(s.value(QStringLiteral("qsl/crxSince")).toString(), Qt::ISODate);
@@ -128,7 +179,106 @@ QslController::QslController(Context context, QObject* parent)
         if (m_batch.isEmpty())
             return;
         if (m_batchMode) {
-            // Club Log ha risposto per tutto il blocco in una volta.
+            if (m_busyService == QLatin1String("clublog") && m_clubLogRestStage == QLatin1String("submitting")) {
+                QSettings settings;
+                ClubLogUploadJournal journal(settings);
+                if (result.requiresReconciliation && !result.remoteId.isEmpty()
+                    && journal.phase() == QLatin1String("queued") && journal.uploadId() == result.remoteId
+                    && journal.nonce() == m_clubLogJournalNonce) {
+                    m_clubLogRestStage = QStringLiteral("polling");
+                    const QString id = result.remoteId;
+                    QTimer::singleShot(0, this, [this, id] {
+                        if (m_clubLogRestStage == QLatin1String("polling"))
+                            m_web.pollClubLogRestBatch(m_clubLogRestCall, m_secret, id, static_cast<int>(m_batch.size()));
+                    });
+                    return;
+                }
+            }
+            if (m_busyService == QLatin1String("clublog") && m_clubLogRestStage == QLatin1String("polling")
+                && !result.clubLogBatchRecords.isEmpty()) {
+                QHash<qint64, QString> identities;
+                for (qint64 id : std::as_const(m_batch)) {
+                    const auto record = m_ctx.db->record(id);
+                    if (!record) { identities.clear(); break; }
+                    QString remote = record->value(QStringLiteral("APP_CLUBLOG_QSOID")).trimmed();
+                    for (const QslState& state : m_ctx.db->qslStatus(id)) {
+                        if (state.service != QLatin1String("clublog") || state.remoteId.isEmpty()) continue;
+                        if (!remote.isEmpty() && remote != state.remoteId) { remote.clear(); break; }
+                        remote = state.remoteId;
+                    }
+                    identities.insert(id, remote);
+                }
+                const auto matched = matchClubLogBatchResults(identities, result.clubLogBatchRecords);
+                if (matched.size() == m_batch.size()) {
+                    if (reconcileClubLogBatch(identities, result.clubLogBatchRecords)) {
+                        QslUploadResult reconciled; reconciled.ok = true;
+                        m_batchMode = false;
+                        finishBatch(reconciled);
+                        return;
+                    }
+                    finishBatch(result);
+                    return;
+                }
+                bool missing = false;
+                for (const QString& id : std::as_const(identities)) missing |= id.isEmpty();
+                if (missing && identities.size() == m_batch.size()) {
+                    QList<QJsonObject> filters;
+                    QSet<qint64> remoteIds;
+                    int rejectedCount = 0;
+                    for (qint64 id : std::as_const(m_batch)) {
+                        const auto row = m_ctx.db->record(id);
+                        filters.append(row ? clubLogIdentityFilter(*row) : QJsonObject());
+                    }
+                    for (const QVariant& value : result.clubLogBatchRecords) {
+                        const QVariantMap row = value.toMap();
+                        const QString status = row.value(QStringLiteral("status")).toString().toLower();
+                        if (status == QLatin1String("rejected") && row.contains(QStringLiteral("qsoid"))
+                            && row.value(QStringLiteral("qsoid")).isNull()) {
+                            ++rejectedCount;
+                            continue;
+                        }
+                        bool ok = false;
+                        const qint64 id = row.value(QStringLiteral("qsoid")).toLongLong(&ok);
+                        if (!ok || id <= 0 || remoteIds.contains(id) ||
+                            (status != QLatin1String("created") && status != QLatin1String("updated")
+                             && status != QLatin1String("duplicate"))) { remoteIds.clear(); break; }
+                        remoteIds.insert(id);
+                    }
+                    if (remoteIds.size() + rejectedCount == m_batch.size()) {
+                        m_clubLogRestStage = QStringLiteral("resolving");
+                        m_web.resolveClubLogBatchIdentities(m_clubLogRestCall, m_secret, filters, remoteIds,
+                            [this, identities, result](const QList<QString>& ids, const QString& error) {
+                                if (m_clubLogRestStage != QLatin1String("resolving")) return;
+                                QHash<qint64, QString> resolved = identities;
+                                if (ids.size() == m_batch.size()) {
+                                    bool consistent = true;
+                                    for (qsizetype i = 0; i < m_batch.size(); ++i) {
+                                        const QString known = resolved.value(m_batch.at(i));
+                                        if (!known.isEmpty() && !ids.at(i).isEmpty() && known != ids.at(i)) { consistent = false; break; }
+                                        if (!ids.at(i).isEmpty()) resolved[m_batch.at(i)] = ids.at(i);
+                                    }
+                                    if (consistent && reconcileClubLogBatch(resolved, result.clubLogBatchRecords)) {
+                                        QslUploadResult success; success.ok = true;
+                                        m_batchMode = false;
+                                        finishBatch(success);
+                                        return;
+                                    }
+                                }
+                                QslUploadResult pending = result;
+                                if (!error.isEmpty()) pending.message += QStringLiteral("; ") + error;
+                                finishBatch(pending);
+                            });
+                        return;
+                    }
+                }
+            }
+            if (m_busyService == QLatin1String("clublog") && m_clubLogRestStage == QLatin1String("polling")
+                && (result.httpStatus == 200 || (result.httpStatus >= 500 && result.httpStatus <= 599))) {
+                reconcileClubLogPresence(result);
+                return;
+            }
+            // Final records must be reconciled individually; never treat a
+            // queued or unrecognised response as acceptance of the batch.
             finishBatch(result);
             return;
         }
@@ -144,6 +294,20 @@ QslController::QslController(Context context, QObject* parent)
     });
 
     // I QSO che arrivano a raffica si mandano insieme poco dopo, non uno a uno.
+    m_clubLogRecheck.setSingleShot(true);
+    m_clubLogRecheck.setInterval(5 * 60 * 1000);
+    connect(&m_clubLogRecheck, &QTimer::timeout, this, [this] {
+        if (busy()) { m_clubLogRecheck.start(); return; }
+        QSettings settings;
+        ClubLogUploadJournal journal(settings);
+        if (!journal.pending()) return;
+        if (!m_ctx.db || journal.logIdentity() != m_ctx.db->path()) return;
+        resumeClubLogPendingUpload();
+    });
+    {
+        QSettings settings;
+        if (ClubLogUploadJournal(settings).pending()) m_clubLogRecheck.start();
+    }
     m_autoDelay.setSingleShot(true);
     m_autoDelay.setInterval(20'000);
     connect(&m_autoDelay, &QTimer::timeout, this, [this] {
@@ -282,10 +446,9 @@ QVariantList QslController::services() const
             ready = tqslReady();
             hint = tqslStatus();
         } else if (id == QLatin1String("clublog")) {
-            ready = hasSecret && !m_clubLogApiKey.isEmpty();
+            ready = hasSecret;
             hint = !hasSecret      ? tr("no credentials: Setup \u2192 QSL services")
-                 : m_clubLogApiKey.isEmpty() ? tr("no API key: Setup \u2192 QSL services")
-                                             : QString();
+                 : QString();
         } else if (id == QLatin1String("wavelog")) {
             const bool hasServer = m_ctx.credentials && !m_ctx.credentials->account(credential).isEmpty();
             ready = hasSecret && hasServer && !m_wavelogStationId.isEmpty();
@@ -318,8 +481,123 @@ void QslController::setTqslPath(const QString& path)
     emit changed();
 }
 
+QString QslController::clubLogPendingState() const
+{
+    QSettings settings;
+    ClubLogUploadJournal journal(settings);
+    return journal.phase();
+}
+
+QVariantMap QslController::clubLogPendingInfo() const
+{
+    QSettings settings;
+    ClubLogUploadJournal journal(settings);
+    if (!journal.pending()) return {};
+    return {{QStringLiteral("phase"), journal.phase()}, {QStringLiteral("station"), journal.station()},
+            {QStringLiteral("uploadId"), journal.uploadId()}, {QStringLiteral("count"), journal.localIds().size()},
+            {QStringLiteral("currentLog"), m_ctx.db && journal.logIdentity() == m_ctx.db->path()}};
+}
+
+QVariantList QslController::clubLogOqrsRequests() const
+{
+    const QString current = m_ctx.stationCallsign ? m_ctx.stationCallsign().trimmed().toUpper() : QString();
+    return current == m_oqrsResultCall ? m_oqrsRequests : QVariantList{};
+}
+
+QString QslController::clubLogOqrsStatus() const
+{
+    const QString current = m_ctx.stationCallsign ? m_ctx.stationCallsign().trimmed().toUpper() : QString();
+    if (!m_oqrsBusy && !m_oqrsResultCall.isEmpty() && current != m_oqrsResultCall)
+        return tr("Station changed; refresh the OQRS requests");
+    return m_oqrsStatus;
+}
+
+void QslController::fetchClubLogOqrs()
+{
+    if (m_oqrsBusy) return;
+    m_oqrsCall = m_ctx.stationCallsign ? m_ctx.stationCallsign().trimmed().toUpper() : QString();
+    m_oqrsRequestGeneration = m_oqrsGeneration;
+    m_oqrsBusy = true;
+    m_oqrsStatus = tr("Reading direct OQRS requests from Club Log…");
+    emit changed();
+    readSecret(QStringLiteral("clublog"), [this, generation = m_oqrsRequestGeneration](const QString& token, const QString& error) {
+        if (generation != m_oqrsGeneration) {
+            m_oqrsBusy = false; m_oqrsStatus = tr("Club Log credential changed; try again"); emit changed(); return;
+        }
+        if (!token.startsWith(QLatin1String("cl_"))) {
+            m_oqrsBusy = false;
+            m_oqrsStatus = error.isEmpty() ? tr("A Club Log personal token is required for OQRS requests") : error;
+            emit changed(); return;
+        }
+        m_oqrs.fetch(m_oqrsCall, token);
+    });
+}
+
+void QslController::resumeClubLogPendingUpload()
+{
+    if (busy() || !m_ctx.db || !m_ctx.db->isOpen()) return;
+    QSettings settings;
+    ClubLogUploadJournal journal(settings);
+    if ((journal.phase() != QLatin1String("queued") && journal.phase() != QLatin1String("submitting")) || journal.logIdentity() != m_ctx.db->path()) {
+        note(tr("Club Log: no resumable upload for this logbook; review the pending checkpoint"), QStringLiteral("warning"));
+        emit changed();
+        return;
+    }
+    QList<qint64> ids;
+    QSet<qint64> unique;
+    for (const QString& text : journal.localIds()) {
+        bool ok = false;
+        const qint64 id = text.toLongLong(&ok);
+        if (!ok || id <= 0 || unique.contains(id)) {
+            note(tr("Club Log: invalid saved QSO list; reconciliation required"), QStringLiteral("warning"));
+            return;
+        }
+        unique.insert(id); ids.append(id);
+    }
+    const QByteArray document = m_ctx.db->exportAdif(ids, QCoreApplication::applicationVersion());
+    const QString hash = ClubLogUploadJournal::recordsFingerprint(document, static_cast<int>(ids.size()));
+    if (ids.isEmpty() || hash != journal.payloadSha256()) {
+        note(tr("Club Log: local QSO data changed; review the pending upload before resuming"), QStringLiteral("warning"));
+        return;
+    }
+    const QString uploadId = journal.uploadId();
+    const bool noUploadId = journal.phase() == QLatin1String("submitting");
+    m_clubLogJournalNonce = journal.nonce();
+    m_clubLogRestCall = journal.station();
+    m_batch = ids;
+    m_batchMode = true;
+    m_busyService = QStringLiteral("clublog");
+    m_clubLogRestJournalThisRun = true;
+    m_clubLogRestStage = QStringLiteral("polling");
+    readSecret(QStringLiteral("clublog"), [this, uploadId, noUploadId](const QString& secret, const QString&) {
+        if (m_clubLogRestStage != QLatin1String("polling")) return;
+        if (!secret.startsWith(QStringLiteral("cl_"))) {
+            QslUploadResult failed;
+            failed.requiresReconciliation = true;
+            failed.message = tr("Club Log: personal token required to resume the pending upload");
+            finishBatch(failed);
+            return;
+        }
+        m_secret = secret;
+        if (noUploadId) {
+            QslUploadResult pending;
+            pending.requiresReconciliation = true;
+            pending.message = tr("Club Log: upload outcome remains unknown");
+            reconcileClubLogPresence(pending);
+            return;
+        }
+        m_web.pollClubLogRestBatch(m_clubLogRestCall, m_secret, uploadId, static_cast<int>(m_batch.size()));
+    });
+    emit changed();
+}
+
 void QslController::setClubLogApiKey(const QString& key)
 {
+    if (key.trimmed().startsWith(QStringLiteral("cl_"))) {
+        note(tr("Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field"), QStringLiteral("warning"));
+        emit changed();
+        return;
+    }
     if (key.trimmed() == m_clubLogApiKey)
         return;
     m_clubLogApiKey = key.trimmed();
@@ -457,6 +735,13 @@ void QslController::uploadQso(qint64 id, const QString& service)
 {
     if (busy() || !m_ctx.db)
         return;
+    if (service == QLatin1String("clublog")) {
+        QSettings settings;
+        if (ClubLogUploadJournal(settings).reservedIds(m_ctx.db->path()).contains(QString::number(id))) {
+            note(tr("Club Log: this contact is already awaiting verification"), QStringLiteral("warning"));
+            return;
+        }
+    }
     m_busyService = service;
     m_batch = {id};
     startNext();
@@ -470,10 +755,13 @@ int QslController::uploadQsos(const QVariantList& ids, const QString& service)
     // gia' confermato non serve a nessuno e fa arrabbiare il servizio.
     const QList<qint64> pending = m_ctx.db->qsosToUpload(service, 0);
     const QSet<qint64> waiting(pending.cbegin(), pending.cend());
+    QSettings checkpointSettings;
+    const QSet<QString> reserved = service == QLatin1String("clublog")
+        ? ClubLogUploadJournal(checkpointSettings).reservedIds(m_ctx.db->path()) : QSet<QString>();
     QList<qint64> batch;
     for (const QVariant& value : ids) {
         const qint64 id = value.toLongLong();
-        if (waiting.contains(id) && !batch.contains(id))
+        if (waiting.contains(id) && !batch.contains(id) && !reserved.contains(QString::number(id)))
             batch << id;
     }
     if (batch.isEmpty()) {
@@ -496,7 +784,15 @@ void QslController::uploadPending(const QString& service, int limit)
         cap = limit > 0 ? qMin(limit, kLotwBatch) : kLotwBatch;
     else if (service == QLatin1String("clublog"))
         cap = limit > 0 ? qMin(limit, kClubLogBatch) : kClubLogBatch;
-    m_batch = m_ctx.db->qsosToUpload(service, cap, sinceFor(service));
+    m_batch = m_ctx.db->qsosToUpload(service, service == QLatin1String("clublog") ? 0 : cap, sinceFor(service));
+    if (service == QLatin1String("clublog")) {
+        QSettings settings;
+        const QSet<QString> reserved = ClubLogUploadJournal(settings).reservedIds(m_ctx.db->path());
+        m_batch.erase(std::remove_if(m_batch.begin(), m_batch.end(), [&reserved](qint64 id) {
+            return reserved.contains(QString::number(id));
+        }), m_batch.end());
+        if (cap > 0 && m_batch.size() > cap) m_batch = m_batch.mid(0, cap);
+    }
     m_deletions.clear();
     if (LogDatabase::editableServices().contains(service))
         m_deletions = m_ctx.db->remoteDeletions(service);
@@ -559,6 +855,33 @@ void QslController::startNext()
             finishBatch(failed);
             return;
         }
+        const QString activeCall = call.trimmed().toUpper();
+        int differentStation = 0;
+        m_batch.erase(std::remove_if(m_batch.begin(), m_batch.end(), [this, &activeCall, &differentStation](qint64 id) {
+            const auto record = m_ctx.db->record(id);
+            if (!record) { ++differentStation; return true; }
+            const QString recordCall = record->value(QStringLiteral("STATION_CALLSIGN")).trimmed().toUpper();
+            const auto meta = m_ctx.db->meta(id);
+            QString profileCall;
+            if (meta && meta->stationProfileId > 0) {
+                const auto profile = m_ctx.db->stationProfile(meta->stationProfileId);
+                if (!profile) { ++differentStation; return true; }
+                profileCall = profile->stationCallsign.trimmed().toUpper();
+            }
+            const bool mismatch = (!recordCall.isEmpty() && recordCall != activeCall)
+                || (!profileCall.isEmpty() && profileCall != activeCall);
+            if (mismatch) ++differentStation;
+            return mismatch;
+        }), m_batch.end());
+        if (differentStation > 0)
+            note(tr("Club Log: %n QSO belong to another station and remain pending", nullptr, differentStation), QStringLiteral("warning"));
+        if (m_batch.isEmpty()) {
+            QslUploadResult failed;
+            failed.requiresReconciliation = true;
+            failed.message = tr("Club Log: no pending contacts belong to the active station");
+            finishBatch(failed);
+            return;
+        }
         m_account = m_ctx.credentials ? m_ctx.credentials->account(QStringLiteral("clublog")) : QString();
         readSecret(QStringLiteral("clublog"), [this, call](const QString& secret, const QString& error) {
             if (secret.isEmpty()) {
@@ -573,8 +896,40 @@ void QslController::startNext()
             auth.callsign = call;
             auth.apiKey = m_clubLogApiKey;
             const QByteArray document = m_ctx.db->exportAdif(m_batch, QCoreApplication::applicationVersion());
+            if (secret.startsWith(QStringLiteral("cl_"))) {
+                QSettings settings;
+                ClubLogUploadJournal journal(settings);
+                QStringList ids;
+                for (qint64 id : std::as_const(m_batch)) ids.append(QString::number(id));
+                const QString hash = ClubLogUploadJournal::recordsFingerprint(document, static_cast<int>(ids.size()));
+                if (!journal.begin(m_ctx.db->path(), call, ids, hash)) {
+                    QslUploadResult failed;
+                    failed.requiresReconciliation = true;
+                    failed.message = tr("Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending");
+                    finishBatch(failed);
+                    return;
+                }
+                m_clubLogRestJournalThisRun = true;
+                m_clubLogJournalNonce = journal.nonce();
+            }
             note(tr("Club Log: sending %n QSO\u2026", nullptr, static_cast<int>(m_batch.size())), QStringLiteral("info"));
-            m_web.uploadClubLog(auth, document, static_cast<int>(m_batch.size()));
+            if (secret.startsWith(QStringLiteral("cl_")) && m_batch.size() > 1) {
+                m_secret = secret;
+                m_clubLogRestCall = call;
+                if (m_batch.size() <= 20) {
+                    m_clubLogRestStage = QStringLiteral("polling");
+                    m_web.submitClubLogRealtimeBatch(call, secret, document, int(m_batch.size()));
+                    return;
+                }
+                m_clubLogRestStage = QStringLiteral("submitting");
+                m_web.submitClubLogRestBatch(call, secret, document, [nonce = m_clubLogJournalNonce](const QString& uploadId) {
+                    QSettings settings;
+                    ClubLogUploadJournal journal(settings);
+                    return journal.queued(uploadId, nonce);
+                });
+            } else {
+                m_web.uploadClubLog(auth, document, static_cast<int>(m_batch.size()));
+            }
         });
         return;
     }
@@ -696,7 +1051,141 @@ void QslController::uploadNextWeb()
         m_web.uploadEqsl(m_account, m_secret, adif);
 }
 
-void QslController::markSent(qint64 id, const QString& service, const QslUploadResult& result)
+bool QslController::clubLogCheckpointMatches() const
+{
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return false;
+    QSettings settings;
+    ClubLogUploadJournal journal(settings);
+    QStringList ids;
+    for (qint64 id : m_batch) ids.append(QString::number(id));
+    return (journal.phase() == QLatin1String("queued") || journal.phase() == QLatin1String("submitting")) && journal.nonce() == m_clubLogJournalNonce
+        && journal.logIdentity() == m_ctx.db->path() && journal.station() == m_clubLogRestCall
+        && journal.localIds() == ids && !ids.isEmpty()
+        && journal.payloadSha256() == ClubLogUploadJournal::recordsFingerprint(
+            m_ctx.db->exportAdif(m_batch, QCoreApplication::applicationVersion()), int(ids.size()));
+}
+
+void QslController::reconcileClubLogPresence(const QslUploadResult& pending)
+{
+    if (!clubLogCheckpointMatches()) {
+        QslUploadResult unresolved = pending;
+        unresolved.message = tr("Club Log: local QSO data changed; review the pending upload before resuming");
+        finishBatch(unresolved);
+        return;
+    }
+    QList<QJsonObject> filters;
+    for (qint64 id : std::as_const(m_batch)) {
+        const auto row = m_ctx.db->record(id);
+        filters.append(row ? clubLogIdentityFilter(*row) : QJsonObject());
+    }
+    m_clubLogRestStage = QStringLiteral("presence");
+    m_web.resolveClubLogBatchIdentities(m_clubLogRestCall, m_secret, filters, {},
+        [this, pending](const QList<QString>& ids, const QString& error) {
+            if (m_clubLogRestStage != QLatin1String("presence")) return;
+            if (ids.size() == m_batch.size() && clubLogCheckpointMatches()) {
+                QHash<qint64, QString> identities;
+                QVariantList rows;
+                QList<qint64> remaining;
+                for (qsizetype i = 0; i < ids.size(); ++i) {
+                    if (ids.at(i).isEmpty()) { remaining.append(m_batch.at(i)); continue; }
+                    const auto record = m_ctx.db->record(m_batch.at(i));
+                    if (!record) { identities.clear(); break; }
+                    QString known = record->value(QStringLiteral("APP_CLUBLOG_QSOID")).trimmed();
+                    for (const QslState& state : m_ctx.db->qslStatus(m_batch.at(i))) {
+                        if (state.service != QLatin1String("clublog") || state.remoteId.isEmpty()) continue;
+                        if (!known.isEmpty() && known.toLongLong() != state.remoteId.toLongLong()) { known = QStringLiteral("invalid"); break; }
+                        known = state.remoteId;
+                    }
+                    if (!known.isEmpty() && known.toLongLong() != ids.at(i).toLongLong()) { identities.clear(); break; }
+                    identities.insert(m_batch.at(i), ids.at(i));
+                    rows.append(QVariantMap{{QStringLiteral("status"), QStringLiteral("duplicate")},
+                                            {QStringLiteral("qsoid"), ids.at(i)}});
+                }
+                if (identities.size() == m_batch.size() && reconcileClubLogBatch(identities, rows)) {
+                    note(tr("Club Log: every contact was found in the log; upload processing details are unavailable"), QStringLiteral("info"));
+                    QslUploadResult success; success.ok = true;
+                    m_batchMode = false;
+                    finishBatch(success);
+                    return;
+                }
+                if (!identities.isEmpty() && identities.size() + remaining.size() == m_batch.size() && !remaining.isEmpty()) {
+                    QStringList remainingIds;
+                    for (qint64 id : remaining) remainingIds.append(QString::number(id));
+                    const QString hash = ClubLogUploadJournal::recordsFingerprint(
+                        m_ctx.db->exportAdif(remaining, QCoreApplication::applicationVersion()), int(remaining.size()));
+                    QSettings settings;
+                    ClubLogUploadJournal journal(settings);
+                    const int oldDuplicates = m_duplicates;
+                    const bool saved = journal.reconcilePartial(m_clubLogJournalNonce, remainingIds, hash, [this, &identities] {
+                        QSqlDatabase db = m_ctx.db->connection();
+                        if (!db.transaction()) return false;
+                        bool ok = true;
+                        for (auto it = identities.cbegin(); it != identities.cend(); ++it) {
+                            QslUploadResult found; found.ok = true; found.duplicates = 1; found.remoteId = it.value();
+                            if (!markSent(it.key(), QStringLiteral("clublog"), found)) { ok = false; break; }
+                        }
+                        if (ok) ok = db.commit();
+                        if (!ok) db.rollback();
+                        return ok;
+                    });
+                    if (saved) {
+                        QslUploadResult unresolved = pending;
+                        unresolved.message = tr("Club Log: %1 contacts found; %2 still awaiting verification")
+                                                 .arg(identities.size()).arg(remaining.size());
+                        finishBatch(unresolved);
+                        return;
+                    }
+                    m_duplicates = oldDuplicates;
+                }
+            }
+            QslUploadResult unresolved = pending;
+            if (!error.isEmpty()) unresolved.message += QStringLiteral("; ") + error;
+            finishBatch(unresolved);
+        }, true);
+}
+
+bool QslController::reconcileClubLogBatch(const QHash<qint64, QString>& identities, const QVariantList& rows)
+{
+    const auto matched = matchClubLogBatchResults(identities, rows);
+    if (matched.size() != m_batch.size()) return false;
+    const int oldAccepted = m_accepted, oldDuplicates = m_duplicates, oldRejected = m_rejected;
+    QSettings settings;
+    ClubLogUploadJournal journal(settings);
+    const bool saved = journal.reconcileAndClear(m_clubLogJournalNonce, [this, &matched] {
+        QSqlDatabase db = m_ctx.db->connection();
+        if (!db.transaction()) return false;
+        bool committed = true;
+        for (qint64 id : std::as_const(m_batch)) {
+            const QVariantMap row = matched.value(id);
+            QslUploadResult individual;
+            individual.remoteId = row.value(QStringLiteral("qsoid")).toString();
+            const QString status = row.value(QStringLiteral("status")).toString().toLower();
+            if (status == QLatin1String("rejected")) {
+                individual.rejected = 1;
+                individual.message = row.value(QStringLiteral("message")).toString();
+                if (individual.message.isEmpty()) individual.message = tr("Club Log rejected this QSO");
+            } else if (status == QLatin1String("duplicate")) {
+                individual.ok = true;
+                individual.duplicates = 1;
+            } else {
+                individual.ok = true;
+                individual.accepted = 1;
+            }
+            if (!markSent(id, QStringLiteral("clublog"), individual)) { committed = false; break; }
+        }
+        if (committed) committed = db.commit();
+        if (!committed) db.rollback();
+        return committed;
+    });
+    if (!saved) {
+        m_accepted = oldAccepted; m_duplicates = oldDuplicates; m_rejected = oldRejected;
+    } else {
+        m_clubLogRestJournalThisRun = false;
+    }
+    return saved;
+}
+
+bool QslController::markSent(qint64 id, const QString& service, const QslUploadResult& result)
 {
     countsDirty();
     QslState state;
@@ -719,27 +1208,48 @@ void QslController::markSent(qint64 id, const QString& service, const QslUploadR
             state.rcvdDate = existing.rcvdDate;
         }
     }
-    m_ctx.db->setQslState(id, state);
+    if (!m_ctx.db->setQslState(id, state)) return false;
     m_accepted += result.accepted;
     m_duplicates += result.duplicates;
     m_rejected += result.rejected;
+    return true;
 }
 
 void QslController::finishBatch(const QslUploadResult& result)
 {
     countsDirty();
     const QString service = m_busyService;
+    bool clubLogStatePersisted = true;
+    if (service == QLatin1String("clublog") && !result.ok && m_auto.value(service)
+        && (!result.requiresReconciliation || result.httpStatus == 401 || result.httpStatus == 403 || result.httpStatus == 429)) {
+        setAutoUpload(service, false);
+        note(tr("Club Log automatic upload paused: review the result before retrying"), QStringLiteral("warning"));
+    }
+    if (service == QLatin1String("clublog") && m_rejected > 0 && m_auto.value(service)) {
+        setAutoUpload(service, false);
+        note(tr("Club Log automatic upload paused: correct the rejected contacts before retrying"), QStringLiteral("warning"));
+    }
     if (service == QLatin1String("lotw") && result.requiresReconciliation && m_auto.value(service)) {
         setAutoUpload(service, false);
         note(tr("LoTW automatic upload paused: check the batch in LoTW before retrying"), QStringLiteral("warning"));
     }
     if (m_batchMode) {
-        if (result.ok) {
+        if (result.ok && service == QLatin1String("clublog") && m_batch.size() == 1) {
+            if (m_clubLogRestJournalThisRun) {
+                QSettings settings;
+                ClubLogUploadJournal journal(settings);
+                clubLogStatePersisted = journal.reconcileAndClear(m_clubLogJournalNonce,
+                    [this, &service, &result] { return markSent(m_batch.first(), service, result); });
+                if (clubLogStatePersisted) m_clubLogRestJournalThisRun = false;
+            } else {
+                clubLogStatePersisted = markSent(m_batch.first(), service, result);
+            }
+        } else if (result.ok) {
             for (qint64 id : m_batch)
                 markSent(id, service, result.duplicates > 0 && result.accepted == 0
                                           ? [] { QslUploadResult r; r.ok = true; r.duplicates = 1; return r; }()
                                           : [] { QslUploadResult r; r.ok = true; r.accepted = 1; return r; }());
-        } else if (service != QLatin1String("lotw")) {
+        } else if (service != QLatin1String("lotw") && !result.requiresReconciliation) {
             for (qint64 id : m_batch) {
                 QslUploadResult failed = result;
                 failed.accepted = failed.duplicates = 0;
@@ -752,11 +1262,31 @@ void QslController::finishBatch(const QslUploadResult& result)
         }
     }
 
+    if (m_clubLogRestJournalThisRun) {
+        if (!result.requiresReconciliation && (!result.ok || clubLogStatePersisted)) {
+            QSettings settings;
+            ClubLogUploadJournal journal(settings);
+            if (!journal.clearAfterReconciliation(m_clubLogJournalNonce))
+                note(tr("Club Log: could not clear upload checkpoint; check before sending again"), QStringLiteral("warning"));
+        }
+        if (result.ok && !clubLogStatePersisted)
+            note(tr("Club Log: remote result received but local save failed; checkpoint retained for reconciliation"), QStringLiteral("warning"));
+        m_clubLogRestJournalThisRun = false;
+    }
+    m_clubLogRestStage.clear();
+    m_clubLogRestCall.clear();
+    m_clubLogJournalNonce.clear();
     m_secret.clear();
     m_credential.clear();
     m_batch.clear();
     m_busyService.clear();
     m_batchMode = false;
+    if (service == QLatin1String("clublog")) {
+        QSettings settings;
+        if (ClubLogUploadJournal(settings).pending()
+            && result.httpStatus != 401 && result.httpStatus != 403 && result.httpStatus != 429)
+            m_clubLogRecheck.start();
+    }
 
     QString summary = result.ok
         ? (service == QLatin1String("lotw")
@@ -780,6 +1310,11 @@ void QslController::finishBatch(const QslUploadResult& result)
 
 void QslController::cancel()
 {
+    // Do not clear a checkpoint: a submitted network request may have reached
+    // Club Log even if the user cancels the local operation.
+    m_clubLogRestJournalThisRun = false;
+    m_clubLogRestStage.clear();
+    m_clubLogRestCall.clear();
     m_tqsl.cancel();
     m_batch.clear();
     m_deletions.clear();

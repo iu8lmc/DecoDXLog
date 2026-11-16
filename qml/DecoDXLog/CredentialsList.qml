@@ -124,6 +124,7 @@ ColumnLayout {
 
     Popup {
         id: editor
+        objectName: "credentialsEditor"
 
         property string service: ""
         property var info: ({})
@@ -135,7 +136,8 @@ ColumnLayout {
             secretField.text = ""
             root.message = ""
             open()
-            accountField.forceActiveFocus()
+            if (info.id === "clublog") secretField.forceActiveFocus()
+            else accountField.forceActiveFocus()
         }
 
         parent: Overlay.overlay
@@ -164,16 +166,35 @@ ColumnLayout {
                     color: Theme.textSecondary
                     font.pixelSize: 12
                 }
+                Text {
+                    Layout.fillWidth: true
+                    visible: editor.service === "clublog"
+                    objectName: "clubLogStationHelp"
+                    wrapMode: Text.Wrap
+                    text: qsTr("REST token: email is not required. The log callsign comes from the active station profile: %1.")
+                              .arg(decolog.stationProfiles.activeProfile.stationCallsign || qsTr("not set"))
+                    color: Theme.textSecondary
+                    font.pixelSize: 12
+                }
+                Text {
+                    Layout.fillWidth: true
+                    visible: editor.service === "clublog"
+                    wrapMode: Text.Wrap
+                    text: qsTr("Check confirms the secret is in the system keystore; it does not test the Club Log connection.")
+                    color: Theme.textSecondary
+                    font.pixelSize: 11
+                }
                 LabeledField {
                     Layout.fillWidth: true
                     label: editor.info.accountLabel || ""
-                    StyledTextField { id: accountField; Layout.fillWidth: true }
+                    StyledTextField { id: accountField; objectName: "credentialAccount"; Layout.fillWidth: true }
                 }
                 LabeledField {
                     Layout.fillWidth: true
                     label: editor.info.secretLabel || ""
                     StyledTextField {
                         id: secretField
+                        objectName: "credentialSecret"
                         Layout.fillWidth: true
                         echoMode: TextInput.Password
                         placeholderText: editor.info.stored ? qsTr("stored — leave empty to keep it") : ""
@@ -199,10 +220,13 @@ ColumnLayout {
                     GlassButton { text: qsTr("Cancel"); onClicked: editor.close() }
                     GlassButton {
                         id: saveButton
+                        objectName: "credentialSave"
                         text: qsTr("Save")
                         tone: Theme.accentColor
                         filled: true
                         enabled: accountField.text.trim().length > 0
+                                 || (editor.service === "clublog"
+                                     && (secretField.text.trim().startsWith("cl_") || editor.info.stored))
                         onClicked: root.store.save(editor.service, accountField.text, secretField.text)
                     }
                 }

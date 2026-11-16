@@ -13,6 +13,7 @@
 
 #include <QDateTime>
 #include <QJsonObject>
+#include <QSet>
 #include <QObject>
 #include <QVariantList>
 #include <QString>
@@ -35,6 +36,8 @@ struct QslUploadResult {
     QString remoteId;       // QRZ: il numero del QSO nel logbook
     bool    retryLater{false};   // problema di rete o servizio giu': si riprova
     bool    requiresReconciliation{false}; // esito parziale: non ritentare automaticamente
+    int     httpStatus{0}; // HTTP response, when available
+    QVariantList clubLogBatchRecords; // raw finished records; never assumed to be in local order
 };
 
 class AdifRecord;
@@ -151,7 +154,7 @@ class WebQslUploader : public QObject {
     Q_OBJECT
 
 public:
-    enum class Service { QrzLogbook, Eqsl, ClubLog, Crx, HrdLog, Wavelog };
+    enum class Service { QrzLogbook, Eqsl, ClubLog, ClubLogRest, Crx, HrdLog, Wavelog };
 
     explicit WebQslUploader(QObject* parent = nullptr);
 
@@ -169,6 +172,22 @@ public:
     // Club Log prende tutto il blocco in una volta: un QSO solo passa da
     // realtime.php, il resto dal caricamento normale di un file ADIF.
     void uploadClubLog(const ClubLogAuth& auth, const QByteArray& adifDocument, int qsoCount);
+    void setClubLogRestEndpoint(const QUrl& url) { m_clubLogRestUrl = url; }
+    void setClubLogRestBatchBaseUrl(const QUrl& url) { m_clubLogRestBatchBaseUrl = url; }
+    // Submit only: a queued response is never reported as completed. The
+    // checkpoint callback must synchronously persist the upload identifier.
+    void submitClubLogRestBatch(const QString& callsign, const QString& token,
+                                const QByteArray& adifDocument,
+                                std::function<bool(const QString&)> checkpoint);
+    void submitClubLogRealtimeBatch(const QString& callsign, const QString& token,
+                                    const QByteArray& adifDocument, int expectedCount);
+    void pollClubLogRestBatch(const QString& callsign, const QString& token,
+                              const QString& uploadId, int expectedCount);
+    void resolveClubLogBatchIdentities(const QString& callsign, const QString& token,
+                                       const QList<QJsonObject>& filters, const QSet<qint64>& expectedIds,
+                                       std::function<void(const QList<QString>&, const QString&)> done,
+                                       bool resolvePresence = false);
+    void setClubLogRestPollIntervalForTest(int milliseconds) { m_clubLogRestPollIntervalMs = qMax(0, milliseconds); }
     // CRX Logbook: la chiave API dell'operatore e il QSO gia' tradotto.
     void uploadCrx(const QString& apiKey, const QJsonObject& qsoData);
     // Toglie un QSO da CRX: edit_myqso con action "delete", come fa HAMPI.
@@ -193,6 +212,9 @@ private:
     QNetworkAccessManager* m_net;
     QUrl m_qrzUrl{QStringLiteral("https://logbook.qrz.com/api")};
     QUrl m_eqslUrl{QStringLiteral("https://www.eqsl.cc/qslcard/importADIF.cfm")};
+    int m_clubLogRestPollIntervalMs{3000};
+    QUrl m_clubLogRestBatchBaseUrl{QStringLiteral("https://clublog.org/api/v1/")};
+    QUrl m_clubLogRestUrl{QStringLiteral("https://clublog.org/api/v1/qso")};
     QUrl m_clubLogRealtimeUrl{QStringLiteral("https://clublog.org/realtime.php")};
     QUrl m_clubLogBatchUrl{QStringLiteral("https://clublog.org/putlogs.php")};
     QUrl m_crxUrl{QStringLiteral("https://s.crx.cloud/api/")};

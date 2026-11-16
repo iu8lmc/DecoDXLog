@@ -852,6 +852,10 @@ int main(int argc, char* argv[])
     qmlRegisterType<decolog::app::WorldMapItem>("DecoDXLog.Native", 1, 0, "WorldMapItem");
     qmlRegisterType<decolog::app::WindowMirror>("DecoDXLog.Native", 1, 0, "WindowMirror");
     engine.rootContext()->setContextProperty(QStringLiteral("mapUsesSafeRenderer"), useSafeMapRenderer);
+    // Qt Quick's CPU renderer cannot render MultiEffect layers. Detached
+    // windows must use an opaque surface and draw their content directly.
+    engine.rootContext()->setContextProperty(QStringLiteral("qtQuickSoftwareRenderer"),
+                                             qgetenv("QT_QUICK_BACKEND").trimmed().toLower() == "software");
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
     engine.rootContext()->setContextProperty(QStringLiteral("startupShow"), parser.value(showOption));
