@@ -339,7 +339,7 @@ DialogFrame {
                     Note {
                         text: decolog.clublogCty.status.length ? decolog.clublogCty.status
                               : !decolog.clublogCty.hasKey
-                                ? qsTr("With the Club Log API key (QSL services) DecoDXLog downloads Club Log's cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.")
+                                ? qsTr("With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log's cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.")
                                 : qsTr("Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today's cty.csv — the one written by LoTW or by you stays.")
                     }
                     SectionTitle { text: qsTr("Language") }
@@ -1566,21 +1566,65 @@ DialogFrame {
                     RowLayout {
                         spacing: 12
                         LabeledField {
-                            label: qsTr("API key")
+                            label: qsTr("Legacy API key")
                             StyledTextField {
                                 Layout.preferredWidth: 280
                                 mono: false
                                 text: decolog.qsl.clubLogApiKey
                                 placeholderText: qsTr("the key Club Log gave you")
-                                onEditingFinished: decolog.qsl.clubLogApiKey = text
+                                onEditingFinished: { decolog.qsl.clubLogApiKey = text; text = decolog.qsl.clubLogApiKey }
                             }
                         }
                     }
                     Note {
-                        text: qsTr("Club Log wants three things: the email and password of the account (below), the callsign of the "
-                                   + "station profile, and an API key. The key is free and personal, and is asked for at "
-                                   + "clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as "
-                                   + "it is logged, a backlog leaves as one ADIF file.")
+                        text: qsTr("Club Log: enter your personal REST token in the Club Log credential below. "
+                                   + "For the legacy API, enter your account email, application password and API key. "
+                                   + "REST file uploads are queued and must be reconciled before they are marked as sent.")
+                    }
+                    Note {
+                        visible: decolog.qsl.clubLogPendingState !== ""
+                        text: decolog.qsl.clubLogPendingState === "queued"
+                              ? qsTr("Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.")
+                                    .arg(decolog.qsl.clubLogPendingInfo.uploadId || "—")
+                                    .arg(decolog.qsl.clubLogPendingInfo.station || "—")
+                                    .arg(decolog.qsl.clubLogPendingInfo.count || 0)
+                              : qsTr("A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.")
+                    }
+                    GlassButton {
+                        visible: decolog.qsl.clubLogPendingState !== ""
+                        enabled: !decolog.qsl.busy
+                        text: qsTr("Resume Club Log upload status")
+                        onClicked: decolog.qsl.resumeClubLogPendingUpload()
+                    }
+                    GlassButton {
+                        visible: decolog.qsl.clubLogPendingState !== ""
+                        text: qsTr("View Club Log upload history")
+                        onClicked: Qt.openUrlExternally("https://clublog.org/viewqueue.php")
+                    }
+                    GlassButton {
+                        enabled: !decolog.qsl.clubLogOqrsBusy
+                        text: decolog.qsl.clubLogOqrsBusy ? qsTr("Reading OQRS requests…") : qsTr("Read direct OQRS requests")
+                        onClicked: decolog.qsl.fetchClubLogOqrs()
+                    }
+                    Note {
+                        text: decolog.qsl.clubLogOqrsStatus.length ? decolog.qsl.clubLogOqrsStatus
+                              : qsTr("Direct OQRS requests for the active station. These requests are not received QSL confirmations.")
+                    }
+                    ListView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(240, count * 28)
+                        visible: count > 0
+                        clip: true
+                        model: decolog.qsl.clubLogOqrsRequests
+                        delegate: Text {
+                            required property var modelData
+                            width: ListView.view.width
+                            height: 28
+                            color: Theme.textPrimary
+                            elide: Text.ElideRight
+                            text: "%1  ·  %2  ·  %3  ·  %4".arg(modelData.dxcall || "—")
+                                  .arg(modelData.qsodate || "—").arg(modelData.band || "—").arg(modelData.mode || "—")
+                        }
                     }
                     // ── CRX Logbook (crx.cloud) ─────────────────────────────
                     SectionTitle { text: "CRX Logbook" }

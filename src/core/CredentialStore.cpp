@@ -47,7 +47,7 @@ QList<CredentialService> CredentialStore::knownServices()
          tr("Upload and confirmations of the QRZ Logbook")},
         {QStringLiteral("lotw"), QStringLiteral("LoTW"), tr("Username"), tr("Password"),
          tr("Downloading confirmations; upload goes through the local TQSL")},
-        {QStringLiteral("clublog"), QStringLiteral("Club Log"), tr("Email"), tr("App password"),
+        {QStringLiteral("clublog"), QStringLiteral("Club Log"), tr("Email (legacy)"), tr("Personal token or app password"),
          tr("Real-time upload and OQRS")},
         {QStringLiteral("eqsl"), QStringLiteral("eQSL"), tr("Username"), tr("Password"),
          tr("Upload and eQSL confirmations")},
@@ -82,7 +82,9 @@ QString CredentialStore::account(const QString& service) const
 
 bool CredentialStore::hasSecret(const QString& service) const
 {
-    return QSettings().value(settingsKey(service, "stored"), false).toBool();
+    QSettings settings;
+    return settings.value(settingsKey(service, "stored"), false).toBool()
+        && !settings.value(settingsKey(service, "replacementPending"), false).toBool();
 }
 
 QStringList CredentialStore::profileServiceBases()
@@ -168,6 +170,10 @@ void CredentialStore::setBusy(const QString& service, bool busy)
 
 void CredentialStore::save(const QString& service, const QString& accountName, const QString& secret)
 {
+    if (service == QLatin1String("clublog") && m_busy.value(service, false)) {
+        emit finished(service, false, tr("A Club Log credential operation is already in progress"));
+        return;
+    }
     QSettings().setValue(settingsKey(service, "account"), accountName.trimmed());
     if (secret.isEmpty()) {
         setError(service, {});
@@ -176,22 +182,49 @@ void CredentialStore::save(const QString& service, const QString& accountName, c
         return;
     }
 
+    if (service == QLatin1String("clublog")) {
+        // A failed replacement must not silently reactivate an older token.
+        m_secretCache.remove(service);
+        ++m_secretGeneration[service];
+        QSettings settings;
+        settings.setValue(settingsKey(service, "replacementPending"), true);
+        settings.sync();
+        if (settings.status() != QSettings::NoError) {
+            setError(service, tr("Cannot save the credential replacement checkpoint"));
+            emit changed();
+            emit finished(service, false, m_errors.value(service));
+            return;
+        }
+    }
 #ifdef DECODXLOG_HAVE_KEYCHAIN
     auto* job = new QKeychain::WritePasswordJob(m_keychainService, this);
     job->setAutoDelete(true);
+    job->setInsecureFallback(false);
     job->setKey(service);
     job->setTextData(secret);
     connect(job, &QKeychain::Job::finished, this, [this, service, secret](QKeychain::Job* j) {
-        const bool ok = j->error() == QKeychain::NoError;
+        bool ok = j->error() == QKeychain::NoError;
+        QString error = j->errorString();
+        if (!secret.isEmpty()) error.replace(secret, QStringLiteral("[redacted]"), Qt::CaseInsensitive);
         if (ok) {
-            QSettings().setValue(settingsKey(service, "stored"), true);
+            QSettings settings;
+            settings.setValue(settingsKey(service, "stored"), true);
+            if (service == QLatin1String("clublog"))
+                settings.remove(settingsKey(service, "replacementPending"));
+            settings.sync();
+            if (settings.status() != QSettings::NoError) {
+                ok = false;
+                error = tr("Cannot save the credential state");
+            }
+        }
+        if (ok) {
             m_secretCache.insert(service, secret);
         } else {
             m_secretCache.remove(service);
         }
-        setError(service, ok ? QString() : j->errorString());
+        setError(service, ok ? QString() : error);
         setBusy(service, false);
-        emit finished(service, ok, ok ? tr("Stored in the system keystore") : j->errorString());
+        emit finished(service, ok, ok ? tr("Stored in the system keystore") : error);
     });
     setBusy(service, true);
     job->start();
@@ -204,10 +237,28 @@ void CredentialStore::save(const QString& service, const QString& accountName, c
 
 void CredentialStore::remove(const QString& service)
 {
+    if (service == QLatin1String("clublog") && m_busy.value(service, false)) {
+        emit finished(service, false, tr("A Club Log credential operation is already in progress"));
+        return;
+    }
     m_secretCache.remove(service);
+    ++m_secretGeneration[service];
 
     QSettings s;
-    s.remove(QStringLiteral("credentials/%1").arg(service));
+    if (service == QLatin1String("clublog")) {
+        // Do not reactivate a token if the keystore deletion fails or the
+        // process exits before its asynchronous completion.
+        s.setValue(settingsKey(service, "replacementPending"), true);
+        s.sync();
+        if (s.status() != QSettings::NoError) {
+            setError(service, tr("Cannot save the credential replacement checkpoint"));
+            emit changed();
+            emit finished(service, false, m_errors.value(service));
+            return;
+        }
+    } else {
+        s.remove(QStringLiteral("credentials/%1").arg(service));
+    }
 
 #ifdef DECODXLOG_HAVE_KEYCHAIN
     auto* job = new QKeychain::DeletePasswordJob(m_keychainService, this);
@@ -215,14 +266,30 @@ void CredentialStore::remove(const QString& service)
     job->setKey(service);
     connect(job, &QKeychain::Job::finished, this, [this, service](QKeychain::Job* j) {
         // Un segreto che non c'era gia' e' comunque tolto.
-        const bool ok = j->error() == QKeychain::NoError || j->error() == QKeychain::EntryNotFound;
-        setError(service, ok ? QString() : j->errorString());
+        bool ok = j->error() == QKeychain::NoError || j->error() == QKeychain::EntryNotFound;
+        QString error = j->errorString();
+        if (ok && service == QLatin1String("clublog")) {
+            QSettings settings;
+            settings.remove(QStringLiteral("credentials/%1").arg(service));
+            settings.sync();
+            if (settings.status() != QSettings::NoError) {
+                ok = false;
+                error = tr("Cannot save the credential state");
+            }
+        }
+        setError(service, ok ? QString() : error);
         setBusy(service, false);
-        emit finished(service, ok, ok ? tr("Removed") : j->errorString());
+        emit finished(service, ok, ok ? tr("Removed") : error);
     });
     setBusy(service, true);
     job->start();
 #else
+    if (service == QLatin1String("clublog")) {
+        setError(service, tr("No system keystore in this build: the secret could not be removed"));
+        emit changed();
+        emit finished(service, false, m_errors.value(service));
+        return;
+    }
     setError(service, {});
     emit changed();
     emit finished(service, true, tr("Removed"));
@@ -232,6 +299,14 @@ void CredentialStore::remove(const QString& service)
 void CredentialStore::readSecret(const QString& service,
                                  std::function<void(const QString&, const QString&)> done)
 {
+    if (QSettings().value(settingsKey(service, "replacementPending"), false).toBool()) {
+        done({}, tr("Credential replacement was not completed; save it again"));
+        return;
+    }
+    if (service == QLatin1String("clublog") && !hasSecret(service)) {
+        done({}, tr("No Club Log credential is stored"));
+        return;
+    }
     if (m_secretCache.contains(service)) {
         done(m_secretCache.value(service), {});
         return;
@@ -240,8 +315,16 @@ void CredentialStore::readSecret(const QString& service,
 #ifdef DECODXLOG_HAVE_KEYCHAIN
     auto* job = new QKeychain::ReadPasswordJob(m_keychainService, this);
     job->setAutoDelete(true);
+    job->setInsecureFallback(false);
     job->setKey(service);
-    connect(job, &QKeychain::Job::finished, this, [this, job, service, done](QKeychain::Job* j) {
+    const quint64 generation = m_secretGeneration.value(service);
+    connect(job, &QKeychain::Job::finished, this, [this, job, service, done, generation](QKeychain::Job* j) {
+        if (generation != m_secretGeneration.value(service)
+            || QSettings().value(settingsKey(service, "replacementPending"), false).toBool()) {
+            m_secretCache.remove(service);
+            done({}, tr("Credential replacement was not completed; save it again"));
+            return;
+        }
         if (j->error() == QKeychain::NoError) {
             const QString secret = job->textData();
             if (!secret.isEmpty())

@@ -5,6 +5,8 @@
 #include "core/Performance.h"
 #include "core/CloudSettings.h"
 #include "core/QslUpload.h"
+#include "core/ClubLogCtyRequest.h"
+#include "core/ClubLogAccessGuard.h"
 #include "core/LogMigration.h"
 #include "../StartupTrace.h"
 
@@ -470,6 +472,8 @@ DecoLogController::DecoLogController(QObject* parent)
                 // La password del collegamento con HH: la sessione si riapre con la nuova chiave.
                 if (service == QLatin1String("hamhub"))
                     startHamHubLink();
+                if (service == QLatin1String("clublog"))
+                    emit ctyChanged();
                 // Credenziali cambiate: la sessione del callbook va rifatta.
                 if (service == QLatin1String("qrz") || service == QLatin1String("hamqth")) {
                     m_callbook.reset();
@@ -922,6 +926,8 @@ bool DecoLogController::openDatabase(const QString& path)
         emit logChanged();
     };
     m_qsl = new QslController(std::move(qslCtx), this);
+    connect(m_qsl, &QslController::changed, this, &DecoLogController::ctyChanged);
+    connect(m_profiles, &StationProfileModel::activeChanged, m_qsl, &QslController::refresh);
     // I conti della pagina QSL si rifanno quando cambia il log, su un altro filo.
     connect(this, &DecoLogController::logChanged, m_qsl, &QslController::countsDirty);
 
@@ -2200,7 +2206,8 @@ QVariantMap DecoLogController::clublogCty() const
         {QStringLiteral("entities"), m_ctyXml.entityCount()},
         {QStringLiteral("status"), m_ctyXmlStatus},
         {QStringLiteral("busy"), m_ctyXmlBusy},
-        {QStringLiteral("hasKey"), m_qsl && !m_qsl->clubLogApiKey().isEmpty()},
+        {QStringLiteral("hasKey"), (m_qsl && !m_qsl->clubLogApiKey().isEmpty())
+                                  || (m_credentials && m_credentials->hasSecret(QStringLiteral("clublog")))},
         {QStringLiteral("age"), file.exists() ? int(file.lastModified().daysTo(QDateTime::currentDateTime())) : -1},
     };
 }
@@ -2210,27 +2217,46 @@ void DecoLogController::updateClubLogCty()
     if (m_ctyXmlBusy)
         return;
     const QString key = m_qsl ? m_qsl->clubLogApiKey() : QString();
-    if (key.isEmpty()) {
-        m_ctyXmlStatus = tr("The Club Log API key is needed (Setup → QSL services → Club Log)");
+    const bool hasCredential = m_credentials && m_credentials->hasSecret(QStringLiteral("clublog"));
+    if (key.isEmpty() && !hasCredential) {
+        m_ctyXmlStatus = tr("A Club Log personal token or legacy API key is needed (Setup → QSL services)");
         emit ctyChanged();
         return;
     }
     m_ctyXmlBusy = true;
     m_ctyXmlStatus = tr("Downloading cty.xml from Club Log…");
     emit ctyChanged();
+    const auto download = [this, key](const QString& credential) {
+    const bool personalToken = credential.startsWith(QLatin1String("cl_"));
+    if (personalToken) {
+        const QString restriction = ClubLogAccessGuard::restriction(credential);
+        if (!restriction.isEmpty()) {
+            m_ctyXmlBusy = false; m_ctyXmlStatus = restriction; emit ctyChanged(); return;
+        }
+    }
+    QNetworkRequest request = clubLogCtyRequest(credential, key);
+    if (request.url().isEmpty()) {
+        m_ctyXmlBusy = false;
+        m_ctyXmlStatus = tr("A Club Log personal token or legacy API key is needed (Setup → QSL services)");
+        emit ctyChanged();
+        return;
+    }
     auto* net = new QNetworkAccessManager(this);
-    QNetworkRequest request(QUrl(QStringLiteral("https://cdn.clublog.org/cty.php?api=") + key));
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("DecoDXLog/%1").arg(QCoreApplication::applicationVersion()));
     request.setTransferTimeout(120'000);
     QNetworkReply* reply = net->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, net, key] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, net, key, credential, personalToken] {
+        if (personalToken)
+            ClubLogAccessGuard::record(credential, reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(),
+                                       reply->rawHeader("Retry-After"));
         reply->deleteLater();
         net->deleteLater();
         m_ctyXmlBusy = false;
         QByteArray data = reply->readAll();
         if (reply->error() != QNetworkReply::NoError) {
-            m_ctyXmlStatus = tr("Club Log: %1").arg(qsl::withoutKey(network::safeErrorString(reply), key));
+            m_ctyXmlStatus = tr("Club Log: %1").arg(ClubLogAccessGuard::redact(
+                qsl::withoutKey(network::safeErrorString(reply), key), credential));
             emit ctyChanged();
             return;
         }
@@ -2244,10 +2270,11 @@ void DecoLogController::updateClubLogCty()
             return;
         }
         QDir().mkpath(QFileInfo(clublogCtyPath()).absolutePath());
-        QFile out(clublogCtyPath());
-        if (out.open(QIODevice::WriteOnly)) {
-            out.write(data);
-            out.close();
+        QSaveFile out(clublogCtyPath());
+        if (!out.open(QIODevice::WriteOnly) || out.write(data) != data.size() || !out.commit()) {
+            m_ctyXmlStatus = tr("Club Log: could not save cty.xml; the existing file was preserved");
+            emit ctyChanged();
+            return;
         }
         m_ctyXml = cty;
         m_ctyXmlStatus = tr("cty.xml of %1: %2 entities").arg(dates::show(cty.date().date().toString(Qt::ISODate))).arg(cty.entityCount());
@@ -2256,6 +2283,20 @@ void DecoLogController::updateClubLogCty()
         emit awardsChanged();
         emit ctyChanged();
     });
+    };
+    if (hasCredential) {
+        m_credentials->readSecret(QStringLiteral("clublog"), [this, download, key](const QString& secret, const QString& error) {
+            if (secret.isEmpty() && key.isEmpty()) {
+                m_ctyXmlBusy = false;
+                m_ctyXmlStatus = tr("Club Log credential unavailable: %1").arg(error);
+                emit ctyChanged();
+                return;
+            }
+            download(secret);
+        });
+    } else {
+        download({});
+    }
 }
 
 void DecoLogController::checkEntitiesByDate()

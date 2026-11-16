@@ -2709,6 +2709,14 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 <context>
     <name>CredentialsList</name>
     <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>Controlla verifica la presenza della credenziale nel portachiavi di sistema; non verifica la connessione a Club Log.</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>Token REST: l’email non è necessaria. Il nominativo del log proviene dal profilo di stazione attivo: %1.</translation>
+    </message>
+    <message>
         <source>…</source>
         <translation>…</translation>
     </message>
@@ -7322,6 +7330,46 @@ Campi extra conservati: %8</translation>
 <context>
     <name>SetupDialog</name>
     <message>
+        <source>Legacy API key</source>
+        <translation>Chiave API precedente</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log: inserisci il token REST personale nelle credenziali Club Log qui sotto. Per l’API precedente inserisci email dell’account, password per applicazioni e chiave API. I file REST vengono messi in coda e verificati prima di segnare i QSO come inviati.</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>L’invio %1 per %2 (%3 contatti) è in attesa di verifica. Se lo stato dell’invio non è disponibile, DecoDXLog controlla se ogni contatto è presente nel tuo log Club Log.</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>Un invio a Club Log ha un esito sconosciuto. I suoi contatti restano in attesa di verifica; gli altri possono essere inviati.</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>Riprendi verifica invio Club Log</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>Apri cronologia invii Club Log</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>Lettura richieste OQRS…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>Leggi richieste OQRS dirette</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>Richieste OQRS dirette per la stazione attiva. Queste richieste non sono conferme QSL ricevute.</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log's cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>Con un token personale Club Log o una chiave API precedente (Servizi QSL), DecoDXLog scarica ogni settimana il file cty.xml di Club Log: le entità con le rispettive date, le operazioni non accettate dall’ARRL e le entità cancellate.</translation>
+    </message>
+    <message>
         <source>Callsign lists</source>
         <translation>Elenchi nominativi</translation>
     </message>
@@ -10738,6 +10786,18 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::app::DecoLogController</name>
     <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>Serve un token personale Club Log o una chiave API precedente (Impostazioni → Servizi QSL)</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log: impossibile salvare cty.xml; il file precedente è stato conservato</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>Credenziale Club Log non disponibile: %1</translation>
+    </message>
+    <message>
         <source>Digital</source>
         <translation>Digitale</translation>
     </message>
@@ -12132,6 +12192,105 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::app::QslController</name>
     <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log: %1 contatti trovati; %2 ancora in attesa di verifica</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log: questo contatto è già in attesa di verifica</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log: l’esito dell’invio rimane sconosciuto</translation>
+    </message>
+    <message>
+        <source>Club Log legacy: multiple contacts are waiting; use one manual ADIF upload before resuming automatic uploads</source>
+        <translation>Club Log legacy: ci sono più contatti in attesa; esegui un unico invio ADIF manuale prima di riattivare gli invii automatici</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log: tutti i contatti sono presenti nel log; i dettagli dell’elaborazione non sono disponibili</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>Credenziali cambiate; aggiorna le richieste OQRS</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>Account Club Log o stazione cambiati; aggiorna le richieste OQRS</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>Stazione cambiata; aggiorna le richieste OQRS</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>Lettura delle richieste OQRS dirette da Club Log…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>Credenziale Club Log cambiata; riprova</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>Per le richieste OQRS serve un token personale Club Log</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log: nessun invio riprendibile per questo log; controlla il riferimento in sospeso</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log: elenco dei QSO salvato non valido; è necessaria una verifica</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log: i dati QSO locali sono cambiati; controlla l’invio in sospeso prima di riprendere</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log: per riprendere l’invio in sospeso serve il token personale</translation>
+    </message>
+    <message>
+        <source>Club Log: an earlier upload needs reconciliation before another can be sent</source>
+        <translation>Club Log: occorre verificare un invio precedente prima di inviarne un altro</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log: un invio non è risolto oppure non è stato possibile salvare il riferimento; controlla prima di inviare</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>Club Log ha rifiutato questo QSO</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>Invio automatico Club Log sospeso: controlla il risultato prima di riprovare</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>Invio automatico Club Log sospeso: correggi i contatti rifiutati prima di riprovare</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log: impossibile rimuovere il riferimento dell’invio; controlla prima di inviare di nuovo</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log: risultato remoto ricevuto, ma salvataggio locale non riuscito; il riferimento è conservato per la verifica</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>I token personali Club Log vanno salvati nel campo credenziali protetto, non nel campo della vecchia chiave API</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>%n richiesta OQRS diretta; non è una conferma QSL</numerusform>
+            <numerusform>%n richieste OQRS dirette; non sono conferme QSL</numerusform>
+        </translation>
+    </message>
+    <message>
         <source>LoTW automatic upload paused: check the batch in LoTW before retrying</source>
         <translation>Invio automatico LoTW sospeso: verifica il blocco su LoTW prima di riprovare</translation>
     </message>
@@ -13185,6 +13344,38 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::core::CredentialStore</name>
     <message>
+        <source>Email (legacy)</source>
+        <translation>Email (API precedente)</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>Token personale o password per app</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>Un’operazione sulle credenziali Club Log è già in corso</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>La sostituzione della credenziale non è stata completata; salvala di nuovo</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>Impossibile salvare il riferimento della sostituzione della credenziale</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>Impossibile salvare lo stato della credenziale</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>Nessuna credenziale Club Log è salvata</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>Il portachiavi di sistema non è disponibile in questa versione: impossibile rimuovere la credenziale</translation>
+    </message>
+    <message>
         <source>not available in this build</source>
         <translation>non disponibile in questa build</translation>
     </message>
@@ -13629,6 +13820,78 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::core::WebQslUploader</name>
     <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log: invio in coda; occorre attendere l’elaborazione e verificare i singoli risultati</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log: invio in coda, ma impossibile salvare il suo identificativo; verifica manualmente</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log: raggiunto il limite di verifiche; riprendi il controllo più tardi</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log: invio ancora in coda; riprendi il controllo più tardi</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log: stato HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log: lo stato finale non contiene i risultati dei contatti</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log: risultati dei contatti non validi o troppo numerosi</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log: cursore dei risultati non valido</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log: cursore dei risultati ripetuto</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log: risultati individuali incompleti; è necessaria una verifica</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log: %1 creati o aggiornati, %2 duplicati, %3 rifiutati, %4 sconosciuti; è necessaria la verifica individuale</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log: l’identità del contatto non è univoca</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log: ricerca delle identità non riuscita (HTTP %1); verifica ancora in sospeso</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log: ricerca delle identità incompleta</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log: ricerca delle identità ambigua</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log: identità dei contatti incomplete</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log: più contatti locali hanno la stessa identità</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log: impossibile identificare i contatti del gruppo</translation>
+    </message>
+    <message>
         <source>Wavelog: write the address of your Wavelog (Setup → QSL services)</source>
         <translation>Wavelog: scrivi l&apos;indirizzo del tuo Wavelog (Impostazioni → Servizi QSL)</translation>
     </message>
@@ -13639,6 +13902,40 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: servono email, password, nominativo e chiave API</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>Servono il nominativo della stazione e un token personale Club Log</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Richiesta OQRS Club Log non riuscita (HTTP %1); risultati precedenti conservati</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS ha restituito un record non valido; risultati precedenti conservati</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS ha restituito un cursore non valido; risultati precedenti conservati</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Paginazione OQRS Club Log non riuscita; risultati precedenti conservati</translation>
+    </message>
+</context>
+<context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log ha rifiutato questo contatto; il motivo individuale non è noto. Motivi del gruppo: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log ha rifiutato questo contatto</translation>
     </message>
 </context>
 </TS>

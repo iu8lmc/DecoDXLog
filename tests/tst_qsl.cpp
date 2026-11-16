@@ -1,6 +1,11 @@
 // Invio QSL: codici d'uscita di TQSL, risposte di QRZ Logbook ed eQSL, coda e
 // stato per servizio nel database.
 #include "core/Adif.h"
+#include "core/ClubLogAccessGuard.h"
+#include "core/ClubLogBatchReconcile.h"
+#include "core/ClubLogOqrsClient.h"
+#include "core/ClubLogUploadJournal.h"
+#include "core/ClubLogRestBatchProtocol.h"
 #include "core/LogDatabase.h"
 #include "core/QslUpload.h"
 
@@ -18,6 +23,17 @@
 using namespace decolog::core;
 
 namespace {
+
+bool hasBearerAuthorization(const QByteArray& request, const QByteArray& token)
+{
+    const QByteArray headers = request.left(request.indexOf("\r\n\r\n"));
+    for (const QByteArray& line : headers.split('\n')) {
+        const int colon = line.indexOf(':');
+        if (colon > 0 && line.left(colon).trimmed().toLower() == "authorization")
+            return line.mid(colon + 1).trimmed() == "Bearer " + token;
+    }
+    return false;
+}
 
 // Un CRX finto: risponde sempre con `answer`, e si tiene la richiesta.
 class FakeCrx : public QTcpServer {
@@ -53,12 +69,277 @@ public:
     QUrl url() const { return QUrl(QStringLiteral("http://127.0.0.1:%1/api/").arg(serverPort())); }
 };
 
+class FakeClubLogPoll : public QTcpServer {
+public:
+    int status {200};
+    QList<QByteArray> answers;
+    QList<QByteArray> requests;
+    FakeClubLogPoll()
+    {
+        connect(this, &QTcpServer::newConnection, this, [this] {
+            QTcpSocket* socket = nextPendingConnection();
+            auto buffer = std::make_shared<QByteArray>();
+            connect(socket, &QTcpSocket::readyRead, socket, [this, socket, buffer] {
+                *buffer += socket->readAll();
+                if (!buffer->contains("\r\n\r\n")) return;
+                requests.append(*buffer);
+                const QByteArray answer = answers.isEmpty() ? QByteArray("{}") : answers.takeFirst();
+                socket->write("HTTP/1.1 " + QByteArray::number(status) + " X\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: "
+                              + QByteArray::number(answer.size()) + "\r\n\r\n" + answer);
+                socket->disconnectFromHost();
+            });
+        });
+    }
+    QUrl url() const { return QUrl(QStringLiteral("http://127.0.0.1:%1/api/").arg(serverPort())); }
+};
+
 } // namespace
 
 class TestQsl : public QObject {
     Q_OBJECT
-
+    QTemporaryDir m_settingsDir;
 private slots:
+    void initTestCase() {
+        QVERIFY(m_settingsDir.isValid());
+        QCoreApplication::setOrganizationName(QStringLiteral("DecoDXLogTests"));
+        QCoreApplication::setApplicationName(QStringLiteral("QslCoreTest"));
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settingsDir.path());
+    }
+    void init() { QSettings().clear(); }
+
+    void clubLogOqrsPaginatesDirectRequestsWithoutConfirmingQsos()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answers = {R"({"matches":[{"dxcall":"K1AAA","band":"20","mode":"FT8","qsodate":"2026-01-01T10:00:00Z","note":"cl_fixture"}],"next_cursor":"page2"})",
+                          R"({"matches":[{"dxcall":"K1BBB","band":"40","mode":"CW","qsodate":"2026-01-02T10:00:00Z"}],"next_cursor":null})"};
+        ClubLogOqrsClient client;
+        client.setBaseUrl(server.url());
+        QSignalSpy done(&client, &ClubLogOqrsClient::finished);
+        client.fetch(QStringLiteral("VP8/G7VJR"), QStringLiteral("cl_fixture"));
+        QVERIFY(done.wait(5000));
+        const QList<QVariant> result = done.takeFirst();
+        QVERIFY(result.at(0).toBool());
+        const QVariantList rows = result.at(1).toList();
+        QCOMPARE(rows.size(), 2);
+        QCOMPARE(rows.at(0).toMap().value("dxcall").toString(), QStringLiteral("K1AAA"));
+        QCOMPARE(rows.at(0).toMap().value("note").toString(), QStringLiteral("[redacted]"));
+        QVERIFY(!rows.at(0).toMap().contains("confirmed"));
+        QCOMPARE(server.requests.size(), 2);
+        QVERIFY(server.requests.at(0).startsWith("GET /api/logs/VP8/G7VJR/oqrs-matches "));
+        QVERIFY(server.requests.at(1).startsWith("GET /api/logs/VP8/G7VJR/oqrs-matches?cursor=page2 "));
+        for (const QByteArray& request : server.requests) {
+            QVERIFY(hasBearerAuthorization(request, "cl_fixture"));
+            QVERIFY(!request.left(request.indexOf("\r\n")).contains("cl_fixture"));
+        }
+    }
+
+    void clubLogOqrsRejectsPartialOrRepeatedPages()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answers = {R"({"matches":[{"dxcall":"K1AAA"}],"next_cursor":"same"})",
+                          R"({"matches":[{"dxcall":"K1BBB"}],"next_cursor":"same"})"};
+        ClubLogOqrsClient client;
+        client.setBaseUrl(server.url());
+        QSignalSpy done(&client, &ClubLogOqrsClient::finished);
+        client.fetch(QStringLiteral("K1TEST"), QStringLiteral("cl_fixture"));
+        QVERIFY(done.wait(5000));
+        const QList<QVariant> result = done.takeFirst();
+        QVERIFY(!result.at(0).toBool());
+        QVERIFY(result.at(1).toList().isEmpty());
+        QVERIFY(!result.at(2).toString().isEmpty());
+        QCOMPARE(server.requests.size(), 2);
+    }
+
+    void clubLogOqrsRejectsCursorContainingToken()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answers = {R"({"matches":[{"dxcall":"K1AAA"}],"next_cursor":"cl_fixture"})"};
+        ClubLogOqrsClient client;
+        client.setBaseUrl(server.url());
+        QSignalSpy done(&client, &ClubLogOqrsClient::finished);
+        client.fetch(QStringLiteral("K1TEST"), QStringLiteral("cl_fixture"));
+        QVERIFY(done.wait(5000));
+        QVERIFY(!done.first().at(0).toBool());
+        QCOMPARE(server.requests.size(), 1);
+    }
+    void clubLogBatchResultsRequireUniqueKnownIdentities()
+    {
+        const QHash<qint64, QString> ids{{1, QStringLiteral("101")}, {2, QStringLiteral("102")}};
+        const QVariantList rows{QVariantMap{{"qsoid", 102}, {"status", "duplicate"}},
+                                QVariantMap{{"qsoid", 101}, {"status", "updated"}}};
+        const auto matched = matchClubLogBatchResults(ids, rows);
+        QCOMPARE(matched.size(), 2);
+        QCOMPARE(matched.value(1).value("status").toString(), QStringLiteral("updated"));
+        QCOMPARE(matched.value(2).value("status").toString(), QStringLiteral("duplicate"));
+        QVERIFY(matchClubLogBatchResults({{1, "101"}, {2, "101"}}, rows).isEmpty());
+        QVERIFY(matchClubLogBatchResults({{1, "101"}, {2, ""}}, rows).isEmpty());
+        QVERIFY(matchClubLogBatchResults(ids, {rows.first(), rows.first()}).isEmpty());
+        QVERIFY(matchClubLogBatchResults(ids, {rows.first()}).isEmpty());
+        QVERIFY(matchClubLogBatchResults(ids, {rows.first(), QVariantMap{{"qsoid", 101}, {"status", "rejected"}}}).isEmpty());
+        const QVariantMap rejected{{"qsoid", QVariant()}, {"status", "rejected"}, {"message", "invalid"}};
+        const auto partial = matchClubLogBatchResults(ids, {rows.first(), rejected});
+        QCOMPARE(partial.size(), 2);
+        QCOMPARE(partial.value(1).value("status").toString(), QStringLiteral("rejected"));
+        const QVariantMap another{{"qsoid", QVariant()}, {"status", "rejected"}, {"message", "bad band"}};
+        const auto bothRejected = matchClubLogBatchResults(ids, {rejected, another});
+        QCOMPARE(bothRejected.size(), 2);
+        for (const QVariantMap& value : bothRejected) {
+            QCOMPARE(value.value("status").toString(), QStringLiteral("rejected"));
+            QVERIFY(value.value("message").toString().contains(QStringLiteral("individual reason is unknown")));
+            QVERIFY(value.value("message").toString().contains(QStringLiteral("invalid")));
+            QVERIFY(value.value("message").toString().contains(QStringLiteral("bad band")));
+        }
+        const QVariantMap withoutReason{{"qsoid", QVariant()}, {"status", "rejected"}};
+        const auto missingReason = matchClubLogBatchResults(ids, {rejected, withoutReason});
+        QCOMPARE(missingReason.size(), 2);
+        for (const QVariantMap& value : missingReason) {
+            QVERIFY(value.value("message").toString().contains(QStringLiteral("individual reason is unknown")));
+            QVERIFY(value.value("message").toString().contains(QStringLiteral("invalid")));
+        }
+    }
+
+    void clubLogIdentityQueryUsesFiltersAndReturnedIds()
+    {
+        const AdifRecord a{{"CALL", "K1AAA"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1000"},
+                           {"BAND", "20m"}, {"MODE", "MFSK"}, {"SUBMODE", "FT4"}};
+        const AdifRecord b{{"CALL", "K1BBB"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "110012"},
+                           {"BAND", "70cm"}, {"MODE", "CW"}};
+        const QJsonObject first = clubLogIdentityFilter(a), second = clubLogIdentityFilter(b);
+        QCOMPARE(first.value("mode").toString(), QStringLiteral("FT4"));
+        QCOMPARE(first.value("band").toString(), QStringLiteral("20"));
+        QCOMPARE(first.value("to").toString(), QStringLiteral("2026-01-01T10:00:59Z"));
+        QCOMPARE(second.value("band").toString(), QStringLiteral("70cm"));
+        QCOMPARE(second.value("to").toString(), QStringLiteral("2026-01-01T11:00:12Z"));
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QJsonArray responses{
+            QJsonObject{{"filter", second}, {"qsos", QJsonArray{QJsonObject{{"qsoid", 102}}}}},
+            QJsonObject{{"filter", first}, {"qsos", QJsonArray{QJsonObject{{"qsoid", 101}}}}}};
+        server.answer = QJsonDocument(QJsonObject{{"results", responses}}).toJson(QJsonDocument::Compact);
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        bool done = false;
+        QList<QString> resolved;
+        QString error;
+        web.resolveClubLogBatchIdentities("K1TEST", "cl_test", {first, second}, {101, 102},
+            [&](const QList<QString>& ids, const QString& message) { resolved = ids; error = message; done = true; });
+        QTRY_VERIFY_WITH_TIMEOUT(done, 5000);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(resolved, (QList<QString>{"101", "102"}));
+        QVERIFY(server.request.startsWith("POST /api/logs/K1TEST/qsos/query "));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_test"));
+        QVERIFY(!server.request.left(server.request.indexOf("\r\n")).contains("cl_test"));
+    }
+
+    void clubLogIdentityQueryRejectsAmbiguousMatches()
+    {
+        const AdifRecord a{{"CALL", "K1AAA"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1000"},
+                           {"BAND", "20m"}, {"MODE", "CW"}};
+        const QJsonObject filter = clubLogIdentityFilter(a);
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QJsonArray qsos{QJsonObject{{"qsoid", 101}}, QJsonObject{{"qsoid", 102}}};
+        server.answer = QJsonDocument(QJsonObject{{"results", QJsonArray{QJsonObject{{"filter", filter}, {"qsos", qsos}}}}}).toJson(QJsonDocument::Compact);
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        bool done = false;
+        QString error;
+        // Two candidate IDs for one filter cannot arise when the complete
+        // expected set contains only one ID; test duplicate local filters too.
+        web.resolveClubLogBatchIdentities("K1TEST", "cl_test", {filter, filter}, {101, 102},
+            [&](const QList<QString>& ids, const QString& message) { QVERIFY(ids.isEmpty()); error = message; done = true; });
+        QVERIFY(done);
+        QVERIFY(!error.isEmpty());
+        QVERIFY(server.request.isEmpty());
+        AdifRecord b = a;
+        b.set(QStringLiteral("CALL"), QStringLiteral("K1BBB"));
+        const QJsonObject second = clubLogIdentityFilter(b);
+        server.answer = QJsonDocument(QJsonObject{{"results", QJsonArray{
+            QJsonObject{{"filter", filter}, {"qsos", qsos}},
+            QJsonObject{{"filter", second}, {"qsos", QJsonArray{QJsonObject{{"qsoid", 102}}}}}}}}).toJson(QJsonDocument::Compact);
+        done = false; error.clear();
+        web.resolveClubLogBatchIdentities("K1TEST", "cl_test", {filter, second}, {101, 102},
+            [&](const QList<QString>& ids, const QString& message) { QVERIFY(ids.isEmpty()); error = message; done = true; });
+        QTRY_VERIFY_WITH_TIMEOUT(done, 5000);
+        QVERIFY(!error.isEmpty());
+    }
+
+    void clubLogIdentityQueryCanResolveMultipleRejectedContacts()
+    {
+        const QJsonObject a{{"dxcall", "K1AAA"}}, b{{"dxcall", "K1BBB"}}, c{{"dxcall", "K1CCC"}};
+        const QJsonArray responses{
+            QJsonObject{{"filter", c}, {"qsos", QJsonArray{}}},
+            QJsonObject{{"filter", a}, {"qsos", QJsonArray{QJsonObject{{"qsoid", 101}}}}},
+            QJsonObject{{"filter", b}, {"qsos", QJsonArray{}}}};
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answer = QJsonDocument(QJsonObject{{"results", responses}}).toJson(QJsonDocument::Compact);
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        bool done = false;
+        QList<QString> ids;
+        QString error;
+        web.resolveClubLogBatchIdentities("K1TEST", "cl_test", {a, b, c}, {101},
+            [&](const QList<QString>& result, const QString& message) { ids = result; error = message; done = true; });
+        QTRY_VERIFY_WITH_TIMEOUT(done, 5000);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(ids, (QList<QString>{QStringLiteral("101"), QString(), QString()}));
+    }
+
+    void clubLogIdentityQueriesRespectHundredFilterLimit()
+    {
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        QList<int> chunkSizes;
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket* socket = server.nextPendingConnection();
+            auto request = std::make_shared<QByteArray>();
+            connect(socket, &QTcpSocket::readyRead, this, [&, socket, request] {
+                *request += socket->readAll();
+                const int headerEnd = request->indexOf("\r\n\r\n");
+                if (headerEnd < 0) return;
+                int length = 0;
+                for (const QByteArray& line : request->left(headerEnd).split('\n'))
+                    if (line.toLower().startsWith("content-length:")) length = line.mid(15).trimmed().toInt();
+                if (request->size() < headerEnd + 4 + length) return;
+                const QJsonArray filters = QJsonDocument::fromJson(request->mid(headerEnd + 4)).object().value("filters").toArray();
+                chunkSizes.append(filters.size());
+                QJsonArray results;
+                for (const QJsonValue& filter : filters) {
+                    const int id = filter.toObject().value("dxcall").toString().mid(1).toInt();
+                    results.prepend(QJsonObject{{"filter", filter.toObject()}, {"qsos", QJsonArray{QJsonObject{{"qsoid", id}}}}});
+                }
+                const QByteArray body = QJsonDocument(QJsonObject{{"results", results}}).toJson(QJsonDocument::Compact);
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                              + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
+                socket->disconnectFromHost();
+            });
+        });
+        QList<QJsonObject> filters;
+        QSet<qint64> ids;
+        for (int i = 1; i <= 101; ++i) {
+            filters.append(QJsonObject{{"dxcall", QStringLiteral("K%1").arg(i)}});
+            ids.insert(i);
+        }
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(QUrl(QStringLiteral("http://127.0.0.1:%1/api/").arg(server.serverPort())));
+        bool done = false;
+        QList<QString> resolved;
+        QString error;
+        web.resolveClubLogBatchIdentities("K1TEST", "cl_test", filters, ids,
+            [&](const QList<QString>& result, const QString& message) { resolved = result; error = message; done = true; });
+        QTRY_VERIFY_WITH_TIMEOUT(done, 5000);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        QCOMPARE(chunkSizes, (QList<int>{100, 1}));
+        QCOMPARE(resolved.size(), 101);
+        QCOMPARE(resolved.first(), QStringLiteral("1"));
+        QCOMPARE(resolved.last(), QStringLiteral("101"));
+    }
+
     void automaticServicesAreQueuedSequentially()
     {
         qsl::AutomaticUploadQueue queue;
@@ -434,6 +715,473 @@ private slots:
         QVERIFY(listed.wait(5000));
         QCOMPARE(listed.first().at(0).toList().size(), 1);
         QVERIFY(stations.request.startsWith("GET /index.php/api/station_info/wl64key "));
+    }
+
+    void clubLogLegacySingleOverWire()
+    {
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answer = "OK";
+        WebQslUploader web;
+        web.setClubLogEndpoints(server.url(), server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        ClubLogAuth auth;
+        auth.callsign = QStringLiteral("9H1SR");
+        auth.email = QStringLiteral("test@example.org");
+        auth.password = QStringLiteral("legacy_password");
+        auth.apiKey = QStringLiteral("legacy_key");
+        web.uploadClubLog(auth, "<CALL:5>K1ABC <EOR>", 1);
+        QVERIFY(done.wait(5000));
+        QVERIFY(done.takeFirst().first().value<QslUploadResult>().ok);
+        QVERIFY(server.body.contains("api=legacy_key"));
+        QVERIFY(server.body.contains("password=legacy_password"));
+        QVERIFY(!server.request.toLower().contains("authorization: bearer"));
+    }
+
+    void clubLogLegacy403BlocksFurtherRequestsAcrossInstances()
+    {
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.status = 403; server.answer = "Forbidden";
+        ClubLogAuth auth;
+        auth.callsign = "K1TEST"; auth.email = "legacy-guard@example.org";
+        auth.password = "legacy-guard-password"; auth.apiKey = "legacy-guard-key";
+        WebQslUploader web;
+        web.setClubLogEndpoints(server.url(), server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        web.uploadClubLog(auth, "<CALL:5>K1ABC<EOR>", 1);
+        QVERIFY(done.wait(5000));
+        QVERIFY(!done.takeFirst().first().value<QslUploadResult>().ok);
+        server.request.clear(); server.body.clear();
+        WebQslUploader restarted;
+        restarted.setClubLogEndpoints(server.url(), server.url());
+        QSignalSpy blocked(&restarted, &WebQslUploader::finished);
+        restarted.uploadClubLog(auth, "<CALL:5>K1ABC<EOR>", 1);
+        QCOMPARE(blocked.size(), 1);
+        QVERIFY(!blocked.takeFirst().first().value<QslUploadResult>().ok);
+        QVERIFY(server.request.isEmpty());
+        auth.password = "legacy-corrected-password";
+        server.status = 200; server.answer = "OK";
+        restarted.uploadClubLog(auth, "<CALL:5>K1ABC<EOR>", 1);
+        QVERIFY(blocked.wait(5000));
+        QVERIFY(blocked.takeFirst().first().value<QslUploadResult>().ok);
+        QVERIFY(!server.request.isEmpty());
+        QSettings settings; settings.sync();
+        for (const QString& key : settings.allKeys()) {
+            QVERIFY(!key.contains(auth.password));
+            QVERIFY(!settings.value(key).toString().contains(auth.password));
+        }
+    }
+
+    void clubLogLegacyBatchOverWire()
+    {
+        FakeCrx realtime, batch;
+        QVERIFY(realtime.listen(QHostAddress::LocalHost));
+        QVERIFY(batch.listen(QHostAddress::LocalHost));
+        batch.answer = "OK";
+        WebQslUploader web;
+        web.setClubLogEndpoints(realtime.url(), batch.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        ClubLogAuth auth;
+        auth.callsign = QStringLiteral("K1TEST");
+        auth.email = QStringLiteral("test@example.org");
+        auth.password = QStringLiteral("legacy_password");
+        auth.apiKey = QStringLiteral("legacy_key");
+        const QByteArray contacts = "<CALL:5>K1AAA<EOR><CALL:5>K1BBB<EOR>";
+        web.uploadClubLog(auth, contacts, 2);
+        QVERIFY(done.wait(5000));
+        QVERIFY(done.takeFirst().first().value<QslUploadResult>().ok);
+        QVERIFY(realtime.request.isEmpty());
+        QVERIFY(batch.request.contains("multipart/form-data"));
+        QVERIFY(batch.body.contains("name=\"email\""));
+        QVERIFY(batch.body.contains("test@example.org"));
+        QVERIFY(batch.body.contains("name=\"password\""));
+        QVERIFY(batch.body.contains("legacy_password"));
+        QVERIFY(batch.body.contains("name=\"api\""));
+        QVERIFY(batch.body.contains("legacy_key"));
+        QVERIFY(batch.body.contains("name=\"clear\"\r\n\r\n0\r\n"));
+        QVERIFY(batch.body.contains(contacts));
+        QVERIFY(!batch.request.toLower().contains("authorization: bearer"));
+    }
+
+    void clubLogRealtimeBatchSendsOneRequestAndPreservesResults()
+    {
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answer = R"({"results":[{"status":"created","qsoid":101},{"status":"duplicate","qsoid":102}]})";
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        const QByteArray contacts = "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>"
+                                    "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1100<BAND:3>20m<MODE:2>CW<EOR>";
+        web.submitClubLogRealtimeBatch("K1TEST", "cl_fixture_batch", contacts, 2);
+        QVERIFY(done.wait(5000));
+        const auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(result.requiresReconciliation);
+        QCOMPARE(result.clubLogBatchRecords.size(), 2);
+        QVERIFY(server.request.startsWith("POST /api/qso/batch "));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_fixture_batch"));
+        const QJsonArray qsos = QJsonDocument::fromJson(server.body).object().value("qsos").toArray();
+        QCOMPARE(qsos.size(), 2);
+        QCOMPARE(qsos.at(0).toObject().value("call").toString(), QStringLiteral("K1TEST"));
+        QVERIFY(qsos.at(0).toObject().value("adif").toString().contains("K1AAA"));
+        QVERIFY(qsos.at(1).toObject().value("adif").toString().contains("K1BBB"));
+        server.request.clear(); server.body.clear();
+        server.status = 500; server.answer = R"({"error":{"message":"failure"}})";
+        web.submitClubLogRealtimeBatch("K1TEST", "cl_fixture_batch", contacts, 2);
+        QVERIFY(done.wait(5000));
+        const auto uncertain = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!uncertain.ok); QVERIFY(uncertain.requiresReconciliation);
+        QCOMPARE(uncertain.httpStatus, 500);
+        QVERIFY(uncertain.clubLogBatchRecords.isEmpty());
+    }
+
+    void clubLogRestSingleAndRejectedResponse()
+    {
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.status = 201;
+        server.answer = R"({"status":"created","qsoid":123456})";
+        WebQslUploader web;
+        web.setClubLogRestEndpoint(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        ClubLogAuth auth;
+        auth.callsign = QStringLiteral("9H1SR");
+        auth.password = QStringLiteral("cl_test_fixture");
+        web.uploadClubLog(auth, "<CALL:5>K1ABC <QSO_DATE:8>20260101 <TIME_ON:4>1200 <BAND:3>20m <MODE:3>FT8 <EOR>", 1);
+        QVERIFY(done.wait(5000));
+        const auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(result.ok);
+        QCOMPARE(result.remoteId, QStringLiteral("123456"));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_test_fixture"));
+        const QJsonObject body = QJsonDocument::fromJson(server.body).object();
+        QCOMPARE(body.value(QStringLiteral("call")).toString(), QStringLiteral("9H1SR"));
+        QVERIFY(body.value(QStringLiteral("adif")).toString().contains(QStringLiteral("K1ABC")));
+        QVERIFY(!server.request.left(server.request.indexOf("\r\n")).contains("cl_test_fixture"));
+
+        server.request.clear(); server.body.clear();
+        server.status = 200;
+        server.answer = R"({"status":"created","qsoid":null})";
+        web.uploadClubLog(auth, "<CALL:5>K1ABC <EOR>", 1);
+        QVERIFY(done.wait(5000));
+        const auto unconfirmed = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!unconfirmed.ok);
+        QVERIFY(unconfirmed.requiresReconciliation);
+
+        server.request.clear(); server.body.clear();
+        server.status = 401;
+        server.answer = R"({"code":"unauthorized","message":"Invalid token cl_test_fixture"})";
+        web.uploadClubLog(auth, "<CALL:5>K1ABC <EOR>", 1);
+        QVERIFY(done.wait(5000));
+        const auto refused = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!refused.ok);
+        QVERIFY(!refused.retryLater);
+        QCOMPARE(refused.message, QStringLiteral("Club Log REST: HTTP 401: Invalid token [redacted]"));
+
+        server.request.clear(); server.body.clear();
+        server.status = 500;
+        server.answer = R"({"message":"temporary failure"})";
+        auth.password = QStringLiteral("cl_different_test_fixture");
+        web.uploadClubLog(auth, "<CALL:5>K1ABC <EOR>", 1);
+        QVERIFY(done.wait(5000));
+        const auto ambiguous = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!ambiguous.ok);
+        QVERIFY(!ambiguous.retryLater);
+        QVERIFY(ambiguous.requiresReconciliation);
+    }
+
+    void clubLogRefusalsAndRateLimitPersistWithoutTheToken()
+    {
+        const QString token = QStringLiteral("cl_guard_fixture");
+        QVERIFY(ClubLogAccessGuard::restriction(token).isEmpty());
+        ClubLogAccessGuard::record(token, 429, "300");
+        QVERIFY(ClubLogAccessGuard::restriction(token).contains(QStringLiteral("rate limit")));
+        QVERIFY(ClubLogAccessGuard::restriction(QStringLiteral("cl_other_fixture")).isEmpty());
+        QSettings saved;
+        saved.sync();
+        for (const QString& key : saved.allKeys()) {
+            QVERIFY(!key.contains(token));
+            QVERIFY(!saved.value(key).toString().contains(token));
+        }
+        ClubLogAccessGuard::record(token, 403, {});
+        QVERIFY(ClubLogAccessGuard::restriction(token).contains(QStringLiteral("403")));
+    }
+
+    void clubLogRestPollsQueuedAndCollectsEveryPage()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answers = {R"({"status":"queued","records":[]})",
+                          R"({"status":"finished","records":[{"index":0,"status":"created","qsoid":101}],"next_cursor":"abc"})",
+                          R"({"status":"finished","records":[{"index":1,"status":"duplicate","qsoid":102,"message":"cl_test_fixture","extra":{"value":"cl_test_fixture"}}],"next_cursor":null})"};
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        web.setClubLogRestPollIntervalForTest(1);
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        web.pollClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"), QStringLiteral("123"), 2);
+        QVERIFY(done.wait(5000));
+        const auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!result.ok); // a controller must reconcile individual records first
+        QVERIFY(result.requiresReconciliation);
+        QCOMPARE(result.remoteId, QStringLiteral("123"));
+        QCOMPARE(result.clubLogBatchRecords.size(), 2);
+        const QVariantMap last = result.clubLogBatchRecords.last().toMap();
+        QCOMPARE(last.value("message").toString(), QStringLiteral("[redacted]"));
+        QCOMPARE(last.value("extra").toMap().value("value").toString(), QStringLiteral("[redacted]"));
+        QVERIFY(result.message.contains(QStringLiteral("1 created or updated")));
+        QVERIFY(result.message.contains(QStringLiteral("1 duplicates")));
+        QCOMPARE(server.requests.size(), 3);
+        QVERIFY(server.requests.at(0).startsWith("GET /api/logs/9H1SR/uploads/123 "));
+        QVERIFY(server.requests.at(2).startsWith("GET /api/logs/9H1SR/uploads/123?cursor=abc "));
+        for (const QByteArray& request : server.requests) {
+            QVERIFY(hasBearerAuthorization(request, "cl_test_fixture"));
+            QVERIFY(!request.left(request.indexOf("\r\n")).contains("cl_test_fixture"));
+        }
+    }
+
+    void clubLogRestPollingRejectsMissingRecords()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answers = {R"({"status":"finished","records":[{"status":"created","qsoid":101}]})"};
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        web.pollClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"), QStringLiteral("123"), 2);
+        QVERIFY(done.wait(5000));
+        const auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!result.ok);
+        QVERIFY(result.requiresReconciliation);
+        QVERIFY(result.clubLogBatchRecords.isEmpty());
+        QCOMPARE(server.requests.size(), 1);
+    }
+
+    void clubLogRestStatusReportsNestedServerErrorWithoutToken()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.status = 500;
+        server.answers = {R"({"error":{"code":"server_error","message":"Unexpected error cl_fixture"}})"};
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        web.pollClubLogRestBatch(QStringLiteral("K1TEST"), QStringLiteral("cl_fixture"), QStringLiteral("123"), 1);
+        QVERIFY(done.wait(5000));
+        const auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(result.requiresReconciliation);
+        QVERIFY(result.message.contains(QStringLiteral("HTTP 500")));
+        QVERIFY(result.message.contains(QStringLiteral("Unexpected error [redacted]")));
+        QVERIFY(!result.message.contains(QStringLiteral("cl_fixture")));
+        QCOMPARE(server.requests.size(), 1);
+    }
+
+    void clubLogRestPollingStopsOnRepeatedCursorAndRateLimit()
+    {
+        FakeClubLogPoll server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answers = {R"({"status":"finished","records":[],"next_cursor":"same"})",
+                          R"({"status":"finished","records":[],"next_cursor":"same"})"};
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        web.pollClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"), QStringLiteral("123"), 1);
+        QVERIFY(done.wait(5000));
+        auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!result.ok);
+        QVERIFY(result.requiresReconciliation);
+        QCOMPARE(server.requests.size(), 2);
+        server.requests.clear();
+        server.status = 429;
+        server.answers = {R"({"message":"rate limit cl_test_fixture"})"};
+        web.pollClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"), QStringLiteral("123"), 1);
+        QVERIFY(done.wait(5000));
+        result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!result.ok);
+        QVERIFY(result.requiresReconciliation);
+        QVERIFY(!result.retryLater);
+        QVERIFY(!result.message.contains(QStringLiteral("cl_test_fixture")));
+        QCOMPARE(server.requests.size(), 1);
+        WebQslUploader restarted;
+        restarted.setClubLogRestBatchBaseUrl(server.url());
+        QSignalSpy blocked(&restarted, &WebQslUploader::finished);
+        restarted.pollClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"), QStringLiteral("123"), 1);
+        QCOMPARE(blocked.size(), 1);
+        QVERIFY(blocked.takeFirst().first().value<QslUploadResult>().requiresReconciliation);
+        QCOMPARE(server.requests.size(), 1);
+    }
+
+    void clubLogRestBatchQueuesWithoutClaimingSuccess()
+    {
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.status = 202;
+        server.answer = R"({"status":"queued","upload_id":12345})";
+        WebQslUploader web;
+        web.setClubLogRestBatchBaseUrl(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        QString savedId;
+        web.submitClubLogRestBatch(QStringLiteral("VP8/G7VJR"), QStringLiteral("cl_test_fixture"),
+                                  "<CALL:5>K1ABC <EOR>",
+                                  [&savedId](const QString& id) { savedId = id; return true; });
+        QVERIFY(done.wait(5000));
+        const auto result = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!result.ok);
+        QVERIFY(result.requiresReconciliation);
+        QCOMPARE(savedId, QStringLiteral("12345"));
+        QCOMPARE(result.remoteId, savedId);
+        QVERIFY(server.request.startsWith("POST /api/logs/VP8/G7VJR/uploads "));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_test_fixture"));
+        QVERIFY(server.body.contains("name=\"file\""));
+        QVERIFY(server.body.contains("filename=\"decodxlog.adi\""));
+        QVERIFY(server.body.contains("<CALL:5>K1ABC"));
+        QVERIFY(!server.body.contains("name=\"clear\""));
+        QVERIFY(!server.request.left(server.request.indexOf("\r\n")).contains("cl_test_fixture"));
+
+        server.request.clear(); server.body.clear();
+        server.status = 409;
+        server.answer = R"({"message":"identical file already processed"})";
+        savedId.clear();
+        web.submitClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"),
+                                  "<CALL:5>K1ABC <EOR>",
+                                  [&savedId](const QString& id) { savedId = id; return true; });
+        QVERIFY(done.wait(5000));
+        const auto duplicateFile = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!duplicateFile.ok);
+        QVERIFY(duplicateFile.requiresReconciliation);
+        QVERIFY(savedId.isEmpty());
+
+        server.request.clear(); server.body.clear();
+        server.status = 202;
+        server.answer = R"({"status":"queued","upload_id":987})";
+        web.submitClubLogRestBatch(QStringLiteral("9H1SR"), QStringLiteral("cl_test_fixture"),
+                                  "<CALL:5>K1ABC <EOR>", [](const QString&) { return false; });
+        QVERIFY(done.wait(5000));
+        const auto checkpointFailed = done.takeFirst().first().value<QslUploadResult>();
+        QVERIFY(!checkpointFailed.ok);
+        QVERIFY(checkpointFailed.requiresReconciliation);
+        QCOMPARE(checkpointFailed.remoteId, QStringLiteral("987"));
+        QVERIFY(checkpointFailed.message.contains(QStringLiteral("could not be saved")));
+    }
+
+    void clubLogBatchEnvelopeNeverTreatsQueueAsCompletion()
+    {
+        using State = ClubLogBatchEnvelope::State;
+        auto queued = parseClubLogBatchEnvelope(202, R"({"status":"queued","upload_id":123})", true);
+        QCOMPARE(queued.state, State::Queued);
+        QCOMPARE(queued.uploadId, QStringLiteral("123"));
+        QCOMPARE(parseClubLogBatchEnvelope(202, R"({"status":"queued"})", true).state, State::Invalid);
+        QCOMPARE(parseClubLogBatchEnvelope(200, R"({"status":"queued","records":[]})", false).state, State::Queued);
+        QCOMPARE(parseClubLogBatchEnvelope(200, R"({"status":"finished"})", false).state, State::Finished);
+        QCOMPARE(parseClubLogBatchEnvelope(200, "not-json", false).state, State::Invalid);
+        QCOMPARE(parseClubLogBatchEnvelope(409, R"({"message":"already processed"})", true).state, State::Rejected);
+        QCOMPARE(parseClubLogBatchEnvelope(429, R"({"message":"rate limit"})", true).state, State::RateLimited);
+        const auto nested = parseClubLogBatchEnvelope(500, R"({"error":{"code":"server_error","message":"unexpected error"}})", false);
+        QCOMPARE(nested.message, QStringLiteral("unexpected error"));
+        QCOMPARE(parseClubLogBatchEnvelope(200, R"({"status":"finished"})", true).state, State::Invalid);
+    }
+
+    void clubLogUploadFingerprintIgnoresVolatileAdifHeader()
+    {
+        const QByteArray first = "<CREATED_TIMESTAMP:15>20261115 120000 <EOH><CALL:5>K1ABC<EOR>";
+        const QByteArray later = "<CREATED_TIMESTAMP:15>20261116 140000 <EOH><CALL:5>K1ABC<EOR>";
+        const QByteArray changed = "<CREATED_TIMESTAMP:15>20261116 140000 <EOH><CALL:5>K2ABC<EOR>";
+        const QByteArray saved = "<CALL:5>K1ABC<CLUBLOG_QSO_UPLOAD_STATUS:1>Y<CLUBLOG_QSO_UPLOAD_DATE:8>20261116<EOR>";
+        const QString a = ClubLogUploadJournal::recordsFingerprint(first, 1);
+        QVERIFY(!a.isEmpty());
+        QCOMPARE(a, ClubLogUploadJournal::recordsFingerprint(later, 1));
+        QCOMPARE(a, ClubLogUploadJournal::recordsFingerprint(saved, 1));
+        QVERIFY(a != ClubLogUploadJournal::recordsFingerprint(changed, 1));
+        QVERIFY(ClubLogUploadJournal::recordsFingerprint(first, 2).isEmpty());
+    }
+
+    void clubLogJournalAllowsDifferentContactsWhileProtectingPendingOnes()
+    {
+        QTemporaryDir directory;
+        QSettings settings(directory.filePath("journal.ini"), QSettings::IniFormat);
+        ClubLogUploadJournal journal(settings);
+        QVERIFY(journal.begin("log", "K1TEST", {"1", "2"}, "hash1"));
+        const QString first = journal.nonce();
+        QVERIFY(journal.queued("123", first));
+        QVERIFY(!journal.begin("log", "K1TEST", {"2", "3"}, "hash2"));
+        QVERIFY(journal.begin("log", "K1TEST", {"3"}, "hash2"));
+        const QString second = journal.nonce();
+        QVERIFY(second != first);
+        QCOMPARE(journal.reservedIds("log"), QSet<QString>({"1", "2", "3"}));
+        QVERIFY(!journal.begin("log", "K1TEST", {"1"}, "hash3"));
+        QVERIFY(journal.clearAfterReconciliation(second));
+        QCOMPARE(journal.nonce(), first);
+        QCOMPARE(journal.uploadId(), QStringLiteral("123"));
+        QCOMPARE(journal.reservedIds("log"), QSet<QString>({"1", "2"}));
+        QVERIFY(journal.clearAfterReconciliation(first));
+        QVERIFY(!journal.pending());
+    }
+
+    void clubLogUploadJournalSurvivesRestart()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        const QString path = directory.filePath(QStringLiteral("journal.ini"));
+        {
+            QSettings settings(path, QSettings::IniFormat);
+            ClubLogUploadJournal journal(settings);
+            QVERIFY(!journal.pending());
+            QVERIFY(journal.begin(QStringLiteral("local-log-A"), QStringLiteral("9H1SR"),
+                                  {QStringLiteral("11"), QStringLiteral("12")}, QStringLiteral("abc123")));
+            QCOMPARE(journal.phase(), QStringLiteral("submitting"));
+            QVERIFY(!journal.begin(QStringLiteral("local-log-A"), QStringLiteral("9H1SR"), {QStringLiteral("11")}, QStringLiteral("def")));
+            QSettings secondSettings(path, QSettings::IniFormat);
+            ClubLogUploadJournal secondInstance(secondSettings);
+            QVERIFY(!secondInstance.begin(QStringLiteral("local-log-A"), QStringLiteral("9H1SR"), {QStringLiteral("12")}, QStringLiteral("xyz")));
+        }
+        {
+            QSettings settings(path, QSettings::IniFormat);
+            ClubLogUploadJournal journal(settings);
+            QVERIFY(journal.pending());
+            QCOMPARE(journal.phase(), QStringLiteral("submitting"));
+            QCOMPARE(journal.localIds(), QStringList({QStringLiteral("11"), QStringLiteral("12")}));
+            QVERIFY(journal.queued(QStringLiteral("123456"), journal.nonce()));
+        }
+        {
+            QSettings settings(path, QSettings::IniFormat);
+            ClubLogUploadJournal journal(settings);
+            QCOMPARE(journal.phase(), QStringLiteral("queued"));
+            QCOMPARE(journal.uploadId(), QStringLiteral("123456"));
+            QCOMPARE(journal.station(), QStringLiteral("9H1SR"));
+            QCOMPARE(journal.logIdentity(), QStringLiteral("local-log-A"));
+            const QString previous = journal.nonce();
+            QVERIFY(!journal.queued(QStringLiteral("another"), previous));
+            QVERIFY(journal.clearAfterReconciliation(previous));
+            QVERIFY(!journal.pending());
+            QVERIFY(journal.begin(QStringLiteral("local-log-B"), QStringLiteral("9H1SR"), {QStringLiteral("13")}, QStringLiteral("def")));
+            QVERIFY(journal.nonce() != previous);
+            QVERIFY(!journal.queued(QStringLiteral("111"), previous));
+            QVERIFY(!journal.clearAfterReconciliation(previous));
+            bool staleWrite = false;
+            QVERIFY(!journal.reconcileAndClear(previous, [&] { staleWrite = true; return true; }));
+            QVERIFY(!staleWrite);
+            QVERIFY(journal.pending());
+            const QString current = journal.nonce();
+            QVERIFY(journal.reconcileAndClear(current, [&] {
+                QSettings otherSettings(path, QSettings::IniFormat);
+                ClubLogUploadJournal other(otherSettings);
+                return !other.begin(QStringLiteral("log-C"), QStringLiteral("9H1SR"),
+                                    {QStringLiteral("14")}, QStringLiteral("ghi"));
+            }));
+        }
+    }
+
+    void clubLogOlderCheckpointCanStillBeReconciled()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        QSettings settings(directory.filePath(QStringLiteral("legacy.ini")), QSettings::IniFormat);
+        settings.setValue(QStringLiteral("clubLogRestUpload/phase"), QStringLiteral("queued"));
+        settings.setValue(QStringLiteral("clubLogRestUpload/uploadId"), QStringLiteral("123"));
+        settings.sync();
+        ClubLogUploadJournal journal(settings);
+        QVERIFY(journal.nonce().isEmpty());
+        QVERIFY(journal.reconcileAndClear(QString(), [] { return true; }));
+        QVERIFY(!journal.pending());
     }
 
     void clubLogNeedsEverything()

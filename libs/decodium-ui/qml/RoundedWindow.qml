@@ -26,9 +26,10 @@ ApplicationWindow {
     // fornisce gia' forma e ombra corrette. Le finestre staccate, invece,
     // impostano la loro superficie trasparente per disegnare gli angoli veri.
     property bool transparentFrame: true
+    readonly property bool softwareSceneGraph: typeof qtQuickSoftwareRenderer !== "undefined" && qtQuickSoftwareRenderer
     readonly property bool roundedFrame: root.visibility !== Window.Maximized
                                        && root.visibility !== Window.FullScreen
-    readonly property bool transparentCorners: root.transparentFrame && root.roundedFrame
+    readonly property bool transparentCorners: root.transparentFrame && root.roundedFrame && !root.softwareSceneGraph
                                                && Qt.platform.os !== "linux"
     // La maschera e' necessaria soltanto dove la finestra ha angoli realmente
     // trasparenti. Su Linux la superficie resta opaca, senza chiedere nulla al
@@ -36,7 +37,7 @@ ApplicationWindow {
     // Il layer rimane invece attivo anche durante il cambio massimizzata ↔
     // normale: ricrearlo mentre la sorgente della maschera era invisibile
     // lasciava talvolta una texture nera su Metal/D3D/OpenGL.
-    readonly property bool useWindowLayer: root.transparentFrame && Qt.platform.os !== "linux"
+    readonly property bool useWindowLayer: root.transparentFrame && Qt.platform.os !== "linux" && !root.softwareSceneGraph
     readonly property bool useRoundedMask: root.transparentCorners
     readonly property real frameRadius: root.roundedFrame
                                        ? (Qt.platform.os === "osx" ? 12 : 8) : 0
