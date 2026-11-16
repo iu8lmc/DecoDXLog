@@ -157,7 +157,7 @@ private slots:
         QSettings settings;
         ClubLogUploadJournal journal(settings);
         QVERIFY(journal.begin(db.path(), "K1TEST", {QString::number(a), QString::number(b)},
-                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif({a, b}), 2)));
+                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif(QList<qint64>{a, b}), 2)));
         QVERIFY(journal.queued("123", journal.nonce()));
         QslController controller({&db});
         controller.m_batch = {a, b};
@@ -214,7 +214,7 @@ private slots:
         QSettings settings;
         ClubLogUploadJournal journal(settings);
         QVERIFY(journal.begin(db.path(), "K1TEST", {QString::number(old)},
-                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif({old}), 1)));
+                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif(QList<qint64>{old}), 1)));
         const QString oldNonce = journal.nonce();
         QVERIFY(journal.queued("123", oldNonce));
         settings.setValue("credentials/clublog/stored", true);
@@ -372,7 +372,7 @@ private slots:
         QSettings settings;
         ClubLogUploadJournal journal(settings);
         QVERIFY(journal.begin(db.path(), "K1TEST", {QString::number(a), QString::number(b)},
-                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif({a, b}), 2)));
+                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif(QList<qint64>{a, b}), 2)));
         QVERIFY(journal.queued("123", journal.nonce()));
         QTcpServer server;
         QVERIFY(server.listen(QHostAddress::LocalHost));
@@ -457,7 +457,7 @@ private slots:
         QSettings settings;
         ClubLogUploadJournal journal(settings);
         QVERIFY(journal.begin(db.path(), "K1TEST", {QString::number(a), QString::number(b)},
-                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif({a, b}), 2)));
+                              ClubLogUploadJournal::recordsFingerprint(db.exportAdif(QList<qint64>{a, b}), 2)));
         QVERIFY(journal.queued("123", journal.nonce()));
         QTcpServer server;
         QVERIFY(server.listen(QHostAddress::LocalHost));
