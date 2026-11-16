@@ -24,6 +24,17 @@ using namespace decolog::core;
 
 namespace {
 
+bool hasBearerAuthorization(const QByteArray& request, const QByteArray& token)
+{
+    const QByteArray headers = request.left(request.indexOf("\r\n\r\n"));
+    for (const QByteArray& line : headers.split('\n')) {
+        const int colon = line.indexOf(':');
+        if (colon > 0 && line.left(colon).trimmed().toLower() == "authorization")
+            return line.mid(colon + 1).trimmed() == "Bearer " + token;
+    }
+    return false;
+}
+
 // Un CRX finto: risponde sempre con `answer`, e si tiene la richiesta.
 class FakeCrx : public QTcpServer {
 public:
@@ -119,7 +130,7 @@ private slots:
         QVERIFY(server.requests.at(0).startsWith("GET /api/logs/VP8/G7VJR/oqrs-matches "));
         QVERIFY(server.requests.at(1).startsWith("GET /api/logs/VP8/G7VJR/oqrs-matches?cursor=page2 "));
         for (const QByteArray& request : server.requests) {
-            QVERIFY(request.contains("Authorization: Bearer cl_fixture"));
+            QVERIFY(hasBearerAuthorization(request, "cl_fixture"));
             QVERIFY(!request.left(request.indexOf("\r\n")).contains("cl_fixture"));
         }
     }
@@ -220,7 +231,7 @@ private slots:
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(resolved, (QList<QString>{"101", "102"}));
         QVERIFY(server.request.startsWith("POST /api/logs/K1TEST/qsos/query "));
-        QVERIFY(server.request.contains("Authorization: Bearer cl_test"));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_test"));
         QVERIFY(!server.request.left(server.request.indexOf("\r\n")).contains("cl_test"));
     }
 
@@ -809,7 +820,7 @@ private slots:
         QVERIFY(result.requiresReconciliation);
         QCOMPARE(result.clubLogBatchRecords.size(), 2);
         QVERIFY(server.request.startsWith("POST /api/qso/batch "));
-        QVERIFY(server.request.contains("Authorization: Bearer cl_fixture_batch"));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_fixture_batch"));
         const QJsonArray qsos = QJsonDocument::fromJson(server.body).object().value("qsos").toArray();
         QCOMPARE(qsos.size(), 2);
         QCOMPARE(qsos.at(0).toObject().value("call").toString(), QStringLiteral("K1TEST"));
@@ -842,7 +853,7 @@ private slots:
         const auto result = done.takeFirst().first().value<QslUploadResult>();
         QVERIFY(result.ok);
         QCOMPARE(result.remoteId, QStringLiteral("123456"));
-        QVERIFY(server.request.contains("Authorization: Bearer cl_test_fixture"));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_test_fixture"));
         const QJsonObject body = QJsonDocument::fromJson(server.body).object();
         QCOMPARE(body.value(QStringLiteral("call")).toString(), QStringLiteral("9H1SR"));
         QVERIFY(body.value(QStringLiteral("adif")).toString().contains(QStringLiteral("K1ABC")));
@@ -923,7 +934,7 @@ private slots:
         QVERIFY(server.requests.at(0).startsWith("GET /api/logs/9H1SR/uploads/123 "));
         QVERIFY(server.requests.at(2).startsWith("GET /api/logs/9H1SR/uploads/123?cursor=abc "));
         for (const QByteArray& request : server.requests) {
-            QVERIFY(request.contains("Authorization: Bearer cl_test_fixture"));
+            QVERIFY(hasBearerAuthorization(request, "cl_test_fixture"));
             QVERIFY(!request.left(request.indexOf("\r\n")).contains("cl_test_fixture"));
         }
     }
@@ -1019,7 +1030,7 @@ private slots:
         QCOMPARE(savedId, QStringLiteral("12345"));
         QCOMPARE(result.remoteId, savedId);
         QVERIFY(server.request.startsWith("POST /api/logs/VP8/G7VJR/uploads "));
-        QVERIFY(server.request.contains("Authorization: Bearer cl_test_fixture"));
+        QVERIFY(hasBearerAuthorization(server.request, "cl_test_fixture"));
         QVERIFY(server.body.contains("name=\"file\""));
         QVERIFY(server.body.contains("filename=\"decodxlog.adi\""));
         QVERIFY(server.body.contains("<CALL:5>K1ABC"));
