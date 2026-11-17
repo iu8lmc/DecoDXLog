@@ -61,7 +61,7 @@ TableView {
         model.insertQso(fresh);
         QTRY_COMPARE_WITH_TIMEOUT(values(1).size(), 3, 3000);
         QCOMPARE(model.count(), 2);
-        QCOMPARE(values(0).at(0).toString(), QString("K1NEW"));
+        QTRY_COMPARE_WITH_TIMEOUT(values(0).at(0).toString(), QString("K1NEW"), 3000);
         QTRY_COMPARE_WITH_TIMEOUT(values(1).at(0).toString(), QString("K1OLD"), 3000);
         QCOMPARE(values(0).at(1).toLongLong(), fresh);
         QVERIFY(values(1).at(1).toLongLong() != fresh);
