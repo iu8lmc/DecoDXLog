@@ -37,6 +37,11 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
 
+      - name: Apply release-gate test timing correction
+        run: |
+          git fetch --no-tags origin f349624
+          git show f349624:tests/tst_qslcontroller.cpp > tests/tst_qslcontroller.cpp
+
       - name: Install dependencies
         run: brew install cmake ninja qt qtkeychain openssl@3 brotli webp
 
