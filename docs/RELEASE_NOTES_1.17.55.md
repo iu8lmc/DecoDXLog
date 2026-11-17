@@ -21,7 +21,7 @@ DecoDXLog 1.17.55 includes the changes since 1.17.53, including the alignment wi
 ### Verification and platform notes
 
 - The Club Log download was tested with a simulated service and with a real read-only export. In an isolated temporary database the real export contained 7,393 records; a repeat import added none. Simulated checks covered HTTP errors, duplicates and event-loop responsiveness. The import-preview confirmation was also checked in a test application window.
-- The Windows packaging step selects the matching OpenSSL runtime DLL pair provided by MinGW; the installed-runtime smoke test also checks that Qt can initialise its OpenSSL backend without the MSYS2 libraries on PATH.
+- The Windows packaging step selects the matching OpenSSL runtime DLL pair provided by MinGW; the installed-runtime smoke test also checks that Qt can initialise its TLS backend without the MSYS2 libraries on PATH.
 - macOS bundles are ad-hoc signed, not Developer ID notarised. Windows and Linux packages are produced by their respective GitHub runners and smoke-tested by the release workflows.
 
 ## Italiano
@@ -47,5 +47,5 @@ DecoDXLog 1.17.55 comprende gli aggiornamenti dalla 1.17.53, incluso l’allinea
 ### Verifiche e piattaforme
 
 - Download Club Log verificato con un servizio simulato e con un’esportazione reale in sola lettura. In un database temporaneo isolato l’esportazione reale conteneva 7.393 record; un secondo import non ha aggiunto QSO. Le prove simulate hanno coperto errori HTTP, duplicati e reattività dell’event loop. La conferma dell’anteprima è stata verificata anche in una finestra di prova.
-- Il packaging Windows seleziona la coppia di DLL OpenSSL del runtime MinGW; lo smoke test dell’installazione verifica anche che Qt inizializzi il backend OpenSSL senza le librerie MSYS2 nel PATH.
+- Il packaging Windows seleziona la coppia di DLL OpenSSL del runtime MinGW; lo smoke test dell’installazione verifica anche che Qt inizializzi il backend TLS senza le librerie MSYS2 nel PATH.
 - I pacchetti macOS sono firmati ad hoc e non notarizzati Developer ID. I pacchetti Windows e Linux sono generati dai rispettivi runner GitHub e sottoposti agli smoke test dei workflow di release.

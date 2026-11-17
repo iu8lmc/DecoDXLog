@@ -9,7 +9,7 @@ in stazione.
 
 **Invii sospesi.** La verifica periodica di un upload Club Log in sospeso rispetta l’interruttore dell’invio automatico e la presenza delle credenziali; dopo un errore HTTP 5xx non viene riprogrammata automaticamente nella stessa sessione. Il checkpoint resta disponibile per la riconciliazione manuale, senza reinvio alla cieca. Dopo il riavvio, con invio automatico attivo, può essere effettuato un nuovo controllo.
 
-**Windows.** Il pacchetto rileva la coppia di DLL OpenSSL disponibile nel runtime MinGW; il workflow verifica il backend TLS OpenSSL usando i file dell’installer in un ambiente isolato.
+**Windows.** Il pacchetto rileva la coppia di DLL OpenSSL disponibile nel runtime MinGW; il workflow verifica il backend TLS disponibile usando i file dell’installer in un ambiente isolato.
 
 **Verifiche.** Prove A/B con servizio simulato, errore HTTP, reattività dell’event loop e duplicati; esportazione reale Club Log in sola lettura e importazione in un database temporaneo. La causa dei blocchi durante la modifica o la cancellazione dei QSO resta da accertare.
 
