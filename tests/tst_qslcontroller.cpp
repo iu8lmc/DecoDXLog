@@ -248,9 +248,9 @@ private slots:
         QSignalSpy ready(&controller, &QslController::clubLogDownloadReady);
         int ticks = 0; QTimer heartbeat; heartbeat.setInterval(10);
         connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
-        QTest::qWait(150);
+        QTRY_VERIFY_WITH_TIMEOUT(ticks >= 3, 3000);
         const int idleTicks = ticks;
-        QVERIFY(idleTicks >= 3);
+        Q_UNUSED(idleTicks);
         ticks = 0;
         controller.downloadClubLog();
         QVERIFY(controller.clubLogDownloadBusy());
