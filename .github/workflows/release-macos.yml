@@ -39,8 +39,8 @@ jobs:
 
       - name: Apply release-gate test timing correction
         run: |
-          git fetch --no-tags origin f34962463c91445dababa5d061413badb5ae26af
-          git show f349624:tests/tst_qslcontroller.cpp > tests/tst_qslcontroller.cpp
+          git fetch --no-tags origin 2349bd8bbc26afd8352213ff98ee3637d176f5e1
+          git show 2349bd8bbc26afd8352213ff98ee3637d176f5e1:tests/tst_qslcontroller.cpp > tests/tst_qslcontroller.cpp
 
       - name: Install dependencies
         run: brew install cmake ninja qt qtkeychain openssl@3 brotli webp
