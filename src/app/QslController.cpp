@@ -3,10 +3,15 @@
 
 #include "core/CredentialStore.h"
 #include "core/ClubLogBatchReconcile.h"
+#include "core/ClubLogAccessGuard.h"
 #include "core/ClubLogUploadJournal.h"
 #include "core/LogDatabase.h"
 
 #include <QCoreApplication>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QRegularExpression>
+#include <QTemporaryFile>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -17,6 +22,7 @@
 #include <QSqlDatabase>
 #include <QStandardPaths>
 #include <algorithm>
+#include <memory>
 #include <array>
 
 namespace decolog::app {
@@ -63,6 +69,7 @@ QslController::QslController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
 {
+    m_downloadNet = new QNetworkAccessManager(this);
     if (m_ctx.credentials) {
         connect(m_ctx.credentials, &CredentialStore::changed, this, [this] {
             ++m_oqrsGeneration;
@@ -297,6 +304,8 @@ QslController::QslController(Context context, QObject* parent)
     m_clubLogRecheck.setSingleShot(true);
     m_clubLogRecheck.setInterval(5 * 60 * 1000);
     connect(&m_clubLogRecheck, &QTimer::timeout, this, [this] {
+        if (!autoUpload(QStringLiteral("clublog")) || !m_ctx.credentials
+            || !m_ctx.credentials->hasSecret(QStringLiteral("clublog"))) return;
         if (busy()) { m_clubLogRecheck.start(); return; }
         QSettings settings;
         ClubLogUploadJournal journal(settings);
@@ -306,7 +315,9 @@ QslController::QslController(Context context, QObject* parent)
     });
     {
         QSettings settings;
-        if (ClubLogUploadJournal(settings).pending()) m_clubLogRecheck.start();
+        if (autoUpload(QStringLiteral("clublog")) && m_ctx.credentials
+            && m_ctx.credentials->hasSecret(QStringLiteral("clublog"))
+            && ClubLogUploadJournal(settings).pending()) m_clubLogRecheck.start();
     }
     m_autoDelay.setSingleShot(true);
     m_autoDelay.setInterval(20'000);
@@ -533,6 +544,61 @@ void QslController::fetchClubLogOqrs()
     });
 }
 
+void QslController::downloadClubLog()
+{
+    if (m_downloadBusy) return;
+    const QString call = m_ctx.stationCallsign ? m_ctx.stationCallsign().trimmed().toUpper() : QString();
+    if (!QRegularExpression(QStringLiteral("^[A-Z0-9]+(?:/[A-Z0-9]+)*$")).match(call).hasMatch()) {
+        m_downloadStatus = tr("Select a station callsign before downloading Club Log"); emit changed(); return;
+    }
+    const quint64 generation = m_oqrsGeneration;
+    const QString logPath = m_ctx.db ? m_ctx.db->path() : QString();
+    m_downloadBusy = true;
+    m_downloadStatus = tr("Downloading the Club Log logbook…"); emit changed();
+    readSecret(QStringLiteral("clublog"), [this, call, generation, logPath](const QString& token, const QString&) {
+        auto fail = [this](const QString& error) { m_downloadBusy = false; m_downloadStatus = error; emit changed(); };
+        if (generation != m_oqrsGeneration || !token.startsWith(QLatin1String("cl_"))) {
+            fail(tr("A valid Club Log personal token is required")); return;
+        }
+        const QString restriction = ClubLogAccessGuard::restriction(token);
+        if (!restriction.isEmpty()) { fail(restriction); return; }
+        m_downloadFile = new QTemporaryFile(QDir::tempPath() + QStringLiteral("/decodxlog-clublog-XXXXXX.adi"), this);
+        if (!m_downloadFile->open()) { delete m_downloadFile; m_downloadFile = nullptr; fail(tr("Cannot create a temporary download file")); return; }
+        const QUrl url = m_downloadBase.resolved(QUrl(QStringLiteral("logs/") + QString::fromLatin1(QUrl::toPercentEncoding(call, "/")) + QStringLiteral("/adif-export")));
+        QNetworkRequest request(url);
+        request.setRawHeader("Authorization", QByteArray("Bearer ") + token.toUtf8());
+        request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+        request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+        request.setTransferTimeout(30000);
+        QNetworkReply* reply = m_downloadNet->post(request, QByteArray("{}"));
+        auto failedWrite = std::make_shared<bool>(false);
+        connect(reply, &QNetworkReply::readyRead, this, [this, reply, failedWrite] {
+            const QByteArray bytes = reply->readAll();
+            if (!m_downloadFile || m_downloadFile->size() + bytes.size() > 256LL * 1024 * 1024 || m_downloadFile->write(bytes) != bytes.size()) {
+                *failedWrite = true; reply->abort();
+            }
+        });
+        connect(reply, &QNetworkReply::finished, this, [this, reply, token, call, generation, logPath, failedWrite] {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            ClubLogAccessGuard::record(token, status, reply->rawHeader("Retry-After"));
+            const bool success = status == 200 && reply->error() == QNetworkReply::NoError && !*failedWrite
+                && generation == m_oqrsGeneration && m_ctx.db && m_ctx.db->path() == logPath
+                && m_ctx.stationCallsign && m_ctx.stationCallsign().trimmed().toUpper() == call
+                && m_downloadFile && m_downloadFile->flush() && m_downloadFile->size() > 0;
+            reply->deleteLater(); m_downloadBusy = false;
+            if (!success) {
+                delete m_downloadFile; m_downloadFile = nullptr;
+                m_downloadStatus = tr("Club Log download failed (HTTP %1); no contacts were imported").arg(status); emit changed(); return;
+            }
+            const QUrl file = QUrl::fromLocalFile(m_downloadFile->fileName());
+            m_downloadFile->close();
+            m_downloadFile = nullptr; // The parent keeps the temporary file until shutdown.
+            m_downloadStatus = tr("Download complete; review the import preview"); emit changed();
+            emit clubLogDownloadReady(file);
+        });
+    });
+}
+
 void QslController::resumeClubLogPendingUpload()
 {
     if (busy() || !m_ctx.db || !m_ctx.db->isOpen()) return;
@@ -696,6 +762,13 @@ void QslController::setAutoUpload(const QString& service, bool automatic)
         return;
     m_auto.insert(service, automatic);
     QSettings().setValue(QStringLiteral("qsl/auto/") + service, automatic);
+    if (service == QLatin1String("clublog")) {
+        if (!automatic) m_clubLogRecheck.stop();
+        else if (m_ctx.credentials && m_ctx.credentials->hasSecret(service)) {
+            QSettings settings;
+            if (ClubLogUploadJournal(settings).pending()) m_clubLogRecheck.start();
+        }
+    }
     emit changed();
 }
 
@@ -1283,8 +1356,11 @@ void QslController::finishBatch(const QslUploadResult& result)
     m_batchMode = false;
     if (service == QLatin1String("clublog")) {
         QSettings settings;
-        if (ClubLogUploadJournal(settings).pending()
-            && result.httpStatus != 401 && result.httpStatus != 403 && result.httpStatus != 429)
+        if (autoUpload(QStringLiteral("clublog")) && m_ctx.credentials
+            && m_ctx.credentials->hasSecret(QStringLiteral("clublog"))
+            && ClubLogUploadJournal(settings).pending()
+            && result.httpStatus != 401 && result.httpStatus != 403 && result.httpStatus != 429
+            && result.httpStatus < 500)
             m_clubLogRecheck.start();
     }
 

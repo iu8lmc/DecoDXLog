@@ -19,6 +19,10 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <functional>
+#include <QUrl>
+
+class QNetworkAccessManager;
+class QTemporaryFile;
 
 namespace decolog::core {
 class CredentialStore;
@@ -39,6 +43,8 @@ class QslController : public QObject {
     Q_PROPERTY(QVariantMap clubLogPendingInfo READ clubLogPendingInfo NOTIFY changed)
     Q_PROPERTY(QVariantList clubLogOqrsRequests READ clubLogOqrsRequests NOTIFY changed)
     Q_PROPERTY(QString clubLogOqrsStatus READ clubLogOqrsStatus NOTIFY changed)
+    Q_PROPERTY(bool clubLogDownloadBusy READ clubLogDownloadBusy NOTIFY changed)
+    Q_PROPERTY(QString clubLogDownloadStatus READ clubLogDownloadStatus NOTIFY changed)
     Q_PROPERTY(bool clubLogOqrsBusy READ clubLogOqrsBusy NOTIFY changed)
     // CRX Logbook: in quale logbook dell'account si scrive, e da che giorno.
     Q_PROPERTY(qint64 crxLogId READ crxLogId WRITE setCrxLogId NOTIFY changed)
@@ -85,6 +91,9 @@ public:
     QString clubLogOqrsStatus() const;
     bool clubLogOqrsBusy() const { return m_oqrsBusy; }
     Q_INVOKABLE void fetchClubLogOqrs();
+    Q_INVOKABLE void downloadClubLog();
+    bool clubLogDownloadBusy() const { return m_downloadBusy; }
+    QString clubLogDownloadStatus() const { return m_downloadStatus; }
     QString tqslStatus() const;
     qint64 crxLogId() const { return m_crxLogId; }
     void setCrxLogId(qint64 id);
@@ -126,6 +135,7 @@ public:
 
 signals:
     void changed();
+    void clubLogDownloadReady(const QUrl& file);
 
 private:
     friend class QslControllerTest;
@@ -144,6 +154,11 @@ private:
     core::TqslUploader m_tqsl;
     core::WebQslUploader m_web;
     core::ClubLogOqrsClient m_oqrs;
+    QNetworkAccessManager* m_downloadNet{nullptr};
+    QTemporaryFile* m_downloadFile{nullptr};
+    QUrl m_downloadBase{QStringLiteral("https://clublog.org/api/v1/")};
+    QString m_downloadStatus;
+    bool m_downloadBusy{false};
     QVariantList m_oqrsRequests;
     QString m_oqrsStatus, m_oqrsCall, m_oqrsResultCall;
     quint64 m_oqrsGeneration{0}, m_oqrsRequestGeneration{0};

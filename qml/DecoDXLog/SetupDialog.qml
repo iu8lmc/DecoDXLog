@@ -1581,6 +1581,12 @@ DialogFrame {
                                    + "For the legacy API, enter your account email, application password and API key. "
                                    + "REST file uploads are queued and must be reconciled before they are marked as sent.")
                     }
+                    GlassButton {
+                        text: decolog.qsl.clubLogDownloadBusy ? qsTr("Downloading Club Log…") : qsTr("Download Club Log for import")
+                        enabled: !decolog.qsl.clubLogDownloadBusy
+                        onClicked: decolog.qsl.downloadClubLog()
+                    }
+                    Note { text: decolog.qsl.clubLogDownloadStatus }
                     Note {
                         visible: decolog.qsl.clubLogPendingState !== ""
                         text: decolog.qsl.clubLogPendingState === "queued"

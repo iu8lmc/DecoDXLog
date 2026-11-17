@@ -7330,6 +7330,14 @@ Campi extra conservati: %8</translation>
 <context>
     <name>SetupDialog</name>
     <message>
+        <source>Downloading Club Log…</source>
+        <translation>Scaricamento da Club Log…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>Scarica il log da Club Log</translation>
+    </message>
+    <message>
         <source>Legacy API key</source>
         <translation>Chiave API precedente</translation>
     </message>
@@ -10786,6 +10794,10 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::app::DecoLogController</name>
     <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>Il log o la stazione sono cambiati; ripeti l’anteprima</translation>
+    </message>
+    <message>
         <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
         <translation>Serve un token personale Club Log o una chiave API precedente (Impostazioni → Servizi QSL)</translation>
     </message>
@@ -12191,6 +12203,30 @@ Campi extra conservati: %8</translation>
 </context>
 <context>
     <name>decolog::app::QslController</name>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Seleziona il nominativo della stazione prima di scaricare da Club Log</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>Scaricamento del log da Club Log…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>È necessario un token personale Club Log valido</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>Impossibile creare un file temporaneo per il download</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Download da Club Log non riuscito (HTTP %1); nessun QSO importato</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>Download completato; controlla l’anteprima prima di importare</translation>
+    </message>
     <message>
         <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
         <translation>Club Log: %1 contatti trovati; %2 ancora in attesa di verifica</translation>

@@ -1,5 +1,6 @@
 #include "app/QslController.h"
 #include "core/ClubLogUploadJournal.h"
+#include "core/ClubLogDownload.h"
 #include "core/ClubLogBatchReconcile.h"
 #include "core/CredentialStore.h"
 #include "core/LogDatabase.h"
@@ -14,6 +15,7 @@
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QSignalSpy>
 #include <cstdio>
 #include <algorithm>
 
@@ -72,6 +74,154 @@ private slots:
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_dir.path());
     }
     void init() { QSettings().clear(); }
+
+    void automaticClubLogRecheckRespectsSwitchAndCredential()
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("clubLogRestUpload/phase"), QStringLiteral("queued"));
+        settings.setValue(QStringLiteral("credentials/clublog/stored"), true);
+        settings.sync();
+        CredentialStore credentials(QStringLiteral("DecoDXLog-test-unused"));
+        QslController::Context context;
+        context.credentials = &credentials;
+        QslController controller(context);
+        QVERIFY(!controller.m_clubLogRecheck.isActive());
+        controller.setAutoUpload(QStringLiteral("clublog"), true);
+        QVERIFY(controller.m_clubLogRecheck.isActive());
+        controller.setAutoUpload(QStringLiteral("clublog"), false);
+        QVERIFY(!controller.m_clubLogRecheck.isActive());
+        QVERIFY(ClubLogUploadJournal(settings).pending());
+        settings.setValue(QStringLiteral("credentials/clublog/stored"), false);
+        settings.sync();
+        controller.setAutoUpload(QStringLiteral("clublog"), true);
+        QVERIFY(!controller.m_clubLogRecheck.isActive());
+    }
+
+    void clubLogDownloadRealOptIn()
+    {
+        if (!qEnvironmentVariableIsSet("DECODXLOG_TEST_REAL_DOWNLOAD")) QSKIP("Live download not requested");
+        LogDatabase db; QVERIFY(db.open(m_dir.filePath("clublog-live-readonly.db")));
+        QSettings().setValue("credentials/clublog/stored", true);
+        char tokenBuffer[512] = {};
+        QVERIFY(std::fgets(tokenBuffer, sizeof(tokenBuffer), stdin));
+        const QString token = QString::fromUtf8(tokenBuffer).trimmed();
+        std::fill(std::begin(tokenBuffer), std::end(tokenBuffer), char(0));
+        QVERIFY(token.startsWith(QLatin1String("cl_")));
+        CredentialStore credentials("unused-test");
+        credentials.m_secretCache.insert("clublog", token);
+        QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
+        ctx.stationCallsign = [] { return QStringLiteral("9H1SR"); };
+        QslController controller(ctx);
+        QSignalSpy ready(&controller, &QslController::clubLogDownloadReady);
+        int ticks = 0; QTimer heartbeat; heartbeat.setInterval(20);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        controller.downloadClubLog();
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.clubLogDownloadBusy(), 60000);
+        QVERIFY2(ready.size() == 1, qPrintable(controller.clubLogDownloadStatus()));
+        QVERIFY(ticks > 0);
+        QFile file(ready.first().at(0).toUrl().toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly));
+        const QByteArray data = file.readAll();
+        QVERIFY(data.toUpper().contains("<EOR>"));
+        const auto document = adif::parse(data);
+        QVERIFY(!document.records.isEmpty());
+        for (const auto& record : document.records) {
+            QVERIFY(!record.value(QStringLiteral("APP_CLUBLOG_QSOID")).isEmpty());
+            QVERIFY(!record.value(QStringLiteral("STATION_CALLSIGN")).isEmpty());
+        }
+        const QByteArray prepared = prepareClubLogDownload(data);
+        QVERIFY(!prepared.isEmpty());
+        const ImportResult first = db.importAdif(prepared, "test");
+        QVERIFY(first.inserted > 0);
+        const ImportResult second = db.importAdif(prepared, "test");
+        QCOMPARE(second.inserted, 0);
+        QVERIFY(second.duplicates > 0);
+        QVERIFY(db.qsosToUpload("clublog", 0).isEmpty());
+        qInfo() << "Live ADIF isolated import:" << first.inserted << "new," << second.duplicates << "duplicates on repeat; heartbeat ticks" << ticks;
+    }
+
+    void invalidClubLogDownloadIsRejected()
+    {
+        QVERIFY(prepareClubLogDownload("<html>error</html>").isEmpty());
+        QVERIFY(prepareClubLogDownload("<CALL:5>K1AAA<EOR>").isEmpty());
+    }
+
+    void clubLogDownloadAsyncAB_data()
+    {
+        QTest::addColumn<bool>("failure");
+        QTest::newRow("A valid ADIF") << false;
+        QTest::newRow("B server failure") << true;
+    }
+    void clubLogDownloadAsyncAB()
+    {
+        QFETCH(bool, failure);
+        LogDatabase db;
+        QVERIFY(db.open(m_dir.filePath(failure ? "download-b.db" : "download-a.db")));
+        QSettings().setValue("credentials/clublog/stored", true);
+        CredentialStore credentials("unused-test");
+        credentials.m_secretCache.insert("clublog", "cl_download_fixture");
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        QByteArray received;
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket* socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, this, [&, socket] {
+                received += socket->readAll();
+                if (!received.contains("\r\n\r\n{}")) return;
+                QTimer::singleShot(150, socket, [socket, failure] {
+                    const QByteArray body = failure ? QByteArray("error") : QByteArray("<EOH><CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>");
+                    socket->write(QByteArray("HTTP/1.1 ") + (failure ? "500 Error" : "200 OK") + "\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
+                    socket->disconnectFromHost();
+                });
+            });
+        });
+        QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
+        ctx.stationCallsign = [] { return QStringLiteral("K1TEST"); };
+        QslController controller(ctx);
+        controller.m_downloadBase = QUrl(QStringLiteral("http://127.0.0.1:%1/api/v1/").arg(server.serverPort()));
+        QSignalSpy ready(&controller, &QslController::clubLogDownloadReady);
+        int ticks = 0; QTimer heartbeat; heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        QTest::qWait(150);
+        const int idleTicks = ticks;
+        QVERIFY(idleTicks >= 3);
+        ticks = 0;
+        controller.downloadClubLog();
+        QVERIFY(controller.clubLogDownloadBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.clubLogDownloadBusy(), 5000);
+        QVERIFY(ticks >= 3);
+        QVERIFY(received.startsWith("POST /api/v1/logs/K1TEST/adif-export "));
+        QCOMPARE(ready.size(), failure ? 0 : 1);
+        QCOMPARE(db.latestIds("K1AAA", 1).size(), 0);
+        if (!failure) {
+            QFile file(ready.first().at(0).toUrl().toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly));
+            const QByteArray adif = file.readAll();
+            QVERIFY(adif.contains("<CALL:5>K1AAA"));
+            QCOMPARE(db.importAdif(adif, "test").inserted, 1);
+            const auto repeated = db.importAdif(adif, "test");
+            QCOMPARE(repeated.inserted, 0);
+            QCOMPARE(repeated.duplicates, 1);
+        }
+    }
+
+    void serverErrorDoesNotScheduleAnotherAutomaticRecheck()
+    {
+        QSettings settings;
+        settings.setValue(QStringLiteral("clubLogRestUpload/phase"), QStringLiteral("queued"));
+        settings.setValue(QStringLiteral("credentials/clublog/stored"), true);
+        settings.sync();
+        CredentialStore credentials(QStringLiteral("DecoDXLog-test-unused"));
+        QslController::Context context;
+        context.credentials = &credentials;
+        QslController controller(context);
+        controller.setAutoUpload(QStringLiteral("clublog"), true);
+        controller.m_clubLogRecheck.stop(); // The timer has just fired.
+        controller.m_busyService = QStringLiteral("clublog");
+        QslUploadResult failure;
+        failure.httpStatus = 500;
+        failure.requiresReconciliation = true;
+        controller.finishBatch(failure);
+        QVERIFY(!controller.m_clubLogRecheck.isActive());
+        QVERIFY(ClubLogUploadJournal(settings).pending());
+    }
 
     void misplacedPersonalTokenIsRemovedFromLegacySettings()
     {
