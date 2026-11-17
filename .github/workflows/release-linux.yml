@@ -156,9 +156,16 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           QML_SOURCES_PATHS: qml:libs/decodium-ui/qml
-          EXTRA_QT_PLUGINS: geoservices
           VERSION: ${{ inputs.tag }}
         run: |
+          if [ -n "${QT_ROOT_DIR:-}" ]; then
+            geo_plugins="$QT_ROOT_DIR/plugins/geoservices"
+          else
+            geo_plugins="$(qtpaths6 --plugin-dir)/geoservices"
+          fi
+          test -f "$geo_plugins/libqtgeoservices_osm.so"
+          mkdir -p AppDir/usr/plugins/geoservices
+          cp "$geo_plugins"/libqtgeoservices_*.so AppDir/usr/plugins/geoservices/
           ./linuxdeploy \
             --appdir AppDir \
             --executable AppDir/usr/bin/DecoDXLog \
