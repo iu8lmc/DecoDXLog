@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.54
+    VERSION 1.17.56
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -664,6 +664,9 @@ endif()
 if(DECODXLOG_BUILD_TESTS)
     enable_testing()
     find_package(Qt6 REQUIRED COMPONENTS Test QuickTest)
+    qt_add_executable(decodxlog_tls_probe tests/tools/tls_probe.cpp)
+    target_link_libraries(decodxlog_tls_probe PRIVATE Qt6::Core Qt6::Network)
+    set_target_properties(decodxlog_tls_probe PROPERTIES WIN32_EXECUTABLE OFF)
     qt_add_executable(clublog_live50 tests/tools/clublog_live50.cpp)
     target_link_libraries(clublog_live50 PRIVATE decolog_core Qt6::Core Qt6::Network)
     set_target_properties(clublog_live50 PROPERTIES WIN32_EXECUTABLE OFF)

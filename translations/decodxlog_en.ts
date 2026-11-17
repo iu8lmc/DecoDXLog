@@ -1380,6 +1380,17 @@ The call Decodium is working shows up here by itself.</source>
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2761,6 +2772,14 @@ The call Decodium is working shows up here by itself.</source>
     </message>
     <message>
         <source>Save</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -5393,6 +5412,25 @@ Extra fields are preserved: %8</source>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7878,15 +7916,7 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -8271,10 +8301,6 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>deleted</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -8899,6 +8925,54 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -10916,10 +10990,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -11824,6 +11894,22 @@ Extra fields are preserved: %8</source>
         <source>The selected station profile is not available.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12303,6 +12389,144 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -13050,6 +13274,29 @@ Extra fields are preserved: %8</source>
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13234,14 +13481,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation type="unfinished"></translation>
     </message>
@@ -13323,6 +13562,38 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -13631,6 +13902,130 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

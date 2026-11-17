@@ -1385,6 +1385,17 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log noraidīja šo sakaru; atsevišķais iemesls nav zināms. Paku iemesli: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log noraidīja šo sakaru</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2772,6 +2783,14 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
     <message>
         <source>Save</source>
         <translation>Saglabāt</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>REST pilnvara: e-pasts nav nepieciešams. Žurnāla izsaukuma zīme nāk no aktīvā stacijas profila: %1.</translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>Pārbaude apstiprina, ka noslēpums ir sistēmas atslēgu glabātuvē; savienojums ar Club Log netiek pārbaudīts.</translation>
     </message>
 </context>
 <context>
@@ -5412,6 +5431,25 @@ Papildu lauki tiek saglabāti: %8</translation>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>Šajā failā nav atrasts neviens derīgs QSO ieraksts</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>Žurnālu nevar atvērt priekšskatījumam</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Nederīga ADIF lejupielāde no Club Log</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>Žurnāls ir mainījies; atkārtojiet priekšskatījumu</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7907,16 +7945,8 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Sertifikāts paliek TQSL: DecoDXLog uzraksta pagaidu ADIF, TQSL to paraksta un nosūta. Dublikāti nav kļūda, LoTW vienkārši patur to, kas tai jau ir. Sūtīšana, automātiskā sūtīšana un skaitītāji ir QSL cilnē apakšā.</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>API atslēga</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>atslēga, ko tev iedevis Club Log</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>Club Log vajadzīgas trīs lietas: konta e-pasts un parole (zemāk), stacijas profila izsaukuma signāls un API atslēga. Atslēga ir bez maksas un personiska, un to pieprasa clublog.org/requestapikey.php — tā apzīmē programmu, nevis tevi. Viens QSO aiziet uzreiz pēc ierakstīšanas, uzkrājums aiziet kā viens ADIF fails.</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8301,10 +8331,6 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>deleted</source>
         <translation>dzēsta</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>Ar Club Log API atslēgu (QSL pakalpojumi) DecoDXLog katru nedēļu lejupielādē Club Log cty.xml: teritorijas ar to datumiem, lai 2005. gada QSO ar PJ2 būtu Nīderlandes Antiļas, nevis Kirasao, ARRL neatzītas operācijas neskaitītos DXCC, un dzēstās teritorijas tiktu parādītas, bet neskaitītas.</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -8929,6 +8955,54 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>Katrs profils saglabā CAT savienojumu, radio modeli, seriālos parametrus, PTT/taustiņa portus un dekodera audio ierīci. Izmaiņas tiek saglabātas automātiski. Izvēlētais profils tiek atjaunots, kad DecoDXLog tiek startēts atkārtoti.</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>Ar personīgo Club Log pilnvaru vai veco API atslēgu (QSL pakalpojumi) DecoDXLog katru nedēļu lejupielādē Club Log cty.xml: vienības ar to datumiem, tāpēc 2005. gada QSO ar PJ2 ir Nīderlandes Antiļas, nevis Kirasao, ARRL neakceptētās darbības DXCC neskaita, un dzēstās vienības tiek rādītas, bet neskaitītas.</translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation>Vecā API atslēga</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log: zemāk esošajos Club Log pieteikšanās datos ievadiet savu personīgo REST pilnvaru. Vecajai API ievadiet konta e-pastu, lietojumprogrammas paroli un API atslēgu. REST failu augšupielādes tiek ierindotas un pirms atzīmēšanas kā nosūtītām ir jāsaskaņo.</translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation>Notiek Club Log lejupielāde…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>Lejupielādēt Club Log importam</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>Augšupielāde %1 priekš %2 (%3 sakari) gaida pārbaudi. Ja augšupielādes statuss nav pieejams, DecoDXLog pārbauda, vai katrs sakars ir jūsu Club Log žurnālā.</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>Club Log iesniegumam rezultāts nav zināms. Tā sakari ir rezervēti pārbaudei; pārējos sakarus joprojām var nosūtīt.</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>Atsākt Club Log augšupielādes statusu</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>Skatīt Club Log augšupielāžu vēsturi</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>Notiek OQRS pieprasījumu nolasīšana…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>Nolasīt tiešos OQRS pieprasījumus</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>Tiešie OQRS pieprasījumi aktīvajai stacijai. Tie nav saņemti QSL apstiprinājumi.</translation>
     </message>
 </context>
 <context>
@@ -10960,10 +11034,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Club Log cty.xml nav nolasāms: %1</translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>Vajag Club Log API atslēgu (Iestatījumi → QSL pakalpojumi → Club Log)</translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation>Lejupielādē cty.xml no Club Log…</translation>
     </message>
@@ -11880,6 +11950,22 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>The selected station profile is not available.</source>
         <translation>Izvēlētais stacijas profils nav pieejams.</translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>Nepieciešama personīga Club Log pilnvara vai vecā API atslēga (Iestatījumi → QSL pakalpojumi)</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log: nevarēja saglabāt cty.xml; esošais fails tika saglabāts</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>Club Log pieteikšanās dati nav pieejami: %1</translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>Žurnāls vai stacija ir mainījusies; atkārtojiet importa priekšskatījumu</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12375,6 +12461,146 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
         <translation>LoTW: TQSL augšupielādēja %1 QSO; pārbaudi apstrādi LoTW sadaļā „Your Activity”</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>Pieteikšanās dati mainīti; atsvaidziniet OQRS pieprasījumus</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>Club Log konts vai stacija ir mainīta; atsvaidziniet OQRS pieprasījumus</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>%n tiešs OQRS pieprasījums; tie nav QSL apstiprinājumi</numerusform>
+            <numerusform>%n tiešie OQRS pieprasījumi; tie nav QSL apstiprinājumi</numerusform>
+            <numerusform>%n tiešo OQRS pieprasījumu; tie nav QSL apstiprinājumi</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log: personīgo pilnvaru nevarēja noņemt no vecā iestatījumu faila; pārbaudiet tā atļaujas</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>Personīgā Club Log pilnvara ir noņemta no vecā atslēgas lauka un tiek pārvietota uz drošu glabāšanu</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>Personīgā Club Log pilnvara ir noņemta no vecā atslēgas lauka; pārbaudiet drošos pieteikšanās datus</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>Stacija ir mainīta; atsvaidziniet OQRS pieprasījumus</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>Notiek tiešo OQRS pieprasījumu nolasīšana no Club Log…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>Club Log pieteikšanās dati ir mainīti; mēģiniet vēlreiz</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>OQRS pieprasījumiem nepieciešama personīga Club Log pilnvara</translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Pirms Club Log lejupielādes izvēlieties stacijas izsaukuma zīmi</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>Notiek Club Log žurnāla lejupielāde…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>Nepieciešama derīga personīga Club Log pilnvara</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>Nevar izveidot pagaidu lejupielādes failu</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Club Log lejupielāde neizdevās (HTTP %1); sakari nav importēti</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>Lejupielāde pabeigta; pārskatiet importa priekšskatījumu</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log: šim žurnālam nav atsākamas augšupielādes; pārskatiet gaidošo kontrolpunktu</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log: saglabātais QSO saraksts nav derīgs; nepieciešama saskaņošana</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log: vietējie QSO dati ir mainīti; pirms atsākšanas pārskatiet gaidošo augšupielādi</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log: lai atsāktu gaidošo augšupielādi, nepieciešama personīga pilnvara</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log: augšupielādes rezultāts joprojām nav zināms</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>Personīgās Club Log pilnvaras jāsaglabā drošajā Club Log pieteikšanās datu laukā, nevis vecajā API atslēgas laukā</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log: šis sakars jau gaida pārbaudi</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log: %n QSO pieder citai stacijai un paliek gaidīšanā</numerusform>
+            <numerusform>Club Log: %n QSO pieder citai stacijai un paliek gaidīšanā</numerusform>
+            <numerusform>Club Log: %n QSO pieder citai stacijai un paliek gaidīšanā</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log: neviens gaidošais sakars nepieder aktīvajai stacijai</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log: augšupielāde nav atrisināta vai tās kontrolpunktu nevarēja saglabāt; pārskatiet to pirms sūtīšanas</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log: visi sakari ir atrasti žurnālā; augšupielādes apstrādes dati nav pieejami</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log: atrasti %1 sakari; %2 vēl gaida pārbaudi</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>Club Log noraidīja šo QSO</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>Automātiska augšupielāde uz Club Log ir apturēta: pirms atkārtošanas pārskatiet rezultātu</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>Automātiska augšupielāde uz Club Log ir apturēta: pirms atkārtošanas izlabojiet noraidītos sakarus</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log: augšupielādes kontrolpunktu nevarēja notīrīt; pārbaudiet pirms atkārtotas sūtīšanas</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log: attālais rezultāts saņemts, bet vietējā saglabāšana neizdevās; kontrolpunkts saglabāts saskaņošanai</translation>
     </message>
 </context>
 <context>
@@ -13122,6 +13348,29 @@ Papildu lauki tiek saglabāti: %8</translation>
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>Nepieciešami stacijas izsaukuma zīme un personīga Club Log pilnvara</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Club Log OQRS pieprasījums neizdevās (HTTP %1); iepriekšējie rezultāti saglabāti</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS atgrieza nederīgu ierakstu; iepriekšējie rezultāti saglabāti</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS atgrieza nederīgu kursoru; iepriekšējie rezultāti saglabāti</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Club Log OQRS lappušu dalīšana neizdevās; iepriekšējie rezultāti saglabāti</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13306,14 +13555,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Apstiprinājumu lejupielāde; augšupielāde iet caur vietējo TQSL</translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation>E-pasts</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>Lietotnes parole</translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation>Augšupielāde reāllaikā un OQRS</translation>
     </message>
@@ -13396,6 +13637,38 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation>QSO nonāk HH, HamHub Log tiltā, caur DecoPort. Ievadi to pašu paroli HH: bez tās nekas netiek sūtīts</translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation>E-pasts (vecais)</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>Personīga pilnvara vai lietotnes parole</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>Club Log pieteikšanās datu darbība jau notiek</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>Nevar saglabāt pieteikšanās datu aizstāšanas kontrolpunktu</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>Nevar saglabāt pieteikšanās datu stāvokli</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>Šajā versijā nav sistēmas atslēgu glabātuves: noslēpumu nevarēja noņemt</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>Pieteikšanās datu aizstāšana nav pabeigta; saglabājiet tos vēlreiz</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>Nav saglabātu Club Log pieteikšanās datu</translation>
     </message>
 </context>
 <context>
@@ -13704,6 +13977,130 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: vajadzīgs gan e-pasts, gan parole, gan izsaukuma signāls, gan API atslēga</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log: nederīga reāllaika paka</translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log: reāllaika paka HTTP %1; pirms atkārtošanas pārbaudiet sakarus</translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log: pārbauda katra sakara rezultātu</translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST: nederīga izsaukuma zīme, pilnvara, ADIF vai kontrolpunkts</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log: augšupielāde ierindota; joprojām nepieciešama galīgā apstrāde un saskaņošana</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log: augšupielāde ierindota, bet tās identifikatoru nevarēja saglabāt; saskaņojiet manuāli</translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Club Log augšupielāde: HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log: nederīgi gaidošās augšupielādes parametri</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log: sasniegts augšupielādes vaicājumu ierobežojums; atsāciet saskaņošanu vēlāk</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log: augšupielāde joprojām ierindota; atsāciet saskaņošanu vēlāk</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log: vaicājums pārtraukts</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log: statuss HTTP %1</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>; atsākt vēlāk</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log: galīgajā statusā nav ierakstu rezultātu</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log: nederīgi vai pārāk daudzi rezultātu ieraksti</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log: nederīgs rezultātu kursors</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log: atkārtots rezultātu kursors</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log: nepilnīgi individuālie rezultāti; nepieciešama saskaņošana</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log: izveidoti vai atjaunināti %1, dublikāti %2, noraidīti %3, nezināmi %4; nepieciešama individuāla saskaņošana</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log: nevar atrisināt paku identitātes</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log: vairākiem vietējiem sakariem ir vienāda identitāte</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log: identitātes vaicājums neizdevās (HTTP %1); saskaņošana paliek gaidīšanā</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log: nepilnīgs identitātes vaicājums</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log: neviennozīmīgs identitātes vaicājums</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log: nederīga sakara identitāte</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log: sakara identitāte nav unikāla</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log: nepilnīgas sakaru identitātes</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log: identitātes vaicājums pārtraukts</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST: nepieciešams tieši viens QSO un stacijas izsaukuma zīme</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST: HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST: HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

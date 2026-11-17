@@ -1377,6 +1377,17 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log 拒绝了此通联；单独原因未知。批次原因：%1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log 拒绝了此通联</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2754,6 +2765,14 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
     <message>
         <source>Save</source>
         <translation>保存</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>REST 令牌：无需电子邮件。日志呼号取自当前电台配置：%1。</translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>检查只确认密钥位于系统密钥库中，不测试与 Club Log 的连接。</translation>
     </message>
 </context>
 <context>
@@ -5388,6 +5407,25 @@ QSL 状态：%6 · UTC 不完整：%7。
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>此文件中未找到有效的 QSO 记录</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>无法打开日志以进行预览</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Club Log ADIF 下载无效</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>日志已更改；请重新预览</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7863,16 +7901,8 @@ QSL 状态：%6 · UTC 不完整：%7。
         <translation>证书留在 TQSL 里：DecoDXLog 写一个临时 ADIF，由 TQSL 签名并发送。重复不是错误，LoTW 只是保留它已经有的那一条。发送、自动发送和计数都在下面的 QSL 标签页里。</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>API 密钥</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>Club Log 给你的密钥</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>Club Log 要三样东西：账户的邮箱和密码（下面）、电台配置里的呼号，以及一个 API 密钥。密钥是免费的、属于你个人的，在 clublog.org/requestapikey.php 申请 — 它标识的是程序，不是你。单个 QSO 一记录就发走，积压的则作为一个 ADIF 文件发走。</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8257,10 +8287,6 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>deleted</source>
         <translation>已删除</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>有了 Club Log 的 API 密钥（QSL 服务），DecoDXLog 每周下载 Club Log 的 cty.xml：带日期的实体，因此 2005 年与 PJ2 的 QSO 属于荷属安的列斯而不是库拉索，ARRL 未认可的运作不计入 DXCC，已删除的实体显示但不计数。</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -8885,6 +8911,54 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>每个配置文件会保存 CAT 连接、电台型号、串口参数、PTT/键控器端口以及解码器音频设备。更改会自动保存。所选配置文件会在 DecoDXLog 再次启动时恢复。</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>使用 Club Log 个人令牌或旧版 API 密钥（QSL 服务）时，DecoDXLog 每周下载 Club Log 的 cty.xml：其中的实体及其日期使 2005 年与 PJ2 的通联归属荷属安的列斯而非库拉索；ARRL 未认可的活动不计入 DXCC，已删除的实体会显示但不计数。</translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation>旧版 API 密钥</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log：请在下方 Club Log 凭据中输入个人 REST 令牌。使用旧版 API 时，请输入账户邮箱、应用密码和 API 密钥。REST 文件上传会排队，必须先核对，才能标记为已发送。</translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation>正在下载 Club Log…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>下载 Club Log 以导入</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>%2 的上传 %1（%3 个通联）等待核实。如果无法获取上传状态，DecoDXLog 会检查每个通联是否已在你的 Club Log 日志中。</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>一次 Club Log 提交的结果未知。其通联已预留待核实；其他通联仍可发送。</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>恢复 Club Log 上传状态</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>查看 Club Log 上传历史</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>正在读取 OQRS 请求…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>读取直接 OQRS 请求</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>当前电台的直接 OQRS 请求。这些请求不是已收到的 QSL 确认。</translation>
     </message>
 </context>
 <context>
@@ -10886,10 +10960,6 @@ QSL 状态：%6 · UTC 不完整：%7。
         <translation>无法读取 Club Log 的 cty.xml：%1</translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>需要 Club Log 的 API 密钥（设置 → QSL 服务 → Club Log）</translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation>正在从 Club Log 下载 cty.xml…</translation>
     </message>
@@ -11782,6 +11852,22 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>The selected station profile is not available.</source>
         <translation>所选电台配置文件不可用。</translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>需要 Club Log 个人令牌或旧版 API 密钥（设置 → QSL 服务）</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log：无法保存 cty.xml；已保留现有文件</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>Club Log 凭据不可用：%1</translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>日志或电台已更改；请重新预览导入</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12247,6 +12333,142 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
         <translation>LoTW：TQSL 已上传 %1 条 QSO；请在 LoTW 的“Your Activity”中查看处理情况</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>凭据已更改；请刷新 OQRS 请求</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>Club Log 账户或电台已更改；请刷新 OQRS 请求</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>%n 个直接 OQRS 请求；这些不是 QSL 确认</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log：无法从旧设置文件中删除个人令牌；请检查其权限</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>个人 Club Log 令牌已从旧密钥字段删除，正在移入安全存储</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>个人 Club Log 令牌已从旧密钥字段删除；请检查安全凭据</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>电台已更改；请刷新 OQRS 请求</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>正在从 Club Log 读取直接 OQRS 请求…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>Club Log 凭据已更改；请重试</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>OQRS 请求需要 Club Log 个人令牌</translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>下载 Club Log 之前请先选择电台呼号</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>正在下载 Club Log 日志…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>需要有效的 Club Log 个人令牌</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>无法创建临时下载文件</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Club Log 下载失败（HTTP %1）；未导入任何通联</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>下载完成；请查看导入预览</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log：此日志没有可恢复的上传；请检查待处理的检查点</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log：已保存的 QSO 列表无效；需要核对</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log：本地 QSO 数据已更改；恢复前请检查待处理的上传</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log：恢复待处理的上传需要个人令牌</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log：上传结果仍未知</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>Club Log 个人令牌必须保存在安全的 Club Log 凭据字段中，而不是旧版 API 密钥字段</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log：此通联已在等待核实</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log：%n 个 QSO 属于其他电台，仍待处理</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log：没有待处理的通联属于当前电台</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log：某个上传未解决，或其检查点无法保存；发送前请检查</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log：所有通联都已在日志中找到；上传处理详情不可用</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log：找到 %1 个通联；%2 个仍待核实</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>Club Log 拒绝了此 QSO</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>Club Log 自动上传已暂停：重试前请检查结果</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>Club Log 自动上传已暂停：重试前请更正被拒绝的通联</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log：无法清除上传检查点；再次发送前请检查</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log：已收到远程结果但本地保存失败；检查点已保留以便核对</translation>
     </message>
 </context>
 <context>
@@ -12992,6 +13214,29 @@ QSL 状态：%6 · UTC 不完整：%7。
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>需要电台呼号和 Club Log 个人令牌</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Club Log OQRS 请求失败（HTTP %1）；已保留之前的结果</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS 返回了无效记录；已保留之前的结果</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS 返回了无效游标；已保留之前的结果</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Club Log OQRS 分页失败；已保留之前的结果</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13176,14 +13421,6 @@ QSL 状态：%6 · UTC 不完整：%7。
         <translation>下载确认；上传走本机的 TQSL</translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation>电子邮件</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>应用密码</translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation>实时上传与 OQRS</translation>
     </message>
@@ -13266,6 +13503,38 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation>QSO 通过 DecoPort 发往 HH（HamHub Log 的桥接程序）。请在 HH 中输入相同的密码：没有它就不会发送任何内容</translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation>电子邮件（旧版）</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>个人令牌或应用密码</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>Club Log 凭据操作已在进行中</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>无法保存凭据替换检查点</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>无法保存凭据状态</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>此版本没有系统密钥库：无法删除密钥</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>凭据替换未完成；请重新保存</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>未保存 Club Log 凭据</translation>
     </message>
 </context>
 <context>
@@ -13574,6 +13843,130 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log：邮箱、密码、呼号和 API 密钥，一个都不能少</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log：实时批次无效</translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log：实时批次 HTTP %1；重试前请核实通联</translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log：正在检查每个通联的结果</translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST：呼号、令牌、ADIF 或检查点无效</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log：上传已排队；仍需最终处理和核对</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log：上传已排队但无法保存其标识符；请手动核对</translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Club Log 上传：HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log：待处理上传的参数无效</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log：已达到上传轮询上限；请稍后恢复核对</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log：上传仍在排队；请稍后恢复核对</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log：轮询已中断</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log：状态 HTTP %1</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>；稍后恢复</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log：最终状态缺少记录结果</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log：结果记录无效或过多</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log：结果游标无效</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log：结果游标重复</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log：单项结果不完整；需要核对</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log：已创建或更新 %1 个，重复 %2 个，拒绝 %3 个，未知 %4 个；需要逐项核对</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log：无法解析批次标识</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log：多个本地通联具有相同标识</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log：标识查询失败（HTTP %1）；核对仍待处理</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log：标识查询不完整</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log：标识查询不明确</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log：通联标识无效</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log：通联标识不唯一</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log：通联标识不完整</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log：标识查询已中断</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST：需要且仅需一个 QSO 和电台呼号</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST：HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST：HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

@@ -1,3 +1,4 @@
+#include "core/ClubLogDownload.h"
 #include "app/DecoLogController.h"
 
 #include "core/NetworkError.h"
@@ -4560,6 +4561,12 @@ QVariantList DecoLogController::dxccInLog() const
 void DecoLogController::importAdif(const QUrl& url)
 {
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
+    if (m_importPreviewFile == url && (m_importPreviewLogPath != m_db.path()
+        || m_importPreviewLogVersion != m_logVersion
+        || m_importPreviewProfile != (m_profiles ? m_profiles->activeProfileId() : 0))) {
+        addActivity(QStringLiteral("IMPORT"), tr("Logbook or station changed; preview the import again"), QStringLiteral("warning"));
+        return;
+    }
     if (m_importProgress >= 0) {
         addActivity(QStringLiteral("IMPORT"), tr("An import is already running: wait for it to finish."),
                     QStringLiteral("warning"));
@@ -4638,7 +4645,7 @@ void DecoLogController::importAdif(const QUrl& url)
     });
 }
 
-QVariantMap DecoLogController::previewImport(const QUrl& url) const
+static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb)
 {
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
     QFile file(path);
@@ -4655,6 +4662,10 @@ QVariantMap DecoLogController::previewImport(const QUrl& url) const
         return out;
     }
     const AdifDocument doc = adif::parse(adif);
+    if (doc.records.isEmpty()) {
+        out.insert(QStringLiteral("error"), QObject::tr("No valid QSO records found in this file"));
+        return out;
+    }
     int missingUtc = 0;
     int qsl = 0;
     QSet<QString> extra;
@@ -4686,8 +4697,8 @@ QVariantMap DecoLogController::previewImport(const QUrl& url) const
     // the operator a before/after comparison without writing the real log.
     LogDatabase probe;
     if (probe.open(QStringLiteral(":memory:"))) {
-        probe.setDedupWindows(m_db.dedupWindowSeconds(false), m_db.dedupWindowSeconds(true));
-        const ImportResult existing = probe.importAdif(m_db.exportAdif(), QStringLiteral("preview"));
+        probe.setDedupWindows(sourceDb.dedupWindowSeconds(false), sourceDb.dedupWindowSeconds(true));
+        const ImportResult existing = probe.importAdif(sourceDb.exportAdif(), QStringLiteral("preview"));
         Q_UNUSED(existing);
         const ImportResult estimate = probe.importAdif(adif, QStringLiteral("preview"), 0);
         out.insert(QStringLiteral("estimatedInserted"), estimate.inserted);
@@ -4695,6 +4706,55 @@ QVariantMap DecoLogController::previewImport(const QUrl& url) const
         out.insert(QStringLiteral("estimatedInvalid"), estimate.invalid);
     }
     return out;
+}
+
+void DecoLogController::previewImport(const QUrl& url, bool fromClubLog)
+{
+    const QString dbPath = m_db.path();
+    const int digital = m_db.dedupWindowSeconds(false);
+    const int manual = m_db.dedupWindowSeconds(true);
+    const quint64 generation = ++m_importPreviewGeneration;
+    const quint64 logVersion = m_logVersion;
+    const qint64 profile = m_profiles ? m_profiles->activeProfileId() : 0;
+    m_importPreviewFile = QUrl();
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, url, dbPath, digital, manual, generation, logVersion, profile, fromClubLog] {
+        QVariantMap result;
+        LogDatabase db;
+        if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:") || !db.open(dbPath)) {
+            result = {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Cannot open logbook for preview")}};
+        } else {
+            db.setDedupWindows(digital, manual);
+            bool valid = true;
+            if (fromClubLog) {
+                QFile input(url.toLocalFile());
+                if (!input.open(QIODevice::ReadOnly)) valid = false;
+                const QByteArray converted = valid ? prepareClubLogDownload(input.readAll()) : QByteArray();
+                input.close();
+                valid = !converted.isEmpty();
+                if (valid) {
+                    QSaveFile output(url.toLocalFile());
+                    valid = output.open(QIODevice::WriteOnly) && output.write(converted) == converted.size() && output.commit();
+                }
+            }
+            result = valid ? makeImportPreview(url, db)
+                           : QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Invalid Club Log ADIF download")}};
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, url, dbPath, generation, logVersion, profile, result] {
+            if (!self || generation != self->m_importPreviewGeneration) return;
+            if (self->m_db.path() != dbPath || self->m_logVersion != logVersion
+                || (self->m_profiles ? self->m_profiles->activeProfileId() : 0) != profile) {
+                emit self->importPreviewReady(url, {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Logbook changed; preview again")}});
+                return;
+            }
+            if (result.value(QStringLiteral("ok")).toBool()) {
+                self->m_importPreviewFile = url; self->m_importPreviewLogPath = dbPath;
+                self->m_importPreviewLogVersion = logVersion; self->m_importPreviewProfile = profile;
+            }
+            emit self->importPreviewReady(url, result);
+        }, Qt::QueuedConnection);
+    });
 }
 
 void DecoLogController::finishImport(const QString& path, const ImportResult& r)

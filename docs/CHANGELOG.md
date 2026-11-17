@@ -3,6 +3,24 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.56 — 17 novembre 2026
+
+**Allineata alla 1.17.55 di elisir80** (la nostra era la 1.17.54). Dalla loro 1.17.55 arrivano il download
+del log dal Club Log con il token personale (anteprima preparata su un worker, importazione solo dopo
+conferma), la verifica periodica degli invii Club Log in sospeso che rispetta l'interruttore dell'invio
+automatico, e la verifica del backend TLS nel pacchetto Windows. Nessuna funzione nostra toccata: l'unione
+è automatica, senza conflitti.
+
+## 1.17.55 — 17 novembre 2026
+
+**Club Log: download del log.** Il log della stazione attiva può essere scaricato in ADIF con il token personale. Il download usa richieste di rete asincrone e l’anteprima viene preparata su un worker; l’importazione richiede la conferma dell’operatore. I nuovi QSO mantengono l’identificativo Club Log e sono segnati come già inviati. I duplicati restano soggetti alle normali regole di importazione e non vengono sostituiti automaticamente.
+
+**Invii sospesi.** La verifica periodica di un upload Club Log in sospeso rispetta l’interruttore dell’invio automatico e la presenza delle credenziali; dopo un errore HTTP 5xx non viene riprogrammata automaticamente nella stessa sessione. Il checkpoint resta disponibile per la riconciliazione manuale, senza reinvio alla cieca. Dopo il riavvio, con invio automatico attivo, può essere effettuato un nuovo controllo.
+
+**Windows.** Il pacchetto rileva la coppia di DLL OpenSSL disponibile nel runtime MinGW; il workflow verifica il backend TLS disponibile usando i file dell’installer in un ambiente isolato.
+
+**Verifiche.** Prove A/B con servizio simulato, errore HTTP, reattività dell’event loop e duplicati; esportazione reale Club Log in sola lettura e importazione in un database temporaneo. La causa dei blocchi durante la modifica o la cancellazione dei QSO resta da accertare.
+
 ## 1.17.54 — 16 novembre 2026
 
 **Club Log REST.** Token personale nel portachiavi di sistema, ricerca DXCC e aggiornamento CTY; richieste OQRS dirette paginate e mostrate separatamente dalle conferme QSL. I nuovi QSO singoli e i piccoli gruppi usano le chiamate REST in tempo reale; gli arretrati sono inviati in ADIF. Gli invii incerti sono conservati e verificati nel log remoto senza bloccare i nuovi QSO, evitando reinvii automatici ambigui. La verifica distingue le stazioni e conserva gli identificativi dei contatti. I limiti del servizio e i rifiuti di autenticazione interrompono le richieste secondo le indicazioni di Club Log; la precedente API resta disponibile.

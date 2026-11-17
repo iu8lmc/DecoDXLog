@@ -1377,6 +1377,17 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>A Club Log elutasította ezt a kapcsolatot; az egyedi ok ismeretlen. A köteg okai: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>A Club Log elutasította ezt a kapcsolatot</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2754,6 +2765,14 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
     <message>
         <source>Save</source>
         <translation>Mentés</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>REST-token: e-mail nem szükséges. A napló hívójele az aktív állomásprofilból származik: %1.</translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>Az ellenőrzés megerősíti, hogy a titok a rendszer kulcstárolójában van; a Club Log-kapcsolatot nem teszteli.</translation>
     </message>
 </context>
 <context>
@@ -5388,6 +5407,25 @@ A további mezők megmaradnak: %8</translation>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>Ebben a fájlban nincs érvényes QSO-rekord</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>A naplót nem lehet megnyitni az előnézethez</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Érvénytelen ADIF-letöltés a Club Logból</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>A napló megváltozott; készítse újra az előnézetet</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7863,16 +7901,8 @@ A további mezők megmaradnak: %8</translation>
         <translation>A tanúsítvány a TQSL-ben marad: a DecoDXLog ír egy ideiglenes ADIF-et, a TQSL aláírja és elküldi. A duplikátum nem hiba, a LoTW egyszerűen megtartja, ami már megvan neki. A küldés, az automatikus küldés és a számlálók az alsó QSL fülön vannak.</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>API-kulcs</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>a kulcs, amit a Club Logtól kaptál</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>A Club Lognak három dolog kell: a fiók e-mail-címe és jelszava (lent), az állomásprofil hívójele, és egy API-kulcs. A kulcs ingyenes és személyes, a clublog.org/requestapikey.php oldalon lehet kérni — a programot azonosítja, nem téged. Egy QSO rögtön elmegy, ahogy naplózódik; a felhalmozódott adag egyetlen ADIF-fájlként megy el.</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8257,10 +8287,6 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>deleted</source>
         <translation>törölt</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>A Club Log API-kulccsal (QSL-szolgáltatások) a DecoDXLog hetente letölti a Club Log cty.xml fájlját: az entitásokat a dátumaikkal, így egy 2005-ös PJ2 QSO Holland Antillák és nem Curaçao, az ARRL által el nem fogadott műveletek nem számítanak a DXCC-be, a törölt entitások pedig látszanak, de nem számítanak.</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -8885,6 +8911,54 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>Minden profil tárolja a CAT-kapcsolatot, a rádió típusát, a soros paramétereket, a PTT-/keyer-portokat és a dekóder hangeszközét. A módosítások automatikusan mentésre kerülnek. A kiválasztott profil a DecoDXLog következő indításakor visszaáll.</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>Személyes Club Log-tokennel vagy régi API-kulccsal (QSL-szolgáltatások) a DecoDXLog hetente letölti a Club Log cty.xml fájlját: az entitásokat a dátumaikkal, így a 2005-ös PJ2 QSO Holland Antillák, nem Curaçao, az ARRL által nem elfogadott műveletek nem számítanak a DXCC-be, a törölt entitások megjelennek, de nem számítanak.</translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation>Régi API-kulcs</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log: adja meg személyes REST-tokenjét az alábbi Club Log-hitelesítő adatoknál. A régi API-hoz adja meg a fiók e-mail-címét, az alkalmazásjelszót és az API-kulcsot. A REST-fájlfeltöltések sorba kerülnek, és elküldöttként való megjelölésük előtt egyeztetni kell őket.</translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation>Club Log letöltése…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>Club Log letöltése importáláshoz</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>A(z) %1 feltöltés (%2, %3 kapcsolat) ellenőrzésre vár. Ha a feltöltés állapota nem érhető el, a DecoDXLog ellenőrzi, hogy minden kapcsolat szerepel-e a Club Log-naplójában.</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>Egy Club Log-beküldés kimenetele ismeretlen. Kapcsolatai ellenőrzésre vannak fenntartva; a többi kapcsolat továbbra is küldhető.</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>Club Log feltöltési állapotának folytatása</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>Club Log feltöltési előzmények megtekintése</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>OQRS-kérések olvasása…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>Közvetlen OQRS-kérések olvasása</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>Közvetlen OQRS-kérések az aktív állomáshoz. Ezek nem kapott QSL-visszaigazolások.</translation>
     </message>
 </context>
 <context>
@@ -10886,10 +10960,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>A Club Log cty.xml nem olvasható: %1</translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>Kell a Club Log API-kulcs (Beállítások → QSL-szolgáltatások → Club Log)</translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation>A cty.xml letöltése a Club Logból…</translation>
     </message>
@@ -11782,6 +11852,22 @@ A további mezők megmaradnak: %8</translation>
         <source>The selected station profile is not available.</source>
         <translation>A kiválasztott állomásprofil nem érhető el.</translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>Személyes Club Log-tokenre vagy régi API-kulcsra van szükség (Beállítás → QSL-szolgáltatások)</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log: a cty.xml nem menthető; a meglévő fájl megmaradt</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>A Club Log-hitelesítő adatok nem érhetők el: %1</translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>A napló vagy az állomás megváltozott; készítse újra az importálási előnézetet</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12247,6 +12333,142 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
         <translation>LoTW: a TQSL %1 QSO-t töltött fel; ellenőrizd a feldolgozást a LoTW „Your Activity” oldalán</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>A hitelesítő adatok megváltoztak; frissítse az OQRS-kéréseket</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>A Club Log-fiók vagy az állomás megváltozott; frissítse az OQRS-kéréseket</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>%n közvetlen OQRS-kérés; ezek nem QSL-visszaigazolások</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log: a személyes tokent nem lehet eltávolítani a régi beállításfájlból; ellenőrizze a jogosultságokat</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>A személyes Club Log-tokent eltávolítottuk a régi kulcsmezőből, és biztonságos tárolóba kerül</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>A személyes Club Log-tokent eltávolítottuk a régi kulcsmezőből; ellenőrizze a biztonságos hitelesítő adatot</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>Az állomás megváltozott; frissítse az OQRS-kéréseket</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>Közvetlen OQRS-kérések olvasása a Club Logból…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>A Club Log-hitelesítő adat megváltozott; próbálja újra</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>OQRS-kérésekhez személyes Club Log-token szükséges</translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Válasszon állomáshívójelet a Club Log letöltése előtt</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>A Club Log-napló letöltése…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>Érvényes személyes Club Log-token szükséges</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>Ideiglenes letöltési fájl nem hozható létre</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>A Club Log letöltése sikertelen (HTTP %1); egyetlen kapcsolat sem lett importálva</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>Letöltés kész; tekintse át az importálási előnézetet</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log: ehhez a naplóhoz nincs folytatható feltöltés; tekintse át a függőben lévő ellenőrzőpontot</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log: érvénytelen mentett QSO-lista; egyeztetés szükséges</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log: a helyi QSO-adatok megváltoztak; folytatás előtt tekintse át a függőben lévő feltöltést</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log: a függőben lévő feltöltés folytatásához személyes token szükséges</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log: a feltöltés kimenetele továbbra is ismeretlen</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>A személyes Club Log-tokeneket a biztonságos Club Log-hitelesítő mezőben kell menteni, nem a régi API-kulcs mezőben</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log: ez a kapcsolat már ellenőrzésre vár</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log: %n QSO másik állomáshoz tartozik, és függőben marad</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log: egyetlen függőben lévő kapcsolat sem tartozik az aktív állomáshoz</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log: egy feltöltés nincs lezárva, vagy ellenőrzőpontja nem menthető; küldés előtt tekintse át</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log: minden kapcsolat megtalálható a naplóban; a feltöltés feldolgozásának részletei nem érhetők el</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log: %1 kapcsolat található; %2 még ellenőrzésre vár</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>A Club Log elutasította ezt a QSO-t</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>A Club Log automatikus feltöltése szüneteltetve: az újrapróbálkozás előtt tekintse át az eredményt</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>A Club Log automatikus feltöltése szüneteltetve: az újrapróbálkozás előtt javítsa a visszautasított kapcsolatokat</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log: a feltöltési ellenőrzőpont nem törölhető; ellenőrizze, mielőtt újra küldene</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log: a távoli eredmény megérkezett, de a helyi mentés sikertelen; az ellenőrzőpont egyeztetésre megmarad</translation>
     </message>
 </context>
 <context>
@@ -12992,6 +13214,29 @@ A további mezők megmaradnak: %8</translation>
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>Állomáshívójelre és személyes Club Log-tokenre van szükség</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>A Club Log OQRS-kérése sikertelen (HTTP %1); a korábbi eredmények megmaradtak</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>A Club Log OQRS érvénytelen rekordot adott vissza; a korábbi eredmények megmaradtak</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>A Club Log OQRS érvénytelen kurzort adott vissza; a korábbi eredmények megmaradtak</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>A Club Log OQRS lapozása sikertelen; a korábbi eredmények megmaradtak</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13176,14 +13421,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>Igazolások letöltése; a feltöltés a helyi TQSL-en át megy</translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation>E-mail</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>Alkalmazásjelszó</translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation>Feltöltés valós időben és OQRS</translation>
     </message>
@@ -13266,6 +13503,38 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation>A QSO-k a HH-hoz, a HamHub Log hídjához mennek DecoPorton. Írd be ugyanazt a jelszót a HH-ban: nélküle semmi sem megy el</translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation>E-mail (régi)</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>Személyes token vagy alkalmazásjelszó</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>Club Log-hitelesítő művelet már folyamatban van</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>A hitelesítő adat cseréjének ellenőrzőpontja nem menthető</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>A hitelesítő adat állapota nem menthető</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>Ebben a buildben nincs rendszer-kulcstároló: a titkot nem lehetett eltávolítani</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>A hitelesítő adat cseréje nem fejeződött be; mentse újra</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>Nincs mentett Club Log-hitelesítő adat</translation>
     </message>
 </context>
 <context>
@@ -13574,6 +13843,130 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: kell az e-mail-cím, a jelszó, a hívójel és az API-kulcs is</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log: érvénytelen valós idejű köteg</translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log: valós idejű köteg HTTP %1; az újrapróbálkozás előtt ellenőrizze a kapcsolatokat</translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log: minden kapcsolat eredményének ellenőrzése</translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST: érvénytelen hívójel, token, ADIF vagy ellenőrzőpont</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log: a feltöltés sorban áll; a végső feldolgozás és egyeztetés még szükséges</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log: a feltöltés sorban áll, de azonosítóját nem lehetett menteni; egyeztesse kézzel</translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Club Log feltöltés: HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log: érvénytelen paraméterek a függőben lévő feltöltéshez</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log: elérte a feltöltés-lekérdezési korlátot; folytassa az egyeztetést később</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log: a feltöltés még sorban áll; folytassa az egyeztetést később</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log: lekérdezés megszakítva</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log: állapot HTTP %1</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>; folytatás később</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log: a végső állapotból hiányoznak a rekorderedmények</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log: érvénytelen vagy túl sok eredményrekord</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log: érvénytelen eredménykurzor</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log: ismétlődő eredménykurzor</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log: hiányos egyéni eredmények; egyeztetés szükséges</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log: %1 létrehozva vagy frissítve, %2 duplikátum, %3 elutasítva, %4 ismeretlen; egyéni egyeztetés szükséges</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log: a köteg azonosítói nem oldhatók fel</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log: több helyi kapcsolatnak ugyanaz az azonosítója</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log: az azonosító-lekérdezés sikertelen (HTTP %1); az egyeztetés függőben marad</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log: hiányos azonosító-lekérdezés</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log: kétértelmű azonosító-lekérdezés</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log: érvénytelen kapcsolatazonosító</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log: a kapcsolatazonosító nem egyedi</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log: hiányos kapcsolatazonosítók</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log: azonosító-lekérdezés megszakítva</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST: pontosan egy QSO és állomáshívójel szükséges</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST: HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST: HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

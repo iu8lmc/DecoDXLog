@@ -1385,6 +1385,17 @@ The call Decodium is working shows up here by itself.</source>
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log отклонил эту связь; причина для отдельной связи неизвестна. Причины пакета: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log отклонил эту связь</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2772,6 +2783,14 @@ The call Decodium is working shows up here by itself.</source>
     <message>
         <source>Save</source>
         <translation>Сохранить</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>REST-токен: адрес электронной почты не нужен. Позывной журнала берётся из профиля активной станции: %1.</translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>Проверка подтверждает, что секрет находится в системном хранилище ключей; соединение с Club Log она не проверяет.</translation>
     </message>
 </context>
 <context>
@@ -5412,6 +5431,25 @@ Extra fields are preserved: %8</source>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>В этом файле не найдено ни одной корректной записи QSO</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>Не удалось открыть журнал для предпросмотра</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Некорректная загрузка ADIF из Club Log</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>Журнал изменился; повторите предпросмотр</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7907,16 +7945,8 @@ Extra fields are preserved: %8</source>
         <translation>Сертификат остаётся в TQSL: DecoDXLog пишет временный ADIF, TQSL его подписывает и отправляет. Дубли — не ошибка, LoTW просто оставляет то, что у него уже есть. Отправка, отправка сама собой и счётчики — на вкладке QSL внизу.</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>Ключ API</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>ключ, который выдал Club Log</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>Club Log нужны три вещи: почта и пароль учётной записи (ниже), позывной из профиля станции и ключ API. Ключ бесплатный и личный, его просят на clublog.org/requestapikey.php — он указывает на программу, а не на вас. Один QSO уходит сразу, как записан; накопившееся уходит одним файлом ADIF.</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8301,10 +8331,6 @@ Extra fields are preserved: %8</source>
     <message>
         <source>deleted</source>
         <translation>удалена</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>С API-ключом Club Log (сервисы QSL) DecoDXLog каждую неделю скачивает cty.xml от Club Log: территории с их датами, чтобы QSO 2005 года с PJ2 было Нидерландскими Антилами, а не Кюрасао, операции, не принятые ARRL, не засчитывались в DXCC, а удалённые территории показывались, но не считались.</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -8929,6 +8955,54 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>Каждый профиль хранит CAT-подключение, модель радиостанции, параметры последовательного порта, порты PTT/ключа и аудиоустройство декодера. Изменения сохраняются автоматически. Выбранный профиль восстанавливается при следующем запуске DecoDXLog.</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>С персональным токеном Club Log или старым ключом API (службы QSL) DecoDXLog раз в неделю загружает cty.xml от Club Log: образования с их датами, так что QSO 2005 года с PJ2 относится к Нидерландским Антильским островам, а не к Курасао; операции, не принятые ARRL, для DXCC не засчитываются, а удалённые образования отображаются, но не учитываются.</translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation>Старый ключ API</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log: введите персональный REST-токен в поле учётных данных Club Log ниже. Для старого API введите e-mail учётной записи, пароль приложения и ключ API. Загрузки файлов по REST ставятся в очередь и перед отметкой как отправленных должны быть сверены.</translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation>Загрузка из Club Log…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>Загрузить из Club Log для импорта</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>Загрузка %1 для %2 (связей: %3) ожидает проверки. Если статус загрузки недоступен, DecoDXLog проверяет, есть ли каждая связь в вашем журнале Club Log.</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>Результат отправки в Club Log неизвестен. Её связи зарезервированы для проверки; остальные связи можно отправлять.</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>Возобновить проверку статуса загрузки Club Log</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>Показать историю загрузок Club Log</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>Чтение запросов OQRS…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>Прочитать прямые запросы OQRS</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>Прямые запросы OQRS для активной станции. Это не полученные QSL-подтверждения.</translation>
     </message>
 </context>
 <context>
@@ -10960,10 +11034,6 @@ Extra fields are preserved: %8</source>
         <translation>cty.xml от Club Log не читается: %1</translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>Нужен API-ключ Club Log (Настройки → Сервисы QSL → Club Log)</translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation>Скачиваю cty.xml от Club Log…</translation>
     </message>
@@ -11880,6 +11950,22 @@ Extra fields are preserved: %8</source>
         <source>The selected station profile is not available.</source>
         <translation>Выбранный профиль станции недоступен.</translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>Нужен персональный токен Club Log или старый ключ API (Настройка → службы QSL)</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log: не удалось сохранить cty.xml; существующий файл сохранён</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>Учётные данные Club Log недоступны: %1</translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>Журнал или станция изменились; повторите предпросмотр импорта</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12375,6 +12461,146 @@ Extra fields are preserved: %8</source>
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
         <translation>LoTW: TQSL загрузил QSO: %1; проверь обработку в разделе «Your Activity» на LoTW</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>Учётные данные изменились; обновите запросы OQRS</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>Учётная запись или станция Club Log изменились; обновите запросы OQRS</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>%n прямой запрос OQRS; это не подтверждения QSL</numerusform>
+            <numerusform>%n прямых запроса OQRS; это не подтверждения QSL</numerusform>
+            <numerusform>%n прямых запросов OQRS; это не подтверждения QSL</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log: не удалось удалить персональный токен из старого файла настроек; проверьте права доступа</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>Персональный токен Club Log удалён из старого поля ключа и переносится в безопасное хранилище</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>Персональный токен Club Log удалён из старого поля ключа; проверьте безопасные учётные данные</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>Станция изменилась; обновите запросы OQRS</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>Чтение прямых запросов OQRS из Club Log…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>Учётные данные Club Log изменились; попробуйте снова</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>Для запросов OQRS нужен персональный токен Club Log</translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Выберите позывной станции перед загрузкой из Club Log</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>Загрузка журнала Club Log…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>Нужен действительный персональный токен Club Log</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>Не удалось создать временный файл загрузки</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Загрузка из Club Log не удалась (HTTP %1); связи не импортированы</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>Загрузка завершена; проверьте предпросмотр импорта</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log: для этого журнала нет загрузки, которую можно возобновить; проверьте ожидающую контрольную точку</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log: сохранённый список QSO некорректен; нужна сверка</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log: локальные данные QSO изменились; перед возобновлением проверьте ожидающую загрузку</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log: для возобновления ожидающей загрузки нужен персональный токен</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log: результат загрузки остаётся неизвестным</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>Персональные токены Club Log нужно сохранять в защищённом поле учётных данных Club Log, а не в старом поле ключа API</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log: эта связь уже ожидает проверки</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log: %n QSO относится к другой станции и остаётся в ожидании</numerusform>
+            <numerusform>Club Log: %n QSO относятся к другой станции и остаются в ожидании</numerusform>
+            <numerusform>Club Log: %n QSO относятся к другой станции и остаются в ожидании</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log: ни одна ожидающая связь не относится к активной станции</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log: загрузка не разрешена или её контрольную точку не удалось сохранить; проверьте перед отправкой</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log: все связи найдены в журнале; подробности обработки загрузки недоступны</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log: найдено связей: %1; ещё ожидают проверки: %2</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>Club Log отклонил это QSO</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>Автоматическая загрузка в Club Log приостановлена: проверьте результат перед повтором</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>Автоматическая загрузка в Club Log приостановлена: исправьте отклонённые связи перед повтором</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log: не удалось очистить контрольную точку загрузки; проверьте перед повторной отправкой</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log: удалённый результат получен, но локальное сохранение не удалось; контрольная точка сохранена для сверки</translation>
     </message>
 </context>
 <context>
@@ -13122,6 +13348,29 @@ Extra fields are preserved: %8</source>
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>Нужны позывной станции и персональный токен Club Log</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Запрос OQRS в Club Log не выполнен (HTTP %1); предыдущие результаты сохранены</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS вернул некорректную запись; предыдущие результаты сохранены</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS вернул некорректный курсор; предыдущие результаты сохранены</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Постраничная выборка Club Log OQRS не удалась; предыдущие результаты сохранены</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13306,14 +13555,6 @@ Extra fields are preserved: %8</source>
         <translation>Скачивание подтверждений; загрузка идёт через местный TQSL</translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation>Эл. почта</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>Пароль приложения</translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation>Загрузка в реальном времени и OQRS</translation>
     </message>
@@ -13396,6 +13637,38 @@ Extra fields are preserved: %8</source>
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation>QSO уходят в HH, мост к HamHub Log, через DecoPort. Введи тот же пароль в HH: без него ничего не отправляется</translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation>E-mail (старый)</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>Персональный токен или пароль приложения</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>Операция с учётными данными Club Log уже выполняется</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>Не удалось сохранить контрольную точку замены учётных данных</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>Не удалось сохранить состояние учётных данных</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>В этой сборке нет системного хранилища ключей: секрет не удалось удалить</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>Замена учётных данных не завершена; сохраните их снова</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>Учётные данные Club Log не сохранены</translation>
     </message>
 </context>
 <context>
@@ -13704,6 +13977,130 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: нужны и почта, и пароль, и позывной, и ключ API</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log: некорректный пакет в реальном времени</translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log: пакет в реальном времени, HTTP %1; проверьте связи перед повтором</translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log: проверка результата каждой связи</translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST: некорректные позывной, токен, ADIF или контрольная точка</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log: загрузка в очереди; всё ещё нужны окончательная обработка и сверка</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log: загрузка в очереди, но её идентификатор не удалось сохранить; сверьте вручную</translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Загрузка в Club Log: HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log: некорректные параметры ожидающей загрузки</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log: достигнут предел опроса загрузки; возобновите сверку позже</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log: загрузка всё ещё в очереди; возобновите сверку позже</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log: опрос прерван</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log: статус HTTP %1</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>; возобновить позже</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log: в окончательном статусе нет результатов записей</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log: некорректные или чрезмерные записи результатов</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log: некорректный курсор результатов</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log: повторяющийся курсор результатов</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log: неполные индивидуальные результаты; нужна сверка</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log: создано или обновлено %1, дубликатов %2, отклонено %3, неизвестно %4; нужна индивидуальная сверка</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log: не удалось определить идентификаторы пакета</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log: несколько локальных связей имеют одинаковый идентификатор</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log: запрос идентификации не выполнен (HTTP %1); сверка остаётся в ожидании</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log: неполный запрос идентификации</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log: неоднозначный запрос идентификации</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log: некорректный идентификатор связи</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log: идентификатор связи не уникален</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log: неполные идентификаторы связей</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log: запрос идентификации прерван</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST: нужны ровно одна связь QSO и позывной станции</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST: HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST: HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

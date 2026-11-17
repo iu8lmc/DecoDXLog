@@ -120,19 +120,20 @@ done
 # quindi ldd non lo vede. La cassaforte Cloud, invece, lo usa direttamente:
 # l'installer deve contenere entrambe le DLL anche su una macchina che non ha
 # MSYS2/OpenSSL installati.
-for ssl in "$MINGW"/bin/libssl-3-x64.dll "$MINGW"/bin/libcrypto-3-x64.dll; do
-    if [ ! -f "$ssl" ]; then
-        echo "manca $(basename "$ssl"): OpenSSL non e' disponibile nel runtime MinGW" >&2
-        exit 1
+openssl_major=""
+for major in 4 3; do
+    if [ -f "$MINGW/bin/libssl-$major-x64.dll" ] && [ -f "$MINGW/bin/libcrypto-$major-x64.dll" ]; then
+        openssl_major="$major"
+        break
     fi
-    cp -n "$ssl" "$DIST/"
 done
-
-for must in libssl-3-x64.dll libcrypto-3-x64.dll; do
-    [ -f "$DIST/$must" ] || {
-        echo "manca $must nel pacchetto Windows" >&2
-        exit 1
-    }
+if [ -z "$openssl_major" ]; then
+    echo "OpenSSL non disponibile: manca una coppia libssl/libcrypto compatibile nel runtime MinGW" >&2
+    exit 1
+fi
+for must in "libssl-$openssl_major-x64.dll" "libcrypto-$openssl_major-x64.dll"; do
+    cp -n "$MINGW/bin/$must" "$DIST/"
+    [ -f "$DIST/$must" ] || { echo "manca $must nel pacchetto Windows" >&2; exit 1; }
 done
 
 # Senza le librerie del compilatore la cartella non si apre, e Windows non dice

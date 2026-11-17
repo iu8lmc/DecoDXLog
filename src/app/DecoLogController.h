@@ -709,7 +709,7 @@ public:
     Q_INVOKABLE QString subdivisionName(const QString& code, int dxcc) const;
 
     Q_INVOKABLE void importAdif(const QUrl& file);
-    Q_INVOKABLE QVariantMap previewImport(const QUrl& file) const;
+    Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false);
     Q_INVOKABLE bool undoLastImport();
     Q_INVOKABLE QVariantList qsoEnrichments(qint64 qsoId) const;
     Q_INVOKABLE bool undoQsoEnrichment(qint64 qsoId, const QString& field);
@@ -784,6 +784,7 @@ signals:
     void stationChanged();
     void backupChanged();
     void importChanged();
+    void importPreviewReady(const QUrl& file, const QVariantMap& result);
     void bulkChanged();
     void duplicatesChanged();
     void backupInspected(const QVariantMap& info);
@@ -1079,6 +1080,11 @@ private:
     QThreadPool m_backupPool;
     QThreadPool m_linkPool;
     QThreadPool m_importPool;
+    quint64 m_importPreviewGeneration{0};
+    QString m_importPreviewLogPath;
+    QUrl m_importPreviewFile;
+    qint64 m_importPreviewProfile{0};
+    quint64 m_importPreviewLogVersion{0};
     QThreadPool m_statsViewPool;
     // L'ultima richiesta di statistiche: le altre, ancora in coda, si saltano.
     std::shared_ptr<std::atomic<int>> m_statsLatest{std::make_shared<std::atomic<int>>(0)};

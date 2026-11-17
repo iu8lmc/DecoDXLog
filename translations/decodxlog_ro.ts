@@ -1385,6 +1385,17 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log a respins această legătură; motivul individual este necunoscut. Motivele lotului: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log a respins această legătură</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2772,6 +2783,14 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
     <message>
         <source>Save</source>
         <translation>Salvează</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>Token REST: nu este necesar e-mailul. Indicativul jurnalului provine din profilul stației active: %1.</translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>Verificarea confirmă că secretul se află în keystore-ul sistemului; nu testează conexiunea la Club Log.</translation>
     </message>
 </context>
 <context>
@@ -5412,6 +5431,25 @@ Câmpuri suplimentare păstrate: %8</translation>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>Nu s-au găsit înregistrări QSO valide în acest fișier</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>Jurnalul nu poate fi deschis pentru previzualizare</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Descărcare ADIF invalidă din Club Log</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>Jurnalul s-a modificat; reface previzualizarea</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7907,16 +7945,8 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Certificatul rămâne în TQSL: DecoDXLog scrie un ADIF temporar, TQSL îl semnează și îl trimite. Dublurile nu sunt o eroare, LoTW păstrează pur și simplu ce are deja. Trimiterea, trimiterea automată și contoarele sunt în fila QSL de jos.</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>Cheie API</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>cheia pe care ți-a dat-o Club Log</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>Club Log vrea trei lucruri: adresa de e-mail și parola contului (mai jos), indicativul profilului de stație și o cheie API. Cheia este gratuită și personală și se cere la clublog.org/requestapikey.php — identifică programul, nu pe tine. Un singur QSO pleacă imediat ce este înregistrat, o restanță pleacă într-un singur fișier ADIF.</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8301,10 +8331,6 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>deleted</source>
         <translation>ștearsă</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>Cu cheia API Club Log (Servicii QSL) DecoDXLog descarcă săptămânal cty.xml de la Club Log: entitățile cu datele lor, astfel un QSO din 2005 cu PJ2 e Antilele Olandeze și nu Curaçao, operațiunile neacceptate de ARRL nu contează pentru DXCC, iar entitățile șterse se arată dar nu se numără.</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -8929,6 +8955,54 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>Fiecare profil păstrează legătura CAT, modelul stației, parametrii seriali, porturile PTT/manipulator și dispozitivul audio al decodorului. Modificările se salvează automat. Profilul selectat este restaurat la următoarea pornire a DecoDXLog.</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>Cu un token personal Club Log sau o cheie API veche (servicii QSL), DecoDXLog descarcă săptămânal cty.xml de la Club Log: entitățile cu datele lor, astfel încât un QSO din 2005 cu PJ2 este Antilele Olandeze și nu Curaçao, operațiunile neacceptate de ARRL nu se numără pentru DXCC, iar entitățile șterse sunt afișate, dar nu se numără.</translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation>Cheie API veche</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log: introdu tokenul REST personal în credențialul Club Log de mai jos. Pentru API-ul vechi, introdu e-mailul contului, parola aplicației și cheia API. Încărcările de fișiere REST sunt puse în coadă și trebuie reconciliate înainte de a fi marcate ca trimise.</translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation>Se descarcă Club Log…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>Descarcă Club Log pentru import</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>Încărcarea %1 pentru %2 (%3 legături) așteaptă verificare. Dacă starea încărcării nu este disponibilă, DecoDXLog verifică dacă fiecare legătură există în jurnalul tău Club Log.</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>O trimitere către Club Log are un rezultat necunoscut. Legăturile ei sunt rezervate pentru verificare; celelalte legături pot fi încă trimise.</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>Reia starea încărcării în Club Log</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>Afișează istoricul încărcărilor în Club Log</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>Se citesc cererile OQRS…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>Citește cererile OQRS directe</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>Cereri OQRS directe pentru stația activă. Nu sunt confirmări QSL primite.</translation>
     </message>
 </context>
 <context>
@@ -10960,10 +11034,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>cty.xml de la Club Log ilizibil: %1</translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>E nevoie de cheia API Club Log (Setări → Servicii QSL → Club Log)</translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation>Descarc cty.xml de la Club Log…</translation>
     </message>
@@ -11880,6 +11950,22 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>The selected station profile is not available.</source>
         <translation>Profilul de stație selectat nu este disponibil.</translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>Este necesar un token personal Club Log sau o cheie API veche (Configurare → servicii QSL)</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log: cty.xml nu a putut fi salvat; fișierul existent a fost păstrat</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>Credențial Club Log indisponibil: %1</translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>Jurnalul sau stația s-au schimbat; reface previzualizarea importului</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12375,6 +12461,146 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
         <translation>LoTW: TQSL a încărcat %1 QSO; verifică procesarea în „Your Activity” din LoTW</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>Credențialele s-au schimbat; actualizează cererile OQRS</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>Contul sau stația Club Log s-au schimbat; actualizează cererile OQRS</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>%n cerere OQRS directă; nu sunt confirmări QSL</numerusform>
+            <numerusform>%n cereri OQRS directe; nu sunt confirmări QSL</numerusform>
+            <numerusform>%n de cereri OQRS directe; nu sunt confirmări QSL</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log: tokenul personal nu a putut fi eliminat din vechiul fișier de setări; verifică permisiunile</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>Tokenul personal Club Log a fost eliminat din vechiul câmp de cheie și este mutat în stocarea sigură</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>Tokenul personal Club Log a fost eliminat din vechiul câmp de cheie; verifică credențialul sigur</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>Stația s-a schimbat; actualizează cererile OQRS</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>Se citesc cererile OQRS directe din Club Log…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>Credențialul Club Log s-a schimbat; încearcă din nou</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>Pentru cererile OQRS este necesar un token personal Club Log</translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Selectează un indicativ de stație înainte de a descărca din Club Log</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>Se descarcă jurnalul Club Log…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>Este necesar un token personal Club Log valid</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>Nu se poate crea un fișier temporar de descărcare</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Descărcarea din Club Log a eșuat (HTTP %1); nu s-a importat nicio legătură</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>Descărcare finalizată; verifică previzualizarea importului</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log: nu există nicio încărcare reluabilă pentru acest jurnal; verifică punctul de control în așteptare</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log: lista QSO salvată este invalidă; este necesară reconcilierea</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log: datele QSO locale s-au schimbat; verifică încărcarea în așteptare înainte de reluare</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log: este necesar tokenul personal pentru a relua încărcarea în așteptare</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log: rezultatul încărcării rămâne necunoscut</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>Tokenurile personale Club Log trebuie salvate în câmpul sigur de credențiale Club Log, nu în vechiul câmp de cheie API</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log: această legătură așteaptă deja verificare</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log: %n QSO aparține altei stații și rămâne în așteptare</numerusform>
+            <numerusform>Club Log: %n QSO aparțin altei stații și rămân în așteptare</numerusform>
+            <numerusform>Club Log: %n de QSO aparțin altei stații și rămân în așteptare</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log: nicio legătură în așteptare nu aparține stației active</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log: o încărcare nu este rezolvată sau punctul său de control nu a putut fi salvat; verific-o înainte de trimitere</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log: toate legăturile au fost găsite în jurnal; detaliile procesării încărcării nu sunt disponibile</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log: %1 legături găsite; %2 încă așteaptă verificare</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>Club Log a respins acest QSO</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>Încărcarea automată în Club Log este suspendată: verifică rezultatul înainte de a reîncerca</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>Încărcarea automată în Club Log este suspendată: corectează legăturile respinse înainte de a reîncerca</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log: punctul de control al încărcării nu a putut fi șters; verifică înainte de a trimite din nou</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log: rezultatul de la distanță a fost primit, dar salvarea locală a eșuat; punctul de control este păstrat pentru reconciliere</translation>
     </message>
 </context>
 <context>
@@ -13122,6 +13348,29 @@ Câmpuri suplimentare păstrate: %8</translation>
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>Sunt necesare un indicativ de stație și un token personal Club Log</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Cererea OQRS Club Log a eșuat (HTTP %1); rezultatele anterioare au fost păstrate</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS a returnat o înregistrare invalidă; rezultatele anterioare au fost păstrate</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS a returnat un cursor invalid; rezultatele anterioare au fost păstrate</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Paginarea Club Log OQRS a eșuat; rezultatele anterioare au fost păstrate</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13306,14 +13555,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Descărcarea confirmărilor; încărcarea trece prin TQSL-ul local</translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation>E-mail</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>Parolă de aplicație</translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation>Încărcare în timp real și OQRS</translation>
     </message>
@@ -13396,6 +13637,38 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation>QSO-urile merg la HH, puntea către HamHub Log, prin DecoPort. Scrie aceeași parolă în HH: fără ea nu se trimite nimic</translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation>E-mail (vechi)</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>Token personal sau parolă de aplicație</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>O operațiune cu credențialul Club Log este deja în desfășurare</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>Nu se poate salva punctul de control al înlocuirii credențialului</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>Nu se poate salva starea credențialului</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>Nu există keystore de sistem în această versiune: secretul nu a putut fi eliminat</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>Înlocuirea credențialului nu s-a finalizat; salveaz-o din nou</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>Nu este salvat niciun credențial Club Log</translation>
     </message>
 </context>
 <context>
@@ -13704,6 +13977,130 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: sunt necesare e-mailul, parola, indicativul și cheia API</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log: lot în timp real invalid</translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log: lot în timp real HTTP %1; verifică legăturile înainte de a reîncerca</translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log: se verifică rezultatul fiecărei legături</translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST: indicativ, token, ADIF sau punct de control invalid</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log: încărcare în coadă; sunt încă necesare procesarea finală și reconcilierea</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log: încărcare în coadă, dar identificatorul ei nu a putut fi salvat; reconciliază manual</translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Încărcare Club Log: HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log: parametri invalizi pentru încărcarea în așteptare</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log: a fost atinsă limita de interogare a încărcării; reia reconcilierea mai târziu</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log: încărcarea este încă în coadă; reia reconcilierea mai târziu</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log: interogare întreruptă</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log: stare HTTP %1</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>; reia mai târziu</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log: starea finală nu conține rezultatele înregistrărilor</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log: înregistrări de rezultat invalide sau prea multe</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log: cursor de rezultat invalid</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log: cursor de rezultat repetat</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log: rezultate individuale incomplete; este necesară reconcilierea</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log: %1 create sau actualizate, %2 duplicate, %3 respinse, %4 necunoscute; este necesară reconcilierea individuală</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log: identitățile lotului nu pot fi rezolvate</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log: mai multe legături locale au aceeași identitate</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log: interogarea identității a eșuat (HTTP %1); reconcilierea rămâne în așteptare</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log: interogare de identitate incompletă</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log: interogare de identitate ambiguă</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log: identitate de legătură invalidă</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log: identitatea legăturii nu este unică</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log: identități de legătură incomplete</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log: interogare de identitate întreruptă</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST: sunt necesare exact un QSO și un indicativ de stație</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST: HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST: HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

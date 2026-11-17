@@ -1381,6 +1381,17 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log ha rifiutato questo contatto; il motivo individuale non è noto. Motivi del gruppo: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log ha rifiutato questo contatto</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>LoTW user (uploaded within the last 365 days according to the loaded ARRL list). This is not a QSO confirmation.</source>
@@ -5408,6 +5419,25 @@ Campi extra conservati: %8</translation>
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>Nel file non ci sono QSO validi</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>Impossibile aprire il log per l&apos;anteprima</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Download ADIF di Club Log non valido</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>Il log è cambiato; ripeti l&apos;anteprima</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message numerus="yes">
         <source>TQSL uploaded %n QSO; check processing in LoTW Your Activity</source>
@@ -7330,6 +7360,14 @@ Campi extra conservati: %8</translation>
 <context>
     <name>SetupDialog</name>
     <message>
+        <source>Downloading Club Log…</source>
+        <translation>Scaricamento da Club Log…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>Scarica il log da Club Log</translation>
+    </message>
+    <message>
         <source>Legacy API key</source>
         <translation>Chiave API precedente</translation>
     </message>
@@ -7366,7 +7404,7 @@ Campi extra conservati: %8</translation>
         <translation>Richieste OQRS dirette per la stazione attiva. Queste richieste non sono conferme QSL ricevute.</translation>
     </message>
     <message>
-        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log's cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
         <translation>Con un token personale Club Log o una chiave API precedente (Servizi QSL), DecoDXLog scarica ogni settimana il file cty.xml di Club Log: le entità con le rispettive date, le operazioni non accettate dall’ARRL e le entità cancellate.</translation>
     </message>
     <message>
@@ -7937,16 +7975,8 @@ Campi extra conservati: %8</translation>
         <translation>Il certificato resta in TQSL: DecoDXLog scrive un ADIF temporaneo, TQSL lo firma e lo manda. I duplicati non sono un errore, LoTW tiene quello che ha già. L&apos;invio, l&apos;invio automatico e i conteggi stanno nella scheda QSL in basso.</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>Chiave API</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>la chiave che ti ha dato Club Log</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>Club Log vuole tre cose: l&apos;email e la password dell&apos;account (qui sotto), il nominativo del profilo stazione e una chiave API. La chiave è gratuita e personale, si chiede su clublog.org/requestapikey.php — dice quale programma sta scrivendo, non chi sei. Un QSO appena registrato parte da solo, un arretrato parte come un unico file ADIF.</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8331,10 +8361,6 @@ Campi extra conservati: %8</translation>
     <message>
         <source>deleted</source>
         <translation>cancellata</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>Con la chiave API di Club Log (Servizi QSL) DecoDXLog scarica ogni settimana il cty.xml di Club Log: le entità con le loro date, così un QSO del 2005 con PJ2 è Antille Olandesi e non Curaçao, le operazioni non accettate dall&apos;ARRL non contano per il DXCC, e le entità cancellate si vedono ma non contano.</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -10786,6 +10812,10 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::app::DecoLogController</name>
     <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>Il log o la stazione sono cambiati; ripeti l’anteprima</translation>
+    </message>
+    <message>
         <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
         <translation>Serve un token personale Club Log o una chiave API precedente (Impostazioni → Servizi QSL)</translation>
     </message>
@@ -10981,10 +11011,6 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log cty.xml not readable: %1</source>
         <translation>cty.xml di Club Log illeggibile: %1</translation>
-    </message>
-    <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>Serve la chiave API di Club Log (Impostazioni → Servizi QSL → Club Log)</translation>
     </message>
     <message>
         <source>Downloading cty.xml from Club Log…</source>
@@ -12192,6 +12218,30 @@ Campi extra conservati: %8</translation>
 <context>
     <name>decolog::app::QslController</name>
     <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Seleziona il nominativo della stazione prima di scaricare da Club Log</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>Scaricamento del log da Club Log…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>È necessario un token personale Club Log valido</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>Impossibile creare un file temporaneo per il download</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Download da Club Log non riuscito (HTTP %1); nessun QSO importato</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>Download completato; controlla l’anteprima prima di importare</translation>
+    </message>
+    <message>
         <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
         <translation>Club Log: %1 contatti trovati; %2 ancora in attesa di verifica</translation>
     </message>
@@ -12202,10 +12252,6 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log: upload outcome remains unknown</source>
         <translation>Club Log: l’esito dell’invio rimane sconosciuto</translation>
-    </message>
-    <message>
-        <source>Club Log legacy: multiple contacts are waiting; use one manual ADIF upload before resuming automatic uploads</source>
-        <translation>Club Log legacy: ci sono più contatti in attesa; esegui un unico invio ADIF manuale prima di riattivare gli invii automatici</translation>
     </message>
     <message>
         <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
@@ -12250,10 +12296,6 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log: personal token required to resume the pending upload</source>
         <translation>Club Log: per riprendere l’invio in sospeso serve il token personale</translation>
-    </message>
-    <message>
-        <source>Club Log: an earlier upload needs reconciliation before another can be sent</source>
-        <translation>Club Log: occorre verificare un invio precedente prima di inviarne un altro</translation>
     </message>
     <message>
         <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
@@ -12470,6 +12512,29 @@ Campi extra conservati: %8</translation>
             <numerusform>, %n cancellato</numerusform>
             <numerusform>, %n cancellati</numerusform>
         </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log: impossibile rimuovere il token personale dal vecchio file delle impostazioni; controlla i permessi</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>Il token personale di Club Log è stato rimosso dal vecchio campo della chiave e viene spostato nel portachiavi sicuro</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>Il token personale di Club Log è stato rimosso dal vecchio campo della chiave; controlla la credenziale sicura</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log: %n QSO appartiene a un&apos;altra stazione e resta in sospeso</numerusform>
+            <numerusform>Club Log: %n QSO appartengono a un&apos;altra stazione e restano in sospeso</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log: nessun contatto in sospeso appartiene alla stazione attiva</translation>
     </message>
 </context>
 <context>
@@ -13216,6 +13281,29 @@ Campi extra conservati: %8</translation>
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>Servono il nominativo della stazione e un token personale Club Log</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Richiesta OQRS Club Log non riuscita (HTTP %1); risultati precedenti conservati</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS ha restituito un record non valido; risultati precedenti conservati</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS ha restituito un cursore non valido; risultati precedenti conservati</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Paginazione OQRS Club Log non riuscita; risultati precedenti conservati</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13430,14 +13518,6 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Downloading confirmations; upload goes through the local TQSL</source>
         <translation>Scarico delle conferme; l&apos;invio passa dal TQSL locale</translation>
-    </message>
-    <message>
-        <source>Email</source>
-        <translation>Email</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>Password dell&apos;app</translation>
     </message>
     <message>
         <source>Real-time upload and OQRS</source>
@@ -13903,39 +13983,57 @@ Campi extra conservati: %8</translation>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: servono email, password, nominativo e chiave API</translation>
     </message>
-</context>
-<context>
-    <name>decolog::core::ClubLogOqrsClient</name>
     <message>
-        <source>A station callsign and Club Log personal token are required</source>
-        <translation>Servono il nominativo della stazione e un token personale Club Log</translation>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log: lotto in tempo reale non valido</translation>
     </message>
     <message>
-        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
-        <translation>Richiesta OQRS Club Log non riuscita (HTTP %1); risultati precedenti conservati</translation>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log: lotto in tempo reale HTTP %1; verifica i contatti prima di riprovare</translation>
     </message>
     <message>
-        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
-        <translation>Club Log OQRS ha restituito un record non valido; risultati precedenti conservati</translation>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log: verifica dell&apos;esito di ogni contatto</translation>
     </message>
     <message>
-        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
-        <translation>Club Log OQRS ha restituito un cursore non valido; risultati precedenti conservati</translation>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST: nominativo, token, ADIF o checkpoint non validi</translation>
     </message>
     <message>
-        <source>Club Log OQRS pagination failed; previous results preserved</source>
-        <translation>Paginazione OQRS Club Log non riuscita; risultati precedenti conservati</translation>
-    </message>
-</context>
-<context>
-    <name>ClubLogBatch</name>
-    <message>
-        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
-        <translation>Club Log ha rifiutato questo contatto; il motivo individuale non è noto. Motivi del gruppo: %1</translation>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Invio a Club Log: HTTP %1</translation>
     </message>
     <message>
-        <source>Club Log rejected this contact</source>
-        <translation>Club Log ha rifiutato questo contatto</translation>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log: parametri non validi per l&apos;invio in sospeso</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log: verifica interrotta</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>; riprendi più tardi</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log: identità del contatto non valida</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log: richiesta d&apos;identità interrotta</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST: serve esattamente un QSO e il nominativo della stazione</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST: HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST: HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

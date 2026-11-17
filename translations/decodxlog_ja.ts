@@ -1377,6 +1377,17 @@ Decodium が交信しているコールサインは、ここにひとりでに�
     </message>
 </context>
 <context>
+    <name>ClubLogBatch</name>
+    <message>
+        <source>Club Log rejected this contact; the individual reason is unknown. Batch reasons: %1</source>
+        <translation>Club Log がこの交信を拒否しました。個別の理由は不明です。バッチの理由: %1</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this contact</source>
+        <translation>Club Log がこの交信を拒否しました</translation>
+    </message>
+</context>
+<context>
     <name>ClusterPanel</name>
     <message>
         <source>DX Cluster</source>
@@ -2754,6 +2765,14 @@ Decodium が交信しているコールサインは、ここにひとりでに�
     <message>
         <source>Save</source>
         <translation>保存</translation>
+    </message>
+    <message>
+        <source>REST token: email is not required. The log callsign comes from the active station profile: %1.</source>
+        <translation>REST トークン: メールアドレスは不要です。ログのコールサインは有効な局プロファイルから取得されます: %1。</translation>
+    </message>
+    <message>
+        <source>Check confirms the secret is in the system keystore; it does not test the Club Log connection.</source>
+        <translation>確認では、シークレットがシステムのキーストアにあることだけを確かめます。Club Log への接続はテストしません。</translation>
     </message>
 </context>
 <context>
@@ -5388,6 +5407,25 @@ QSL の状態: %6 · UTC が不完全: %7。
     </message>
 </context>
 <context>
+    <name>QObject</name>
+    <message>
+        <source>No valid QSO records found in this file</source>
+        <translation>このファイルに有効な QSO レコードが見つかりません</translation>
+    </message>
+    <message>
+        <source>Cannot open logbook for preview</source>
+        <translation>プレビュー用にログブックを開けません</translation>
+    </message>
+    <message>
+        <source>Invalid Club Log ADIF download</source>
+        <translation>Club Log からの ADIF ダウンロードが無効です</translation>
+    </message>
+    <message>
+        <source>Logbook changed; preview again</source>
+        <translation>ログブックが変更されました。プレビューをやり直してください</translation>
+    </message>
+</context>
+<context>
     <name>Qsl</name>
     <message>
         <source>TQSL: cancelled</source>
@@ -7863,16 +7901,8 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>証明書は TQSL の中に置いたままです。DecoDXLog が一時の ADIF を書き、TQSL が署名して送ります。重複はエラーではありません。LoTW はすでに持っているほうを残すだけです。送信、ひとりでの送信、数の表示は、下の QSL タブにあります。</translation>
     </message>
     <message>
-        <source>API key</source>
-        <translation>API キー</translation>
-    </message>
-    <message>
         <source>the key Club Log gave you</source>
         <translation>Club Log がくれたキー</translation>
-    </message>
-    <message>
-        <source>Club Log wants three things: the email and password of the account (below), the callsign of the station profile, and an API key. The key is free and personal, and is asked for at clublog.org/requestapikey.php — it identifies the program, not you. A single QSO leaves as soon as it is logged, a backlog leaves as one ADIF file.</source>
-        <translation>Club Log がほしいのは三つです。アカウントのメールとパスワード (下)、局プロファイルのコールサイン、そして API キー。キーは無料で自分だけのもので、clublog.org/requestapikey.php でもらいます。あれはプログラムを指すもので、あなたを指すものではありません。1 件の QSO は記録したらすぐ出ていきます。たまったぶんは 1 つの ADIF ファイルで出ていきます。</translation>
     </message>
     <message>
         <source>Logbook on CRX</source>
@@ -8257,10 +8287,6 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>deleted</source>
         <translation>削除済み</translation>
-    </message>
-    <message>
-        <source>With the Club Log API key (QSL services) DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
-        <translation>Club Log の API キー（QSL サービス）があれば、DecoDXLog は毎週 Club Log の cty.xml をダウンロードします。エンティティとその日付により、2005 年の PJ2 との QSO はキュラソーではなくオランダ領アンティルとなり、ARRL が認めなかった運用は DXCC に数えず、削除エンティティは表示しても数えません。</translation>
     </message>
     <message>
         <source>Every week from Club Log. New QSOs get the entity of their date; the check compares the log with the dates and corrects only the DXCC that was empty or set by today&apos;s cty.csv — the one written by LoTW or by you stays.</source>
@@ -8885,6 +8911,54 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>各プロファイルには、CAT 接続、無線機のモデル、シリアルのパラメーター、PTT／キーヤーのポート、デコーダーのオーディオデバイスが保存されます。変更は自動的に保存されます。選択したプロファイルは、DecoDXLog を再起動したときに復元されます。</translation>
+    </message>
+    <message>
+        <source>With a Club Log personal token or legacy API key (QSL services), DecoDXLog downloads Club Log&apos;s cty.xml every week: the entities with their dates, so a QSO of 2005 with PJ2 is the Netherlands Antilles and not Curacao, operations the ARRL did not accept do not count for DXCC, and deleted entities are shown but not counted.</source>
+        <translation>Club Log の個人トークンまたは旧 API キー（QSL サービス）があると、DecoDXLog は毎週 Club Log の cty.xml をダウンロードします。エンティティとその有効日付により、2005 年の PJ2 との交信はキュラソーではなくオランダ領アンティルになります。ARRL が認めていない運用は DXCC に含まれず、削除されたエンティティは表示されますが集計されません。</translation>
+    </message>
+    <message>
+        <source>Legacy API key</source>
+        <translation>旧 API キー</translation>
+    </message>
+    <message>
+        <source>Club Log: enter your personal REST token in the Club Log credential below. For the legacy API, enter your account email, application password and API key. REST file uploads are queued and must be reconciled before they are marked as sent.</source>
+        <translation>Club Log: 下の Club Log 認証情報欄に個人の REST トークンを入力してください。旧 API の場合は、アカウントのメールアドレス、アプリパスワード、API キーを入力します。REST によるファイルのアップロードはキューに入り、送信済みとマークする前に照合が必要です。</translation>
+    </message>
+    <message>
+        <source>Downloading Club Log…</source>
+        <translation>Club Log をダウンロード中…</translation>
+    </message>
+    <message>
+        <source>Download Club Log for import</source>
+        <translation>インポート用に Club Log をダウンロード</translation>
+    </message>
+    <message>
+        <source>Upload %1 for %2 (%3 contacts) is awaiting verification. If upload status is unavailable, DecoDXLog checks whether each contact is present in your Club Log logbook.</source>
+        <translation>%2 用のアップロード %1（%3 件の交信）は確認待ちです。アップロードの状態が取得できない場合、DecoDXLog は各交信が Club Log のログブックにあるかを確認します。</translation>
+    </message>
+    <message>
+        <source>A Club Log submission has an unknown outcome. Its contacts are reserved for verification; other contacts can still be sent.</source>
+        <translation>Club Log への送信の結果が不明です。その交信は確認のために保留され、ほかの交信は引き続き送信できます。</translation>
+    </message>
+    <message>
+        <source>Resume Club Log upload status</source>
+        <translation>Club Log のアップロード状態を再開</translation>
+    </message>
+    <message>
+        <source>View Club Log upload history</source>
+        <translation>Club Log のアップロード履歴を表示</translation>
+    </message>
+    <message>
+        <source>Reading OQRS requests…</source>
+        <translation>OQRS リクエストを読み込み中…</translation>
+    </message>
+    <message>
+        <source>Read direct OQRS requests</source>
+        <translation>直接の OQRS リクエストを読み込む</translation>
+    </message>
+    <message>
+        <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation>有効な局の直接の OQRS リクエストです。これらは受信した QSL 確認ではありません。</translation>
     </message>
 </context>
 <context>
@@ -10886,10 +10960,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>Club Log の cty.xml を読めません: %1</translation>
     </message>
     <message>
-        <source>The Club Log API key is needed (Setup → QSL services → Club Log)</source>
-        <translation>Club Log の API キーが必要です（設定 → QSL サービス → Club Log）</translation>
-    </message>
-    <message>
         <source>Downloading cty.xml from Club Log…</source>
         <translation>Club Log から cty.xml をダウンロード中…</translation>
     </message>
@@ -11782,6 +11852,22 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>The selected station profile is not available.</source>
         <translation>選択したステーションプロファイルは利用できません。</translation>
     </message>
+    <message>
+        <source>A Club Log personal token or legacy API key is needed (Setup → QSL services)</source>
+        <translation>Club Log の個人トークンまたは旧 API キーが必要です（設定 → QSL サービス）</translation>
+    </message>
+    <message>
+        <source>Club Log: could not save cty.xml; the existing file was preserved</source>
+        <translation>Club Log: cty.xml を保存できませんでした。既存のファイルは保持されています</translation>
+    </message>
+    <message>
+        <source>Club Log credential unavailable: %1</source>
+        <translation>Club Log の認証情報を利用できません: %1</translation>
+    </message>
+    <message>
+        <source>Logbook or station changed; preview the import again</source>
+        <translation>ログブックまたは局が変更されました。インポートのプレビューをやり直してください</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>
@@ -12247,6 +12333,142 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>LoTW: TQSL uploaded %1 QSO; check processing in LoTW Your Activity</source>
         <translation>LoTW: TQSL が %1 件の QSO をアップロードしました。LoTW の「Your Activity」で処理状況を確認してください</translation>
+    </message>
+    <message>
+        <source>Credentials changed; refresh the OQRS requests</source>
+        <translation>認証情報が変更されました。OQRS リクエストを更新してください</translation>
+    </message>
+    <message>
+        <source>Club Log account or station changed; refresh the OQRS requests</source>
+        <translation>Club Log のアカウントまたは局が変更されました。OQRS リクエストを更新してください</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n direct OQRS request(s); these are not QSL confirmations</source>
+        <translation>
+            <numerusform>直接の OQRS リクエスト %n 件。これらは QSL 確認ではありません</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: could not remove the personal token from the old settings file; check its permissions</source>
+        <translation>Club Log: 旧設定ファイルから個人トークンを削除できませんでした。ファイルの権限を確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field and is being moved to secure storage</source>
+        <translation>個人の Club Log トークンを旧キー欄から削除し、安全な保管場所へ移しています</translation>
+    </message>
+    <message>
+        <source>Club Log personal token was removed from the legacy key field; check the secure credential</source>
+        <translation>個人の Club Log トークンを旧キー欄から削除しました。安全な認証情報を確認してください</translation>
+    </message>
+    <message>
+        <source>Station changed; refresh the OQRS requests</source>
+        <translation>局が変更されました。OQRS リクエストを更新してください</translation>
+    </message>
+    <message>
+        <source>Reading direct OQRS requests from Club Log…</source>
+        <translation>Club Log から直接の OQRS リクエストを読み込み中…</translation>
+    </message>
+    <message>
+        <source>Club Log credential changed; try again</source>
+        <translation>Club Log の認証情報が変更されました。もう一度お試しください</translation>
+    </message>
+    <message>
+        <source>A Club Log personal token is required for OQRS requests</source>
+        <translation>OQRS リクエストには Club Log の個人トークンが必要です</translation>
+    </message>
+    <message>
+        <source>Select a station callsign before downloading Club Log</source>
+        <translation>Club Log をダウンロードする前に局のコールサインを選択してください</translation>
+    </message>
+    <message>
+        <source>Downloading the Club Log logbook…</source>
+        <translation>Club Log のログブックをダウンロード中…</translation>
+    </message>
+    <message>
+        <source>A valid Club Log personal token is required</source>
+        <translation>有効な Club Log の個人トークンが必要です</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary download file</source>
+        <translation>一時ダウンロードファイルを作成できません</translation>
+    </message>
+    <message>
+        <source>Club Log download failed (HTTP %1); no contacts were imported</source>
+        <translation>Club Log のダウンロードに失敗しました（HTTP %1）。交信はインポートされていません</translation>
+    </message>
+    <message>
+        <source>Download complete; review the import preview</source>
+        <translation>ダウンロードが完了しました。インポートのプレビューを確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
+        <translation>Club Log: このログブックには再開できるアップロードがありません。保留中のチェックポイントを確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid saved QSO list; reconciliation required</source>
+        <translation>Club Log: 保存された QSO リストが無効です。照合が必要です</translation>
+    </message>
+    <message>
+        <source>Club Log: local QSO data changed; review the pending upload before resuming</source>
+        <translation>Club Log: ローカルの QSO データが変更されました。再開する前に保留中のアップロードを確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log: personal token required to resume the pending upload</source>
+        <translation>Club Log: 保留中のアップロードを再開するには個人トークンが必要です</translation>
+    </message>
+    <message>
+        <source>Club Log: upload outcome remains unknown</source>
+        <translation>Club Log: アップロードの結果は依然として不明です</translation>
+    </message>
+    <message>
+        <source>Club Log personal tokens must be saved in the secure Club Log credential field, not the legacy API-key field</source>
+        <translation>Club Log の個人トークンは、旧 API キー欄ではなく、安全な Club Log 認証情報欄に保存してください</translation>
+    </message>
+    <message>
+        <source>Club Log: this contact is already awaiting verification</source>
+        <translation>Club Log: この交信はすでに確認待ちです</translation>
+    </message>
+    <message numerus="yes">
+        <source>Club Log: %n QSO belong to another station and remain pending</source>
+        <translation>
+            <numerusform>Club Log: %n 件の QSO は別の局のもので、保留のままです</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Club Log: no pending contacts belong to the active station</source>
+        <translation>Club Log: 保留中の交信で有効な局のものはありません</translation>
+    </message>
+    <message>
+        <source>Club Log: an upload is unresolved or its checkpoint could not be saved; review it before sending</source>
+        <translation>Club Log: アップロードが未解決か、そのチェックポイントを保存できませんでした。送信前に確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log: every contact was found in the log; upload processing details are unavailable</source>
+        <translation>Club Log: すべての交信がログブックに見つかりました。アップロード処理の詳細は利用できません</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 contacts found; %2 still awaiting verification</source>
+        <translation>Club Log: %1 件の交信が見つかりました。%2 件はまだ確認待ちです</translation>
+    </message>
+    <message>
+        <source>Club Log rejected this QSO</source>
+        <translation>Club Log がこの QSO を拒否しました</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: review the result before retrying</source>
+        <translation>Club Log への自動アップロードを一時停止しました。再試行の前に結果を確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log automatic upload paused: correct the rejected contacts before retrying</source>
+        <translation>Club Log への自動アップロードを一時停止しました。再試行の前に拒否された交信を修正してください</translation>
+    </message>
+    <message>
+        <source>Club Log: could not clear upload checkpoint; check before sending again</source>
+        <translation>Club Log: アップロードのチェックポイントを消去できませんでした。再送信の前に確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation>Club Log: リモートの結果を受け取りましたが、ローカルへの保存に失敗しました。照合のためチェックポイントを保持しています</translation>
     </message>
 </context>
 <context>
@@ -12992,6 +13214,29 @@ QSL の状態: %6 · UTC が不完全: %7。
     </message>
 </context>
 <context>
+    <name>decolog::core::ClubLogOqrsClient</name>
+    <message>
+        <source>A station callsign and Club Log personal token are required</source>
+        <translation>局のコールサインと Club Log の個人トークンが必要です</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS request failed (HTTP %1); previous results preserved</source>
+        <translation>Club Log OQRS のリクエストに失敗しました（HTTP %1）。以前の結果は保持されています</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid record; previous results preserved</source>
+        <translation>Club Log OQRS が無効なレコードを返しました。以前の結果は保持されています</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS returned an invalid cursor; previous results preserved</source>
+        <translation>Club Log OQRS が無効なカーソルを返しました。以前の結果は保持されています</translation>
+    </message>
+    <message>
+        <source>Club Log OQRS pagination failed; previous results preserved</source>
+        <translation>Club Log OQRS のページ分割に失敗しました。以前の結果は保持されています</translation>
+    </message>
+</context>
+<context>
     <name>decolog::core::ClusterConnection</name>
     <message>
         <source>the node answers but says nothing: it may be down, or an antivirus or firewall (AVG, Avast…) is holding the connection — press Check, or try another source</source>
@@ -13176,14 +13421,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>確認の取り込み。送信はこのパソコンの TQSL を通します</translation>
     </message>
     <message>
-        <source>Email</source>
-        <translation>メール</translation>
-    </message>
-    <message>
-        <source>App password</source>
-        <translation>アプリのパスワード</translation>
-    </message>
-    <message>
         <source>Real-time upload and OQRS</source>
         <translation>すぐの送信と OQRS</translation>
     </message>
@@ -13266,6 +13503,38 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>The QSOs go to HH, the HamHub Log bridge, over DecoPort. Type the same password in HH: nothing is sent without it</source>
         <translation>QSO は DecoPort で HH（HamHub Log へのブリッジ）に送られます。HH にも同じパスワードを入力してください。パスワードがないと何も送信されません</translation>
+    </message>
+    <message>
+        <source>Email (legacy)</source>
+        <translation>メール（旧）</translation>
+    </message>
+    <message>
+        <source>Personal token or app password</source>
+        <translation>個人トークンまたはアプリパスワード</translation>
+    </message>
+    <message>
+        <source>A Club Log credential operation is already in progress</source>
+        <translation>Club Log の認証情報の操作がすでに進行中です</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential replacement checkpoint</source>
+        <translation>認証情報の置き換えのチェックポイントを保存できません</translation>
+    </message>
+    <message>
+        <source>Cannot save the credential state</source>
+        <translation>認証情報の状態を保存できません</translation>
+    </message>
+    <message>
+        <source>No system keystore in this build: the secret could not be removed</source>
+        <translation>このビルドにはシステムのキーストアがないため、シークレットを削除できませんでした</translation>
+    </message>
+    <message>
+        <source>Credential replacement was not completed; save it again</source>
+        <translation>認証情報の置き換えが完了していません。もう一度保存してください</translation>
+    </message>
+    <message>
+        <source>No Club Log credential is stored</source>
+        <translation>保存されている Club Log の認証情報はありません</translation>
     </message>
 </context>
 <context>
@@ -13574,6 +13843,130 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Club Log: email, password, callsign and API key are all needed</source>
         <translation>Club Log: メール、パスワード、コールサイン、API キーのどれも要ります</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid real-time batch</source>
+        <translation>Club Log: リアルタイムのバッチが無効です</translation>
+    </message>
+    <message>
+        <source>Club Log: real-time batch HTTP %1; verify contacts before retrying</source>
+        <translation>Club Log: リアルタイムのバッチが HTTP %1 を返しました。再試行の前に交信を確認してください</translation>
+    </message>
+    <message>
+        <source>Club Log: checking the result of each contact</source>
+        <translation>Club Log: 各交信の結果を確認しています</translation>
+    </message>
+    <message>
+        <source>Club Log REST: invalid callsign, token, ADIF or checkpoint</source>
+        <translation>Club Log REST: コールサイン、トークン、ADIF、またはチェックポイントが無効です</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued; final processing and reconciliation are still required</source>
+        <translation>Club Log: アップロードはキューに入りました。最終処理と照合がまだ必要です</translation>
+    </message>
+    <message>
+        <source>Club Log: upload queued but its identifier could not be saved; reconcile manually</source>
+        <translation>Club Log: アップロードはキューに入りましたが、その識別子を保存できませんでした。手動で照合してください</translation>
+    </message>
+    <message>
+        <source>Club Log upload: HTTP %1</source>
+        <translation>Club Log アップロード: HTTP %1</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid parameters for pending upload</source>
+        <translation>Club Log: 保留中のアップロードのパラメータが無効です</translation>
+    </message>
+    <message>
+        <source>Club Log: upload polling limit reached; resume reconciliation later</source>
+        <translation>Club Log: アップロードの問い合わせ上限に達しました。照合は後で再開してください</translation>
+    </message>
+    <message>
+        <source>Club Log: upload still queued; resume reconciliation later</source>
+        <translation>Club Log: アップロードはまだキューにあります。照合は後で再開してください</translation>
+    </message>
+    <message>
+        <source>Club Log: polling interrupted</source>
+        <translation>Club Log: 問い合わせが中断されました</translation>
+    </message>
+    <message>
+        <source>Club Log: status HTTP %1</source>
+        <translation>Club Log: 状態 HTTP %1</translation>
+    </message>
+    <message>
+        <source>; resume later</source>
+        <translation>; 後で再開</translation>
+    </message>
+    <message>
+        <source>Club Log: final status lacks record results</source>
+        <translation>Club Log: 最終状態にレコードの結果がありません</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid or excessive result records</source>
+        <translation>Club Log: 結果レコードが無効、または多すぎます</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid result cursor</source>
+        <translation>Club Log: 結果のカーソルが無効です</translation>
+    </message>
+    <message>
+        <source>Club Log: repeated result cursor</source>
+        <translation>Club Log: 結果のカーソルが繰り返されています</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete individual results; reconciliation required</source>
+        <translation>Club Log: 個々の結果が不完全です。照合が必要です</translation>
+    </message>
+    <message>
+        <source>Club Log: %1 created or updated, %2 duplicates, %3 rejected, %4 unknown; individual reconciliation required</source>
+        <translation>Club Log: 作成または更新 %1、重複 %2、拒否 %3、不明 %4。個別の照合が必要です</translation>
+    </message>
+    <message>
+        <source>Club Log: cannot resolve batch identities</source>
+        <translation>Club Log: バッチの識別情報を解決できません</translation>
+    </message>
+    <message>
+        <source>Club Log: multiple local contacts have the same identity</source>
+        <translation>Club Log: 複数のローカル交信に同じ識別情報があります</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query failed (HTTP %1); reconciliation remains pending</source>
+        <translation>Club Log: 識別情報の問い合わせに失敗しました（HTTP %1）。照合は保留のままです</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete identity query</source>
+        <translation>Club Log: 識別情報の問い合わせが不完全です</translation>
+    </message>
+    <message>
+        <source>Club Log: ambiguous identity query</source>
+        <translation>Club Log: 識別情報の問い合わせがあいまいです</translation>
+    </message>
+    <message>
+        <source>Club Log: invalid contact identity</source>
+        <translation>Club Log: 交信の識別情報が無効です</translation>
+    </message>
+    <message>
+        <source>Club Log: contact identity is not unique</source>
+        <translation>Club Log: 交信の識別情報が一意ではありません</translation>
+    </message>
+    <message>
+        <source>Club Log: incomplete contact identities</source>
+        <translation>Club Log: 交信の識別情報が不完全です</translation>
+    </message>
+    <message>
+        <source>Club Log: identity query interrupted</source>
+        <translation>Club Log: 識別情報の問い合わせが中断されました</translation>
+    </message>
+    <message>
+        <source>Club Log REST: exactly one QSO and a station callsign are required</source>
+        <translation>Club Log REST: QSO を 1 件だけと、局のコールサインが必要です</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1 (%2)</source>
+        <translation>Club Log REST: HTTP %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Club Log REST: HTTP %1: %2</source>
+        <translation>Club Log REST: HTTP %1: %2</translation>
     </message>
 </context>
 </TS>

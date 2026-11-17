@@ -1613,10 +1613,20 @@ RoundedWindow {
                       qsTr("Spreadsheets (*.csv *.tsv)"), qsTr("N1MM Logger+ databases (*.s3db)"),
                       qsTr("All files (*)")]
         onAccepted: {
-            pendingImport = selectedFile
-            importPreview = decolog.previewImport(selectedFile)
+            decolog.previewImport(selectedFile, false)
+        }
+    }
+    Connections {
+        target: decolog
+        function onImportPreviewReady(file, result) {
+            window.pendingImport = file
+            window.importPreview = result
             importPreviewDialog.open()
         }
+    }
+    Connections {
+        target: decolog.qsl
+        function onClubLogDownloadReady(file) { decolog.previewImport(file, true) }
     }
     property url pendingImport
     property var importPreview: ({})

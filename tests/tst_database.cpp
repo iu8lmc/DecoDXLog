@@ -71,7 +71,7 @@ private slots:
         QTemporaryDir dir;
         const QString path = dir.filePath(QStringLiteral("api.sqlite"));
         const ApiIdempotencyRecord stored{"body-a", 201, "application/json", "{\"ok\":true}",
-                                          QStringLiteral("2026-10-18T12:00:00Z")};
+                                          QDateTime::currentDateTimeUtc().toString(Qt::ISODate)};
         {
             LogDatabase db;
             QVERIFY(db.open(path));
