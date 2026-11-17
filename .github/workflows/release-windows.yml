@@ -112,6 +112,13 @@ jobs:
           $app = Start-Process -FilePath $exe -ArgumentList @('--show','badge','--grab',$png) -Wait -PassThru
           if ($app.ExitCode -ne 0) { throw "Installed application exited with code $($app.ExitCode)" }
           if (!(Test-Path $png) -or ((Get-Item $png).Length -le 0)) { throw "Installed application did not produce a PNG" }
+          # Run the probe alongside the installed app, with MSYS2 removed from
+          # PATH, so a missing packaged TLS backend or DLL cannot be masked.
+          Copy-Item 'build-rel/decodxlog_tls_probe.exe' $installRoot
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+          & (Join-Path $installRoot 'decodxlog_tls_probe.exe')
+          if ($LASTEXITCODE -ne 0) { throw "Installed runtime cannot initialise Qt TLS" }
+
 
       - name: Sign the approved Windows installer
         if: inputs.publish
