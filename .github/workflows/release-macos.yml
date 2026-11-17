@@ -11,7 +11,7 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v1.17.56
+        default: v1.17.57
       arch:
         description: Architettura da costruire (all, arm64, x86_64)
         required: true
@@ -36,11 +36,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag }}
-
-      - name: Apply release-gate test timing correction
-        run: |
-          git fetch --no-tags origin 2349bd8bbc26afd8352213ff98ee3637d176f5e1
-          git show 2349bd8bbc26afd8352213ff98ee3637d176f5e1:tests/tst_qslcontroller.cpp > tests/tst_qslcontroller.cpp
 
       - name: Install dependencies
         run: brew install cmake ninja qt qtkeychain openssl@3 brotli webp

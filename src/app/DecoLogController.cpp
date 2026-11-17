@@ -868,7 +868,7 @@ bool DecoLogController::openDatabase(const QString& path)
         if (!rig || !rig->connected() || mhz <= 0)
             return false;
         rig->tuneTo(static_cast<qint64>(std::llround(mhz * 1e6)),
-                    mode.isEmpty() ? QString() : modes::catFor(mode, mhz));
+                    mode.isEmpty() ? QString() : modes::catForClusterSpot(mode, mhz));
         return true;
     };
     m_cluster = new ClusterController(std::move(ctx), this);
@@ -3658,6 +3658,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
 
 QVariantMap DecoLogController::qsoDetail(qint64 id) const
 {
+    decolog::StartupSpan trace("QSO detail read");
     const auto record = m_db.record(id);
     const auto meta = m_db.meta(id);
     if (!record || !meta)
@@ -3883,6 +3884,14 @@ void DecoLogController::recordUiLatency(const QString& scenario, qint64 elapsedM
     samples.append(qMax<qint64>(0, elapsedMs));
     while (samples.size() > 256)
         samples.removeFirst();
+    if (key.startsWith(QLatin1String("qso.detail.")) && elapsedMs >= 400) {
+        const QString detail = QStringLiteral("%1 slow: %2 (%3 ms)")
+            .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate), key).arg(elapsedMs);
+        addActivity(QStringLiteral("APP"), detail, QStringLiteral("warning"));
+        m_freezeDiagnostics.append(detail);
+        while (m_freezeDiagnostics.size() > 20)
+            m_freezeDiagnostics.removeFirst();
+    }
 }
 
 QString DecoLogController::saveDiagnosticReport(const QUrl& file) const
@@ -3915,6 +3924,7 @@ QString DecoLogController::saveDiagnosticJsonReport(const QUrl& file) const
 
 QVariantMap DecoLogController::qslManagerSuggestion(qint64 qsoId) const
 {
+    decolog::StartupSpan trace("QSO QSL manager read");
     const auto record = m_db.record(qsoId);
     if (!record)
         return {};
@@ -4826,6 +4836,7 @@ bool DecoLogController::undoLastImport()
 
 QVariantList DecoLogController::qsoEnrichments(qint64 qsoId) const
 {
+    decolog::StartupSpan trace("QSO enrichments read");
     QVariantList out;
     for (const EnrichmentEntry& e : m_db.enrichments(qsoId))
         out << QVariantMap{{QStringLiteral("field"), e.field},

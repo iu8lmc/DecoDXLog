@@ -101,6 +101,15 @@ QString catFor(const QString& mode, double mhz)
     return cat;
 }
 
+QString catForClusterSpot(const QString& mode, double mhz)
+{
+    const QString normalized = mode.trimmed().toUpper();
+    if (normalized == QLatin1String("FT8") || normalized == QLatin1String("FT4")
+        || normalized == QLatin1String("FT2"))
+        return QStringLiteral("USB");
+    return catFor(mode, mhz);
+}
+
 QString catFor(const QString& mode)
 {
     const QString wanted = mode.trimmed().toUpper();

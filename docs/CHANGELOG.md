@@ -3,6 +3,12 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.57 — 18 novembre 2026
+
+- Gli spot FT8, FT4 e FT2 selezionati dal cluster impostano la radio in USB, evitando la selezione RTTY di alcuni backend CAT.
+- Ulteriori misurazioni diagnostiche per il caricamento della scheda QSO dopo una modifica.
+- Resi più affidabili i test della tabella e della reattività Club Log sui runner macOS.
+
 ## 1.17.56 — 17 novembre 2026
 
 - Calendario DX-Pedition con ricerca, filtri, aggiornamento asincrono e cache offline.

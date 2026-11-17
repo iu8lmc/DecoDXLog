@@ -11,6 +11,17 @@ class TestModes : public QObject {
     Q_OBJECT
 
 private slots:
+    void clusterFtModesUseUsbWithoutChangingRtty()
+    {
+        for (const auto* mode : {"FT8", "FT4", "FT2", " ft8 "})
+            QCOMPARE(modes::catForClusterSpot(QLatin1String(mode), 7.074), QString("USB"));
+        QCOMPARE(modes::catForClusterSpot("RTTY", 14.09), QString("RTTY"));
+        QCOMPARE(modes::catForClusterSpot("RTTY-R", 14.09), QString("RTTYR"));
+        QCOMPARE(modes::catForClusterSpot("CW", 7.03), QString("CW"));
+        QCOMPARE(modes::catForClusterSpot("SSB", 7.12), QString("LSB"));
+        QCOMPARE(modes::catFor("FT8", 7.074), QString("PKTUSB"));
+    }
+
     void cwAndPhoneGoStraightThrough()
     {
         QCOMPARE(modes::catFor(QStringLiteral("CW")), QStringLiteral("CW"));
