@@ -73,7 +73,7 @@ RoundedWindow {
         property real mapWidth: 308
         // I pannelli chiusi e quelli in finestra propria, come liste di chiavi
         // separate da virgola. Restano da una sessione all'altra.
-        property string hiddenPanels: "cw,bandmap,decodium,decfull,decsig"
+        property string hiddenPanels: "cw,bandmap,decodium,decfull,decsig,dxcalendar"
         property string detachedPanels: ""
         // Il Cluster fuori dal Contest vive sempre in una finestra propria.
         // Fa quindi parte dello stato dei pannelli esattamente come quelli
@@ -81,6 +81,7 @@ RoundedWindow {
         property alias clusterWindowOpen: clusterWindow.active
         // La band map e' arrivata dopo: a chi aveva gia' la sua lavagna si
         // presenta chiusa, la apre da Pannelli quando vuole.
+        property bool dxCalendarIntroduced: false
         property bool bandMapIntroduced: false
         // Lo stesso per il pannello Decodium (Full Spectrum e Signal RX).
         property bool decodiumIntroduced: false
@@ -113,7 +114,7 @@ RoundedWindow {
     // Ogni pannello ha una chiave. Con quella si sa come si chiama, da quale
     // file nasce quando lo si stacca, e se adesso e' agganciato, in finestra o
     // chiuso. Chiuso vuol dire chiuso davvero: lo spazio non resta vuoto.
-    readonly property var panelKeys: ["newqso", "logbook", "callinfo", "cw", "rotor", "ft2", "tabs", "map", "bandmap", "decodium", "decfull", "decsig",
+    readonly property var panelKeys: ["newqso", "logbook", "callinfo", "cw", "rotor", "ft2", "tabs", "map", "bandmap", "decodium", "decfull", "decsig", "dxcalendar",
                                       "contest", "score", "rate", "cluster", "net", "dvk", "mults"]
     // Gli ultimi quattro vivono solo in finestra: nel contest ognuno se li
     // mette dove vuole, e nella disposizione agganciata non hanno un posto.
@@ -131,6 +132,7 @@ RoundedWindow {
         case "tabs":     return qsTr("Awards, statistics, QSL, activity")
         case "map":      return qsTr("Map")
         case "bandmap":  return qsTr("Band map")
+        case "dxcalendar": return qsTr("DXpedition calendar")
         case "decodium": return qsTr("Decodium")
         case "decfull":  return qsTr("Full Spectrum (Decodium window)")
         case "decsig":   return qsTr("Signal RX (Decodium window)")
@@ -155,6 +157,7 @@ RoundedWindow {
         case "tabs":     return "BottomTabs.qml"
         case "map":      return "MapPanel.qml"
         case "bandmap":  return "BandMapPanel.qml"
+        case "dxcalendar": return "DxCalendarPanel.qml"
         case "decodium": return "DecodiumPanel.qml"
         case "decfull":  return "DecodiumWindowPanel.qml"
         case "decsig":   return "DecodiumWindowPanel.qml"
@@ -176,7 +179,7 @@ RoundedWindow {
     // ridimensiona dai bordi, si attacca ai bordi vicini, si stacca e si
     // chiude. Chi e' chiuso o staccato lo tengono hiddenPanels e
     // detachedPanels, come prima; posizioni e misure la lavagna.
-    readonly property var boardKeys: ["newqso", "logbook", "callinfo", "cw", "rotor", "ft2", "tabs", "map", "bandmap", "decodium", "decfull", "decsig"]
+    readonly property var boardKeys: ["newqso", "logbook", "callinfo", "cw", "rotor", "ft2", "tabs", "map", "bandmap", "decodium", "decfull", "decsig", "dxcalendar"]
 
     // Il pannello sulla lavagna, con la stessa faccia delle caselle di prima
     // (item, currentTab, setTab, showMenu…).
@@ -928,6 +931,12 @@ RoundedWindow {
     }
 
     Component.onCompleted: {
+        if (!layout.dxCalendarIntroduced) {
+            const hidden = window.panelListOf(layout.hiddenPanels)
+            if (hidden.indexOf("dxcalendar") < 0)
+                layout.hiddenPanels = hidden.concat(["dxcalendar"]).join(",")
+            layout.dxCalendarIntroduced = true
+        }
         if (!layout.bandMapIntroduced) {
             const hidden = window.panelListOf(layout.hiddenPanels)
             if (hidden.indexOf("bandmap") < 0)
@@ -1091,6 +1100,7 @@ RoundedWindow {
             window.openChat()
         }
         // La band map aperta, con una manciata di spot su 20 m.
+        else if (what[0] === "dxcalendar") { window.showPanel("dxcalendar"); if (what[1] === "detach") window.detachPanel("dxcalendar") }
         else if (what[0] === "bandmap") {
             window.showPanel("bandmap")
             const now = new Date()
@@ -2275,7 +2285,7 @@ RoundedWindow {
         external: true
         settingsCategory: "layout/mainboard"
         allKeys: window.boardKeys
-        defaultKeys: window.boardKeys.filter(k => k !== "cw" && k !== "bandmap" && k !== "decodium" && k !== "decfull" && k !== "decsig")
+        defaultKeys: window.boardKeys.filter(k => k !== "cw" && k !== "bandmap" && k !== "decodium" && k !== "decfull" && k !== "decsig" && k !== "dxcalendar")
         // Come la disposizione di prima: l'inserimento a sinistra, il log al
         // centro, la colonna di destra, la fascia delle schede in basso.
         defaultGeometry: ({
@@ -2288,6 +2298,7 @@ RoundedWindow {
             tabs:     { x: 0.00, y: 0.68, w: 0.60, h: 0.32 },
             ft2:      { x: 0.60, y: 0.68, w: 0.18, h: 0.32 },
             bandmap:  { x: 0.60, y: 0.00, w: 0.18, h: 0.68 },
+            dxcalendar: { x: 0.24, y: 0.10, w: 0.50, h: 0.70 },
             decodium: { x: 0.50, y: 0.30, w: 0.28, h: 0.38 },
             decfull:  { x: 0.00, y: 0.68, w: 0.40, h: 0.32 },
             decsig:   { x: 0.40, y: 0.68, w: 0.30, h: 0.32 }

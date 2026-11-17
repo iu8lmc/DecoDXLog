@@ -163,6 +163,7 @@ public:
     bool filtered() const;
 
     Q_INVOKABLE void reload();
+    Q_INVOKABLE void refreshAfterInsert();
     bool busy() const { return m_busy; }
     QString sortKey() const { return m_sortKey; }
     bool sortAscending() const { return m_sortAscending; }

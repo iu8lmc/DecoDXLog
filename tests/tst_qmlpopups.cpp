@@ -270,6 +270,7 @@ private slots:
             {QStringLiteral("tabs"), QStringLiteral("BottomTabs.qml")},
             {QStringLiteral("map"), QStringLiteral("MapPanel.qml")},
             {QStringLiteral("bandmap"), QStringLiteral("BandMapPanel.qml")},
+            {QStringLiteral("dxcalendar"), QStringLiteral("DxCalendarPanel.qml")},
             {QStringLiteral("decodium"), QStringLiteral("DecodiumPanel.qml")},
             {QStringLiteral("decfull"), QStringLiteral("DecodiumWindowPanel.qml")},
             {QStringLiteral("decsig"), QStringLiteral("DecodiumWindowPanel.qml")},
@@ -281,7 +282,7 @@ private slots:
             {QStringLiteral("dvk"), QStringLiteral("DvkPanel.qml")},
             {QStringLiteral("mults"), QStringLiteral("ContestMultipliersPanel.qml")}
         };
-        QCOMPARE(panels.size(), 19);
+        QCOMPARE(panels.size(), 20);
 
         QStringList registered = qmlStringListProperty(main, QStringLiteral("panelKeys"));
         QStringList board = qmlStringListProperty(main, QStringLiteral("boardKeys"));

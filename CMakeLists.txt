@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.55
+    VERSION 1.17.56
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -352,6 +352,8 @@ qt_add_executable(decolog
     src/CrashLog.h
     src/WarningLog.cpp
     src/WarningLog.h
+    src/app/DxCalendarCache.cpp
+    src/app/DxCalendarCache.h
     src/app/QsoTableModel.cpp
     src/app/QsoTableModel.h
     src/app/DecoLogController.cpp
@@ -432,6 +434,9 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/MapSafeView.qml
     qml/DecoDXLog/StatusRail.qml
     qml/DecoDXLog/DxAlertToast.qml
+    qml/DecoDXLog/DxCalendarPanel.qml
+    qml/DecoDXLog/DxCalendarWorker.js
+    qml/DecoDXLog/DxCalendarParser.js
     qml/DecoDXLog/BandMapPanel.qml
     qml/DecoDXLog/PathForecastView.qml
     qml/DecoDXLog/ChatWindow.qml
@@ -500,6 +505,7 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/RotorTopBar.qml
     qml/DecoDXLog/RotorStatus.qml
     qml/DecoDXLog/RotorLocatorBar.qml
+    qml/DecoDXLog/QsoJourney.qml
     qml/DecoDXLog/RotorMap.qml
     qml/DecoDXLog/RotorDial.qml
     qml/DecoDXLog/RotorControlPage.qml
@@ -524,10 +530,14 @@ set(DECODXLOG_QML_FILES
 # Is a directory". Su Windows non succedeva perche' li' l'eseguibile ha .exe.
 # Il modulo finisce comunque nelle risorse, quindi spostarlo non cambia niente
 # a chi lo usa.
+set_source_files_properties(qml/DecoDXLog/DxCalendarWorker.js qml/DecoDXLog/DxCalendarParser.js PROPERTIES QT_QML_SKIP_QMLDIR_ENTRY TRUE)
+
 qt_add_qml_module(decolog
     URI DecoDXLog
     VERSION 1.0
     QML_FILES ${DECODXLOG_QML_FILES}
+    RESOURCES qml/DecoDXLog/journey/earth-0.jpg qml/DecoDXLog/journey/earth-1.jpg
+              qml/DecoDXLog/journey/earth-2.jpg qml/DecoDXLog/journey/earth-3.jpg
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/qml_modules/DecoDXLog
 )
 
@@ -745,11 +755,25 @@ if(DECODXLOG_BUILD_TESTS)
     target_link_libraries(tst_qsomodel PRIVATE decolog_core Qt6::Test)
     set_target_properties(tst_qsomodel PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME qsomodel COMMAND tst_qsomodel)
+    qt_add_executable(tst_qsotableview tests/tst_qsotableview.cpp src/app/QsoTableModel.cpp src/app/QsoTableModel.h)
+    target_include_directories(tst_qsotableview PRIVATE src)
+    target_link_libraries(tst_qsotableview PRIVATE decolog_core Qt6::Test Qt6::Quick)
+    set_target_properties(tst_qsotableview PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME qsotableview COMMAND tst_qsotableview)
+    set_tests_properties(qsotableview PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     qt_add_executable(tst_maplayers tests/tst_maplayers.cpp)
     target_link_libraries(tst_maplayers PRIVATE Qt6::QuickTest Qt6::Quick decodium_ui decodium_uiplugin)
     set_target_properties(tst_maplayers PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME qsojourney COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_qsojourney.qml)
     add_test(NAME maplayers COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_maplayers.qml)
     set_tests_properties(maplayers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
+    add_test(NAME dxcalendar COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_dxcalendar.qml)
+    set_tests_properties(dxcalendar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
+    qt_add_executable(tst_dxcalendarcache tests/tst_dxcalendarcache.cpp src/app/DxCalendarCache.cpp src/app/DxCalendarCache.h)
+    target_include_directories(tst_dxcalendarcache PRIVATE src)
+    target_link_libraries(tst_dxcalendarcache PRIVATE Qt6::Core Qt6::Test)
+    set_target_properties(tst_dxcalendarcache PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME dxcalendarcache COMMAND tst_dxcalendarcache)
     add_test(NAME newqsotuning COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_newqsotuning.qml)
     set_tests_properties(newqsotuning PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
     add_test(NAME clublogcredentials COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_clublogcredentials.qml)

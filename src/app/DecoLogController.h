@@ -991,6 +991,7 @@ private:
     QElapsedTimer m_freezeClock;
     qint64        m_lastBeat{0};
     int           m_freezeCount{0};
+    QStringList   m_freezeDiagnostics;
     mutable QList<core::AwardResult> m_awardCache;
     mutable bool m_awardsDirty{true};
     mutable QList<core::AwardResult> m_globalAwardCache;

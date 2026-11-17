@@ -4470,6 +4470,10 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 <context>
     <name>Main</name>
     <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendario DX-Pedition</translation>
+    </message>
+    <message>
         <source>New QSO</source>
         <translation>Nuovo QSO</translation>
     </message>
@@ -9481,6 +9485,10 @@ Campi extra conservati: %8</translation>
 <context>
     <name>TopBar</name>
     <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendario DX-Pedition</translation>
+    </message>
+    <message>
         <source>Import</source>
         <translation>Importa</translation>
     </message>
@@ -13972,6 +13980,93 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log rejected this contact</source>
         <translation>Club Log ha rifiutato questo contatto</translation>
+    </message>
+</context>
+<context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendario DX-Pedition</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Nessun calendario salvato. Premi Aggiorna per scaricarlo.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>La fonte non ha restituito eventi validi. Il calendario salvato è stato conservato.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Calendario salvato: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Aggiornato: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Calendario aggiornato, ma la copia offline non è stata salvata.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>Tempo di aggiornamento scaduto. Mostro l’ultimo calendario salvato.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Aggiornamento calendario…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>Aggiornamento non riuscito. Mostro l’ultimo calendario salvato.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Aggiornamento…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Aggiorna</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Nominativo, entità o dettagli</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Attive e future</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Attive</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Future</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation>Tutte</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Nessun dettaglio disponibile</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Nessuna operazione corrispondente</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Annunci: NG3K ADXO · calendario: DXCAL / KK7DS. Le date possono cambiare; verificare con gli organizzatori.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>Apri fonte NG3K</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>Apri feed DXCAL</translation>
     </message>
 </context>
 </TS>

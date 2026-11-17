@@ -3,6 +3,13 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.56 — 17 novembre 2026
+
+- Calendario DX-Pedition con ricerca, filtri, aggiornamento asincrono e cache offline.
+- Mappa QSO animata con vista satellitare, percorso ortodromico e panoramica finale.
+- Corretto il duplicato visivo dopo l'inserimento manuale di un QSO.
+- Migliorata la diagnostica dei blocchi e delle operazioni QSL.
+
 ## 1.17.55 — 17 novembre 2026
 
 **Club Log: download del log.** Il log della stazione attiva può essere scaricato in ADIF con il token personale. Il download usa richieste di rete asincrone e l’anteprima viene preparata su un worker; l’importazione richiede la conferma dell’operatore. I nuovi QSO mantengono l’identificativo Club Log e sono segnati come già inviati. I duplicati restano soggetti alle normali regole di importazione e non vengono sostituiti automaticamente.

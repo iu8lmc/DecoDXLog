@@ -504,6 +504,7 @@ Rectangle {
                             { key: "rate", label: qsTr("Rate") },
                             { key: "score", label: qsTr("Score") },
                             { key: "map", label: qsTr("Map") },
+                            { key: "dxcalendar", label: qsTr("DXpedition calendar") },
                             { key: "cw", label: qsTr("CW") }
                         ]
                         delegate: StyledMenuItem {

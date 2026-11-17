@@ -850,6 +850,7 @@ int QslController::uploadQsos(const QVariantList& ids, const QString& service)
 
 void QslController::uploadPending(const QString& service, int limit)
 {
+    decolog::StartupSpan trace("QSL prepare pending uploads");
     if (busy() || !m_ctx.db || !m_ctx.db->isOpen())
         return;
     int cap = limit;
@@ -897,6 +898,7 @@ void QslController::startNextAutomaticUpload()
 
 void QslController::startNext()
 {
+    decolog::StartupSpan trace("QSL start upload");
     m_accepted = m_duplicates = m_rejected = m_removed = 0;
     m_batchMode = isBatchService(m_busyService);
     emit changed();
@@ -1290,6 +1292,7 @@ bool QslController::markSent(qint64 id, const QString& service, const QslUploadR
 
 void QslController::finishBatch(const QslUploadResult& result)
 {
+    decolog::StartupSpan trace("QSL process upload result");
     countsDirty();
     const QString service = m_busyService;
     bool clubLogStatePersisted = true;
