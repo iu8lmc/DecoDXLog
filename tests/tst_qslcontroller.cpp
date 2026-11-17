@@ -234,7 +234,7 @@ private slots:
             connect(socket, &QTcpSocket::readyRead, this, [&, socket] {
                 received += socket->readAll();
                 if (!received.contains("\r\n\r\n{}")) return;
-                QTimer::singleShot(150, socket, [socket, failure] {
+                QTimer::singleShot(500, socket, [socket, failure] {
                     const QByteArray body = failure ? QByteArray("error") : QByteArray("<EOH><CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>");
                     socket->write(QByteArray("HTTP/1.1 ") + (failure ? "500 Error" : "200 OK") + "\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
                     socket->disconnectFromHost();
