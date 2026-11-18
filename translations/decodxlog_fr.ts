@@ -3409,6 +3409,93 @@ Dans Decodium : Settings → Reporting → UDP Server 127.0.0.1, port %1, et &qu
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendrier des DXpeditions</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Aucun calendrier enregistré. Sélectionnez Mettre à jour pour le télécharger.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>La source n&apos;a renvoyé aucune entrée valide. Le calendrier enregistré a été conservé.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Calendrier enregistré : %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Mis à jour : %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Calendrier mis à jour, mais la copie hors ligne n&apos;a pas pu être enregistrée.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>Délai de mise à jour dépassé. Affichage du dernier calendrier enregistré.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Mise à jour du calendrier…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>Échec de la mise à jour. Affichage du dernier calendrier enregistré.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Mise à jour…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Mettre à jour</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Indicatif, entité ou détails</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>En cours et à venir</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>En cours</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>À venir</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Tout</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Aucun détail fourni</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Aucune opération correspondante</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Annonces : NG3K ADXO · flux du calendrier : DXCAL / KK7DS. Les dates peuvent changer ; vérifiez auprès de l&apos;opération.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>Ouvrir la source NG3K</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>Ouvrir le flux DXCAL</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4311,6 +4398,10 @@ Ouvrez-le une fois dans DecoDXLog pour le mettre à jour.</translation>
         <source>Add tag…</source>
         <translation>Ajouter une étiquette…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>Carte des QSO</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4713,6 +4804,10 @@ Champs supplémentaires conservés : %8</translation>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Tous les panneaux sont dans leur propre fenêtre : ↩ dans un panneau le ramène ici.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendrier des DXpeditions</translation>
     </message>
 </context>
 <context>
@@ -6518,6 +6613,25 @@ Champs supplémentaires conservés : %8</translation>
     <message>
         <source>Save · rev %1</source>
         <translation>Enregistrer · rév. %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>Carte des QSO</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Coordonnées de la station ou du contact manquantes</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Satellite</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Renvoyer les décodages</translation>
     </message>
 </context>
 <context>
@@ -9734,6 +9848,10 @@ Champs supplémentaires conservés : %8</translation>
         <source>Search…</source>
         <translation>Rechercher…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendrier des DXpeditions</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10925,13 +11043,6 @@ Champs supplémentaires conservés : %8</translation>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>Impossible d&apos;écouter sur UDP %1 : %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>La fenêtre n&apos;a pas répondu pendant %1 s, occupée par : %2 (%n fois depuis le démarrage)</numerusform>
-            <numerusform>La fenêtre n&apos;a pas répondu pendant %1 s, occupée par : %2 (%n fois depuis le démarrage)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>À l&apos;écoute de N1MM Logger+ sur UDP %1</translation>
@@ -11916,6 +12027,30 @@ Champs supplémentaires conservés : %8</translation>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>Journal ou station modifié ; refaire l&apos;aperçu de l&apos;importation</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>Enregistrement du QSO dans la base de données</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>Mise en file d&apos;attente de la modification distante</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Mise en file d&apos;attente de la QSL automatique</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>Notification des vues et services du QSO modifié</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>Mise à jour de l&apos;instantané DecoLink</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>Actualisation des informations sur l&apos;indicatif</translation>
     </message>
 </context>
 <context>

@@ -3409,6 +3409,93 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, poort %1, en &quot
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition-agenda</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Geen opgeslagen agenda. Kies Bijwerken om hem te downloaden.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>De bron leverde geen geldige items. De opgeslagen agenda is bewaard.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Opgeslagen agenda: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Bijgewerkt: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Agenda bijgewerkt, maar de offlinekopie kon niet worden opgeslagen.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>Bijwerken duurde te lang. De laatst opgeslagen agenda wordt getoond.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Agenda wordt bijgewerkt…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>Bijwerken mislukt. De laatst opgeslagen agenda wordt getoond.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Bezig met bijwerken…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Bijwerken</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Roepteken, entiteit of details</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Actief en komend</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Actief</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Komend</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Alle</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Geen details opgegeven</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Geen overeenkomende operaties</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Aankondigingen: NG3K ADXO · agendafeed: DXCAL / KK7DS. Data kunnen wijzigen; controleer dit bij de operatie.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>NG3K-bron openen</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>DXCAL-feed openen</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4311,6 +4398,10 @@ Open het één keer in DecoDXLog om het bij te werken.</translation>
         <source>Add tag…</source>
         <translation>Label toevoegen…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO-kaart</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4713,6 +4804,10 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Alle panelen staan in een eigen venster: ↩ in een paneel haalt het hierheen terug.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition-agenda</translation>
     </message>
 </context>
 <context>
@@ -6518,6 +6613,25 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>Save · rev %1</source>
         <translation>Opslaan · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO-kaart</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Coördinaten van station of contact ontbreken</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Satelliet</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Decodes herhalen</translation>
     </message>
 </context>
 <context>
@@ -9734,6 +9848,10 @@ Extra velden blijven behouden: %8</translation>
         <source>Search…</source>
         <translation>Zoeken…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition-agenda</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10925,13 +11043,6 @@ Extra velden blijven behouden: %8</translation>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>Kan niet op UDP %1 luisteren: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>Het venster gaf %1 s lang geen antwoord, bezig met: %2 (%n keer sinds de start)</numerusform>
-            <numerusform>Het venster gaf %1 s lang geen antwoord, bezig met: %2 (%n keer sinds de start)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>Luistert naar N1MM Logger+ op UDP %1</translation>
@@ -11916,6 +12027,30 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>Logboek of station gewijzigd; importvoorbeeld opnieuw maken</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>QSO wordt in de database opgeslagen</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>Externe bewerking wordt in de wachtrij gezet</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Automatische QSL wordt in de wachtrij gezet</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>Weergaven en diensten worden op de hoogte gebracht van het bewerkte QSO</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>DecoLink-snapshot wordt bijgewerkt</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>Roepteeminformatie wordt vernieuwd</translation>
     </message>
 </context>
 <context>

@@ -1,4 +1,6 @@
 #include "app/QslController.h"
+#include "StartupTrace.h"
+#include <QThread>
 #include "core/ClubLogUploadJournal.h"
 #include "core/ClubLogDownload.h"
 #include "core/ClubLogBatchReconcile.h"
@@ -15,6 +17,7 @@
 #include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QElapsedTimer>
 #include <QSignalSpy>
 #include <cstdio>
 #include <algorithm>
@@ -74,6 +77,71 @@ private slots:
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_dir.path());
     }
     void init() { QSettings().clear(); }
+
+
+    void clubLogStatusEditResponsiveness_data()
+    {
+        QTest::addColumn<bool>("automatic");
+        QTest::newRow("automatic-off") << false;
+        QTest::newRow("automatic-on") << true;
+    }
+
+    void clubLogStatusEditResponsiveness()
+    {
+        QFETCH(bool, automatic);
+        LogDatabase db;
+        QVERIFY(db.open(m_dir.filePath(automatic ? "edit-auto.sqlite" : "edit-manual.sqlite")));
+        const auto inserted = db.insertQso({{"CALL", "K1ABC"}, {"QSO_DATE", "20261117"},
+                                          {"TIME_ON", "123456"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        QslController::Context context;
+        context.db = &db;
+        QslController controller(context);
+        controller.setAutoUpload(QStringLiteral("clublog"), automatic);
+        QElapsedTimer timer;
+        qint64 longest = 0;
+        int ticks = 0;
+        QTimer heartbeat;
+        heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&ticks] { ++ticks; });
+        heartbeat.start();
+        for (int i = 0; i < 20; ++i) {
+            timer.start();
+            AdifRecord record = *db.record(inserted.id);
+            record.set("CLUBLOG_QSO_UPLOAD_STATUS", i % 2 ? "N" : "Y");
+            QCOMPARE(db.updateQso(inserted.id, record).status, InsertResult::Status::Inserted);
+            controller.qsoLogged(inserted.id);
+            longest = qMax(longest, timer.elapsed());
+            QTest::qWait(20);
+        }
+        // Stop the delayed auto queue: this test does not send contacts.
+        controller.m_autoDelay.stop();
+        QCOMPARE(db.record(inserted.id)->value("CLUBLOG_QSO_UPLOAD_STATUS"), QString("N"));
+        QVERIFY(ticks >= 10);
+        qInfo() << "Club Log status edits; automatic" << automatic
+                << "longest synchronous edit ms" << longest << "heartbeat ticks" << ticks;
+    }
+
+
+    void slowOperationIsCapturedOnUiThread()
+    {
+        auto& slow = decolog::lastSlowOp();
+        slow.name.store(nullptr);
+        slow.durationMs.store(0);
+        {
+            decolog::StartupSpan fast("fast operation");
+        }
+        QVERIFY(slow.name.load() == nullptr);
+        {
+            decolog::StartupSpan blocked("simulated QSL processing");
+            QThread::msleep(320);
+        }
+        QVERIFY(slow.name.load() != nullptr);
+        QCOMPARE(QString::fromLatin1(slow.name.load()), QStringLiteral("simulated QSL processing"));
+        QVERIFY(slow.durationMs.load() >= 300);
+        slow.name.store(nullptr);
+        slow.durationMs.store(0);
+    }
 
     void automaticClubLogRecheckRespectsSwitchAndCredential()
     {
@@ -166,7 +234,7 @@ private slots:
             connect(socket, &QTcpSocket::readyRead, this, [&, socket] {
                 received += socket->readAll();
                 if (!received.contains("\r\n\r\n{}")) return;
-                QTimer::singleShot(150, socket, [socket, failure] {
+                QTimer::singleShot(500, socket, [socket, failure] {
                     const QByteArray body = failure ? QByteArray("error") : QByteArray("<EOH><CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>");
                     socket->write(QByteArray("HTTP/1.1 ") + (failure ? "500 Error" : "200 OK") + "\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
                     socket->disconnectFromHost();
@@ -180,9 +248,9 @@ private slots:
         QSignalSpy ready(&controller, &QslController::clubLogDownloadReady);
         int ticks = 0; QTimer heartbeat; heartbeat.setInterval(10);
         connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
-        QTest::qWait(150);
+        QTRY_VERIFY_WITH_TIMEOUT(ticks >= 3, 3000);
         const int idleTicks = ticks;
-        QVERIFY(idleTicks >= 3);
+        Q_UNUSED(idleTicks);
         ticks = 0;
         controller.downloadClubLog();
         QVERIFY(controller.clubLogDownloadBusy());

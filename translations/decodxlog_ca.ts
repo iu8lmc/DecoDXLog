@@ -3409,6 +3409,93 @@ A Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, i &quot;Ac
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendari de DXpeditions</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>No hi ha cap calendari desat. Selecciona Actualitza per baixar-lo.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>La font no ha retornat entrades vàlides. S&apos;ha conservat el calendari desat.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Calendari desat: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Actualitzat: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Calendari actualitzat, però no s&apos;ha pogut desar la còpia fora de línia.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>L&apos;actualització ha superat el temps. Es mostra l&apos;últim calendari desat.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Actualitzant el calendari…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>L&apos;actualització ha fallat. Es mostra l&apos;últim calendari desat.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Actualitzant…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Actualitza</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Indicatiu, entitat o detalls</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Actives i properes</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Actives</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Properes</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Tot</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>No s&apos;han indicat detalls</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>No hi ha operacions coincidents</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Anuncis: NG3K ADXO · font del calendari: DXCAL / KK7DS. Les dates poden canviar; verifica-ho amb l&apos;operació.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>Obre la font NG3K</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>Obre la font DXCAL</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4311,6 +4398,10 @@ Obre&apos;l una vegada a DecoDXLog per actualitzar-lo.</translation>
         <source>Add tag…</source>
         <translation>Afegeix una etiqueta…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>Mapa de QSO</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4713,6 +4804,10 @@ Camps extra conservats: %8</translation>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Tots els panells són en una finestra pròpia: ↩ en un panell el torna aquí.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendari de DXpeditions</translation>
     </message>
 </context>
 <context>
@@ -6518,6 +6613,25 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Save · rev %1</source>
         <translation>Desa · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>Mapa de QSO</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Falten les coordenades de l&apos;estació o del contacte</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Satèl·lit</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Repeteix les descodificacions</translation>
     </message>
 </context>
 <context>
@@ -9734,6 +9848,10 @@ Camps extra conservats: %8</translation>
         <source>Search…</source>
         <translation>Cerca…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Calendari de DXpeditions</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10925,13 +11043,6 @@ Camps extra conservats: %8</translation>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>No es pot escoltar a UDP %1: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>La finestra ha deixat de respondre durant %1 s, ocupada amb: %2 (%n cop des de l&apos;arrencada)</numerusform>
-            <numerusform>La finestra ha deixat de respondre durant %1 s, ocupada amb: %2 (%n cops des de l&apos;arrencada)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>Escoltant N1MM Logger+ a UDP %1</translation>
@@ -11916,6 +12027,30 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>El registre o l&apos;estació han canviat; torna a generar la vista prèvia de la importació</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>Desant el QSO a la base de dades</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>Posant en cua l&apos;edició remota</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Posant en cua la QSL automàtica</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>Notificant les vistes i els serveis del QSO editat</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>Actualitzant la instantània de DecoLink</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>Actualitzant la informació de l&apos;indicatiu</translation>
     </message>
 </context>
 <context>

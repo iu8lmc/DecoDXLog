@@ -3400,6 +3400,93 @@ A Decodiumban: Settings → Reporting → UDP Server 127.0.0.1, port: %1, és &q
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedíció-naptár</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Nincs mentett naptár. Válassza a Frissítés gombot a letöltéshez.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>A forrás nem adott vissza érvényes bejegyzést. A mentett naptár megmaradt.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Mentett naptár: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Frissítve: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>A naptár frissítve, de az offline másolatot nem sikerült menteni.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>A frissítés időtúllépés miatt megszakadt. A legutóbb mentett naptár látszik.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Naptár frissítése…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>A frissítés sikertelen. A legutóbb mentett naptár látszik.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Frissítés…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Frissítés</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Hívójel, entitás vagy részletek</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Aktív és közelgő</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Aktív</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Közelgő</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Mind</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Nincs megadva részlet</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Nincs megfelelő művelet</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Közlemények: NG3K ADXO · naptárfeed: DXCAL / KK7DS. A dátumok változhatnak; ellenőrizze a művelettel.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>NG3K forrás megnyitása</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>DXCAL feed megnyitása</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4302,6 +4389,10 @@ Nyisd meg egyszer a DecoDXLog-ban a frissítéshez.</translation>
         <source>Add tag…</source>
         <translation>Címke hozzáadása…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO-térkép</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4702,6 +4793,10 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Minden panel saját ablakban van: a panelen a ↩ visszahozza ide.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedíció-naptár</translation>
     </message>
 </context>
 <context>
@@ -6504,6 +6599,25 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Save · rev %1</source>
         <translation>Mentés · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO-térkép</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Hiányoznak az állomás vagy a kapcsolat koordinátái</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Műhold</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Dekódolások ismétlése</translation>
     </message>
 </context>
 <context>
@@ -9712,6 +9826,10 @@ A további mezők megmaradnak: %8</translation>
         <source>Search…</source>
         <translation>Keresés…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedíció-naptár</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10889,12 +11007,6 @@ A további mezők megmaradnak: %8</translation>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>Nem tud figyelni az UDP %1 porton: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>Az ablak %1 másodpercig nem válaszolt, ezzel volt elfoglalva: %2 (%n alkalommal az indítás óta)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>N1MM Logger+ figyelése az UDP %1 porton</translation>
@@ -11867,6 +11979,30 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>A napló vagy az állomás megváltozott; készítse újra az importálási előnézetet</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>A QSO mentése az adatbázisba</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>A távoli szerkesztés sorba állítása</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Az automatikus QSL sorba állítása</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>A nézetek és szolgáltatások értesítése a módosított QSO-ról</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>A DecoLink pillanatkép frissítése</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>A hívójel adatainak frissítése</translation>
     </message>
 </context>
 <context>

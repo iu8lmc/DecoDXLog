@@ -3400,6 +3400,93 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition 日历</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>没有已保存的日历。请选择“更新”来下载。</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>来源没有返回有效条目。已保留保存的日历。</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>已保存的日历：%1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>已更新：%1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>日历已更新，但无法保存离线副本。</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>更新超时。显示上次保存的日历。</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>正在更新日历…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>更新失败。显示上次保存的日历。</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>正在更新…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>呼号、实体或详情</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>进行中和即将开始</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>进行中</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>即将开始</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">全部</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>未提供详情</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>没有匹配的活动</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>公告：NG3K ADXO · 日历订阅源：DXCAL / KK7DS。日期可能变动，请以活动方为准。</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>打开 NG3K 来源</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>打开 DXCAL 订阅源</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4302,6 +4389,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <source>Add tag…</source>
         <translation>加标签…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO 地图</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4702,6 +4793,10 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>所有面板都在各自的窗口中：面板中的 ↩ 可将其放回这里。</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition 日历</translation>
     </message>
 </context>
 <context>
@@ -6504,6 +6599,25 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>Save · rev %1</source>
         <translation>保存 · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO 地图</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>缺少电台或通联的坐标</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">卫星</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">重发解码</translation>
     </message>
 </context>
 <context>
@@ -9712,6 +9826,10 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>Search…</source>
         <translation>搜索…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition 日历</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10889,12 +11007,6 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>Cannot listen on UDP %1: %2</source>
         <translation>无法在 UDP %1 上监听：%2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>窗口有 %1 秒没有响应，正在处理：%2（启动以来第 %n 次）</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>正在 UDP %1 上监听 N1MM Logger+</translation>
@@ -11867,6 +11979,30 @@ QSL 状态：%6 · UTC 不完整：%7。
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>日志或电台已更改；请重新预览导入</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>正在将 QSO 保存到数据库</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>正在排队远程编辑</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>正在排队自动 QSL</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>正在通知视图和服务已编辑的 QSO</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>正在更新 DecoLink 快照</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>正在刷新呼号信息</translation>
     </message>
 </context>
 <context>

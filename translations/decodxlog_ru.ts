@@ -3418,6 +3418,93 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Календарь DXpedition</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Сохранённого календаря нет. Выберите «Обновить», чтобы загрузить его.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>Источник не вернул корректных записей. Сохранённый календарь сохранён.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Сохранённый календарь: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Обновлено: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Календарь обновлён, но офлайн-копию сохранить не удалось.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>Время обновления истекло. Показан последний сохранённый календарь.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Обновление календаря…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>Обновление не удалось. Показан последний сохранённый календарь.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Обновление…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Обновить</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Позывной, образование или подробности</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Активные и предстоящие</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Активные</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Предстоящие</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Все</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Подробности не указаны</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Нет подходящих операций</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Объявления: NG3K ADXO · лента календаря: DXCAL / KK7DS. Даты могут измениться; уточняйте у операции.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>Открыть источник NG3K</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>Открыть ленту DXCAL</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4320,6 +4407,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <source>Add tag…</source>
         <translation>Добавить метку…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>Карта QSO</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4724,6 +4815,10 @@ Extra fields are preserved: %8</source>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Все панели в отдельных окнах: ↩ в панели возвращает её сюда.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Календарь DXpedition</translation>
     </message>
 </context>
 <context>
@@ -6532,6 +6627,25 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Save · rev %1</source>
         <translation>Сохранить · ред. %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>Карта QSO</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Нет координат станции или связи</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Спутник</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Повторить декоды</translation>
     </message>
 </context>
 <context>
@@ -9756,6 +9870,10 @@ Extra fields are preserved: %8</source>
         <source>Search…</source>
         <translation>Поиск…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>Календарь DXpedition</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10961,14 +11079,6 @@ Extra fields are preserved: %8</source>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>Не слушать UDP %1: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>Окно не отвечало %1 с, занято: %2 (%n раз с запуска)</numerusform>
-            <numerusform>Окно не отвечало %1 с, занято: %2 (%n раза с запуска)</numerusform>
-            <numerusform>Окно не отвечало %1 с, занято: %2 (%n раз с запуска)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>Слушаю N1MM Logger+ на UDP %1</translation>
@@ -11965,6 +12075,30 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>Журнал или станция изменились; повторите предпросмотр импорта</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>Сохранение QSO в базе данных</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>Постановка удалённого изменения в очередь</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Постановка автоматического QSL в очередь</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>Уведомление окон и служб об изменённом QSO</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>Обновление снимка DecoLink</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>Обновление сведений о позывном</translation>
     </message>
 </context>
 <context>

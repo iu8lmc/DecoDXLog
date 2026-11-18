@@ -3400,6 +3400,93 @@ Decodium で: Settings → Reporting → UDP Server 127.0.0.1、ポート %1、�
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXペディションカレンダー</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>保存されたカレンダーはありません。「更新」を選んでダウンロードしてください。</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>ソースに有効なエントリがありませんでした。保存済みのカレンダーを保持しています。</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>保存済みカレンダー: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>更新日時: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>カレンダーを更新しましたが、オフライン用のコピーを保存できませんでした。</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>更新がタイムアウトしました。最後に保存されたカレンダーを表示しています。</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>カレンダーを更新中…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>更新に失敗しました。最後に保存されたカレンダーを表示しています。</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>更新中…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>コールサイン、エンティティ、詳細</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>実施中と予定</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>実施中</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>予定</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">すべての地域</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>詳細はありません</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>一致する運用はありません</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>お知らせ: NG3K ADXO · カレンダーフィード: DXCAL / KK7DS。日付は変わることがあるため、運用者にご確認ください。</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>NG3K のソースを開く</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>DXCAL フィードを開く</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4302,6 +4389,10 @@ DecoDXLog で一度開いて更新してください。</translation>
         <source>Add tag…</source>
         <translation>タグを付ける…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO マップ</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4702,6 +4793,10 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>すべてのパネルが別ウィンドウにあります：パネルの ↩ でここに戻せます。</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXペディションカレンダー</translation>
     </message>
 </context>
 <context>
@@ -6504,6 +6599,25 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Save · rev %1</source>
         <translation>保存 · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO マップ</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>局または交信の座標がありません</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">衛星</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">デコードを再送</translation>
     </message>
 </context>
 <context>
@@ -9712,6 +9826,10 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Search…</source>
         <translation>検索…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXペディションカレンダー</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10889,12 +11007,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Cannot listen on UDP %1: %2</source>
         <translation>UDP %1 で聞けません: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>窓が %1 秒のあいだ返事をしませんでした。処理中: %2 (起動してから %n 回目)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>UDP %1 で N1MM Logger+ を待ち受け中</translation>
@@ -11867,6 +11979,30 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>ログブックまたは局が変更されました。インポートのプレビューをやり直してください</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>QSO をデータベースに保存中</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>リモート編集をキューに追加中</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>自動 QSL をキューに追加中</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>編集された QSO をビューとサービスに通知中</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>DecoLink スナップショットを更新中</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>コールサイン情報を更新中</translation>
     </message>
 </context>
 <context>

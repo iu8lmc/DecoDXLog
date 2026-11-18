@@ -2,6 +2,7 @@
 // rigctld che risponde come quello vero (protocollo esteso, "+f" → "get_freq:
 // / Frequency: … / RPRT 0"), cosi' la prova non ha bisogno di una radio.
 #include "core/RigControl.h"
+#include "core/Modes.h"
 
 #include <QSignalSpy>
 #include <QTcpServer>
@@ -195,6 +196,23 @@ private slots:
         control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
         QTRY_COMPARE_WITH_TIMEOUT(control.speedWpm(), 37, 5000);
     }
+    void clusterFtAndRttySendDistinctHamlibModes()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_VERIFY_WITH_TIMEOUT(control.connected(), 5000);
+
+        control.setFrequency(14074000);
+        control.setMode(modes::catForClusterSpot("FT8", 14.074));
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+F 14074000")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M USB 0")), 5000);
+        QVERIFY(!rig.received.contains(QStringLiteral("+M RTTY 0")));
+
+        control.setMode(modes::catForClusterSpot("RTTY", 14.09));
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M RTTY 0")), 5000);
+    }
+
     void readsWhereTheRadioIs()
     {
         FakeRigctld rig;

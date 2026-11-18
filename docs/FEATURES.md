@@ -1,4 +1,4 @@
-# DecoDXLog 1.17.56 — funzioni / features
+# DecoDXLog 1.17.58 — funzioni / features
 
 Ogni voce è in italiano e in inglese: *italiano* / *English*.
 Quello che manca è in fondo.
@@ -537,6 +537,10 @@ Quello che manca è in fondo.
 
 ## 11. DX cluster
 
+- **Calendario DX-Pedition**: pannello staccabile con ricerca, filtri per stato e copia
+  offline dell'ultimo aggiornamento riuscito; dati DXCAL dagli annunci NG3K. /
+  **DX-Pedition calendar**: detachable panel with search, status filters and an offline
+  copy of the last successful update; DXCAL data based on NG3K announcements.
 - **Fonti in un elenco solo**: nodi telnet (DX Spider, CC Cluster), Reverse Beacon Network
   (CW/RTTY e FT8/FT4), HamAlert, attivazioni POTA. / **All sources in one list**: telnet
   nodes (DX Spider, CC Cluster), Reverse Beacon Network (CW/RTTY and FT8/FT4), HamAlert,

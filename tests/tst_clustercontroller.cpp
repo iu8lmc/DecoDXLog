@@ -3,6 +3,7 @@
 #include "app/ClusterController.h"
 #include "core/DecoLinkServer.h"
 #include "core/LogDatabase.h"
+#include "core/Modes.h"
 
 #include <QElapsedTimer>
 #include <QFile>
@@ -98,6 +99,7 @@ private slots:
         // La radio finta: si segna dove le e' stato detto di andare.
         double radioMhz = 0;
         QString radioMode;
+        QString radioCatMode;
         bool radioThere = true;
         ClusterController::Context ctx;
         ctx.db = &db;
@@ -119,6 +121,7 @@ private slots:
                 return false;
             radioMhz = mhz;
             radioMode = mode;
+            radioCatMode = modes::catForClusterSpot(mode, mhz);
             return true;
         };
         ClusterController cluster(std::move(ctx));
@@ -214,6 +217,7 @@ private slots:
         // nell'audio, e una radio portata su 18101.5 non lo sentirebbe.
         QCOMPARE(radioMhz, 18.100);
         QCOMPARE(radioMode, QString("FT8"));
+        QCOMPARE(radioCatMode, QString("USB"));
 
         // In CW il quadrante e' la frequenza dello spot, senza scarti.
         cluster.injectLine(QString("DX de F5ABC:  14025.1  3Y0J  CW 18 dB  %1Z").arg(hhmm));
@@ -227,6 +231,7 @@ private slots:
         }
         QCOMPARE(radioMhz, 14.0251);
         QCOMPARE(radioMode, QString("CW"));
+        QCOMPARE(radioCatMode, QString("CW"));
 
         // Senza Decodium la radio si muove lo stesso: chi lavora in CW non ha
         // Decodium aperto, e fino a ieri un doppio clic non muoveva un VFO.

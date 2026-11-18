@@ -3406,6 +3406,93 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4307,6 +4394,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <source>Add tag…</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4706,6 +4797,10 @@ Extra fields are preserved: %8</source>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>All the panels are in their own windows: ↩ in a panel brings it back here.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -6510,6 +6605,25 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Save · rev %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Replay</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -9727,6 +9841,10 @@ Extra fields are preserved: %8</source>
         <source>Search…</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10918,13 +11036,6 @@ Extra fields are preserved: %8</source>
         <source>Cannot listen on UDP %1: %2</source>
         <translation type="unfinished"></translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation type="unfinished"></translation>
@@ -11908,6 +12019,30 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Logbook or station changed; preview the import again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

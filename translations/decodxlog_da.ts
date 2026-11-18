@@ -3409,6 +3409,93 @@ I Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, og &quot;A
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition-kalender</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Ingen gemt kalender. Vælg Opdater for at hente den.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>Kilden returnerede ingen gyldige poster. Den gemte kalender blev bevaret.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Gemt kalender: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Opdateret: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Kalenderen er opdateret, men offlinekopien kunne ikke gemmes.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>Opdateringen fik timeout. Viser den sidst gemte kalender.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Opdaterer kalenderen…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>Opdateringen mislykkedes. Viser den sidst gemte kalender.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Opdaterer…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Opdater</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Kaldesignal, enhed eller detaljer</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Aktive og kommende</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Aktive</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Kommende</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Alle</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Ingen detaljer angivet</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Ingen matchende aktiviteter</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Meddelelser: NG3K ADXO · kalenderfeed: DXCAL / KK7DS. Datoer kan ændre sig; bekræft med aktiviteten.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>Åbn NG3K-kilden</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>Åbn DXCAL-feedet</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4311,6 +4398,10 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <source>Add tag…</source>
         <translation>Sæt mærkat…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO-kort</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4713,6 +4804,10 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Alle paneler er i deres egne vinduer: ↩ i et panel bringer det tilbage hertil.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition-kalender</translation>
     </message>
 </context>
 <context>
@@ -6518,6 +6613,25 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Save · rev %1</source>
         <translation>Gem · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO-kort</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Koordinater for station eller forbindelse mangler</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Satelit</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Gentag dekodninger</translation>
     </message>
 </context>
 <context>
@@ -9734,6 +9848,10 @@ Ekstra felter bevares: %8</translation>
         <source>Search…</source>
         <translation>Søg…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedition-kalender</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10925,13 +11043,6 @@ Ekstra felter bevares: %8</translation>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>Kan ikke lytte på UDP %1: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>Vinduet svarede ikke i %1 s, optaget af: %2 (%n gang siden starten)</numerusform>
-            <numerusform>Vinduet svarede ikke i %1 s, optaget af: %2 (%n gange siden starten)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>Lytter efter N1MM Logger+ på UDP %1</translation>
@@ -11916,6 +12027,30 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>Logbog eller station er ændret; lav importforhåndsvisningen igen</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>Gemmer QSO&apos;en i databasen</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>Sætter den eksterne redigering i kø</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Sætter automatisk QSL i kø</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>Underretter visninger og tjenester om den redigerede QSO</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>Opdaterer DecoLink-snapshottet</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>Opdaterer oplysninger om kaldesignalet</translation>
     </message>
 </context>
 <context>

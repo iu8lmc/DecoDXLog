@@ -12,7 +12,7 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v1.17.56
+        default: v1.17.58
 
 permissions:
   contents: write
@@ -95,6 +95,7 @@ jobs:
             qt6-declarative-dev-tools \
             qml6-module-qttest \
             qt6-location-dev \
+            qt6-location-plugins \
             qt6-l10n-tools \
             qt6-multimedia-dev \
             qt6-positioning-dev \
@@ -157,6 +158,14 @@ jobs:
           QML_SOURCES_PATHS: qml:libs/decodium-ui/qml
           VERSION: ${{ inputs.tag }}
         run: |
+          if [ -n "${QT_ROOT_DIR:-}" ]; then
+            geo_plugins="$QT_ROOT_DIR/plugins/geoservices"
+          else
+            geo_plugins="$(qtpaths6 --plugin-dir)/geoservices"
+          fi
+          test -f "$geo_plugins/libqtgeoservices_osm.so"
+          mkdir -p AppDir/usr/plugins/geoservices
+          cp "$geo_plugins"/libqtgeoservices_*.so AppDir/usr/plugins/geoservices/
           ./linuxdeploy \
             --appdir AppDir \
             --executable AppDir/usr/bin/DecoDXLog \
@@ -164,6 +173,8 @@ jobs:
             --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/decodxlog.png \
             --plugin qt \
             --output appimage
+          test -n "$(find AppDir -name libqtgeoservices_osm.so -print -quit)" \
+            || { echo "Qt OpenStreetMap plugin was not bundled"; exit 1; }
           for library in libcrypto.so* libssl.so*; do
             test -n "$(find AppDir \( -type f -o -type l \) -name "$library" -print -quit)" \
               || { echo "OpenSSL $library was not bundled into the AppImage"; exit 1; }

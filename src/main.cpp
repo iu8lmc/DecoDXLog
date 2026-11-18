@@ -1,3 +1,4 @@
+#include "app/DxCalendarCache.h"
 // DecoDXLog — il log di stazione della famiglia Decodium.
 
 #include "CrashLog.h"
@@ -839,6 +840,8 @@ int main(int argc, char* argv[])
             QCoreApplication::exit(restarted ? 0 : -1);
         });
     });
+    DxCalendarCache dxCalendarCache;
+    engine.rootContext()->setContextProperty(QStringLiteral("dxCalendarCache"), &dxCalendarCache);
     engine.rootContext()->setContextProperty(QStringLiteral("decolog"), &controller);
     // La finestra principale puo' sparire prima che QObject inizi a distruggere
     // i controller. Chiudiamo esplicitamente socket, timer e code mentre Qt e'

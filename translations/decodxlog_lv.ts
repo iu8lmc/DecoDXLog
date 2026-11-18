@@ -3418,6 +3418,93 @@ Decodium: Settings → Reporting → UDP Server 127.0.0.1, ports %1, un &quot;Ac
     </message>
 </context>
 <context>
+    <name>DxCalendarPanel</name>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedīciju kalendārs</translation>
+    </message>
+    <message>
+        <source>No saved calendar. Select Update to download it.</source>
+        <translation>Nav saglabāta kalendāra. Izvēlieties Atjaunināt, lai to lejupielādētu.</translation>
+    </message>
+    <message>
+        <source>The source returned no valid entries. The saved calendar was kept.</source>
+        <translation>Avots neatgrieza derīgus ierakstus. Saglabātais kalendārs tika paturēts.</translation>
+    </message>
+    <message>
+        <source>Saved calendar: %1</source>
+        <translation>Saglabātais kalendārs: %1</translation>
+    </message>
+    <message>
+        <source>Updated: %1</source>
+        <translation>Atjaunināts: %1</translation>
+    </message>
+    <message>
+        <source>Calendar updated, but the offline copy could not be saved.</source>
+        <translation>Kalendārs atjaunināts, bet bezsaistes kopiju nevarēja saglabāt.</translation>
+    </message>
+    <message>
+        <source>Update timed out. Showing the last saved calendar.</source>
+        <translation>Atjaunināšanas laiks beidzās. Tiek rādīts pēdējais saglabātais kalendārs.</translation>
+    </message>
+    <message>
+        <source>Updating calendar…</source>
+        <translation>Notiek kalendāra atjaunināšana…</translation>
+    </message>
+    <message>
+        <source>Update failed. Showing the last saved calendar.</source>
+        <translation>Atjaunināšana neizdevās. Tiek rādīts pēdējais saglabātais kalendārs.</translation>
+    </message>
+    <message>
+        <source>Updating…</source>
+        <translation>Notiek atjaunināšana…</translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation>Atjaunināt</translation>
+    </message>
+    <message>
+        <source>Callsign, entity or details</source>
+        <translation>Izsaukuma zīme, vienība vai dati</translation>
+    </message>
+    <message>
+        <source>Active and upcoming</source>
+        <translation>Aktīvās un gaidāmās</translation>
+    </message>
+    <message>
+        <source>Active</source>
+        <translation>Aktīvās</translation>
+    </message>
+    <message>
+        <source>Upcoming</source>
+        <translation>Gaidāmās</translation>
+    </message>
+    <message>
+        <source>All</source>
+        <translation type="unfinished">Visi</translation>
+    </message>
+    <message>
+        <source>No details provided</source>
+        <translation>Informācija nav norādīta</translation>
+    </message>
+    <message>
+        <source>No matching operations</source>
+        <translation>Nav atbilstošu operāciju</translation>
+    </message>
+    <message>
+        <source>Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.</source>
+        <translation>Paziņojumi: NG3K ADXO · kalendāra plūsma: DXCAL / KK7DS. Datumi var mainīties; pārbaudiet ar operāciju.</translation>
+    </message>
+    <message>
+        <source>Open NG3K source</source>
+        <translation>Atvērt NG3K avotu</translation>
+    </message>
+    <message>
+        <source>Open DXCAL feed</source>
+        <translation>Atvērt DXCAL plūsmu</translation>
+    </message>
+</context>
+<context>
     <name>ExportPeriodDialog</name>
     <message>
         <source>EXPORT A PERIOD</source>
@@ -4320,6 +4407,10 @@ Atver to vienreiz DecoDXLog, lai atjauninātu.</translation>
         <source>Add tag…</source>
         <translation>Pievienot birku…</translation>
     </message>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO karte</translation>
+    </message>
 </context>
 <context>
     <name>LogbookWindow</name>
@@ -4724,6 +4815,10 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Visi paneļi ir savos logos: ↩ panelī to atgriež šeit.</translation>
+    </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedīciju kalendārs</translation>
     </message>
 </context>
 <context>
@@ -6532,6 +6627,25 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Save · rev %1</source>
         <translation>Saglabāt · rev %1</translation>
+    </message>
+</context>
+<context>
+    <name>QsoJourney</name>
+    <message>
+        <source>QSO map</source>
+        <translation>QSO karte</translation>
+    </message>
+    <message>
+        <source>Station or contact coordinates missing</source>
+        <translation>Trūkst stacijas vai sakara koordinātu</translation>
+    </message>
+    <message>
+        <source>Satellite</source>
+        <translation type="unfinished">Satelīts</translation>
+    </message>
+    <message>
+        <source>Replay</source>
+        <translation type="unfinished">Atkārtot dekodējumus</translation>
     </message>
 </context>
 <context>
@@ -9756,6 +9870,10 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Search…</source>
         <translation>Meklēt…</translation>
     </message>
+    <message>
+        <source>DXpedition calendar</source>
+        <translation>DXpedīciju kalendārs</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -10961,14 +11079,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Cannot listen on UDP %1: %2</source>
         <translation>Nevar klausīties uz UDP %1: %2</translation>
     </message>
-    <message numerus="yes">
-        <source>The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)</source>
-        <translation>
-            <numerusform>Logs %1 s neatbildēja, aizņemts ar: %2 (%n reizi kopš starta)</numerusform>
-            <numerusform>Logs %1 s neatbildēja, aizņemts ar: %2 (%n reizes kopš starta)</numerusform>
-            <numerusform>Logs %1 s neatbildēja, aizņemts ar: %2 (%n reizes kopš starta)</numerusform>
-        </translation>
-    </message>
     <message>
         <source>Listening for N1MM Logger+ on UDP %1</source>
         <translation>Klausos N1MM Logger+ uz UDP %1</translation>
@@ -11965,6 +12075,30 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>Žurnāls vai stacija ir mainījusies; atkārtojiet importa priekšskatījumu</translation>
+    </message>
+    <message>
+        <source>Saving the QSO in the database</source>
+        <translation>QSO tiek saglabāts datubāzē</translation>
+    </message>
+    <message>
+        <source>Queueing the remote edit</source>
+        <translation>Attālās rediģēšanas ievietošana rindā</translation>
+    </message>
+    <message>
+        <source>Queueing automatic QSL</source>
+        <translation>Automātiskās QSL ievietošana rindā</translation>
+    </message>
+    <message>
+        <source>Notifying views and services of the edited QSO</source>
+        <translation>Skatu un pakalpojumu informēšana par rediģēto QSO</translation>
+    </message>
+    <message>
+        <source>Updating the DecoLink snapshot</source>
+        <translation>DecoLink momentuzņēmuma atjaunināšana</translation>
+    </message>
+    <message>
+        <source>Refreshing callsign information</source>
+        <translation>Izsaukuma zīmes informācijas atsvaidzināšana</translation>
     </message>
 </context>
 <context>

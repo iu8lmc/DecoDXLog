@@ -1335,6 +1335,12 @@ void QsoTableModel::refreshQso(qint64 id)
     emit dataChanged(index(row, 0), index(row, columns() - 1));
 }
 
+void QsoTableModel::refreshAfterInsert()
+{
+    if (rowCount() > 0 && columnCount() > 0)
+        emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+}
+
 void QsoTableModel::insertQso(qint64 id)
 {
     if (!m_db || !m_db->isOpen())

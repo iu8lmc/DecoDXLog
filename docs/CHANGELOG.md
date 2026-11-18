@@ -3,13 +3,27 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.58 — 18 novembre 2026
+
+**Allineata alla 1.17.57 di elisir80** (la nostra era la 1.17.56). Dalla loro 1.17.57 e dalla 1.17.56
+arrivano il calendario DX-Pedition con ricerca, filtri e cache offline, la mappa QSO animata con vista
+satellitare, la correzione del duplicato visivo dopo l'inserimento manuale di un QSO e la diagnostica
+più completa dei blocchi e delle operazioni QSL. La 1.17.57 aggiunge la selezione USB per gli spot FT8,
+FT4 e FT2 e rende più affidabili i test sui runner macOS. Nessuna funzione nostra toccata; la nostra
+1.17.56, mai pubblicata, è sostituita da questa numerazione.
+
+## 1.17.57 — 18 novembre 2026
+
+- Gli spot FT8, FT4 e FT2 selezionati dal cluster impostano la radio in USB, evitando la selezione RTTY di alcuni backend CAT.
+- Ulteriori misurazioni diagnostiche per il caricamento della scheda QSO dopo una modifica.
+- Resi più affidabili i test della tabella e della reattività Club Log sui runner macOS.
+
 ## 1.17.56 — 17 novembre 2026
 
-**Allineata alla 1.17.55 di elisir80** (la nostra era la 1.17.54). Dalla loro 1.17.55 arrivano il download
-del log dal Club Log con il token personale (anteprima preparata su un worker, importazione solo dopo
-conferma), la verifica periodica degli invii Club Log in sospeso che rispetta l'interruttore dell'invio
-automatico, e la verifica del backend TLS nel pacchetto Windows. Nessuna funzione nostra toccata: l'unione
-è automatica, senza conflitti.
+- Calendario DX-Pedition con ricerca, filtri, aggiornamento asincrono e cache offline.
+- Mappa QSO animata con vista satellitare, percorso ortodromico e panoramica finale.
+- Corretto il duplicato visivo dopo l'inserimento manuale di un QSO.
+- Migliorata la diagnostica dei blocchi e delle operazioni QSL.
 
 ## 1.17.55 — 17 novembre 2026
 

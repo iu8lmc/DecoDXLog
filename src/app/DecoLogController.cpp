@@ -41,6 +41,7 @@
 #include <QSet>
 #include <QRegularExpression>
 #include <QSettings>
+#include <QSysInfo>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QUdpSocket>
@@ -867,7 +868,7 @@ bool DecoLogController::openDatabase(const QString& path)
         if (!rig || !rig->connected() || mhz <= 0)
             return false;
         rig->tuneTo(static_cast<qint64>(std::llround(mhz * 1e6)),
-                    mode.isEmpty() ? QString() : modes::catFor(mode, mhz));
+                    mode.isEmpty() ? QString() : modes::catForClusterSpot(mode, mhz));
         return true;
     };
     m_cluster = new ClusterController(std::move(ctx), this);
@@ -1496,6 +1497,10 @@ void DecoLogController::timed(const QString& what, const std::function<void()>& 
     if (spent >= 400) {
         addActivity(QStringLiteral("APP"), tr("%1: %2 s").arg(what, QString::number(spent / 1000.0, 'f', 1)),
                     QStringLiteral("warning"));
+        m_freezeDiagnostics.append(QStringLiteral("%1 slow: %2 (%3 ms)")
+            .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate), what).arg(spent));
+        while (m_freezeDiagnostics.size() > 20)
+            m_freezeDiagnostics.removeFirst();
     }
 }
 
@@ -1531,8 +1536,11 @@ void DecoLogController::startFreezeWatch()
         const qint64 now = m_freezeClock.elapsed();
         const qint64 late = now - m_lastBeat - m_freezeBeat.interval();
         m_lastBeat = now;
-        if (late < kSayItMs)
+        if (late < kSayItMs) {
+            decolog::lastSlowOp().name.store(nullptr);
+            decolog::lastSlowOp().durationMs.store(0);
             return;
+        }
         ++m_freezeCount;
         // Cosa stava facendo: l'ultima operazione lunga conclusa dentro il blocco.
         const decolog::SlowOp& slow = decolog::lastSlowOp();
@@ -1541,14 +1549,22 @@ void DecoLogController::startFreezeWatch()
         const bool known = busyWith && endedAgo >= 0 && endedAgo <= late + kBeatMs
                            && slow.durationMs.load() >= late / 3;
         const QString seconds = QString::number(late / 1000.0, 'f', 1);
+        const QString service = m_qsl && m_qsl->busy() ? m_qsl->busyService() : QStringLiteral("none");
+        const QString detail = QStringLiteral("%1 freeze: delay=%2 ms; count=%3; QSL active after recovery=%4; QSO=%5; %6")
+            .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate))
+            .arg(late).arg(m_freezeCount).arg(service).arg(m_model ? m_model->count() : 0)
+            .arg(known ? QStringLiteral("slow operation=%1 (%2 ms)")
+                             .arg(QString::fromLatin1(busyWith)).arg(slow.durationMs.load())
+                       : QStringLiteral("slow operation=unknown"));
         addActivity(QStringLiteral("APP"),
-                    known ? tr("The window stopped answering for %1 s, busy with: %2 (%n time(s) since the start)",
-                               nullptr, m_freezeCount)
-                                .arg(seconds, QString::fromLatin1(busyWith))
-                          : tr("The window stopped answering for %1 s (%n time(s) since the start)",
-                               nullptr, m_freezeCount)
-                                .arg(seconds),
-                    QStringLiteral("warning"));
+                    tr("The window stopped answering for %1 s (%n time(s) since the start)",
+                       nullptr, m_freezeCount).arg(seconds), QStringLiteral("warning"));
+        addActivity(QStringLiteral("APP"), detail, QStringLiteral("warning"));
+        m_freezeDiagnostics.append(detail);
+        while (m_freezeDiagnostics.size() > 20)
+            m_freezeDiagnostics.removeFirst();
+        decolog::lastSlowOp().name.store(nullptr);
+        decolog::lastSlowOp().durationMs.store(0);
     });
     m_freezeBeat.start();
 }
@@ -3642,6 +3658,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
 
 QVariantMap DecoLogController::qsoDetail(qint64 id) const
 {
+    decolog::StartupSpan trace("QSO detail read");
     const auto record = m_db.record(id);
     const auto meta = m_db.meta(id);
     if (!record || !meta)
@@ -3817,7 +3834,10 @@ QString DecoLogController::diagnosticSupportText() const
     QStringList lines;
     lines << QStringLiteral("DecoDXLog diagnostic summary")
           << QStringLiteral("version=%1").arg(QCoreApplication::applicationVersion())
-          << QStringLiteral("log_open=%1").arg(m_db.isOpen() ? QStringLiteral("yes") : QStringLiteral("no"));
+          << QStringLiteral("log_open=%1").arg(m_db.isOpen() ? QStringLiteral("yes") : QStringLiteral("no"))
+          << QStringLiteral("os=%1; architecture=%2; Qt=%3")
+                 .arg(QSysInfo::prettyProductName(), QSysInfo::currentCpuArchitecture(), QString::fromLatin1(qVersion()));
+    lines << m_freezeDiagnostics;
     for (const QVariant& item : integrationDiagnostics()) {
         const QVariantMap row = item.toMap();
         lines << QStringLiteral("%1: %2 — %3").arg(row.value(QStringLiteral("label")).toString(),
@@ -3864,6 +3884,14 @@ void DecoLogController::recordUiLatency(const QString& scenario, qint64 elapsedM
     samples.append(qMax<qint64>(0, elapsedMs));
     while (samples.size() > 256)
         samples.removeFirst();
+    if (key.startsWith(QLatin1String("qso.detail.")) && elapsedMs >= 400) {
+        const QString detail = QStringLiteral("%1 slow: %2 (%3 ms)")
+            .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate), key).arg(elapsedMs);
+        addActivity(QStringLiteral("APP"), detail, QStringLiteral("warning"));
+        m_freezeDiagnostics.append(detail);
+        while (m_freezeDiagnostics.size() > 20)
+            m_freezeDiagnostics.removeFirst();
+    }
 }
 
 QString DecoLogController::saveDiagnosticReport(const QUrl& file) const
@@ -3896,6 +3924,7 @@ QString DecoLogController::saveDiagnosticJsonReport(const QUrl& file) const
 
 QVariantMap DecoLogController::qslManagerSuggestion(qint64 qsoId) const
 {
+    decolog::StartupSpan trace("QSO QSL manager read");
     const auto record = m_db.record(qsoId);
     if (!record)
         return {};
@@ -3996,6 +4025,7 @@ QString DecoLogController::saveQso(qint64 id, const QVariantMap& fields, qint64 
 
 QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationProfileId)
 {
+    decolog::StartupSpan trace("save QSO");
     // Un nominativo sbagliato e corretto: quello che veniva dal vecchio (nazione, DXCC, zone,
     // continente) si rifa' dal nuovo — a meno che l'operatore l'abbia toccato nello stesso
     // salvataggio — e i servizi che hanno ricevuto il QSO sbagliato lo rimandano.
@@ -4012,7 +4042,8 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
         }
         applyEntity(r);
     }
-    const InsertResult res = m_db.updateQso(id, r, stationProfileId);
+    InsertResult res;
+    timed(tr("Saving the QSO in the database"), [&] { res = m_db.updateQso(id, r, stationProfileId); });
     if (res.status != InsertResult::Status::Inserted)
         return res.message.isEmpty() ? tr("Cannot save the QSO") : res.message;
     QStringList resent;
@@ -4021,8 +4052,8 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
             resent << serviceLabel(service);
     }
     // Dove il QSO si puo' correggere (CRX), la correzione va anche li'.
-    m_db.queueRemoteEdit(id);
-    m_qsl->qsoLogged(id);
+    timed(tr("Queueing the remote edit"), [&] { m_db.queueRemoteEdit(id); });
+    timed(tr("Queueing automatic QSL"), [&] { m_qsl->qsoLogged(id); });
     const auto meta = m_db.meta(id);
     const int revision = meta ? meta->revision : 0;
     addActivity(QStringLiteral("LOG"),
@@ -4035,9 +4066,9 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
                     QStringLiteral("warning"));
     }
     timed(tr("reloading the log table"), [this] { m_model->reload(); });
-    emit logChanged();
-    m_decoLink.resendSnapshot();
-    refreshCallInfo();
+    timed(tr("Notifying views and services of the edited QSO"), [this] { emit logChanged(); });
+    timed(tr("Updating the DecoLink snapshot"), [this] { m_decoLink.resendSnapshot(); });
+    timed(tr("Refreshing callsign information"), [this] { refreshCallInfo(); });
     return {};
 }
 
@@ -4805,6 +4836,7 @@ bool DecoLogController::undoLastImport()
 
 QVariantList DecoLogController::qsoEnrichments(qint64 qsoId) const
 {
+    decolog::StartupSpan trace("QSO enrichments read");
     QVariantList out;
     for (const EnrichmentEntry& e : m_db.enrichments(qsoId))
         out << QVariantMap{{QStringLiteral("field"), e.field},

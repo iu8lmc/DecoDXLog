@@ -49,15 +49,21 @@ DialogFrame {
     }
 
     function reload() {
+        let started = Date.now()
         detail = decolog.qsoDetail(qsoId)
+        decolog.recordUiLatency("qso.detail.record", Date.now() - started)
+        started = Date.now()
         fields = Object.assign({}, detail.fields || {})
         profileId = detail.stationProfileId || 0
         enrichments = decolog.qsoEnrichments(qsoId)
         attachments = detail.attachments || []
+        decolog.recordUiLatency("qso.detail.fields", Date.now() - started)
+        started = Date.now()
         managerSuggestion = decolog.qslManagerSuggestion(qsoId)
         edited = false
         errorText.text = ""
         formRev++
+        decolog.recordUiLatency("qso.detail.bindings", Date.now() - started)
     }
 
     function field(key) { return fields[key] !== undefined ? fields[key] : "" }

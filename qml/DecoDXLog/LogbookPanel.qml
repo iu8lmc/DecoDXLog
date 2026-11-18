@@ -10,6 +10,24 @@ import Decodium.UI
 GlassPanel {
     id: root
 
+    Loader {
+        id: journey
+        active: false
+        source: "QsoJourney.qml"
+        property var detail
+        onLoaded: item.present(detail)
+        Connections {
+            target: journey.item
+            function onClosing() { Qt.callLater(function() { journey.active = false }) }
+        }
+    }
+
+    function showJourney(id) {
+        journey.detail = decolog.qsoDetail(id)
+        if (journey.item) journey.item.present(journey.detail)
+        else journey.active = true
+    }
+
     // Colonne, larghezze e filtri salvati li tiene il log stesso, nelle
     // impostazioni: prima li teneva chi lo ospitava, e dove nessuno lo faceva
     // (la lavagna del contest, un log staccato, il log spostato in un'altra
@@ -1596,6 +1614,13 @@ GlassPanel {
             }
             Connections {
                 target: root.model
+                function onRowsInserted() {
+                    Qt.callLater(function() {
+                        table.forceLayout()
+                        if (root.model)
+                            root.model.refreshAfterInsert()
+                    })
+                }
                 function onLayoutChanged() {
                     table.clearColumnWidths()
                     root.applyStoredWidths()
@@ -1614,6 +1639,7 @@ GlassPanel {
             delegate: Rectangle {
                 id: cell
                 required property var display
+                required property int column
                 required property string columnKey
                 required property string modeName
                 required property bool isNew
@@ -1650,7 +1676,7 @@ GlassPanel {
                     visible: cell.columnKey !== "qsl"
                     anchors.fill: parent
                     anchors.leftMargin: 10
-                    anchors.rightMargin: 4
+                    anchors.rightMargin: cell.column === root.model.columns - 1 ? cell.height + 4 : 4
                     verticalAlignment: Text.AlignVCenter
                     text: cell.display
                     elide: Text.ElideRight
@@ -1731,6 +1757,18 @@ GlassPanel {
                             rowMenu.popupFor(cell.qsoId, cell.row, cell.columnKey)
                     }
                     onDoubleClicked: root.openQso(cell.qsoId)
+                }
+
+                ToolButton {
+                    visible: cell.column === root.model.columns - 1 && !cell.editing
+                    anchors.right: parent.right
+                    height: parent.height
+                    width: height
+                    text: "◎"
+                    Accessible.name: qsTr("QSO map")
+                    ToolTip.visible: hovered
+                    ToolTip.text: Accessible.name
+                    onClicked: root.showJourney(cell.qsoId)
                 }
 
                 // La correzione sul posto: il testo della cella diventa un campo.

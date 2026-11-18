@@ -60,7 +60,7 @@ Item {
     property string floatingText: qsTr("All the contest panels are in their own windows: ↩ in a panel brings it back here.")
 
     // I pannelli, nell'ordine del menu.
-    property var allKeys: ["contest", "cluster", "logbook", "callinfo", "rate", "score", "map", "cw", "bandmap", "decodium", "decfull", "decsig", "net", "dvk", "mults"]
+    property var allKeys: ["contest", "cluster", "logbook", "callinfo", "rate", "score", "map", "cw", "bandmap", "decodium", "decfull", "decsig", "dxcalendar", "net", "dvk", "mults"]
     property var defaultKeys: ["contest", "cluster", "logbook", "callinfo", "rate", "score", "map"]
     // Dove stanno all'inizio, in proporzione alla lavagna: in gara tre
     // colonne, come nei programmi da gara.
@@ -73,6 +73,7 @@ Item {
         score:    { x: 0.76, y: 0.00, w: 0.24, h: 0.30 },
         rate:     { x: 0.76, y: 0.30, w: 0.24, h: 0.34 },
         map:      { x: 0.76, y: 0.64, w: 0.24, h: 0.36 },
+        dxcalendar: { x: 0.24, y: 0.10, w: 0.50, h: 0.70 },
         bandmap:  { x: 0.00, y: 0.00, w: 0.16, h: 1.00 },
         decodium: { x: 0.53, y: 0.30, w: 0.30, h: 0.40 },
         decfull:  { x: 0.24, y: 0.70, w: 0.30, h: 0.30 },
@@ -417,6 +418,7 @@ Item {
             case "score":    return "ContestScorePanel.qml"
             case "map":      return "MapPanel.qml"
             case "cw":       return "CwPanel.qml"
+            case "dxcalendar": return "DxCalendarPanel.qml"
             case "bandmap":  return "BandMapPanel.qml"
             case "decodium": return "DecodiumPanel.qml"
             case "decfull":  return "DecodiumWindowPanel.qml"
@@ -589,6 +591,7 @@ Item {
                 case "score":    return "ContestScorePanel.qml"
                 case "map":      return "MapPanel.qml"
                 case "cw":       return "CwPanel.qml"
+                case "dxcalendar": return "DxCalendarPanel.qml"
                 case "bandmap":  return "BandMapPanel.qml"
                 case "decodium": return "DecodiumPanel.qml"
                 case "decfull":  return "DecodiumWindowPanel.qml"
