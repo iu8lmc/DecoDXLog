@@ -3,6 +3,13 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.59 — 18 novembre 2026
+
+- Scheda nominativo: clic sulle caselle banda/modo per elencare i QSO del nominativo o dell’entità DXCC, con stato delle conferme e accesso ai dettagli.
+- Log grandi: evitata la ricostruzione completa della tabella dopo una modifica che non cambia ordine o insieme delle righe.
+- Club Log: l’anteprima accetta gli export senza identificativo remoto o nominativo di stazione, preservando i controlli su stazioni diverse e identificativi non validi; messaggi di errore più chiari.
+- Aggiunti test su griglia DXCC, ordinamento del log e download Club Log simulato.
+
 ## 1.17.58 — 18 novembre 2026
 
 **Allineata alla 1.17.57 di elisir80** (la nostra era la 1.17.56). Dalla loro 1.17.57 e dalla 1.17.56

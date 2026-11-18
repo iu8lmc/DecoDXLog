@@ -1241,6 +1241,17 @@ QString QsoTableModel::idsSql(QVariantList& binds, bool scan) const
 
 void QsoTableModel::reload()
 {
+    reloadImpl(false);
+}
+
+void QsoTableModel::reloadAfterEdit(qint64 id)
+{
+    refreshQso(id);
+    reloadImpl(true);
+}
+
+void QsoTableModel::reloadImpl(bool preserveIfUnchanged)
+{
     decolog::StartupSpan trace("QsoTableModel::reload");
     const int generation = ++m_reloadGeneration;
     m_reloadLatest->store(generation);
@@ -1259,7 +1270,7 @@ void QsoTableModel::reload()
         }
         QPointer<QsoTableModel> self(this);
         const auto latest = m_reloadLatest;
-        m_reloadPool.start([self, path, sql, binds, generation, latest] {
+        m_reloadPool.start([self, path, sql, binds, generation, latest, preserveIfUnchanged] {
             // Un altro ricarico chiesto dopo: questo non serve piu'.
             if (latest->load() != generation)
                 return;
@@ -1280,10 +1291,10 @@ void QsoTableModel::reload()
             }
             QMetaObject::invokeMethod(
                 self.data(),
-                [self, generation, ids = std::move(ids)]() mutable {
+                [self, generation, preserveIfUnchanged, ids = std::move(ids)]() mutable {
                     if (!self || generation != self->m_reloadGeneration)
                         return;
-                    self->adoptIds(std::move(ids));
+                    self->adoptIds(std::move(ids), preserveIfUnchanged);
                 },
                 Qt::QueuedConnection);
         });
@@ -1302,11 +1313,22 @@ void QsoTableModel::reload()
                 ids.append(q.value(0).toLongLong());
         }
     }
-    adoptIds(std::move(ids));
+    adoptIds(std::move(ids), preserveIfUnchanged);
 }
 
-void QsoTableModel::adoptIds(QVector<qint64>&& ids)
+void QsoTableModel::adoptIds(QVector<qint64>&& ids, bool preserveIfUnchanged)
 {
+    if (preserveIfUnchanged && ids == m_ids) {
+        if (m_db && m_db->isOpen())
+            computeCategories();
+        if (rowCount() > 0 && columnCount() > 0)
+            emit dataChanged(index(0, 0), index(rowCount() - 1, columns() - 1), {CategoryRole});
+        if (m_busy) {
+            m_busy = false;
+            emit busyChanged();
+        }
+        return;
+    }
     beginResetModel();
     m_ids = std::move(ids);
     dropPages();

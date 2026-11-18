@@ -1636,7 +1636,7 @@ RoundedWindow {
     }
     Connections {
         target: decolog.qsl
-        function onClubLogDownloadReady(file) { decolog.previewImport(file, true) }
+        function onClubLogDownloadReady(file, stationCall) { decolog.previewImport(file, true, stationCall) }
     }
     property url pendingImport
     property var importPreview: ({})

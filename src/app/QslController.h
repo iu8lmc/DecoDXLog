@@ -135,7 +135,7 @@ public:
 
 signals:
     void changed();
-    void clubLogDownloadReady(const QUrl& file);
+    void clubLogDownloadReady(const QUrl& file, const QString& stationCall);
 
 private:
     friend class QslControllerTest;

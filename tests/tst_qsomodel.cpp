@@ -40,6 +40,37 @@ class TestQsoModel : public QObject {
     Q_OBJECT
 
 private slots:
+    void editedRowsAvoidResetUnlessTheirPositionChanges()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const qint64 a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261117"},
+                                       {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "CW"}}, "manual").id;
+        QVERIFY(a > 0);
+        QVERIFY(db.insertQso({{"CALL", "K1ZZZ"}, {"QSO_DATE", "20261117"},
+                              {"TIME_ON", "1201"}, {"BAND", "20m"}, {"MODE", "CW"}}, "manual").id > 0);
+        QsoTableModel model(&db);
+        model.setSort("call", true);
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        auto record = *db.record(a);
+        record.set("NAME", "Edited name");
+        QCOMPARE(db.updateQso(a, record).status, InsertResult::Status::Inserted);
+        model.reloadAfterEdit(a);
+        QCOMPARE(resets.size(), 0);
+        QCOMPARE(model.valueAt(model.rowForId(a), QsoTableModel::Name), QString("Edited name"));
+        record.set("CALL", "K2ZZZ");
+        QCOMPARE(db.updateQso(a, record).status, InsertResult::Status::Inserted);
+        model.reloadAfterEdit(a);
+        QCOMPARE(resets.size(), 1);
+        QCOMPARE(model.rowForId(a), 1);
+        model.setFilterText("K1");
+        QCOMPARE(model.count(), 1);
+        record.set("CALL", "K1BBB");
+        QCOMPARE(db.updateQso(a, record).status, InsertResult::Status::Inserted);
+        model.reloadAfterEdit(a);
+        QCOMPARE(model.count(), 2);
+        QVERIFY(model.rowForId(a) >= 0);
+    }
     void insertedRowsKeepAllExistingValuesAligned()
     {
         LogDatabase db;

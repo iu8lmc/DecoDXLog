@@ -342,6 +342,8 @@ public:
     // Le caselle di un nominativo e quelle di tutta la sua entita' DXCC.
     QList<BandModeSlot> bandModeSlotsForCall(const QString& call) const;
     QList<BandModeSlot> bandModeSlotsForDxcc(int dxcc) const;
+    QVariantList qsosForBandModeSlot(const QString& call, int dxcc, const QString& band,
+                                    const QString& group, bool* ok = nullptr) const;
     // Tutti i QSO in forma compatta per DecoLink: [call, banda, modo, data yyyyMMdd,
     // locatore a 4, confermato 0/1], con le conferme accettate indicate.
     QList<QJsonArray> workedRows(bool confirmLotw, bool confirmCard, bool confirmEqsl) const;

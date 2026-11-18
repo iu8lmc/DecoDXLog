@@ -196,7 +196,7 @@ private slots:
             QVERIFY(!record.value(QStringLiteral("APP_CLUBLOG_QSOID")).isEmpty());
             QVERIFY(!record.value(QStringLiteral("STATION_CALLSIGN")).isEmpty());
         }
-        const QByteArray prepared = prepareClubLogDownload(data);
+        const QByteArray prepared = prepareClubLogDownload(data, QStringLiteral("9H1SR")).adif;
         QVERIFY(!prepared.isEmpty());
         const ImportResult first = db.importAdif(prepared, "test");
         QVERIFY(first.inserted > 0);
@@ -209,8 +209,23 @@ private slots:
 
     void invalidClubLogDownloadIsRejected()
     {
-        QVERIFY(prepareClubLogDownload("<html>error</html>").isEmpty());
-        QVERIFY(prepareClubLogDownload("<CALL:5>K1AAA<EOR>").isEmpty());
+        QVERIFY(prepareClubLogDownload("<html>error</html>", "K1TEST").adif.isEmpty());
+        QVERIFY(prepareClubLogDownload("<CALL:5>K1AAA", "K1TEST").adif.isEmpty());
+        const QByteArray mismatch = "<EOH><CALL:5>K1AAA<STATION_CALLSIGN:5>K2BAD<EOR>";
+        QCOMPARE(prepareClubLogDownload(mismatch, "K1TEST").error, ClubLogDownloadResult::Error::StationMismatch);
+        const QByteArray invalidId = "<EOH><CALL:5>K1AAA<APP_CLUBLOG_QSOID:3>bad<EOR>";
+        QCOMPARE(prepareClubLogDownload(invalidId, "K1TEST").error, ClubLogDownloadResult::Error::InvalidRemoteId);
+        const QByteArray mixed = "<EOH><CALL:5>K1AAA<APP_CLUBLOG_QSOID:2>42<STATION_CALLSIGN:6>K1TEST<EOR>"
+                                 "<CALL:5>K1BBB<EOR>";
+        const auto prepared = prepareClubLogDownload(mixed, "K1TEST");
+        QCOMPARE(prepared.missingRemoteIds, 1);
+        QCOMPARE(prepared.filledStations, 1);
+        const auto records = adif::parse(prepared.adif).records;
+        QCOMPARE(records.size(), 2);
+        QCOMPARE(records.first().value("APP_CLUBLOG_QSOID"), QString("42"));
+        QCOMPARE(records.last().value("STATION_CALLSIGN"), QString("K1TEST"));
+        QCOMPARE(records.last().value("CLUBLOG_QSO_UPLOAD_STATUS"), QString("Y"));
+        QVERIFY(prepareClubLogDownload(mixed + "<CALL:5>K1CCC", "K1TEST").adif.isEmpty());
     }
 
     void clubLogDownloadAsyncAB_data()
@@ -263,10 +278,30 @@ private slots:
             QFile file(ready.first().at(0).toUrl().toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly));
             const QByteArray adif = file.readAll();
             QVERIFY(adif.contains("<CALL:5>K1AAA"));
-            QCOMPARE(db.importAdif(adif, "test").inserted, 1);
-            const auto repeated = db.importAdif(adif, "test");
+            // A: the old validation required both optional fields on every QSO.
+            const auto raw = adif::parse(adif);
+            QVERIFY(raw.records.first().value("APP_CLUBLOG_QSOID").isEmpty());
+            QVERIFY(raw.records.first().value("STATION_CALLSIGN").isEmpty());
+            const auto oldValidatorAccepts = [](const AdifDocument& doc) {
+                if (doc.records.isEmpty()) return false;
+                for (const auto& record : doc.records) {
+                    bool ok = false;
+                    const auto id = record.value("APP_CLUBLOG_QSOID").toLongLong(&ok);
+                    if (!ok || id <= 0 || record.value("STATION_CALLSIGN").trimmed().isEmpty()) return false;
+                }
+                return true;
+            };
+            QVERIFY(!oldValidatorAccepts(raw));
+            // B: a download tied to the authenticated station is importable.
+            const auto prepared = prepareClubLogDownload(adif, ready.first().at(1).toString());
+            QCOMPARE(prepared.missingRemoteIds, 1);
+            QCOMPARE(prepared.filledStations, 1);
+            QVERIFY(!prepared.adif.isEmpty());
+            QCOMPARE(db.importAdif(prepared.adif, "test").inserted, 1);
+            const auto repeated = db.importAdif(prepared.adif, "test");
             QCOMPARE(repeated.inserted, 0);
             QCOMPARE(repeated.duplicates, 1);
+            QVERIFY(db.qsosToUpload("clublog", 0).isEmpty());
         }
     }
 

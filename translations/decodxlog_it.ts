@@ -1081,6 +1081,18 @@
 </context>
 <context>
     <name>CallInfoPanel</name>
+    <message><source>Entity</source><translation>Entità</translation></message>
+    <message><source>Loading QSOs…</source><translation>Caricamento QSO…</translation></message>
+    <message><source>Could not load QSOs.</source><translation>Impossibile caricare i QSO.</translation></message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · clicca sulla riga per aprire i dettagli</numerusform>
+            <numerusform>%n QSO · clicca su una riga per aprire i dettagli</numerusform>
+        </translation>
+    </message>
+    <message><source>Confirmed</source><translation>Confermato</translation></message>
+    <message><source>Unconfirmed</source><translation>Non confermato</translation></message>
     <message>
         <source>Call info</source>
         <translation>Scheda nominativo</translation>
@@ -5515,6 +5527,10 @@ Campi extra conservati: %8</translation>
 </context>
 <context>
     <name>QObject</name>
+    <message><source>Club Log download contains a different station callsign; nothing was imported</source><translation>Il download di Club Log contiene un nominativo di stazione diverso; non è stato importato nulla</translation></message>
+    <message><source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source><translation>Il download di Club Log contiene un identificativo QSO remoto non valido; non è stato importato nulla</translation></message>
+    <message><source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source><translation>Club Log ha restituito un download ADIF vuoto o non riconosciuto; non è stato importato nulla</translation></message>
+    <message><source>Cannot prepare the temporary Club Log download for preview</source><translation>Impossibile preparare il download temporaneo di Club Log per l’anteprima</translation></message>
     <message>
         <source>No valid QSO records found in this file</source>
         <translation>Nel file non ci sono QSO validi</translation>
@@ -12352,6 +12368,7 @@ Campi extra conservati: %8</translation>
 </context>
 <context>
     <name>decolog::app::QslController</name>
+    <message><source>Download received; see the import preview</source><translation>Download ricevuto; consulta l’anteprima di importazione</translation></message>
     <message>
         <source>Select a station callsign before downloading Club Log</source>
         <translation>Seleziona il nominativo della stazione prima di scaricare da Club Log</translation>
