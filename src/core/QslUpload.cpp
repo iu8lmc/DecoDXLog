@@ -39,6 +39,11 @@ namespace qsl {
 void AutomaticUploadQueue::reset(const QStringList& services)
 {
     m_services.clear();
+    append(services);
+}
+
+void AutomaticUploadQueue::append(const QStringList& services)
+{
     for (const QString& service : services) {
         const QString id = service.trimmed();
         if (!id.isEmpty() && !m_services.contains(id))

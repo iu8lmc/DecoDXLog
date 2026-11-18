@@ -1081,6 +1081,14 @@
 </context>
 <context>
     <name>CallInfoPanel</name>
+    <message><source>View on QRZ.com</source><translation>Vedi su QRZ.com</translation></message>
+    <message><source>Open this callsign on QRZ.com</source><translation>Apri questo nominativo su QRZ.com</translation></message>
+    <message><source>Checking the QRZ.com profile…</source><translation>Verifica del profilo QRZ.com…</translation></message>
+    <message><source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source><translation>Profilo QRZ.com non verificato; controlla la connessione e le impostazioni del callbook QRZ</translation></message>
+    <message><source>View on HamQTH</source><translation>Vedi su HamQTH</translation></message>
+    <message><source>Open this callsign on HamQTH (data provided by HamQTH.com)</source><translation>Apri questo nominativo su HamQTH (dati forniti da HamQTH.com)</translation></message>
+    <message><source>Checking the HamQTH profile…</source><translation>Verifica del profilo HamQTH…</translation></message>
+    <message><source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source><translation>Profilo HamQTH non verificato; controlla la connessione e le impostazioni del callbook HamQTH</translation></message>
     <message><source>Entity</source><translation>Entità</translation></message>
     <message><source>Loading QSOs…</source><translation>Caricamento QSO…</translation></message>
     <message><source>Could not load QSOs.</source><translation>Impossibile caricare i QSO.</translation></message>
@@ -3350,6 +3358,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
         <translation>Un doppio clic apre il QSO.</translation>
     </message>
     <message>
+        <source>Merging… %1%</source>
+        <translation>Unione in corso… %1%</translation>
+    </message>
+    <message>
         <source>Close</source>
         <translation>Chiudi</translation>
     </message>
@@ -4055,6 +4067,14 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
     <message>
         <source>Clean up %1 QSO damaged by an old import…</source>
         <translation>Ripulisci %1 QSO rovinati da un vecchio import…</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Verifica dei QSO danneggiati…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>Impossibile verificare i QSO danneggiati</translation>
     </message>
     <message>
         <source>Search these filters in every log…</source>
@@ -7672,6 +7692,14 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Fill missing DXCC</source>
         <translation>Completa i DXCC mancanti</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>Aggiornamento DXCC in background…</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO aggiornati, %2 non riusciti; le versioni precedenti restano nello storico.</translation>
     </message>
     <message>
         <source>%1 QSO completed, each kept as a new revision.</source>
@@ -11487,6 +11515,42 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Deleted %1 QSO (kept in history)</source>
         <translation>Cancellati %1 QSO (restano nello storico)</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>Cancellati %1 QSO (restano nello storico); %2 non riusciti</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>Una modifica in background è terminata su un log che non è più aperto</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>Il log è cambiato durante il controllo delle entità; esegui nuovamente la verifica</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC aggiornato su %1 di %2 QSO (%3 invariati, %4 non riusciti; dati %5)</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>Ripuliti %1 QSO di un vecchio import; %2 non riusciti (il testo precedente resta nello storico)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>Impossibile unire %1 gruppi di doppioni</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>Uniti %1 gruppi di doppioni: %2 QSO cancellati (restano nello storico); %3 non riusciti</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Etichetta &quot;%1&quot; aggiunta a %2 QSO (%3 invariati, %4 non riusciti)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Etichetta &quot;%1&quot; rimossa da %2 QSO (%3 invariati, %4 non riusciti)</translation>
     </message>
     <message>
         <source>Restored an earlier revision of QSO #%1</source>

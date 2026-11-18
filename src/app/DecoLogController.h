@@ -31,6 +31,7 @@
 #include "core/CqMarathon.h"
 #include "core/Vucc.h"
 #include "core/Callbook.h"
+#include "core/CallbookProfileVerifier.h"
 #include "core/Countries.h"
 #include "core/DecoLinkServer.h"
 #include "core/DecoPortLog.h"
@@ -108,6 +109,7 @@ class DecoLogController : public QObject {
     // Ripetitore UDP: a chi inoltrare i pacchetti di Decodium ("host:porta, ...").
     Q_PROPERTY(QString udpForward READ udpForward WRITE setUdpForward NOTIFY udpChanged)
     Q_PROPERTY(QString udpForwardError READ udpForwardError NOTIFY udpChanged)
+    Q_PROPERTY(bool udpResendBusy READ udpResendBusy NOTIFY udpChanged)
     // I QSO di N1MM Logger+ (XML su UDP, di solito la 12060). 0 = spento.
     Q_PROPERTY(int n1mmPort READ n1mmPort WRITE setN1mmPort NOTIFY udpChanged)
     Q_PROPERTY(bool n1mmListening READ n1mmListening NOTIFY udpChanged)
@@ -159,6 +161,10 @@ class DecoLogController : public QObject {
 
     Q_PROPERTY(QString lookupCall READ lookupCall WRITE setLookupCall NOTIFY lookupChanged)
     Q_PROPERTY(QVariantMap callInfo READ callInfo NOTIFY lookupChanged)
+    Q_PROPERTY(QString qrzProfileCall READ qrzProfileCall NOTIFY qrzProfileChanged)
+    Q_PROPERTY(QString qrzProfileState READ qrzProfileState NOTIFY qrzProfileChanged)
+    Q_PROPERTY(QString hamqthProfileCall READ hamqthProfileCall NOTIFY hamqthProfileChanged)
+    Q_PROPERTY(QString hamqthProfileState READ hamqthProfileState NOTIFY hamqthProfileChanged)
     // Cambiano sia quando parla Decodium sia quando si muove la radio.
     Q_PROPERTY(QString shownFrequency READ shownFrequency NOTIFY tuningChanged)
     Q_PROPERTY(QString shownMode READ shownMode NOTIFY tuningChanged)
@@ -263,6 +269,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(double importProgress READ importProgress NOTIFY importChanged)
     // Anche una modifica in blocco: da 0 a 1 mentre va, -1 ferma.
     Q_PROPERTY(double bulkProgress READ bulkProgress NOTIFY bulkChanged)
+    Q_PROPERTY(bool exportBusy READ exportBusy NOTIFY exportBusyChanged)
     // I doppioni trovati: {busy, windowMinutes, searched, limited, groups:
     // [{keep, rows: [{id, call, when, band, mode, freq, source, confirmed, fields}]}]}.
     Q_PROPERTY(QVariantMap duplicates READ duplicates NOTIFY duplicatesChanged)
@@ -341,6 +348,7 @@ public:
     QString udpForward() const { return m_udpForward; }
     void setUdpForward(const QString& targets);
     QString udpForwardError() const { return m_udpForwardError; }
+    bool udpResendBusy() const { return m_udpResendActive; }
     int n1mmPort() const { return m_n1mmPort; }
     void setN1mmPort(int port);
     bool n1mmListening() const { return m_n1mm.isListening(); }
@@ -403,6 +411,10 @@ public:
     QString lookupCall() const { return m_lookupCall; }
     void setLookupCall(const QString& call);
     QVariantMap callInfo() const { return m_callInfo; }
+    QString qrzProfileCall() const { return m_qrzProfile.call(); }
+    QString qrzProfileState() const { return m_qrzProfile.state(); }
+    QString hamqthProfileCall() const { return m_hamqthProfile.call(); }
+    QString hamqthProfileState() const { return m_hamqthProfile.state(); }
     QString myGrid() const;
     QVariantMap myPosition() const;
 
@@ -534,10 +546,10 @@ public:
     void setCallbookComplete(bool complete);
     bool callbookFallback() const { return m_callbookFallback; }
     void setCallbookFallback(bool enabled);
-    int callbookQueued() const { return static_cast<int>(m_callbookQueue.size()); }
+    int callbookQueued() const { return static_cast<int>(m_callbookQueue.size()) + (m_callbookScanPending ? 1 : 0); }
     // Completa un QSO gia' scritto: dalla scheda del QSO, e dal log per
-    // tutte le righe mostrate. Torna quanti ne ha completati (o messi in
-    // coda alla ricerca).
+    // tutte le righe mostrate. Per il log su file la scansione e' asincrona:
+    // il conteggio viene aggiornato tramite callbookChanged().
     Q_INVOKABLE int completeQsoFromCallbook(qint64 id);
     Q_INVOKABLE int completeShownFromCallbook();
     // Tutto il log, non solo quello che si vede: si mettono in coda e si
@@ -546,6 +558,10 @@ public:
     Q_INVOKABLE void stopCallbookQueue();
     Q_INVOKABLE int damagedFieldCount() const;
     Q_INVOKABLE int repairImportedFields();
+    Q_INVOKABLE bool repairImportedFieldsAsync();
+    Q_INVOKABLE void refreshDamagedFieldCount();
+    Q_PROPERTY(int damagedFieldCountCached READ damagedFieldCountCached NOTIFY damagedFieldCountChanged)
+    int damagedFieldCountCached() const { return m_damagedFieldCount; }
     void setCallbookAutofill(bool autofill);
     QString callbookStatus() const { return m_callbookStatus; }
     bool callbookBusy() const { return !m_callbookPending.isEmpty(); }
@@ -573,6 +589,7 @@ public:
     // Cerca i QSO che, con la data del QSO, sono di un'altra entita'.
     Q_INVOKABLE void checkEntitiesByDate();
     Q_INVOKABLE int applyEntityFixes();
+    Q_INVOKABLE bool applyEntityFixesAsync();
     QVariantList adifWatchSuggestions() const;
     Q_INVOKABLE void addAdifWatch(const QString& path, const QString& label = {});
     Q_INVOKABLE void removeAdifWatch(const QString& path);
@@ -624,6 +641,7 @@ public:
 
     double importProgress() const { return m_importProgress; }
     double bulkProgress() const { return m_bulkProgress; }
+    bool exportBusy() const { return m_exportsPending > 0; }
     QVariantMap duplicates() const { return m_duplicates; }
     bool backupEnabled() const { return m_backupEnabled; }
     void setBackupEnabled(bool enabled);
@@ -681,16 +699,20 @@ public:
     // Scheda di un QSO: campi ADIF, dati di sync, QSL, storico, effetto sugli award.
     Q_INVOKABLE QVariantMap qsoDetail(qint64 id) const;
     // `fields` e' la mappa ADIF completa (come in qsoDetail().fields).
-    Q_INVOKABLE QString saveQso(qint64 id, const QVariantMap& fields, qint64 stationProfileId);
+    Q_INVOKABLE QString saveQso(qint64 id, const QVariantMap& fields, qint64 stationProfileId,
+                                const QStringList& touchedFields);
     Q_INVOKABLE bool deleteQso(qint64 id);
     Q_INVOKABLE int deleteQsos(const QVariantList& ids);
+    Q_INVOKABLE bool deleteQsosAsync(const QVariantList& ids);
     // Rimanda QSO gia' nel log ai destinatari UDP configurati nel formato
     // N1MM/HamAward. Non riscrive il log e non innesca upload QSL.
     Q_INVOKABLE int resendQsosViaUdp(const QVariantList& ids);
+    Q_INVOKABLE bool resendQsosViaUdpAsync(const QVariantList& ids);
     Q_INVOKABLE QString restoreRevision(qint64 id, qint64 historyId);
 
     // Etichette: aggiunge o toglie `tag` ai QSO indicati. Restituisce quanti sono cambiati.
     Q_INVOKABLE int tagQsos(const QVariantList& ids, const QString& tag, bool add);
+    Q_INVOKABLE bool tagQsosAsync(const QVariantList& ids, const QString& tag, bool add);
     // Lo stesso valore in un campo dei QSO indicati, ognuno con la sua revisione
     // nello storico. I campi che si possono cambiare cosi':
     // [{field, label, choices: [{value, label}]}] (choices vuoto: testo libero).
@@ -700,6 +722,7 @@ public:
     // ([{keep, ids}]): chi resta prende quello che manca, gli altri si cancellano.
     Q_INVOKABLE void findDuplicates(int windowMinutes);
     Q_INVOKABLE int mergeDuplicates(const QVariantList& groups);
+    Q_INVOKABLE bool mergeDuplicatesAsync(const QVariantList& groups);
     Q_INVOKABLE void clearDuplicates();
     // Le entita' presenti nel log per il filtro: [{dxcc, name, count}].
     Q_INVOKABLE QVariantList dxccInLog() const;
@@ -744,6 +767,7 @@ public:
     // Completa DXCC, paese, zone e continente dei QSO che non li hanno. Ogni QSO
     // modificato diventa una nuova revisione. Restituisce quanti ne ha completati.
     Q_INVOKABLE int fillMissingDxcc();
+    Q_INVOKABLE bool fillMissingDxccAsync();
     // Carica un cty.csv scelto dall'operatore e lo copia nella cartella dei dati.
     Q_INVOKABLE QString installCountries(const QUrl& file);
     Q_INVOKABLE void clearActivity();
@@ -789,12 +813,17 @@ signals:
     void importChanged();
     void importPreviewReady(const QUrl& file, const QVariantMap& result);
     void bulkChanged();
+    void exportBusyChanged();
     void duplicatesChanged();
     void backupInspected(const QVariantMap& info);
     void statsReady(const QVariantMap& stats);
     void cloudChanged();
     void countriesChanged();
     void callbookChanged();
+    void qrzProfileChanged();
+    void hamqthProfileChanged();
+    void damagedFieldCountChanged();
+    void dxccBatchFinished(bool historical, int changed, int failed);
     void awardsChanged();
     void decoLinkChanged();
     void hamHubLinkChanged();
@@ -905,6 +934,8 @@ private:
     Recovered saveRecoveredQso(const core::AdifRecord& record, bool bulk, const RecoverySource& source);
     QSet<QString> confirmedAwardKeys(const QString& awardId) const;
     void requestCallbook();
+    void updateCallbookProfiles();
+    void finishCallbookProfiles(const QString& call);
     const QList<core::AwardResult>& awardResults() const;
     // Gli stessi award senza i filtri di banda, modo, profilo ed etichetta (solo le
     // conferme scelte): quello che vede Decodium e che decide "nuovo confermato".
@@ -919,6 +950,9 @@ private:
     core::Countries   m_countries;
     core::CredentialStore* m_credentials{nullptr};
     core::CallbookClient m_callbook;
+    core::CallbookProfileVerifier m_qrzProfile;
+    core::CallbookProfileVerifier m_hamqthProfile{core::CallbookClient::Provider::HamQth};
+    QSet<QString> m_primaryProfileAttempted;
     core::AwardFilter m_awardFilter;
     core::DecoLinkServer m_decoLink;
     core::DecoPortLogServer m_hamHubLink;
@@ -954,11 +988,17 @@ private:
     bool m_ctyXmlBusy{false};
     struct EntityFix {
         qint64 id{0};
+        int oldDxcc{0};
+        QString oldCall;
+        QString oldDateTime;
         int dxcc{0};
         QString country;
         int cqz{0};
         QString cont;
     };
+    static core::BulkEditResult processDxccBatch(core::LogDatabase& db, bool historical,
+            const QList<EntityFix>& fixes, const core::Countries& countries, const core::ClubLogCty& cty,
+            int& requested, const std::function<void(int, int)>& progress = {});
     QList<EntityFix> m_entityFixes;
     QVariantMap m_entityFixesInfo;
     QThreadPool m_ctyPool;
@@ -1004,6 +1044,8 @@ private:
     bool      m_callbookFallback{true};
     // La coda dei QSO da completare, servita a un tot per volta.
     QList<qint64> m_callbookQueue;
+    quint64 m_callbookScanGeneration{0};
+    bool m_callbookScanPending{false};
     QTimer    m_callbookQueueTimer;
     int       m_callbookQueueDone{0};
     int       m_callbookQueueTotal{0};
@@ -1084,6 +1126,9 @@ private:
     QThreadPool m_backupPool;
     QThreadPool m_linkPool;
     QThreadPool m_importPool;
+    // Accepted exports must finish even when the window closes.
+    QThreadPool m_exportPool;
+    int m_exportsPending{0};
     quint64 m_importPreviewGeneration{0};
     QString m_importPreviewLogPath;
     QUrl m_importPreviewFile;
@@ -1096,7 +1141,16 @@ private:
     QList<qint64> m_lastImportIds;
     void finishImport(const QString& path, const core::ImportResult& result);
     double m_bulkProgress{-1};
+    bool m_udpResendActive{false};
     void finishBulk(const QString& field, const QString& value, const core::BulkEditResult& result);
+    bool startLogMutation(const QVariantList& ids, const QString& tag, bool add, bool deleting);
+    int finishMergeBatch(const core::MergeBatchResult& result);
+    int finishRepairBatch(const core::RepairBatchResult& result);
+    bool startDxccBatch(bool historical);
+    int finishDxccBatch(bool historical, const core::BulkEditResult& result, int requested,
+                        const QString& version);
+    int m_damagedFieldCount{-1};
+    quint64 m_damagedCountGeneration{0};
     QVariantMap m_duplicates;
 
     // I conti dell'entita' per la scheda del nominativo (quante volte, bande,

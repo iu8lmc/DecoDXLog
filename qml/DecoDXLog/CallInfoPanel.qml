@@ -17,6 +17,9 @@ GlassPanel {
     readonly property var info: decolog.callInfo
     readonly property bool hasCall: (info.call || "").length > 0
     readonly property bool worked: (info.count || 0) > 0
+    readonly property string profileCall: String(info.call || "").trim().toUpperCase()
+    function openQrzUrl(url) { Qt.openUrlExternally(url) }
+    function openHamqthUrl(url) { Qt.openUrlExternally(url) }
 
     function showSlot(band, group, entity) {
         slotWindow.rows = []
@@ -322,6 +325,57 @@ GlassPanel {
                     font.pixelSize: 10
                 }
             }
+            }
+
+            Flow {
+                visible: root.hasCall
+                Layout.fillWidth: true
+                spacing: 6
+
+                Item {
+                    objectName: "qrzProfileArea"
+                    width: qrzButton.implicitWidth; height: qrzButton.implicitHeight
+                    GlassButton {
+                        id: qrzButton
+                        objectName: "qrzProfileButton"
+                        text: qsTr("View on QRZ.com")
+                        tone: Theme.primaryColor
+                        readonly property string profileUrl: "https://www.qrz.com/db/" + encodeURIComponent(root.profileCall)
+                        enabled: root.profileCall.length > 0 && decolog.qrzProfileState === "available"
+                                 && decolog.qrzProfileCall === root.profileCall
+                        Accessible.description: enabled ? qsTr("Open this callsign on QRZ.com")
+                                               : decolog.qrzProfileState === "checking" && decolog.qrzProfileCall === root.profileCall
+                                                 ? qsTr("Checking the QRZ.com profile…")
+                                                 : qsTr("QRZ.com profile not verified; check your connection and QRZ callbook settings")
+                        onClicked: root.openQrzUrl(profileUrl)
+                    }
+                    HoverHandler { id: qrzHover }
+                    ToolTip.visible: qrzHover.hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: qrzButton.Accessible.description
+                }
+                Item {
+                    objectName: "hamqthProfileArea"
+                    width: hamqthButton.implicitWidth; height: hamqthButton.implicitHeight
+                    GlassButton {
+                        id: hamqthButton
+                        objectName: "hamqthProfileButton"
+                        text: qsTr("View on HamQTH")
+                        tone: Theme.primaryColor
+                        readonly property string profileUrl: "https://www.hamqth.com/" + encodeURIComponent(root.profileCall)
+                        enabled: root.profileCall.length > 0 && decolog.hamqthProfileState === "available"
+                                 && decolog.hamqthProfileCall === root.profileCall
+                        Accessible.description: enabled ? qsTr("Open this callsign on HamQTH (data provided by HamQTH.com)")
+                                               : decolog.hamqthProfileState === "checking" && decolog.hamqthProfileCall === root.profileCall
+                                                 ? qsTr("Checking the HamQTH profile…")
+                                                 : qsTr("HamQTH profile not verified; check your connection and HamQTH callbook settings")
+                        onClicked: root.openHamqthUrl(profileUrl)
+                    }
+                    HoverHandler { id: hamqthHover }
+                    ToolTip.visible: hamqthHover.hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: hamqthButton.Accessible.description
+                }
             }
 
             RowLayout {

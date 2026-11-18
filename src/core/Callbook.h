@@ -110,6 +110,10 @@ public:
 signals:
     void found(const QString& callsign, const decolog::core::CallbookRecord& record);
     void failed(const QString& callsign, const QString& message);
+    // Raw provider outcome before fallback/merging, so independent UI actions
+    // can reuse the same lookup without treating one callbook as another.
+    void providerResult(const QString& requested, const QString& provider,
+                        const QString& returnedCall);
 
 private:
     void ask(Provider provider, const QString& callsign, bool allowFallback);

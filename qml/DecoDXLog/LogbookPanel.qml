@@ -40,6 +40,9 @@ GlassPanel {
         property string hiddenColumns: ""
         // Le colonne mostrate, nell'ordine in cui si vedono.
         property string columnLayout: ""
+        // Add the new map column to existing layouts only once; a later
+        // deliberate choice to hide it must survive application restarts.
+        property bool journeyColumnMigrated: false
         // Le larghezze scelte a mano, come {"call": 120, "name": 260}.
         property string columnWidths: ""
         property var savedFilters: ({})
@@ -88,13 +91,20 @@ GlassPanel {
     }
     readonly property var defaultLayout: ["utc", "call", "band", "freq", "mode", "rst_sent", "rst_rcvd",
                                           "grid", "name", "comment", "qth", "country", "state", "county",
-                                          "cqz", "ituz", "iota", "dxcc", "qsl", "source", "tags"]
+                                          "cqz", "ituz", "iota", "dxcc", "qsl", "source", "tags", "journey"]
     function setLayout(list) {
         logStore.columnLayout = list.join(",")
         root.model.columnLayout = list
     }
     Component.onCompleted: {
-        root.model.columnLayout = root.storedLayout()
+        let layout = root.storedLayout()
+        if (!logStore.journeyColumnMigrated) {
+            if (layout.indexOf("journey") < 0)
+                layout.push("journey")
+            logStore.columnLayout = layout.join(",")
+            logStore.journeyColumnMigrated = true
+        }
+        root.model.columnLayout = layout
         root.model.setSort(logStore.sortKey, logStore.sortAscending)
     }
     function isHidden(key) { return root.model.columnLayout.indexOf(key) < 0 }
@@ -312,7 +322,12 @@ GlassPanel {
     function columnAtHeaderX(x) {
         let edge = 0
         for (let c = 0; c < root.model.columns; ++c) {
-            edge += table.columnWidth(c)
+            // Qt may not have laid out a column yet (notably with an empty
+            // log); use the same width provider as the table in that case.
+            let width = table.columnWidth(c)
+            if (!(width > 0))
+                width = table.columnWidthProvider(c)
+            edge += width
             if (x < edge)
                 return c
         }
@@ -320,6 +335,20 @@ GlassPanel {
     }
     function headerCell(col) { return header.itemAtCell(Qt.point(col, 0)) }
     function tableCell(col) { return table.itemAtCell(Qt.point(col, 0)) }
+    function journeyProbeCell(row) { return table.itemAtCell(Qt.point(root.columnOf("journey"), row)) }
+    function journeyProbeId() { return journey.detail ? journey.detail.id : 0 }
+    function bulkProbeIds(allRows) {
+        const row = Math.min(10000, root.model.count - 1)
+        if (row >= 0)
+            table.positionViewAtRow(row, TableView.AlignVCenter)
+        return allRows ? root.model.shownIds() : [root.model.idAt(row)]
+    }
+    function prepareBulkProbe(allRows, field, value, onlyEmpty) {
+        const ids = bulkProbeIds(allRows)
+        bulkDialog.prepareProbe(ids, field, value, onlyEmpty)
+        return ids.length
+    }
+    function bulkProbeButton() { return bulkDialog.probeApplyButton() }
     function columnWidthOf(col) { return table.columnWidth(col) }
     // Per le schermate di prova (--show select:<righe separate da virgola>:<cosa>).
     function showSelection(rows, what) {
@@ -335,7 +364,7 @@ GlassPanel {
         if (what === "menu") rowMenu.popupFor(list[0])
         else if (what === "confirm") confirmRowDelete.openFor(list)
         else if (what === "confirm2") { confirmRowDelete.openFor(list); confirmRowDelete.step = 2 }
-        else if (what === "delete") { decolog.deleteQsos(list); root.clearSelection() }
+        else if (what === "delete") { if (decolog.deleteQsosAsync(list)) root.clearSelection() }
         else if (what === "callbook") { for (let k = 0; k < list.length; ++k) decolog.completeQsoFromCallbook(list[k]) }
         else if (String(what).indexOf("upload") === 0)
             decolog.qsl.uploadQsos(list, String(what).split("-")[1] || "lotw")
@@ -607,6 +636,7 @@ GlassPanel {
     // ── Azioni sulle righe mostrate ─────────────────────────────────────────
     StyledMenu {
         id: actionsMenu
+        onAboutToShow: decolog.refreshDamagedFieldCount()
         StyledMenuItem {
             text: qsTr("Tag the %1 QSO shown…").arg(root.model.count)
             enabled: root.model.count > 0
@@ -654,10 +684,13 @@ GlassPanel {
             onTriggered: decolog.stopCallbookQueue()
         }
         StyledMenuItem {
-            readonly property int damaged: actionsMenu.opened ? decolog.damagedFieldCount() : 0
-            visible: damaged > 0
+            readonly property int damaged: decolog.damagedFieldCountCached
+            visible: damaged !== 0
             height: visible ? implicitHeight : 0
-            text: qsTr("Clean up %1 QSO damaged by an old import…").arg(damaged)
+            enabled: damaged > 0 && decolog.bulkProgress < 0
+            text: damaged === -1 ? qsTr("Checking for damaged QSOs…")
+                : damaged < 0 ? qsTr("Could not check damaged QSOs")
+                : qsTr("Clean up %1 QSO damaged by an old import…").arg(damaged)
             onTriggered: confirmRepair.open()
         }
         MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSoft } }
@@ -1033,8 +1066,8 @@ GlassPanel {
                         }
                         const list = confirmRowDelete.ids
                         confirmRowDelete.close()
-                        decolog.deleteQsos(list)
-                        root.clearSelection()
+                        if (decolog.deleteQsosAsync(list))
+                            root.clearSelection()
                     }
                 }
             }
@@ -1067,8 +1100,8 @@ GlassPanel {
                     tone: Theme.accentColor
                     filled: true
                     onClicked: {
-                        confirmRepair.close()
-                        decolog.repairImportedFields()
+                        if (decolog.repairImportedFieldsAsync())
+                            confirmRepair.close()
                     }
                 }
             }
@@ -1164,9 +1197,10 @@ GlassPanel {
                     filled: true
                     enabled: tagField.text.trim().length > 0 && tagField.text.indexOf(",") < 0
                     onClicked: {
-                        const n = decolog.tagQsos(tagPopup.ids, tagField.text.trim(), tagPopup.adding)
-                        tagResult.text = ""
-                        tagPopup.close()
+                        if (decolog.tagQsosAsync(tagPopup.ids, tagField.text.trim(), tagPopup.adding)) {
+                            tagResult.text = ""
+                            tagPopup.close()
+                        }
                     }
                 }
             }
@@ -1673,10 +1707,10 @@ GlassPanel {
                 }
 
                 Text {
-                    visible: cell.columnKey !== "qsl"
+                    visible: cell.columnKey !== "qsl" && cell.columnKey !== "journey"
                     anchors.fill: parent
                     anchors.leftMargin: 10
-                    anchors.rightMargin: cell.column === root.model.columns - 1 ? cell.height + 4 : 4
+                    anchors.rightMargin: 4
                     verticalAlignment: Text.AlignVCenter
                     text: cell.display
                     elide: Text.ElideRight
@@ -1760,8 +1794,8 @@ GlassPanel {
                 }
 
                 ToolButton {
-                    visible: cell.column === root.model.columns - 1 && !cell.editing
-                    anchors.right: parent.right
+                    visible: cell.columnKey === "journey" && !cell.editing
+                    anchors.centerIn: parent
                     height: parent.height
                     width: height
                     text: "◎"
@@ -1884,8 +1918,8 @@ GlassPanel {
             readonly property var ids: root.selectedIds.length > 1 ? root.selectedIds : [rowMenu.qsoId]
             text: ids.length > 1 ? qsTr("Resend the %1 selected QSO via UDP").arg(ids.length)
                                  : qsTr("Resend this QSO via UDP")
-            enabled: decolog.udpForward.length > 0 && decolog.udpForwardError.length === 0
-            onTriggered: decolog.resendQsosViaUdp(ids)
+            enabled: decolog.udpForward.length > 0 && decolog.udpForwardError.length === 0 && !decolog.udpResendBusy
+            onTriggered: decolog.resendQsosViaUdpAsync(ids)
         }
         StyledMenuItem { text: qsTr("Filter by this call"); onTriggered: root.model.filterText = decolog.lookupCall }
         StyledMenuItem {
@@ -1929,6 +1963,7 @@ GlassPanel {
             text: root.selectedIds.length > 1
                   ? qsTr("Paper QSL: queue the %1 chosen for the bureau").arg(root.selectedIds.length)
                   : qsTr("Paper QSL: queue for the bureau")
+            enabled: !decolog.cards.operationBusy
             onTriggered: decolog.cards.enqueue(root.selectedIds.length > 1 ? root.selectedIds
                                                                            : [rowMenu.qsoId], "B")
         }
@@ -1936,6 +1971,7 @@ GlassPanel {
             text: root.selectedIds.length > 1
                   ? qsTr("Paper QSL: queue the %1 chosen as direct").arg(root.selectedIds.length)
                   : qsTr("Paper QSL: queue as direct")
+            enabled: !decolog.cards.operationBusy
             onTriggered: decolog.cards.enqueue(root.selectedIds.length > 1 ? root.selectedIds
                                                                            : [rowMenu.qsoId], "D")
         }
@@ -1954,7 +1990,7 @@ GlassPanel {
                 StyledMenuItem {
                     required property string modelData
                     text: modelData
-                    onTriggered: decolog.tagQsos([rowMenu.qsoId], modelData, false)
+                    onTriggered: decolog.tagQsosAsync([rowMenu.qsoId], modelData, false)
                 }
             }
         }

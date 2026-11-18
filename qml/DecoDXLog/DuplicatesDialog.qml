@@ -34,7 +34,7 @@ Popup {
     function mergeTicked() {
         const list = root.ticked().map(g => ({ keep: root.keepOf(g), ids: g.rows.map(r => r.id) }))
         if (list.length > 0)
-            decolog.mergeDuplicates(list)
+            decolog.mergeDuplicatesAsync(list)
     }
 
     popupType: Popup.Window
@@ -88,7 +88,7 @@ Popup {
             Text { text: qsTr("minutes"); color: Theme.textSecondary; font.pixelSize: 12 }
             GlassButton {
                 text: root.result.busy ? qsTr("Searching…") : qsTr("Search")
-                enabled: !root.result.busy
+                enabled: !root.result.busy && decolog.bulkProgress < 0
                 onClicked: {
                     root.keepFor = ({})
                     root.skipped = ({})
@@ -119,6 +119,7 @@ Popup {
                 anchors.fill: parent
                 anchors.margins: 4
                 clip: true
+                enabled: decolog.bulkProgress < 0
                 spacing: 6
                 model: root.groups
                 ScrollBar.vertical: ScrollBar {}
@@ -264,7 +265,8 @@ Popup {
             Text {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
-                text: qsTr("A double click opens the QSO.")
+                text: root.result.merging ? qsTr("Merging… %1%").arg(Math.round(decolog.bulkProgress * 100))
+                                          : qsTr("A double click opens the QSO.")
                 color: Theme.textSecondary
                 font.pixelSize: 11
             }
@@ -273,7 +275,7 @@ Popup {
                 text: qsTr("Merge %1 groups").arg(root.ticked().length)
                 tone: Theme.accentColor
                 filled: true
-                enabled: !root.result.busy && root.ticked().length > 0
+                enabled: !root.result.busy && decolog.bulkProgress < 0 && root.ticked().length > 0
                 onClicked: root.mergeTicked()
             }
         }

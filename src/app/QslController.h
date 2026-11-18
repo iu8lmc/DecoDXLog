@@ -13,6 +13,7 @@
 #include <QHash>
 #include <QObject>
 #include <QQueue>
+#include <QSet>
 #include <QStringList>
 #include <QThreadPool>
 #include <QTimer>
@@ -129,6 +130,10 @@ public:
 
     // Un QSO appena scritto nel log: se il servizio e' automatico, parte da solo.
     void qsoLogged(qint64 id);
+    // An edit should wake only services for which this contact needs upload.
+    void qsoEdited(qint64 id);
+    QStringList enabledAutomaticServices() const;
+    void scheduleAutomaticServices(const QStringList& services);
     // Il log e' cambiato: i conti (in coda, inviati, confermati) si rifanno su
     // un altro filo; fino ad allora valgono quelli di prima.
     void countsDirty();
@@ -201,7 +206,7 @@ private:
     qint64 m_deletingId{0};
     QTimer m_autoDelay;
     QTimer m_clubLogRecheck;
-    QList<qint64> m_autoQueue;
+    QSet<QString> m_autoServices;
     core::qsl::AutomaticUploadQueue m_automaticUploads;
     // I conti della pagina, tenuti qui: services() si legge a ogni changed(),
     // anche durante un invio, e contarli ogni volta su un log grande fermava

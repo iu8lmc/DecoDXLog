@@ -322,14 +322,14 @@ QslController::QslController(Context context, QObject* parent)
     m_autoDelay.setSingleShot(true);
     m_autoDelay.setInterval(20'000);
     connect(&m_autoDelay, &QTimer::timeout, this, [this] {
-        m_autoQueue.clear();
         QStringList services;
         for (const auto& info : kServices) {
             const QString id = QLatin1String(info.id);
-            if (m_auto.value(id))
+            if (m_autoServices.contains(id) && m_auto.value(id))
                 services.append(id);
         }
-        m_automaticUploads.reset(services);
+        m_autoServices.clear();
+        m_automaticUploads.append(services);
         startNextAutomaticUpload();
     });
 }
@@ -796,12 +796,53 @@ void QslController::readSecret(const QString& service, std::function<void(const 
 
 void QslController::qsoLogged(qint64 id)
 {
-    const bool anyAuto = std::any_of(kServices.cbegin(), kServices.cend(),
-                                     [this](const ServiceInfo& i) { return m_auto.value(QLatin1String(i.id)); });
-    if (!anyAuto)
+    Q_UNUSED(id);
+    scheduleAutomaticServices(enabledAutomaticServices());
+}
+
+QStringList QslController::enabledAutomaticServices() const
+{
+    QStringList services;
+    for (const auto& info : kServices) {
+        const QString service = QLatin1String(info.id);
+        if (m_auto.value(service))
+            services.append(service);
+    }
+    return services;
+}
+
+void QslController::scheduleAutomaticServices(const QStringList& services)
+{
+    bool scheduled = false;
+    for (const QString& service : services) {
+        if (m_auto.value(service)) {
+            m_autoServices.insert(service);
+            scheduled = true;
+        }
+    }
+    if (scheduled)
+        m_autoDelay.start();
+}
+
+void QslController::qsoEdited(qint64 id)
+{
+    if (!m_ctx.db || !m_ctx.db->isOpen())
         return;
-    m_autoQueue << id;
-    m_autoDelay.start();
+    QHash<QString, QString> sent;
+    for (const QslState& state : m_ctx.db->qslStatus(id))
+        sent.insert(state.service, state.sent);
+    bool scheduled = false;
+    for (const auto& info : kServices) {
+        const QString service = QLatin1String(info.id);
+        const QString status = sent.value(service);
+        if (m_auto.value(service) && (status.isEmpty() || status == QLatin1String("N")
+            || status == QLatin1String("R") || status == QLatin1String("Q") || status == QLatin1String("D"))) {
+            m_autoServices.insert(service);
+            scheduled = true;
+        }
+    }
+    if (scheduled)
+        m_autoDelay.start();
 }
 
 void QslController::uploadQso(qint64 id, const QString& service)
@@ -832,10 +873,13 @@ int QslController::uploadQsos(const QVariantList& ids, const QString& service)
     const QSet<QString> reserved = service == QLatin1String("clublog")
         ? ClubLogUploadJournal(checkpointSettings).reservedIds(m_ctx.db->path()) : QSet<QString>();
     QList<qint64> batch;
+    QSet<qint64> added;
     for (const QVariant& value : ids) {
         const qint64 id = value.toLongLong();
-        if (waiting.contains(id) && !batch.contains(id) && !reserved.contains(QString::number(id)))
+        if (waiting.contains(id) && !added.contains(id) && !reserved.contains(QString::number(id))) {
             batch << id;
+            added.insert(id);
+        }
     }
     if (batch.isEmpty()) {
         m_lastResult.insert(service, tr("nothing to send: they have already gone"));
@@ -1402,6 +1446,8 @@ void QslController::cancel()
     m_batchMode = false;
     m_secret.clear();
     m_automaticUploads.clear();
+    m_autoDelay.stop();
+    m_autoServices.clear();
     emit changed();
 }
 

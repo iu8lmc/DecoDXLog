@@ -7,6 +7,7 @@
 #include "core/LogMigration.h"
 
 #include <QFile>
+#include <QElapsedTimer>
 #include <QCryptographicHash>
 #include <QSaveFile>
 #include <QJsonArray>
@@ -795,14 +796,25 @@ std::optional<LogDatabase::Prepared> LogDatabase::prepare(const AdifRecord& inpu
 bool LogDatabase::writeQsl(qint64 qsoId, const QList<QslState>& states, bool keepRemote)
 {
     QSqlDatabase db = connection();
-    QHash<QString, QPair<QString, QString>> remote;
+    QHash<QString, QslState> remote;
     if (keepRemote) {
         QSqlQuery r(db);
-        r.prepare(QStringLiteral("SELECT service, remote_id, last_error FROM qsl_status WHERE qso_id = ?"));
+        r.prepare(QStringLiteral("SELECT service, sent, sent_date, rcvd, rcvd_date, remote_id, last_error, via "
+                                 "FROM qsl_status WHERE qso_id = ?"));
         r.addBindValue(qsoId);
         if (r.exec()) {
-            while (r.next())
-                remote.insert(r.value(0).toString(), {r.value(1).toString(), r.value(2).toString()});
+            while (r.next()) {
+                QslState st;
+                st.service = r.value(0).toString();
+                st.sent = r.value(1).toString();
+                st.sentDate = r.value(2).toString();
+                st.rcvd = r.value(3).toString();
+                st.rcvdDate = r.value(4).toString();
+                st.remoteId = r.value(5).toString();
+                st.lastError = r.value(6).toString();
+                st.via = r.value(7).toString();
+                remote.insert(st.service, st);
+            }
         }
     }
 
@@ -826,27 +838,33 @@ bool LogDatabase::writeQsl(qint64 qsoId, const QList<QslState>& states, bool kee
         ins.addBindValue(nullable(st.sentDate));
         ins.addBindValue(st.rcvd);
         ins.addBindValue(nullable(st.rcvdDate));
-        ins.addBindValue(nullable(st.remoteId.isEmpty() ? kept.first : st.remoteId));
-        ins.addBindValue(nullable(st.lastError.isEmpty() ? kept.second : st.lastError));
+        ins.addBindValue(nullable(st.remoteId.isEmpty() ? kept.remoteId : st.remoteId));
+        ins.addBindValue(nullable(st.lastError.isEmpty() ? kept.lastError : st.lastError));
         ins.addBindValue(nullable(st.via));
         if (!ins.exec())
             return false;
         written << st.service;
     }
-    // Un errore di upload o un id remoto non si perdono solo perche' lo stato e'
-    // tornato "N".
+    // I servizi senza campi ADIF non sono rappresentati nel record editato:
+    // conservarne tutto lo stato, altrimenti un edit li rimette da inviare.
+    // Per i servizi ADIF, un errore o id remoto sopravvive a un ritorno a N.
     for (auto it = remote.cbegin(); it != remote.cend(); ++it) {
-        if (written.contains(it.key()) || (it.value().first.isEmpty() && it.value().second.isEmpty()))
+        if (written.contains(it.key()))
+            continue;
+        const bool adifMapped = std::any_of(kQslFields.cbegin(), kQslFields.cend(),
+                                            [&it](const QslFields& f) { return it.key() == QLatin1String(f.service); });
+        const QslState& kept = it.value();
+        if (adifMapped && kept.remoteId.isEmpty() && kept.lastError.isEmpty())
             continue;
         ins.addBindValue(qsoId);
         ins.addBindValue(it.key());
-        ins.addBindValue(QStringLiteral("N"));
-        ins.addBindValue(QVariant());
-        ins.addBindValue(QStringLiteral("N"));
-        ins.addBindValue(QVariant());
-        ins.addBindValue(nullable(it.value().first));
-        ins.addBindValue(nullable(it.value().second));
-        ins.addBindValue(QVariant());
+        ins.addBindValue(adifMapped ? QStringLiteral("N") : kept.sent);
+        ins.addBindValue(adifMapped ? QVariant() : nullable(kept.sentDate));
+        ins.addBindValue(adifMapped ? QStringLiteral("N") : kept.rcvd);
+        ins.addBindValue(adifMapped ? QVariant() : nullable(kept.rcvdDate));
+        ins.addBindValue(nullable(kept.remoteId));
+        ins.addBindValue(nullable(kept.lastError));
+        ins.addBindValue(adifMapped ? QVariant() : nullable(kept.via));
         if (!ins.exec())
             return false;
     }
@@ -1057,6 +1075,105 @@ bool LogDatabase::softDeleteQso(qint64 id)
     return !ownTransaction || db.commit();
 }
 
+namespace {
+// The caller uses a worker-owned connection. Publish changed IDs only after
+// their transaction has committed, so the UI never reports rolled-back work.
+BulkEditResult runMutationBatches(LogDatabase& log, const QList<qint64>& ids,
+                                 const std::function<int(qint64, QString&)>& mutate,
+                                 const std::function<void(int, int)>& progress)
+{
+    BulkEditResult out;
+    QSqlDatabase db = log.connection();
+    constexpr int batchSize = 100;
+    int done = 0;
+    while (done < ids.size()) {
+        const int end = qMin(int(ids.size()), done + batchSize);
+        if (!db.transaction()) {
+            out.failed += int(ids.size()) - done;
+            out.errors << db.lastError().text();
+            break;
+        }
+        QList<qint64> changed;
+        bool batchFailed = false;
+        QElapsedTimer held;
+        held.start();
+        while (done < end) {
+            const qint64 id = ids.at(done++);
+            QSqlQuery checkpoint(db);
+            if (!checkpoint.exec(QStringLiteral("SAVEPOINT decolog_mutation_item"))) {
+                if (out.errors.size() < 5) out.errors << checkpoint.lastError().text();
+                ++out.failed;
+                batchFailed = true;
+                break;
+            }
+            QString error;
+            const int result = mutate(id, error);
+            if (result < 0 && !checkpoint.exec(QStringLiteral("ROLLBACK TO decolog_mutation_item"))) {
+                if (out.errors.size() < 5) out.errors << checkpoint.lastError().text();
+                ++out.failed;
+                batchFailed = true;
+                break;
+            }
+            if (!checkpoint.exec(QStringLiteral("RELEASE decolog_mutation_item"))) {
+                if (out.errors.size() < 5) out.errors << checkpoint.lastError().text();
+                ++out.failed;
+                batchFailed = true;
+                break;
+            }
+            if (result > 0) changed << id;
+            else if (result == 0) ++out.unchanged;
+            else {
+                ++out.failed;
+                if (out.errors.size() < 5) out.errors << error;
+            }
+            if (held.elapsed() >= 250) break;
+        }
+        if (batchFailed) {
+            db.rollback();
+            out.failed += int(changed.size()) + int(ids.size()) - done;
+            break;
+        }
+        if (!db.commit()) {
+            const QString error = db.lastError().text();
+            db.rollback();
+            out.failed += int(changed.size()) + int(ids.size()) - done;
+            if (out.errors.size() < 5) out.errors << error;
+            break;
+        }
+        out.changed += int(changed.size());
+        out.changedIds += changed;
+        if (progress) progress(done, int(ids.size()));
+    }
+    return out;
+}
+} // namespace
+
+BulkEditResult LogDatabase::softDeleteBatch(const QList<qint64>& ids,
+                                             const std::function<void(int, int)>& progress)
+{
+    QHash<qint64, QStringList> pending;
+    BulkEditResult result = runMutationBatches(*this, ids, [this, &pending](qint64 id, QString& error) {
+        const auto old = meta(id);
+        if (!old || old->deleted) return 0;
+        if (softDeleteQso(id)) {
+            for (const QslState& state : qslStatus(id)) {
+                if (editableServices().contains(state.service) && state.sent == QLatin1String("D")
+                    && !state.remoteId.isEmpty())
+                    pending[id] << state.service;
+            }
+            return 1;
+        }
+        error = QStringLiteral("QSO #%1: %2").arg(id).arg(connection().lastError().text());
+        return -1;
+    }, progress);
+    for (qint64 id : std::as_const(result.changedIds)) {
+        for (const QString& service : pending.value(id)) {
+            if (!result.pendingServices.contains(service)) result.pendingServices << service;
+        }
+    }
+    return result;
+}
+
 bool LogDatabase::recordEnrichment(const QList<EnrichmentEntry>& entries)
 {
     if (entries.isEmpty())
@@ -1127,6 +1244,24 @@ bool LogDatabase::undoEnrichment(qint64 qsoId, const QString& field)
 
 // Il campo della data che va con uno stato QSL ("LOTW_QSL_RCVD" →
 // "LOTW_QSLRDATE"); vuoto se il campo non e' uno stato QSL.
+void LogDatabase::mergeUneditedQslFields(AdifRecord& edited, const AdifRecord& current,
+                                        const QSet<QString>& touched)
+{
+    auto merge = [&](const QString& field) {
+        if (field.isEmpty() || touched.contains(field)) return;
+        const QString value = current.value(field);
+        if (value.isEmpty()) edited.remove(field);
+        else edited.set(field, value);
+    };
+    for (const auto& f : kQslFields) {
+        merge(QLatin1String(f.sent));
+        merge(QLatin1String(f.sentDate));
+        merge(QLatin1String(f.rcvd));
+        merge(QLatin1String(f.rcvdDate));
+    }
+    merge(QStringLiteral("QSL_SENT_VIA"));
+}
+
 static QString qslDateFieldFor(const QString& status)
 {
     for (const auto& f : kQslFields) {
@@ -1148,7 +1283,8 @@ static bool isQslDateField(const QString& name)
 }
 
 BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& field, const QString& value,
-                                     bool onlyEmpty, const std::function<void(int, int)>& progress)
+                                     bool onlyEmpty, const std::function<void(int, int)>& progress,
+                                     const QStringList& automaticServices)
 {
     BulkEditResult out;
     const bool profile = field == QLatin1String("@profile");
@@ -1157,59 +1293,131 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
     const QString dateField = qslDateFieldFor(name);
     const QString today = QDateTime::currentDateTimeUtc().date().toString(QStringLiteral("yyyyMMdd"));
     QSqlDatabase db = connection();
-    bool open = db.transaction();
+    if (ids.isEmpty()) return out;
+    if (!db.transaction()) {
+        out.failed = int(ids.size());
+        out.errors << db.lastError().text();
+        return out;
+    }
+    QElapsedTimer held;
+    held.start();
+    QList<qint64> blockChanged;
+    QSet<QString> blockPending, committedPending;
+    const QSet<QString> automatic(automaticServices.cbegin(), automaticServices.cend());
     int done = 0;
-    for (const qint64 id : ids) {
-        ++done;
+    auto error = [&out](const QString& message) {
+        if (out.errors.size() < 5) out.errors << message;
+    };
+    auto commitBlock = [&] {
+        const bool committed = db.commit();
+        if (committed) {
+            out.changed += int(blockChanged.size());
+            out.changedIds += blockChanged;
+            committedPending.unite(blockPending);
+        } else {
+            const QString message = db.lastError().text();
+            db.rollback();
+            out.failed += int(blockChanged.size());
+            error(message.isEmpty() ? QStringLiteral("Cannot commit bulk edit") : message);
+        }
+        blockChanged.clear();
+        blockPending.clear();
+        return committed;
+    };
+    // False means the savepoint or surrounding transaction is no longer
+    // reliable; stop before another row can accidentally run in autocommit.
+    auto editOne = [&](qint64 id) -> bool {
         auto r = record(id);
         const auto m = meta(id);
         if (!r || !m || m->deleted) {
             ++out.failed;
-            continue;
+            return true;
         }
-        InsertResult res;
         if (profile) {
             const qint64 target = clean.toLongLong();
             if (m->stationProfileId == target || (onlyEmpty && m->stationProfileId > 0)) {
                 ++out.unchanged;
-                continue;
+                return true;
             }
-            res = updateQso(id, *r, target, QStringLiteral("bulk"));
         } else {
             const QString current = r->value(name);
             // Uno stato QSL a N e' vuoto: non e' ne' mandato ne' ricevuto.
             const bool empty = current.isEmpty() || (!dateField.isEmpty() && current == QLatin1String("N"));
             if ((onlyEmpty && !empty) || current.compare(clean, Qt::CaseInsensitive) == 0) {
                 ++out.unchanged;
-                continue;
+                return true;
             }
             r->set(name, clean);
             if (!dateField.isEmpty() && clean.compare(QLatin1String("Y"), Qt::CaseInsensitive) == 0
                 && r->value(dateField).isEmpty())
                 r->set(dateField, today);
-            res = updateQso(id, *r, -1, QStringLiteral("bulk"));
         }
-        if (res.status == InsertResult::Status::Inserted) {
-            ++out.changed;
-            out.changedIds << id;
-        } else {
+        QSqlQuery savepoint(db);
+        if (!savepoint.exec(QStringLiteral("SAVEPOINT bulk_row"))) {
             ++out.failed;
-            if (out.errors.size() < 5)
-                out.errors << QStringLiteral("%1: %2").arg(r->value(QStringLiteral("CALL")), res.message);
+            error(savepoint.lastError().text());
+            return false;
         }
-        // Un blocco per volta: chi scrive un QSO dalla radio intanto passa.
-        if (done % 500 == 0) {
-            if (open)
-                db.commit();
-            if (progress)
-                progress(done, int(ids.size()));
-            open = db.transaction();
+        const InsertResult res = updateQso(id, *r, profile ? clean.toLongLong() : -1, QStringLiteral("bulk"));
+        const bool remoteQueued = res.status == InsertResult::Status::Inserted && queueRemoteEdit(id);
+        if (!remoteQueued || !savepoint.exec(QStringLiteral("RELEASE SAVEPOINT bulk_row"))) {
+            const QString message = res.status != InsertResult::Status::Inserted ? res.message
+                                  : !remoteQueued ? m_lastError : savepoint.lastError().text();
+            QSqlQuery rollback(db);
+            const bool rolledBack = rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT bulk_row"));
+            const QString rollbackError = rolledBack ? QString() : rollback.lastError().text();
+            const bool released = rolledBack && rollback.exec(QStringLiteral("RELEASE SAVEPOINT bulk_row"));
+            ++out.failed;
+            error(QStringLiteral("%1: %2").arg(r->value(QStringLiteral("CALL")), message));
+            if (!released) {
+                error(rolledBack ? rollback.lastError().text() : rollbackError);
+                return false;
+            }
+            return true;
+        }
+        blockChanged << id;
+        const QSet<QString> remaining = automatic - committedPending - blockPending;
+        if (!remaining.isEmpty()) {
+            QHash<QString, QString> status;
+            for (const QslState& s : qslStatus(id)) status.insert(s.service, s.sent);
+            for (const QString& service : remaining) {
+                const QString flag = status.value(service);
+                if (flag.isEmpty() || flag == QLatin1String("N") || flag == QLatin1String("R")
+                    || flag == QLatin1String("Q") || flag == QLatin1String("D"))
+                    blockPending.insert(service);
+            }
+        }
+        return true;
+    };
+    for (const qint64 id : ids) {
+        ++done;
+        if (!editOne(id)) {
+            db.rollback();
+            out.failed += int(blockChanged.size()) + int(ids.size()) - done;
+            blockChanged.clear();
+            blockPending.clear();
+            break;
+        }
+        // Keep write locks short even on a slow disk, including long runs of
+        // unchanged or invalid records. Commit results only after success.
+        if (done % 200 == 0 || held.elapsed() >= 250) {
+            if (!commitBlock()) {
+                out.failed += int(ids.size()) - done;
+                break;
+            }
+            if (progress) progress(done, int(ids.size()));
+            if (done < ids.size() && !db.transaction()) {
+                out.failed += int(ids.size()) - done;
+                error(db.lastError().text());
+                break;
+            }
+            held.restart();
+        } else if (done == ids.size()) {
+            commitBlock();
         }
     }
-    if (open)
-        db.commit();
-    if (progress)
-        progress(int(ids.size()), int(ids.size()));
+    out.pendingServices = committedPending.values();
+    if (progress) progress(done, int(ids.size()));
     return out;
 }
 
@@ -1387,6 +1595,64 @@ InsertResult LogDatabase::mergeQsos(qint64 keep, const QList<qint64>& others)
     return result;
 }
 
+MergeBatchResult LogDatabase::mergeBatch(const QList<MergeGroup>& groups, const QStringList& automaticServices,
+                                         const std::function<void(int, int)>& progress)
+{
+    struct CommittedGroup { qint64 keep; QList<qint64> removed; QStringList services; };
+    QHash<qint64, CommittedGroup> prepared;
+    QList<qint64> indices;
+    for (qsizetype i = 0; i < groups.size(); ++i) indices << i + 1;
+    const BulkEditResult mutations = runMutationBatches(*this, indices,
+        [this, &groups, &automaticServices, &prepared](qint64 index, QString& error) {
+            const MergeGroup& group = groups.at(index - 1);
+            QList<qint64> others;
+            QSet<qint64> seen;
+            for (const qint64 id : group.others) {
+                if (id <= 0 || id == group.keep || seen.contains(id)) continue;
+                seen.insert(id);
+                const auto existing = meta(id);
+                if (existing && !existing->deleted) others << id;
+            }
+            if (group.keep <= 0 || others.isEmpty()) return 0;
+            const InsertResult merged = mergeQsos(group.keep, others);
+            if (merged.status != InsertResult::Status::Inserted || !queueRemoteEdit(group.keep)) {
+                error = QStringLiteral("QSO #%1: %2").arg(group.keep)
+                            .arg(merged.message.isEmpty() ? lastError() : merged.message);
+                return -1;
+            }
+            QStringList services;
+            QHash<QString, QString> sent;
+            for (const QslState& state : qslStatus(group.keep)) sent.insert(state.service, state.sent);
+            for (const QString& service : automaticServices) {
+                const QString status = sent.value(service);
+                if ((status.isEmpty() || status == QLatin1String("N") || status == QLatin1String("R")
+                     || status == QLatin1String("Q") || status == QLatin1String("D")) && !services.contains(service))
+                    services << service;
+            }
+            for (const qint64 id : std::as_const(others)) {
+                for (const QslState& state : qslStatus(id)) {
+                    if (editableServices().contains(state.service) && state.sent == QLatin1String("D")
+                        && !state.remoteId.isEmpty() && !services.contains(state.service))
+                        services << state.service;
+                }
+            }
+            prepared.insert(index, {group.keep, others, services});
+            return 1;
+        }, progress);
+    MergeBatchResult result;
+    result.failed = mutations.failed;
+    result.errors = mutations.errors;
+    for (const qint64 index : mutations.changedIds) {
+        const CommittedGroup group = prepared.value(index);
+        result.keptIds << group.keep;
+        result.removedIds += group.removed;
+        for (const QString& service : group.services) {
+            if (!result.pendingServices.contains(service)) result.pendingServices << service;
+        }
+    }
+    return result;
+}
+
 namespace {
 
 // Dove sta ogni colonna in un "SELECT * FROM qso": si cerca una volta per
@@ -1441,6 +1707,16 @@ AdifRecord adifFromRow(const QSqlQuery& q, const RowLayout& l, const QList<QslSt
         r.set(QLatin1String(c.adif), fromColumnValue(c, l.columns.at(i) >= 0 ? q.value(l.columns.at(i)) : QVariant()));
     }
 
+    // QSL values in adif_extra can be explicit defaults from an earlier
+    // import. The current structured QSL status must take precedence after an
+    // upload or confirmation changes it.
+    const QString extra = l.extra >= 0 ? q.value(l.extra).toString() : QString();
+    if (!extra.isEmpty()) {
+        const QJsonObject obj = QJsonDocument::fromJson(extra.toUtf8()).object();
+        for (auto it = obj.begin(); it != obj.end(); ++it)
+            r.set(it.key(), it.value().toString());
+    }
+
     for (const QslState& st : qsl) {
         // Le cartacee portano anche la via: bureau, diretta o elettronica.
         if (st.service == QLatin1String("card") && !st.via.isEmpty())
@@ -1448,23 +1724,23 @@ AdifRecord adifFromRow(const QSqlQuery& q, const RowLayout& l, const QList<QslSt
         for (const auto& f : kQslFields) {
             if (st.service != QLatin1String(f.service))
                 continue;
+            const QString sentField = QLatin1String(f.sent);
             if (st.sent != QLatin1String("N"))
-                r.set(QLatin1String(f.sent), st.sent);
+                r.set(sentField, st.sent);
+            else if (r.value(sentField).trimmed().toUpper() != QLatin1String("N"))
+                r.remove(sentField);
             r.set(QLatin1String(f.sentDate), st.sentDate);
             if (*f.rcvd) {
+                const QString receivedField = QLatin1String(f.rcvd);
                 if (st.rcvd != QLatin1String("N"))
-                    r.set(QLatin1String(f.rcvd), st.rcvd);
+                    r.set(receivedField, st.rcvd);
+                else if (r.value(receivedField).trimmed().toUpper() != QLatin1String("N"))
+                    r.remove(receivedField);
                 r.set(QLatin1String(f.rcvdDate), st.rcvdDate);
             }
         }
     }
 
-    const QString extra = l.extra >= 0 ? q.value(l.extra).toString() : QString();
-    if (!extra.isEmpty()) {
-        const QJsonObject obj = QJsonDocument::fromJson(extra.toUtf8()).object();
-        for (auto it = obj.begin(); it != obj.end(); ++it)
-            r.set(it.key(), it.value().toString());
-    }
     return r;
 }
 
@@ -2219,6 +2495,55 @@ QList<qint64> LogDatabase::idsWithDamagedText() const
     return ids;
 }
 
+RepairBatchResult LogDatabase::repairDamagedFields(const std::function<void(int, int)>& progress)
+{
+    const QList<qint64> ids = idsWithDamagedText();
+    QSet<qint64> emptied;
+    RepairBatchResult result;
+    result.changes = runMutationBatches(*this, ids, [this, &emptied](qint64 id, QString& error) {
+        auto record = this->record(id);
+        const auto metadata = meta(id);
+        if (!record || !metadata || metadata->deleted) return 0;
+        bool changed = false, emptiedHere = false;
+        for (const char* name : {"NAME", "QTH", "ADDRESS", "COMMENT", "NOTES", "COUNTRY", "QSL_VIA"}) {
+            const QString old = record->value(QLatin1String(name));
+            if (old.isEmpty()) continue;
+            const QString clean = adif::repairTruncated(old);
+            if (clean == old) continue;
+            record->set(QLatin1String(name), clean);
+            changed = true;
+            emptiedHere |= clean.isEmpty();
+        }
+        if (!changed) return 0;
+        const InsertResult saved = updateQso(id, *record, -1, QStringLiteral("repair"));
+        if (saved.status != InsertResult::Status::Inserted) {
+            error = QStringLiteral("QSO #%1: %2").arg(id).arg(saved.message);
+            return -1;
+        }
+        if (emptiedHere) emptied.insert(id);
+        return 1;
+    }, progress);
+    for (qint64 id : std::as_const(result.changes.changedIds)) {
+        if (emptied.contains(id)) result.emptiedIds << id;
+    }
+    return result;
+}
+
+BulkEditResult LogDatabase::updateRecordsBatch(const QList<qint64>& ids, const QString& reason,
+                                               const std::function<bool(qint64, AdifRecord&)>& change,
+                                               const std::function<void(int, int)>& progress)
+{
+    return runMutationBatches(*this, ids, [this, &reason, &change](qint64 id, QString& error) {
+        auto record = this->record(id);
+        const auto metadata = meta(id);
+        if (!record || !metadata || metadata->deleted || !change(id, *record)) return 0;
+        const InsertResult saved = updateQso(id, *record, -1, reason);
+        if (saved.status == InsertResult::Status::Inserted) return 1;
+        error = QStringLiteral("QSO #%1: %2").arg(id).arg(saved.message);
+        return -1;
+    }, progress);
+}
+
 QList<qint64> LogDatabase::idsWithoutDxcc() const
 {
     decolog::StartupSpan trace("LogDatabase::idsWithoutDxcc");
@@ -2754,9 +3079,16 @@ bool LogDatabase::writeQslState(qint64 id, const QslState& st, bool includeRecei
     u.prepare(QStringLiteral("UPDATE qso SET dirty = 1, updated_at = ? WHERE id = ?"));
     u.addBindValue(nowIso());
     u.addBindValue(id);
-    u.exec();
-    if (ownTransaction)
-        return db.commit();
+    if (!u.exec()) {
+        m_lastError = u.lastError().text();
+        if (ownTransaction) db.rollback();
+        return false;
+    }
+    if (ownTransaction && !db.commit()) {
+        m_lastError = db.lastError().text();
+        db.rollback();
+        return false;
+    }
     return true;
 }
 
@@ -2814,13 +3146,17 @@ QStringList LogDatabase::editableServices()
     return {QStringLiteral("crx")};
 }
 
-void LogDatabase::queueRemoteEdit(qint64 id)
+bool LogDatabase::queueRemoteEdit(qint64 id)
 {
     QSqlQuery q(connection());
     q.prepare(QStringLiteral("UPDATE qsl_status SET sent = 'R' WHERE qso_id = ? AND sent = 'Y' "
                              "AND IFNULL(remote_id, '') <> '' AND service IN ('%1')").arg(editableServices().join(QStringLiteral("','"))));
     q.addBindValue(id);
-    q.exec();
+    if (!q.exec()) {
+        m_lastError = q.lastError().text();
+        return false;
+    }
+    return true;
 }
 
 QStringList LogDatabase::markSentForResend(qint64 id)
@@ -3232,7 +3568,7 @@ QVariantMap LogDatabase::cardCounts() const
     return out;
 }
 
-QList<QVariantMap> LogDatabase::cardRows(const QString& state, int limit) const
+QList<QVariantMap> LogDatabase::cardRows(const QString& state, int limit, const QList<qint64>& ids) const
 {
     decolog::StartupSpan trace("LogDatabase::cardRows");
     QString where = QStringLiteral("qso.deleted = 0");
@@ -3244,17 +3580,24 @@ QList<QVariantMap> LogDatabase::cardRows(const QString& state, int limit) const
         where += QStringLiteral(" AND s.rcvd = 'Y'");
     else
         where += QStringLiteral(" AND (s.sent IN ('R', 'Q', 'Y') OR s.rcvd = 'Y')");
+    if (!ids.isEmpty()) {
+        QStringList placeholders;
+        for (qsizetype i = 0; i < ids.size(); ++i) placeholders << QStringLiteral("?");
+        where += QStringLiteral(" AND qso.id IN (%1)").arg(placeholders.join(QLatin1Char(',')));
+    }
 
     QList<QVariantMap> out;
     QSqlQuery q(connection());
     q.setForwardOnly(true);
     q.prepare(QStringLiteral(
         "SELECT qso.id, qso.call, qso.qso_datetime_on, qso.band, qso.mode, qso.submode, qso.freq, "
-        "qso.rst_sent, qso.name, qso.country, s.sent, s.sent_date, s.rcvd, s.rcvd_date, s.via "
+        "qso.rst_sent, qso.name, qso.country, s.sent, s.sent_date, s.rcvd, s.rcvd_date, s.via, qso.uuid "
         "FROM qsl_status s JOIN qso ON qso.id = s.qso_id "
         "WHERE s.service = 'card' AND ") + where
         + QStringLiteral(" ORDER BY qso.call, qso.qso_datetime_on")
         + (limit > 0 ? QStringLiteral(" LIMIT ?") : QString()));
+    for (qint64 id : ids)
+        q.addBindValue(id);
     if (limit > 0)
         q.addBindValue(limit);
     if (!q.exec())
@@ -3278,6 +3621,7 @@ QList<QVariantMap> LogDatabase::cardRows(const QString& state, int limit) const
             {QStringLiteral("rcvd"), q.value(12).toString()},
             {QStringLiteral("rcvdDate"), q.value(13).toString()},
             {QStringLiteral("via"), q.value(14).toString()},
+            {QStringLiteral("uuid"), q.value(15).toString()},
         };
         out << row;
     }
@@ -3328,6 +3672,31 @@ QList<CountRow> LogDatabase::tagCounts() const
         return a.count != b.count ? a.count > b.count : a.key.compare(b.key, Qt::CaseInsensitive) < 0;
     });
     return out;
+}
+
+BulkEditResult LogDatabase::setTagBatch(const QList<qint64>& ids, const QString& tag, bool add,
+                                        const std::function<void(int, int)>& progress)
+{
+    const QString clean = tag.simplified().remove(QLatin1Char(','));
+    if (clean.isEmpty()) return {};
+    return runMutationBatches(*this, ids, [this, clean, add](qint64 id, QString& error) {
+        auto record = this->record(id);
+        const auto metadata = meta(id);
+        if (!record || !metadata || metadata->deleted) return 0;
+        QStringList tags = splitTags(record->value(QStringLiteral("APP_DECOLOG_TAGS")));
+        const auto it = std::find_if(tags.cbegin(), tags.cend(), [&clean](const QString& item) {
+            return item.compare(clean, Qt::CaseInsensitive) == 0;
+        });
+        const qsizetype index = it - tags.cbegin();
+        if (add == (index < tags.size())) return 0;
+        if (add) tags << clean;
+        else tags.removeAt(index);
+        record->set(QStringLiteral("APP_DECOLOG_TAGS"), joinTags(tags));
+        const auto result = updateQso(id, *record, -1, QStringLiteral("tag"));
+        if (result.status == InsertResult::Status::Inserted) return 1;
+        error = QStringLiteral("QSO #%1: %2").arg(id).arg(result.message);
+        return -1;
+    }, progress);
 }
 
 int LogDatabase::setTag(const QList<qint64>& ids, const QString& tag, bool add)

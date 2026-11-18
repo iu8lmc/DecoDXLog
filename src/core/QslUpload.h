@@ -51,6 +51,7 @@ namespace qsl {
 class AutomaticUploadQueue {
 public:
     void reset(const QStringList& services);
+    void append(const QStringList& services);
     QString takeNext(bool busy);
     void clear() { m_services.clear(); }
     bool isEmpty() const { return m_services.isEmpty(); }

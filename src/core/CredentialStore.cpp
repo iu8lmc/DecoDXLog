@@ -1,6 +1,7 @@
 #include "core/CredentialStore.h"
 
 #include <QSettings>
+#include <QPointer>
 
 #ifdef DECODXLOG_HAVE_KEYCHAIN
 #include <qt6keychain/keychain.h>
@@ -182,10 +183,10 @@ void CredentialStore::save(const QString& service, const QString& accountName, c
         return;
     }
 
+    m_secretCache.remove(service);
+    ++m_secretGeneration[service];
     if (service == QLatin1String("clublog")) {
         // A failed replacement must not silently reactivate an older token.
-        m_secretCache.remove(service);
-        ++m_secretGeneration[service];
         QSettings settings;
         settings.setValue(settingsKey(service, "replacementPending"), true);
         settings.sync();
@@ -313,27 +314,52 @@ void CredentialStore::readSecret(const QString& service,
     }
 
 #ifdef DECODXLOG_HAVE_KEYCHAIN
+    const quint64 generation = m_secretGeneration.value(service);
+    const QString readKey = service + QChar(0) + QString::number(generation);
+    auto it = m_pendingReads.find(readKey);
+    if (it != m_pendingReads.end()) {
+        it->append(std::move(done));
+        return;
+    }
+    m_pendingReads.insert(readKey, {std::move(done)});
+    auto complete = [this, service, readKey, generation](const QString& value, const QString& backendError) {
+        const auto callbacks = m_pendingReads.take(readKey);
+        QString secret;
+        QString error;
+        if (generation != m_secretGeneration.value(service)
+            || QSettings().value(settingsKey(service, "replacementPending"), false).toBool()) {
+            error = tr("Credential changed while it was being read; try again");
+        } else if (backendError.isEmpty()) {
+            secret = value;
+            if (!secret.isEmpty())
+                m_secretCache.insert(service, secret);
+        } else {
+            m_secretCache.remove(service);
+            error = backendError;
+        }
+        QPointer<CredentialStore> guard(this);
+        for (const auto& callback : callbacks) {
+            if (generation != m_secretGeneration.value(service)
+                || QSettings().value(settingsKey(service, "replacementPending"), false).toBool())
+                callback({}, tr("Credential changed while it was being read; try again"));
+            else
+                callback(secret, error);
+            if (!guard) return;
+        }
+    };
+    if (m_readBackendForTest) {
+        m_readBackendForTest(service, complete);
+        return;
+    }
     auto* job = new QKeychain::ReadPasswordJob(m_keychainService, this);
     job->setAutoDelete(true);
     job->setInsecureFallback(false);
     job->setKey(service);
-    const quint64 generation = m_secretGeneration.value(service);
-    connect(job, &QKeychain::Job::finished, this, [this, job, service, done, generation](QKeychain::Job* j) {
-        if (generation != m_secretGeneration.value(service)
-            || QSettings().value(settingsKey(service, "replacementPending"), false).toBool()) {
-            m_secretCache.remove(service);
-            done({}, tr("Credential replacement was not completed; save it again"));
-            return;
-        }
-        if (j->error() == QKeychain::NoError) {
-            const QString secret = job->textData();
-            if (!secret.isEmpty())
-                m_secretCache.insert(service, secret);
-            done(secret, {});
-        } else {
-            m_secretCache.remove(service);
-            done({}, j->errorString());
-        }
+    connect(job, &QKeychain::Job::finished, this, [job, complete](QKeychain::Job* j) {
+        if (j->error() == QKeychain::NoError)
+            complete(job->textData(), {});
+        else
+            complete({}, j->errorString().isEmpty() ? tr("Cannot read the system keystore") : j->errorString());
     });
     job->start();
 #else

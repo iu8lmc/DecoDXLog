@@ -9,6 +9,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkRequest>
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QUrl>
 
 #include <QSqlQuery>
@@ -58,6 +59,272 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void batchedTagAndDeletePreserveHistoryAndRemoteQueue()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QList<qint64> ids;
+        for (int i = 0; i < 205; ++i) {
+            const auto result = db.insertQso({{"CALL", QStringLiteral("K%1ABC").arg(i)},
+                {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test");
+            QVERIFY(result.id > 0);
+            ids << result.id;
+        }
+        QList<int> progress;
+        const auto tagged = db.setTagBatch(ids, "Field Day", true, [&](int done, int total) {
+            QCOMPARE(total, 205);
+            progress << done;
+        });
+        QCOMPARE(tagged.changed, 205);
+        QCOMPARE(tagged.failed, 0);
+        QCOMPARE(tagged.changedIds, ids);
+        QVERIFY(progress.size() >= 3);
+        QCOMPARE(progress.last(), 205);
+        for (int i = 1; i < progress.size(); ++i) QVERIFY(progress.at(i) > progress.at(i - 1));
+        QCOMPARE(db.record(ids.first())->value("APP_DECOLOG_TAGS"), QString("Field Day"));
+        QCOMPARE(db.history(ids.first()).size(), 1);
+        const auto unchanged = db.setTagBatch(ids, "field day", true);
+        QCOMPARE(unchanged.changed, 0);
+        QCOMPARE(unchanged.unchanged, 205);
+
+        QslState crx; crx.service = "crx"; crx.sent = "Y"; crx.remoteId = "7:123";
+        QVERIFY(db.setQslState(ids.first(), crx));
+        const auto deleted = db.softDeleteBatch({ids.first(), ids.last()});
+        QCOMPARE(deleted.changed, 2);
+        QCOMPARE(deleted.failed, 0);
+        QCOMPARE(deleted.changedIds, (QList<qint64>{ids.first(), ids.last()}));
+        QCOMPARE(deleted.pendingServices, QStringList({"crx"}));
+        QVERIFY(db.meta(ids.first())->deleted);
+        QCOMPARE(db.history(ids.first()).size(), 2);
+        QCOMPARE(db.qslStatus(ids.first()).first().sent, QString("D"));
+        QVERIFY(!db.meta(ids.at(1))->deleted);
+    }
+
+    void batchedMutationsRollbackIndividualFailures()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        auto add = [&db](const char* call) {
+            return db.insertQso({{"CALL", call}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                  {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        };
+        const qint64 bad = add("K1BAD");
+        const qint64 good = add("K1GOOD");
+        QVERIFY(bad > 0 && good > 0);
+        QslState crx; crx.service = "crx"; crx.sent = "Y"; crx.remoteId = "7:123";
+        QVERIFY(db.setQslState(bad, crx));
+        QVERIFY(db.setQslState(good, crx));
+        QSqlQuery query(db.connection());
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER fail_delete BEFORE UPDATE OF sent ON qsl_status "
+                            "WHEN OLD.qso_id = %1 BEGIN SELECT RAISE(ABORT, 'injected delete failure'); END").arg(bad)),
+                 qPrintable(query.lastError().text()));
+        auto deleted = db.softDeleteBatch({bad, good});
+        QCOMPARE(deleted.changed, 1);
+        QCOMPARE(deleted.failed, 1);
+        QCOMPARE(deleted.changedIds, QList<qint64>{good});
+        QCOMPARE(deleted.pendingServices, QStringList{"crx"});
+        QVERIFY(!db.meta(bad)->deleted);
+        QCOMPARE(db.meta(bad)->revision, 1);
+        QVERIFY(db.history(bad).isEmpty());
+        QCOMPARE(db.qslStatus(bad).first().sent, QString("Y"));
+        QVERIFY(db.meta(good)->deleted);
+        QVERIFY(query.exec(QStringLiteral("DROP TRIGGER fail_delete")));
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER fail_tag BEFORE INSERT ON qsl_status "
+                            "WHEN NEW.qso_id = %1 BEGIN SELECT RAISE(ABORT, 'injected tag failure'); END").arg(bad)),
+                 qPrintable(query.lastError().text()));
+        const auto tagged = db.setTagBatch({bad}, "test", true);
+        QCOMPARE(tagged.changed, 0);
+        QCOMPARE(tagged.failed, 1);
+        QVERIFY(tagged.changedIds.isEmpty());
+        QVERIFY(db.record(bad)->value("APP_DECOLOG_TAGS").isEmpty());
+        QCOMPARE(db.meta(bad)->revision, 1);
+        QVERIFY(db.history(bad).isEmpty());
+        QCOMPARE(db.qslStatus(bad).first().sent, QString("Y"));
+
+        // A SQLite ROLLBACK trigger invalidates the entire current chunk.
+        // No ID from that chunk may be reported as committed.
+        QVERIFY(query.exec(QStringLiteral("DROP TRIGGER fail_tag")));
+        const qint64 first = add("K1FIRST");
+        const qint64 second = add("K1SECOND");
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER rollback_chunk BEFORE UPDATE ON qso "
+                            "WHEN NEW.id = %1 BEGIN SELECT RAISE(ROLLBACK, 'rollback chunk'); END").arg(second)),
+                 qPrintable(query.lastError().text()));
+        const auto rolledBack = db.softDeleteBatch({first, second});
+        QCOMPARE(rolledBack.changed, 0);
+        QCOMPARE(rolledBack.failed, 2);
+        QVERIFY(rolledBack.changedIds.isEmpty());
+        QVERIFY(rolledBack.pendingServices.isEmpty());
+        QVERIFY(!db.meta(first)->deleted);
+        QCOMPARE(db.meta(first)->revision, 1);
+        QVERIFY(db.history(first).isEmpty());
+    }
+
+    void batchedMergePreservesHistoryAndRollsBackFailedGroups()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add = [&db](const char* call, const char* time) {
+            return db.insertQso({{"CALL", call}, {"QSO_DATE", "20261118"}, {"TIME_ON", time},
+                                  {"BAND", "20m"}, {"MODE", "FT8"}}, "test", {}, false, -1, false).id;
+        };
+        const qint64 keep = add("K1AAA", "1200"), other = add("K1AAA", "1201");
+        const qint64 badKeep = add("K1BBB", "1300"), badOther = add("K1BBB", "1301");
+        QVERIFY(keep > 0 && other > 0 && badKeep > 0 && badOther > 0);
+        QslState eqsl; eqsl.service = "eqsl"; eqsl.sent = "Y"; QVERIFY(db.setQslState(keep, eqsl));
+        QslState crx; crx.service = "crx"; crx.sent = "Y"; crx.remoteId = "7:123";
+        QVERIFY(db.setQslState(other, crx));
+        QVERIFY(db.setQslState(badOther, crx));
+        QSqlQuery query(db.connection());
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER fail_merge BEFORE UPDATE OF deleted ON qso "
+                            "WHEN NEW.id = %1 BEGIN SELECT RAISE(ABORT, 'injected merge failure'); END").arg(badOther)),
+                 qPrintable(query.lastError().text()));
+        const auto result = db.mergeBatch({{keep, {other}}, {badKeep, {badOther}}}, {"eqsl", "crx"});
+        QCOMPARE(result.keptIds, QList<qint64>{keep});
+        QCOMPARE(result.removedIds, QList<qint64>{other});
+        QCOMPARE(result.failed, 1);
+        QCOMPARE(result.pendingServices, QStringList{"crx"});
+        QVERIFY(db.meta(other)->deleted);
+        QVERIFY(!db.meta(badOther)->deleted);
+        QCOMPARE(db.meta(badKeep)->revision, 1);
+        QVERIFY(db.history(badKeep).isEmpty());
+        QVERIFY(db.history(badOther).isEmpty());
+        bool foundCrx = false;
+        for (const QslState& state : db.qslStatus(keep)) {
+            if (state.service == QLatin1String("crx")) {
+                foundCrx = true;
+                QCOMPARE(state.remoteId, QString("7:123"));
+                QCOMPARE(state.sent, QString("R"));
+            }
+        }
+        QVERIFY(foundCrx);
+        QCOMPARE(db.qslStatus(badOther).first().remoteId, QString("7:123"));
+
+        QVERIFY(query.exec(QStringLiteral("DROP TRIGGER fail_merge")));
+        const qint64 queueKeep = add("K1QUE", "1600"), queueOther = add("K1QUE", "1601");
+        QVERIFY(db.setQslState(queueKeep, crx));
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER fail_queue BEFORE UPDATE OF sent ON qsl_status "
+                            "WHEN NEW.qso_id = %1 AND NEW.sent = 'R' "
+                            "BEGIN SELECT RAISE(ABORT, 'queue failure'); END").arg(queueKeep)),
+                 qPrintable(query.lastError().text()));
+        const auto queueFailed = db.mergeBatch({{queueKeep, {queueOther}}}, {"crx"});
+        QCOMPARE(queueFailed.failed, 1);
+        QVERIFY(queueFailed.keptIds.isEmpty() && queueFailed.removedIds.isEmpty());
+        QVERIFY(queueFailed.errors.join(" ").contains("queue failure"));
+        QVERIFY(!db.meta(queueOther)->deleted);
+        QVERIFY(db.history(queueKeep).isEmpty());
+        QCOMPARE(db.qslStatus(queueKeep).first().sent, QString("Y"));
+        QVERIFY(query.exec(QStringLiteral("DROP TRIGGER fail_queue")));
+        const qint64 k1 = add("K1CCC", "1400"), o1 = add("K1CCC", "1401");
+        const qint64 k2 = add("K1DDD", "1500"), o2 = add("K1DDD", "1501");
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER rollback_merge BEFORE UPDATE OF deleted ON qso "
+                            "WHEN NEW.id = %1 BEGIN SELECT RAISE(ROLLBACK, 'rollback merge'); END").arg(o2)),
+                 qPrintable(query.lastError().text()));
+        const auto undone = db.mergeBatch({{k1, {o1}}, {k2, {o2}}}, {"eqsl", "crx"});
+        QVERIFY(undone.keptIds.isEmpty());
+        QVERIFY(undone.removedIds.isEmpty());
+        QVERIFY(undone.pendingServices.isEmpty());
+        QCOMPARE(undone.failed, 2);
+        QVERIFY(!db.meta(o1)->deleted && !db.meta(o2)->deleted);
+        QCOMPARE(db.meta(k1)->revision, 1);
+        QVERIFY(db.history(k1).isEmpty());
+    }
+
+    void batchedDeleteDoesNotPublishFailedCommit()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto id = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                      {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        QVERIFY(id > 0);
+        QslState crx; crx.service = "crx"; crx.sent = "Y"; crx.remoteId = "7:123";
+        QVERIFY(db.setQslState(id, crx));
+        QSqlQuery query(db.connection());
+        QVERIFY(query.exec("CREATE TABLE fake_parent(id INTEGER PRIMARY KEY)"));
+        QVERIFY(query.exec("CREATE TABLE fake_child(parent INTEGER REFERENCES fake_parent(id) DEFERRABLE INITIALLY DEFERRED)"));
+        QVERIFY2(query.exec(QStringLiteral("CREATE TRIGGER fail_commit AFTER UPDATE OF deleted ON qso "
+                            "WHEN NEW.id = %1 BEGIN INSERT INTO fake_child VALUES(999); END").arg(id)),
+                 qPrintable(query.lastError().text()));
+        const auto result = db.softDeleteBatch({id});
+        QCOMPARE(result.changed, 0);
+        QCOMPARE(result.failed, 1);
+        QVERIFY(result.changedIds.isEmpty());
+        QVERIFY(result.pendingServices.isEmpty());
+        QVERIFY(!db.meta(id)->deleted);
+        QCOMPARE(db.meta(id)->revision, 1);
+        QVERIFY(db.history(id).isEmpty());
+        QCOMPARE(db.qslStatus(id).first().sent, QString("Y"));
+    }
+
+    void repairDamagedFieldsIsBatchedAndKeepsHistory()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add = [&db](const char* call, const QString& name) {
+            return db.insertQso({{"CALL", call}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                  {"BAND", "20m"}, {"MODE", "FT8"}, {"NAME", name}}, "test").id;
+        };
+        const auto fixed = add("K1FIX", "Broken<NAME");
+        const auto emptied = add("K1EMPTY", QString(QChar(0xfffd)));
+        const auto unchanged = add("K1UNCH", "Good<NO!");
+        const auto failed = add("K1FAIL", "Damaged<QTH");
+        QslState eqsl; eqsl.service = "eqsl"; eqsl.sent = "Y";
+        QVERIFY(db.setQslState(fixed, eqsl));
+        QVERIFY(db.setQslState(failed, eqsl));
+        QSqlQuery q(db.connection());
+        QVERIFY2(q.exec(QStringLiteral("CREATE TRIGGER fail_repair BEFORE INSERT ON qsl_status "
+                         "WHEN NEW.qso_id = %1 BEGIN SELECT RAISE(ABORT, 'repair failure'); END").arg(failed)),
+                 qPrintable(q.lastError().text()));
+        int progress = 0;
+        const auto result = db.repairDamagedFields([&](int done, int total) { progress = done; QCOMPARE(total, 4); });
+        QCOMPARE(result.changes.changed, 2);
+        QCOMPARE(result.changes.unchanged, 1);
+        QCOMPARE(result.changes.failed, 1);
+        QCOMPARE(result.emptiedIds, QList<qint64>{emptied});
+        QCOMPARE(progress, 4);
+        QCOMPARE(db.record(fixed)->value("NAME"), QString("Broken"));
+        QVERIFY(db.record(emptied)->value("NAME").isEmpty());
+        QCOMPARE(db.record(unchanged)->value("NAME"), QString("Good<NO!"));
+        QCOMPARE(db.record(failed)->value("NAME"), QString("Damaged<QTH"));
+        QCOMPARE(db.history(fixed).size(), 1);
+        QVERIFY(db.history(failed).isEmpty());
+        QCOMPARE(db.meta(failed)->revision, 1);
+        QCOMPARE(db.qslStatus(failed).first().sent, QString("Y"));
+    }
+
+    void genericRecordBatchProtectsHistoryAndQslOnError()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        QList<qint64> ids;
+        for (int i = 0; i < 205; ++i) {
+            const auto result = db.insertQso({{"CALL", QStringLiteral("K%1XYZ").arg(i)},
+                {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test");
+            QVERIFY(result.id > 0);
+            ids << result.id;
+        }
+        QslState eqsl; eqsl.service = "eqsl"; eqsl.sent = "Y";
+        QVERIFY(db.setQslState(ids.first(), eqsl));
+        QVERIFY(db.setQslState(ids.last(), eqsl));
+        QSqlQuery q(db.connection());
+        QVERIFY2(q.exec(QStringLiteral("CREATE TRIGGER fail_dxcc BEFORE INSERT ON qsl_status "
+                         "WHEN NEW.qso_id = %1 BEGIN SELECT RAISE(ABORT, 'dxcc failure'); END").arg(ids.last())),
+                 qPrintable(q.lastError().text()));
+        int progress = 0;
+        const auto result = db.updateRecordsBatch(ids, "dxcc-test", [skip = ids.at(1)](qint64 id, AdifRecord& record) {
+            if (id == skip) return false;
+            record.set("DXCC", "291");
+            record.set("COUNTRY", "United States");
+            return true;
+        }, [&](int done, int total) { progress = done; QCOMPARE(total, 205); });
+        QCOMPARE(result.changed, 203);
+        QCOMPARE(result.unchanged, 1);
+        QCOMPARE(result.failed, 1);
+        QCOMPARE(progress, 205);
+        QCOMPARE(db.record(ids.first())->value("DXCC"), QString("291"));
+        QCOMPARE(db.qslStatus(ids.first()).first().sent, QString("Y"));
+        QCOMPARE(db.history(ids.first()).size(), 1);
+        QVERIFY(db.record(ids.at(1))->value("DXCC").isEmpty());
+        QVERIFY(db.record(ids.last())->value("DXCC").isEmpty());
+        QCOMPARE(db.qslStatus(ids.last()).first().sent, QString("Y"));
+        QVERIFY(db.history(ids.last()).isEmpty());
+    }
+
     void schemaIsApplied()
     {
         LogDatabase db;
@@ -525,6 +792,63 @@ private slots:
         QCOMPARE(db.insertQso(r, "manual", "test", true).status, InsertResult::Status::Duplicate);
         QCOMPARE(db.insertQso(r, "manual", "test", true, 0, false).status, InsertResult::Status::Inserted);
         QCOMPARE(db.qsoCount(), 2);
+    }
+
+    void editPreservesNonAdifServiceStates()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1000"},
+                          {"BAND", "20m"}, {"MODE", "FT8"}};
+        const auto inserted = db.insertQso(record, "manual", "test", true);
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        const qint64 id = inserted.id;
+        QslState crx;
+        crx.service = "crx"; crx.sent = "Y"; crx.sentDate = "20260102";
+        crx.rcvd = "Y"; crx.rcvdDate = "20260103"; crx.remoteId = "1:101";
+        crx.lastError = "old error"; crx.via = "E";
+        QVERIFY(db.setQslState(id, crx));
+        QslState wavelog;
+        wavelog.service = "wavelog"; wavelog.sent = "Y"; wavelog.sentDate = "20260104";
+        QVERIFY(db.setQslState(id, wavelog));
+        QslState eqsl;
+        eqsl.service = "eqsl"; eqsl.sent = "Y";
+        QVERIFY(db.setQslState(id, eqsl));
+
+        auto edited = db.record(id);
+        QVERIFY(edited);
+        edited->set("COMMENT", "edited");
+        QCOMPARE(db.updateQso(id, *edited).status, InsertResult::Status::Inserted);
+        QHash<QString, QslState> states;
+        for (const auto& state : db.qslStatus(id)) states.insert(state.service, state);
+        QVERIFY(states.contains("crx"));
+        QCOMPARE(states.value("crx").sent, crx.sent);
+        QCOMPARE(states.value("crx").sentDate, crx.sentDate);
+        QCOMPARE(states.value("crx").rcvd, crx.rcvd);
+        QCOMPARE(states.value("crx").rcvdDate, crx.rcvdDate);
+        QCOMPARE(states.value("crx").remoteId, crx.remoteId);
+        QCOMPARE(states.value("crx").lastError, crx.lastError);
+        QCOMPARE(states.value("crx").via, crx.via);
+        QVERIFY(states.contains("wavelog"));
+        QCOMPARE(states.value("wavelog").sent, wavelog.sent);
+        QCOMPARE(states.value("wavelog").sentDate, wavelog.sentDate);
+        QCOMPARE(states.value("eqsl").sent, QString("Y"));
+        QVERIFY(db.qsosToUpload("wavelog").isEmpty());
+        QVERIFY(db.qsosToUpload("eqsl").isEmpty());
+        db.queueRemoteEdit(id);
+        QCOMPARE(db.qsosToUpload("crx"), QList<qint64>{id});
+        for (const auto& state : db.qslStatus(id)) {
+            if (state.service == QLatin1String("crx")) {
+                QCOMPARE(state.sent, QString("R"));
+                QCOMPARE(state.remoteId, crx.remoteId);
+            }
+        }
+
+        edited = db.record(id);
+        QVERIFY(edited);
+        edited->set("EQSL_QSL_SENT", "N");
+        QCOMPARE(db.updateQso(id, *edited).status, InsertResult::Status::Inserted);
+        QCOMPARE(db.qsosToUpload("eqsl"), QList<qint64>{id});
     }
 
     void crxFollowsEditsAndDeletions()

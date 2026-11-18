@@ -21,6 +21,14 @@ RoundedWindow {
 
     readonly property var rows: { revision; return decolog.cards.rows(root.state, 0) }
     readonly property var counts: { revision; return decolog.cards.counts }
+    // Compute once per change, not once per button on a large queue.
+    readonly property var selectedRowIds: {
+        const selected = root.chosen
+        const out = []
+        for (const row of root.rows)
+            if (selected[row.id]) out.push(row.id)
+        return out
+    }
 
     width: 1020
     height: 680
@@ -65,12 +73,7 @@ RoundedWindow {
     }
 
     function selectedIds() {
-        const out = []
-        for (const row of root.rows) {
-            if (root.chosen[row.id])
-                out.push(row.id)
-        }
-        return out
+        return root.selectedRowIds
     }
     function allIds() {
         return root.rows.map(row => row.id)
@@ -151,7 +154,7 @@ RoundedWindow {
                 text: qsTr("Queue every QSL to answer")
                 buttonHeight: 26
                 fontPixelSize: 12
-                enabled: (root.counts.unanswered || 0) > 0
+                enabled: !decolog.cards.operationBusy && (root.counts.unanswered || 0) > 0
                 onClicked: decolog.cards.enqueueUnanswered("B")
             }
         }
@@ -296,14 +299,14 @@ RoundedWindow {
                 text: qsTr("Queue (bureau)")
                 buttonHeight: 26
                 fontPixelSize: 12
-                enabled: root.selectedIds().length > 0
+                enabled: !decolog.cards.operationBusy && root.selectedIds().length > 0
                 onClicked: decolog.cards.enqueue(root.selectedIds(), "B")
             }
             GlassButton {
                 text: qsTr("Queue (direct)")
                 buttonHeight: 26
                 fontPixelSize: 12
-                enabled: root.selectedIds().length > 0
+                enabled: !decolog.cards.operationBusy && root.selectedIds().length > 0
                 onClicked: decolog.cards.enqueue(root.selectedIds(), "D")
             }
             GlassButton {
@@ -311,19 +314,21 @@ RoundedWindow {
                 tone: Theme.accentColor
                 buttonHeight: 26
                 fontPixelSize: 12
-                enabled: root.selectedIds().length > 0
+                enabled: !decolog.cards.operationBusy && root.selectedIds().length > 0
                 onClicked: { decolog.cards.markSent(root.selectedIds(), ""); root.chosen = ({}) }
             }
             GlassButton {
                 text: qsTr("Out of the queue")
                 buttonHeight: 26
                 fontPixelSize: 12
-                enabled: root.selectedIds().length > 0
+                enabled: !decolog.cards.operationBusy && root.selectedIds().length > 0
                 onClicked: { decolog.cards.drop(root.selectedIds()); root.chosen = ({}) }
             }
             Item { Layout.fillWidth: true }
             Text {
-                text: decolog.cards.status
+                text: decolog.cards.exportBusy ? qsTr("Writing paper QSL…")
+                      : decolog.cards.operationBusy ? qsTr("Updating paper QSL…")
+                      : decolog.cards.cacheLoading ? qsTr("Loading paper QSL…") : decolog.cards.status
                 color: Theme.textSecondary
                 font.pixelSize: 11
                 elide: Text.ElideRight
@@ -374,7 +379,7 @@ RoundedWindow {
                     tone: Theme.primaryColor
                     filled: true
                     buttonHeight: 28
-                    enabled: (root.counts.queue || 0) > 0
+                    enabled: !decolog.cards.exportBusy && !decolog.cards.operationBusy && (root.counts.queue || 0) > 0
                     onClicked: saveDialog.open()
                 }
                 Text {

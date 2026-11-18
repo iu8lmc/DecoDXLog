@@ -59,6 +59,8 @@ QString qslSql(const char* what, const char* service)
 const QList<ExtraColumn>& extraColumns()
 {
     static const QList<ExtraColumn> list{
+        // A UI action, not an ADIF value or a sortable database field.
+        {"journey", "", "QSO map", 130, "''"},
         {"qso_date", "QSO_DATE", QT_TRANSLATE_NOOP("QsoTableModel", "Date"), 92, "substr(qso_datetime_on, 1, 10)"},
         {"time_on", "TIME_ON", QT_TRANSLATE_NOOP("QsoTableModel", "Time on"), 70, "substr(qso_datetime_on, 12, 5)"},
         {"time_off", "TIME_OFF", QT_TRANSLATE_NOOP("QsoTableModel", "Time off"), 70, "CASE WHEN IFNULL(qso_datetime_off, '') <> '' THEN substr(qso_datetime_off, 12, 5) "
@@ -330,7 +332,7 @@ constexpr quint16 kNoCategory = 0xFFFF;
 QsoTableModel::QsoTableModel(LogDatabase* db, QObject* parent)
     : QAbstractTableModel(parent)
     , m_db(db)
-    , m_layout(coreKeys())
+    , m_layout(defaultLayout())
 {
     m_reloadPool.setMaxThreadCount(1);
     rebuildSlots();
@@ -526,6 +528,8 @@ int coreWidth(int column)
 
 QString QsoTableModel::titleOf(const QString& key) const
 {
+    if (key == QLatin1String("journey"))
+        return QCoreApplication::translate("LogbookPanel", "QSO map");
     const qsizetype core = coreKeys().indexOf(key);
     if (core >= 0)
         return coreTitle(static_cast<int>(core));
@@ -554,7 +558,9 @@ int QsoTableModel::columnWidthHint(int column) const
 
 QStringList QsoTableModel::defaultLayout()
 {
-    return coreKeys();
+    QStringList keys = coreKeys();
+    keys.append(QStringLiteral("journey"));
+    return keys;
 }
 
 QVariantList QsoTableModel::availableColumns() const
@@ -574,7 +580,7 @@ QVariantList QsoTableModel::availableColumns() const
     }
     for (const auto& c : extraColumns()) {
         out << QVariantMap{{QStringLiteral("key"), QLatin1String(c.key)},
-                           {QStringLiteral("title"), QCoreApplication::translate("QsoTableModel", c.title)},
+                           {QStringLiteral("title"), titleOf(QLatin1String(c.key))},
                            {QStringLiteral("field"), QLatin1String(c.field)}};
     }
     // I campi ADIF qualsiasi che l'operatore ha aggiunto.
@@ -606,7 +612,7 @@ void QsoTableModel::setColumnLayout(const QStringList& keys)
     m_layout = clean;
     m_extra.clear();
     for (const QString& key : m_layout) {
-        if (!coreKeys().contains(key))
+        if (!coreKeys().contains(key) && key != QLatin1String("journey"))
             m_extra << key;
     }
     rebuildSlots();
@@ -632,7 +638,7 @@ void QsoTableModel::rebuildSlots()
 
 void QsoTableModel::sortBy(const QString& key)
 {
-    if (key.isEmpty() || key == QLatin1String("qsl"))
+    if (key.isEmpty() || key == QLatin1String("qsl") || key == QLatin1String("journey"))
         return;
     // Stessa colonna: si gira. Colonna nuova: l'ora dal piu' recente, il resto
     // dalla A alla Z (o dal piu' piccolo).
@@ -642,6 +648,8 @@ void QsoTableModel::sortBy(const QString& key)
 
 void QsoTableModel::setSort(const QString& key, bool ascending)
 {
+    if (key == QLatin1String("journey"))
+        return;
     const QString clean = key.isEmpty() ? QStringLiteral("utc") : key;
     if (clean == m_sortKey && ascending == m_sortAscending)
         return;
@@ -1250,6 +1258,17 @@ void QsoTableModel::reloadAfterEdit(qint64 id)
     reloadImpl(true);
 }
 
+void QsoTableModel::reloadAfterQslUpdate()
+{
+    // Le pagine possono contenere gli stati precedenti all'upload. Rileggerle
+    // su richiesta e notificare le viste senza distruggere il TableView, se
+    // l'ordine e i QSO mostrati non sono cambiati.
+    dropPages();
+    if (rowCount() > 0 && columnCount() > 0)
+        emit dataChanged(index(0, 0), index(rowCount() - 1, columns() - 1));
+    reloadImpl(true);
+}
+
 void QsoTableModel::reloadImpl(bool preserveIfUnchanged)
 {
     decolog::StartupSpan trace("QsoTableModel::reload");
@@ -1355,6 +1374,42 @@ void QsoTableModel::refreshQso(qint64 id)
     m_pageUse.removeOne(row / kPage);
     m_category.insert(id, categoryOf(id));
     emit dataChanged(index(row, 0), index(row, columns() - 1));
+}
+
+void QsoTableModel::removeDeletedIds(const QList<qint64>& ids)
+{
+    if (ids.isEmpty()) return;
+    const QSet<qint64> removed(ids.cbegin(), ids.cend());
+    // A previous asynchronous filter result must not reinsert deleted rows.
+    m_reloadLatest->store(++m_reloadGeneration);
+    if (m_busy) {
+        m_busy = false;
+        emit busyChanged();
+    }
+    // Remove contiguous runs from the end so the remaining row numbers keep
+    // their meaning. TableView can keep its viewport and delegates alive.
+    bool any = false;
+    for (int row = int(m_ids.size()) - 1; row >= 0;) {
+        if (!removed.contains(m_ids.at(row))) { --row; continue; }
+        const int last = row;
+        while (row >= 0 && removed.contains(m_ids.at(row))) --row;
+        const int first = row + 1;
+        beginRemoveRows({}, first, last);
+        m_ids.remove(first, last - first + 1);
+        dropPages();
+        endRemoveRows();
+        any = true;
+    }
+    for (const qint64 id : ids) m_category.remove(id);
+    refreshTotal();
+    // A deletion can be hidden by a filter while another visible row was
+    // changed by the same operation (for example the kept QSO in a merge).
+    if (!any) dropPages();
+    if (rowCount() > 0 && columnCount() > 0)
+        emit dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+    emit countChanged();
+    // Reapply any filter/sort request that was in flight during deletion.
+    reloadImpl(true);
 }
 
 void QsoTableModel::refreshAfterInsert()

@@ -58,6 +58,13 @@ DialogFrame {
     // Una macro scritta e mai uscita dal suo campo si salva lo stesso.
     onClosed: setupMacros.commit()
 
+    Connections {
+        target: decolog
+        function onDxccBatchFinished(historical, changed, failed) {
+            ctyNote.text = qsTr("%1 QSO updated, %2 failed; previous versions remain in history.").arg(changed).arg(failed)
+        }
+    }
+
     function apply() {
         setupMacros.commit()
         const port = parseInt(portField.text)
@@ -281,8 +288,8 @@ DialogFrame {
                             text: qsTr("Fill missing DXCC")
                             tone: Theme.primaryColor
                             filled: true
-                            enabled: decolog.missingDxccCount > 0
-                            onClicked: ctyNote.text = qsTr("%1 QSO completed, each kept as a new revision.").arg(decolog.fillMissingDxcc())
+                            enabled: decolog.missingDxccCount > 0 && decolog.bulkProgress < 0 && !decolog.clublogCty.busy
+                            onClicked: if (decolog.fillMissingDxccAsync()) ctyNote.text = qsTr("Updating DXCC in the background…")
                         }
                         GlassButton { text: qsTr("Load newer cty.csv…"); onClicked: ctyDialog.open() }
                     }
@@ -308,12 +315,12 @@ DialogFrame {
                         spacing: 8
                         GlassButton {
                             text: decolog.clublogCty.busy ? qsTr("Working…") : qsTr("Update cty.xml")
-                            enabled: !decolog.clublogCty.busy && decolog.clublogCty.hasKey
+                            enabled: !decolog.clublogCty.busy && decolog.bulkProgress < 0 && decolog.clublogCty.hasKey
                             onClicked: decolog.updateClubLogCty()
                         }
                         GlassButton {
                             text: qsTr("Check the entities with the dates")
-                            enabled: decolog.clublogCty.loaded && !decolog.clublogCty.busy
+                            enabled: decolog.clublogCty.loaded && !decolog.clublogCty.busy && decolog.bulkProgress < 0
                             onClicked: decolog.checkEntitiesByDate()
                         }
                         GlassButton {
@@ -321,7 +328,8 @@ DialogFrame {
                             text: qsTr("Correct %1 QSO").arg(decolog.entityFixes.count || 0)
                             tone: Theme.warningColor
                             filled: true
-                            onClicked: ctyNote.text = qsTr("%1 QSO corrected, each kept as a new revision.").arg(decolog.applyEntityFixes())
+                            enabled: decolog.bulkProgress < 0 && !decolog.clublogCty.busy
+                            onClicked: if (decolog.applyEntityFixesAsync()) ctyNote.text = qsTr("Updating DXCC in the background…")
                         }
                     }
                     Repeater {

@@ -26,6 +26,16 @@ Popup {
         open()
     }
 
+    // Isolated UI regression probe: prepare the real dialog and let the
+    // application send a mouse click to the same button used by operators.
+    function prepareProbe(list, field, value, onlyEmptyValue) {
+        openFor(list)
+        fieldBox.currentIndex = root.fields.findIndex(function(f) { return f.field === field })
+        valueField.text = value
+        onlyEmpty.checked = onlyEmptyValue
+    }
+    function probeApplyButton() { return applyButton }
+
     // In una finestra sua il popup riceve i tasti solo se ha il fuoco: senza
     // "focus: true" il campo prende il cursore ma quello che si scrive si perde.
     popupType: Popup.Window

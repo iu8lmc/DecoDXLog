@@ -430,7 +430,7 @@ ColumnLayout {
                 tone: Theme.primaryColor
                 filled: true
                 buttonHeight: 28
-                enabled: root.fields.length > 0
+                enabled: root.fields.length > 0 && !root.cards.exportBusy && !root.cards.operationBusy
                 onClicked: pdfDialog.open()
             }
             GlassButton {
@@ -438,7 +438,7 @@ ColumnLayout {
                 Layout.bottomMargin: 2
                 text: qsTr("One PNG each…")
                 buttonHeight: 28
-                enabled: root.fields.length > 0
+                enabled: root.fields.length > 0 && !root.cards.exportBusy && !root.cards.operationBusy
                 onClicked: pngDialog.open()
             }
             // La cartolina per email: l'indirizzo lo sa il callbook.
@@ -448,7 +448,7 @@ ColumnLayout {
                 text: root.cards.mailBusy ? qsTr("Sending…") : qsTr("Send by email…")
                 tone: Theme.secondaryColor
                 buttonHeight: 28
-                enabled: root.fields.length > 0 && !root.cards.mailBusy
+                enabled: root.fields.length > 0 && !root.cards.mailBusy && !root.cards.operationBusy
                 onClicked: mailDialog.open()
                 ToolTip.visible: hovered
                 ToolTip.text: !root.cards.mail.ready

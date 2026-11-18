@@ -196,6 +196,10 @@ public:
     // un QSO): la tabella non si ricostruisce per una riga sola.
     void refreshQso(qint64 id);
     void reloadAfterEdit(qint64 id);
+    // Gli upload QSL possono aggiornare piu' righe contemporaneamente.
+    void reloadAfterQslUpdate();
+    // Remove confirmed deletions without resetting a deeply scrolled view.
+    void removeDeletedIds(const QList<qint64>& ids);
 
 signals:
     void countChanged();

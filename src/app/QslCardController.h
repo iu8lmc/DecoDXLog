@@ -16,6 +16,10 @@
 #include <QPair>
 #include <QSize>
 #include <QVariantMap>
+#include <QThreadPool>
+#include <QHash>
+#include <atomic>
+#include <memory>
 #include <functional>
 
 class QNetworkAccessManager;
@@ -34,6 +38,9 @@ class QslCardController : public QObject {
     Q_PROPERTY(QVariantList sheets READ sheets CONSTANT)
     Q_PROPERTY(QString lastFile READ lastFile NOTIFY changed)
     Q_PROPERTY(QString status READ status NOTIFY changed)
+    Q_PROPERTY(bool operationBusy READ operationBusy NOTIFY operationChanged)
+    Q_PROPERTY(bool cacheLoading READ cacheLoading NOTIFY cacheLoadingChanged)
+    Q_PROPERTY(bool exportBusy READ exportBusy NOTIFY exportBusyChanged)
     // La cartolina: il modello (un'immagine) e i campi posati sopra.
     Q_PROPERTY(QString cardTemplate READ cardTemplate NOTIFY cardChanged)
     Q_PROPERTY(QVariantList cardFields READ cardFields NOTIFY cardChanged)
@@ -68,20 +75,26 @@ public:
     QVariantList sheets() const;
     QString lastFile() const { return m_lastFile; }
     QString status() const { return m_status; }
+    bool operationBusy() const { return m_operationBusy; }
+    bool cacheLoading() const { return !m_rowsPending.isEmpty() || m_countsPending != 0; }
+    bool exportBusy() const { return m_exportBusy; }
 
     // `state`: queue | sent | received | all.
     Q_INVOKABLE QVariantList rows(const QString& state, int limit = 0) const;
     // Mette in coda: `via` e' B (bureau), D (diretta) o E (elettronica).
     Q_INVOKABLE void enqueue(const QVariantList& ids, const QString& via);
     // Tutte le QSL ricevute a cui non si e' ancora risposto.
+    // Returns the count for an in-memory log; -1 means queued in the worker.
     Q_INVOKABLE int enqueueUnanswered(const QString& via);
     Q_INVOKABLE void markSent(const QVariantList& ids, const QString& via);
     Q_INVOKABLE void markReceived(qint64 id, bool received);
     // Toglie dalla coda senza dire che e' partita ("I" di ignore in ADIF).
     Q_INVOKABLE void drop(const QVariantList& ids);
-    // Scrive il PDF delle etichette e torna il percorso; vuoto se e' andata male.
+    // For file-backed logs output is asynchronous: the result is in
+    // lastFile/status when exportBusy becomes false (the immediate return is empty).
     Q_INVOKABLE QString writeLabels(const QUrl& file, const QString& sheetId, int perLabel, bool guides);
     Q_INVOKABLE void refresh();
+    void invalidateCache();
 
     // ── La cartolina ────────────────────────────────────────────────────────
     QString cardTemplate() const { return m_card.templatePath; }
@@ -127,10 +140,18 @@ signals:
     void changed();
     void cardChanged();
     void mailChanged();
+    void operationChanged();
+    void cacheLoadingChanged();
+    void exportBusyChanged();
 
 private:
     void note(const QString& text, const QString& level);
     void touch(qint64 id, const QString& sent, const QString& rcvd, const QString& via);
+    int changeCards(const QList<qint64>& ids, const QString& sent, const QString& via,
+                    bool unanswered = false, const QString& received = {});
+    void ensureCacheIdentity() const;
+    void startOutput(int kind, const QString& path, const QVariantList& ids,
+                     const QString& sheetId, int perPage, bool guides);
 
     void loadCard();
     void saveCard();
@@ -140,6 +161,21 @@ private:
     Context m_ctx;
     QString m_lastFile;
     QString m_status;
+    bool m_operationBusy{false};
+    bool m_notifyingLogChange{false};
+    bool m_exportBusy{false};
+    QThreadPool m_cardPool;
+    QThreadPool m_exportPool;
+    mutable QThreadPool m_readPool;
+    mutable QString m_cachePath;
+    mutable quint64 m_cacheGeneration{1};
+    mutable std::shared_ptr<std::atomic<quint64>> m_cacheLatest{std::make_shared<std::atomic<quint64>>(1)};
+    mutable QHash<QString, QVariantList> m_cachedRows;
+    mutable QHash<QString, quint64> m_rowsVersion;
+    mutable QHash<QString, quint64> m_rowsPending;
+    mutable QVariantMap m_cachedCounts;
+    mutable quint64 m_countsVersion{0};
+    mutable quint64 m_countsPending{0};
     core::qsldesign::Card m_card;
     QSize m_cardSize;
 
@@ -148,7 +184,10 @@ private:
     void sendThroughCloud(const QVariantMap& qso, const QString& email, const QByteArray& png);
     QByteArray drawCard(const QVariantMap& qso) const;
     QString mailRoute() const;
-    void lookupAndSend(const QList<QVariantMap>& qsos);
+    void lookupAndSend(const QList<QVariantMap>& qsos, quint64 generation);
+    void beginMail(const QList<QVariantMap>& qsos, quint64 generation);
+    void recordConfirmedMail(const QString& path, qint64 id, const QString& uuid, const QString& email);
+    bool mailOriginIsCurrent() const;
     QString mailBodyFor(const QVariantMap& qso) const;
 
     core::MailSender m_mail;
@@ -159,6 +198,13 @@ private:
     int m_mailWaiting{0};     // quanti aspettano ancora l'email dal callbook
     int m_mailSent{0};
     int m_mailFailed{0};
+    quint64 m_mailGeneration{0};
+    bool m_mailPreparing{false};
+    struct MailTarget { QString path; qint64 id{0}; QString uuid; quint64 generation{0}; };
+    QHash<qint64, MailTarget> m_mailTargets;
+    qint64 m_mailNextTag{0};
+    int m_mailPendingRecords{0};
+    QString m_mailOriginPath;
 };
 
 } // namespace decolog::app

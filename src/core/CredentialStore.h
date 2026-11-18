@@ -95,6 +95,9 @@ private:
     QHash<QString, bool> m_busy;
     QHash<QString, QString> m_secretCache;
     QHash<QString, quint64> m_secretGeneration;
+    using ReadCallback = std::function<void(const QString&, const QString&)>;
+    QHash<QString, QList<ReadCallback>> m_pendingReads;
+    std::function<void(const QString&, ReadCallback)> m_readBackendForTest;
 };
 
 } // namespace decolog::core

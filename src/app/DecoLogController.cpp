@@ -389,6 +389,7 @@ DecoLogController::DecoLogController(QObject* parent)
     // deve fermarsi quando Decodium si collega.
     m_linkPool.setMaxThreadCount(1);
     m_importPool.setMaxThreadCount(1);
+    m_exportPool.setMaxThreadCount(1);
     m_statsViewPool.setMaxThreadCount(1);
     m_callInfoPool.setMaxThreadCount(1);
     // Ogni cambio del log fa vecchi i conti dell'entita' nella scheda.
@@ -466,6 +467,16 @@ DecoLogController::DecoLogController(QObject* parent)
     });
 
     m_credentials = new CredentialStore(QStringLiteral("DecoDXLog"), this);
+    for (auto* verifier : {&m_qrzProfile, &m_hamqthProfile})
+        verifier->setCredentialReaders(
+            [this](const QString& service) {
+                return m_credentials->hasSecret(service) ? m_credentials->account(service) : QString();
+            },
+            [this](const QString& service, std::function<void(const QString&, const QString&)> done) {
+                m_credentials->readSecret(service, std::move(done));
+            });
+    connect(&m_qrzProfile, &CallbookProfileVerifier::changed, this, &DecoLogController::qrzProfileChanged);
+    connect(&m_hamqthProfile, &CallbookProfileVerifier::changed, this, &DecoLogController::hamqthProfileChanged);
     connect(m_credentials, &CredentialStore::finished, this,
             [this](const QString& service, bool ok, const QString& message) {
                 // Mai il segreto: solo il servizio e l'esito.
@@ -479,8 +490,11 @@ DecoLogController::DecoLogController(QObject* parent)
                 // Credenziali cambiate: la sessione del callbook va rifatta.
                 if (service == QLatin1String("qrz") || service == QLatin1String("hamqth")) {
                     m_callbook.reset();
+                    (service == QLatin1String("qrz") ? m_qrzProfile : m_hamqthProfile).invalidateCredentials();
+                    m_primaryProfileAttempted.clear();
                     m_callbookErrors.clear();
                     m_callbookStatus.clear();
+                    updateCallbookProfiles();
                     emit callbookChanged();
                     requestCallbook();
                 }
@@ -499,8 +513,20 @@ DecoLogController::DecoLogController(QObject* parent)
     m_callbookComplete = s.value(QStringLiteral("callbook/completeLogged"), true).toBool();
     m_callbookFallback = s.value(QStringLiteral("callbook/fallback"), true).toBool();
     m_callbook.setFallbackEnabled(m_callbookFallback);
+    connect(&m_callbook, &CallbookClient::providerResult, this,
+            [this](const QString& call, const QString& provider, const QString& returned) {
+        if (call != m_lookupCall || (provider != QLatin1String("qrz") && provider != QLatin1String("hamqth")))
+            return;
+        m_primaryProfileAttempted.insert(provider);
+        auto& verifier = provider == QLatin1String("qrz") ? m_qrzProfile : m_hamqthProfile;
+        if (!returned.isEmpty() && returned.trimmed().compare(call, Qt::CaseInsensitive) == 0)
+            verifier.observeVerified(call, returned);
+        else
+            verifier.observeUnverified(call);
+    });
     connect(&m_callbook, &CallbookClient::found, this, [this](const QString& call, const CallbookRecord& record) {
         m_callbookResults.insert(call, record.toMap());
+        finishCallbookProfiles(call);
         m_callbookErrors.remove(call);
         if (call == m_callbookPending)
             m_callbookPending.clear();
@@ -530,6 +556,7 @@ DecoLogController::DecoLogController(QObject* parent)
     });
     connect(&m_callbook, &CallbookClient::failed, this, [this](const QString& call, const QString& message) {
         m_callbookErrors.insert(call, message);
+        finishCallbookProfiles(call);
         if (call == m_callbookPending)
             m_callbookPending.clear();
         // Chi aspettava resta com'e': un QSO senza nome e' meglio di un QSO con
@@ -662,8 +689,16 @@ void DecoLogController::shutdown()
     m_statsLatest->fetch_add(1);
     for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool,
                               &m_countsPool, &m_backupPool, &m_linkPool,
-                              &m_importPool, &m_statsViewPool, &m_callInfoPool})
+                              &m_statsViewPool, &m_callInfoPool})
         pool->clear();
+    // A confirmed import or mutation may be queued behind an earlier scan.
+    // Do not silently discard accepted writes when the application closes.
+    // Wait while this object and all the callbacks' targets are still alive.
+    if (m_bulkProgress < 0 && m_importProgress < 0)
+        m_importPool.clear();
+    m_importPool.waitForDone();
+    // ADIF exports use QSaveFile and must also finish once accepted.
+    m_exportPool.waitForDone();
 }
 
 // Diplomi e statistiche di tutto il log, calcolati fuori dal thread della
@@ -924,7 +959,7 @@ bool DecoLogController::openDatabase(const QString& path)
         addActivity(category, text, level);
     };
     qslCtx.logChanged = [this] {
-        timed(tr("reloading the log table"), [this] { m_model->reload(); });
+        timed(tr("reloading the log table"), [this] { m_model->reloadAfterQslUpdate(); });
         emit logChanged();
     };
     m_qsl = new QslController(std::move(qslCtx), this);
@@ -961,10 +996,11 @@ bool DecoLogController::openDatabase(const QString& path)
         addActivity(category, text, level);
     };
     cardCtx.logChanged = [this] {
-        timed(tr("reloading the log table"), [this] { m_model->reload(); });
+        timed(tr("reloading the log table"), [this] { m_model->reloadAfterQslUpdate(); });
         emit logChanged();
     };
     m_cards = new QslCardController(std::move(cardCtx), this);
+    connect(this, &DecoLogController::logChanged, m_cards, &QslCardController::invalidateCache);
 
     SolarController::Context solarCtx;
     solarCtx.db = &m_db;
@@ -2097,19 +2133,20 @@ QString DecoLogController::installCountries(const QUrl& url)
     return {};
 }
 
-bool DecoLogController::applyEntity(AdifRecord& record) const
+namespace {
+bool applyEntitySnapshot(AdifRecord& record, const Countries& countries, const ClubLogCty& cty)
 {
     // Con il cty.xml di Club Log l'entita' e' quella del giorno del QSO.
-    if (!m_ctyXml.isEmpty()) {
+    if (!cty.isEmpty()) {
         const QDateTime when = QDateTime::fromString(
             LogDatabase::isoFromAdif(record.value(QStringLiteral("QSO_DATE")), record.value(QStringLiteral("TIME_ON"))),
             Qt::ISODate);
-        const CtyMatch m = m_ctyXml.lookup(record.value(QStringLiteral("CALL")), when);
+        const CtyMatch m = cty.lookup(record.value(QStringLiteral("CALL")), when);
         if (m.found) {
             const QString existing = record.value(QStringLiteral("DXCC"));
             if (!existing.isEmpty() && existing.toInt() != m.adif)
                 return false;
-            const auto e = m_countries.lookup(record.value(QStringLiteral("CALL")));
+            const auto e = countries.lookup(record.value(QStringLiteral("CALL")));
             bool changed = false;
             auto fill = [&record, &changed](const char* field, const QString& value) {
                 if (record.value(QLatin1String(field)).isEmpty() && !value.isEmpty()) {
@@ -2127,7 +2164,7 @@ bool DecoLogController::applyEntity(AdifRecord& record) const
             return changed;
         }
     }
-    const auto e = m_countries.lookup(record.value(QStringLiteral("CALL")));
+    const auto e = countries.lookup(record.value(QStringLiteral("CALL")));
     if (!e)
         return false;
     // Il DXCC decide il resto: se il QSO ne ha gia' uno diverso (una correzione
@@ -2149,6 +2186,12 @@ bool DecoLogController::applyEntity(AdifRecord& record) const
     fill("ITUZ", e->ituZone > 0 ? QString::number(e->ituZone) : QString());
     fill("CONT", e->continent);
     return changed;
+}
+} // namespace
+
+bool DecoLogController::applyEntity(AdifRecord& record) const
+{
+    return applyEntitySnapshot(record, m_countries, m_ctyXml);
 }
 
 // ── Il cty.xml di Club Log ────────────────────────────────────────────────────
@@ -2325,10 +2368,11 @@ void DecoLogController::checkEntitiesByDate()
     m_entityFixesInfo = QVariantMap{{QStringLiteral("busy"), true}};
     emit ctyChanged();
     const QString path = m_db.path();
+    const quint64 logVersion = m_logVersion;
     const ClubLogCty cty = m_ctyXml;
     const Countries countries = m_countries;
     QPointer<DecoLogController> self(this);
-    m_ctyPool.start([self, path, cty, countries] {
+    m_ctyPool.start([self, path, logVersion, cty, countries] {
         QList<EntityFix> fixes;
         QVariantList examples;
         int checked = 0;
@@ -2352,6 +2396,9 @@ void DecoLogController::checkEntitiesByDate()
                     continue;
                 EntityFix fix;
                 fix.id = q.value(0).toLongLong();
+                fix.oldDxcc = stored;
+                fix.oldCall = call;
+                fix.oldDateTime = q.value(2).toString();
                 fix.dxcc = m.adif;
                 fix.country = current && current->dxcc == m.adif ? current->name : m.name;
                 fix.cqz = m.cqz;
@@ -2372,10 +2419,18 @@ void DecoLogController::checkEntitiesByDate()
         }
         QMetaObject::invokeMethod(
             self.data(),
-            [self, fixes, examples, checked] {
+            [self, path, logVersion, fixes, examples, checked] {
                 if (!self)
                     return;
                 self->m_ctyXmlBusy = false;
+                if (self->m_db.path() != path || self->m_logVersion != logVersion) {
+                    self->m_entityFixes.clear();
+                    self->m_entityFixesInfo = {{QStringLiteral("stale"), true}};
+                    self->addActivity(QStringLiteral("DXCC"), tr("The log changed while checking entities; run the check again"),
+                                      QStringLiteral("warning"));
+                    emit self->ctyChanged();
+                    return;
+                }
                 self->m_entityFixes = fixes;
                 self->m_entityFixesInfo = QVariantMap{{QStringLiteral("count"), int(fixes.size())},
                                                       {QStringLiteral("checked"), checked},
@@ -2386,62 +2441,141 @@ void DecoLogController::checkEntitiesByDate()
     });
 }
 
+BulkEditResult DecoLogController::processDxccBatch(LogDatabase& db, bool historical,
+        const QList<EntityFix>& fixes, const Countries& countries, const ClubLogCty& cty,
+        int& requested, const std::function<void(int, int)>& progress)
+{
+    QHash<qint64, EntityFix> byId;
+    QList<qint64> ids;
+    if (historical) {
+        for (const EntityFix& fix : fixes) {
+            if (!byId.contains(fix.id)) ids << fix.id;
+            byId.insert(fix.id, fix);
+        }
+    } else {
+        ids = db.idsWithoutDxcc();
+    }
+    requested = int(ids.size());
+    return db.updateRecordsBatch(ids, historical ? QStringLiteral("dxcc-date") : QStringLiteral("edit"),
+        [historical, &byId, &countries, &cty](qint64 id, AdifRecord& record) {
+            if (!historical) return applyEntitySnapshot(record, countries, cty);
+            const EntityFix fix = byId.value(id);
+            const QString currentDate = LogDatabase::isoFromAdif(record.value(QStringLiteral("QSO_DATE")),
+                                                                  record.value(QStringLiteral("TIME_ON")));
+            // Do not apply a stale preview after an operator changed the QSO.
+            if (record.value(QStringLiteral("CALL")).compare(fix.oldCall, Qt::CaseInsensitive) != 0
+                || record.value(QStringLiteral("DXCC")).toInt() != fix.oldDxcc
+                || QDateTime::fromString(currentDate, Qt::ISODate) != QDateTime::fromString(fix.oldDateTime, Qt::ISODate))
+                return false;
+            record.set(QStringLiteral("DXCC"), QString::number(fix.dxcc));
+            record.set(QStringLiteral("COUNTRY"), fix.country);
+            if (fix.cqz > 0) record.set(QStringLiteral("CQZ"), QString::number(fix.cqz));
+            if (!fix.cont.isEmpty()) record.set(QStringLiteral("CONT"), fix.cont);
+            return true;
+        }, progress);
+}
+
+int DecoLogController::finishDxccBatch(bool historical, const BulkEditResult& result, int requested,
+                                        const QString& version)
+{
+    if (historical) {
+        const QSet<qint64> changed(result.changedIds.cbegin(), result.changedIds.cend());
+        m_entityFixes.erase(std::remove_if(m_entityFixes.begin(), m_entityFixes.end(),
+                                           [&changed](const EntityFix& fix) { return changed.contains(fix.id); }),
+                            m_entityFixes.end());
+        m_entityFixesInfo[QStringLiteral("count")] = int(m_entityFixes.size());
+        m_entityFixesInfo[QStringLiteral("examples")] = QVariantList{};
+        emit ctyChanged();
+    }
+    addActivity(QStringLiteral("DXCC"),
+                tr("DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)")
+                    .arg(result.changed).arg(requested).arg(result.unchanged).arg(result.failed).arg(version),
+                result.failed ? QStringLiteral("warning") : result.changed ? QStringLiteral("success") : QStringLiteral("info"));
+    for (const QString& error : result.errors) addActivity(QStringLiteral("DXCC"), error, QStringLiteral("error"));
+    if (result.changed > 0) {
+        m_model->reloadAfterQslUpdate();
+        m_awardsDirty = m_globalAwardsDirty = true;
+        emit awardsChanged();
+        emit logChanged();
+        m_decoLink.resendSnapshot();
+        refreshCallInfo();
+    }
+    emit dxccBatchFinished(historical, result.changed, result.failed);
+    return result.changed;
+}
+
 int DecoLogController::applyEntityFixes()
 {
-    if (m_entityFixes.isEmpty())
-        return 0;
-    int done = 0;
-    QSqlDatabase db = m_db.connection();
-    const bool transaction = db.transaction();
-    for (const EntityFix& fix : std::as_const(m_entityFixes)) {
-        auto r = m_db.record(fix.id);
-        if (!r)
-            continue;
-        r->set(QStringLiteral("DXCC"), QString::number(fix.dxcc));
-        r->set(QStringLiteral("COUNTRY"), fix.country);
-        if (fix.cqz > 0)
-            r->set(QStringLiteral("CQZ"), QString::number(fix.cqz));
-        if (!fix.cont.isEmpty())
-            r->set(QStringLiteral("CONT"), fix.cont);
-        if (m_db.updateQso(fix.id, *r, -1, QStringLiteral("dxcc-date")).status == InsertResult::Status::Inserted)
-            ++done;
-    }
-    if (transaction)
-        db.commit();
-    m_entityFixes.clear();
-    m_entityFixesInfo.clear();
-    addActivity(QStringLiteral("DXCC"), tr("Entity of %n QSO(s) corrected with the date of the QSO (Club Log)", nullptr, done),
-                done > 0 ? QStringLiteral("success") : QStringLiteral("info"));
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
-    m_awardsDirty = m_globalAwardsDirty = true;
-    emit awardsChanged();
-    emit logChanged();
-    m_decoLink.resendSnapshot();
-    emit ctyChanged();
-    return done;
+    if (m_bulkProgress >= 0 || !m_db.isOpen() || m_entityFixes.isEmpty()) return 0;
+    int requested = 0;
+    const auto result = processDxccBatch(m_db, true, m_entityFixes, m_countries, m_ctyXml, requested);
+    return finishDxccBatch(true, result, requested, m_ctyXml.date().date().toString(Qt::ISODate));
 }
 
 int DecoLogController::fillMissingDxcc()
 {
-    int filled = 0;
-    const QList<qint64> ids = m_db.idsWithoutDxcc();
-    // Una revisione per QSO, ognuna nella sua transazione: se un record non si
-    // puo' salvare, gli altri non ne risentono.
-    for (qint64 id : ids) {
-        auto r = m_db.record(id);
-        if (!r || !applyEntity(*r))
-            continue;
-        if (m_db.updateQso(id, *r).status == InsertResult::Status::Inserted)
-            ++filled;
+    if (m_bulkProgress >= 0 || !m_db.isOpen()) return 0;
+    int requested = 0;
+    const auto result = processDxccBatch(m_db, false, {}, m_countries, m_ctyXml, requested);
+    return finishDxccBatch(false, result, requested, m_countries.version());
+}
+
+bool DecoLogController::applyEntityFixesAsync() { return startDxccBatch(true); }
+bool DecoLogController::fillMissingDxccAsync() { return startDxccBatch(false); }
+
+bool DecoLogController::startDxccBatch(bool historical)
+{
+    if (m_bulkProgress >= 0 || m_ctyXmlBusy || !m_db.isOpen() || (historical && m_entityFixes.isEmpty())) return false;
+    const QString path = m_db.path();
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        if (historical) applyEntityFixes(); else fillMissingDxcc();
+        return true;
     }
-    addActivity(QStringLiteral("LOG"), tr("DXCC filled on %1 of %2 QSO (cty.csv %3)")
-                                           .arg(filled).arg(ids.size()).arg(m_countries.version()),
-                filled > 0 ? QStringLiteral("success") : QStringLiteral("info"));
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
-    emit logChanged();
-    m_decoLink.resendSnapshot();
-    refreshCallInfo();
-    return filled;
+    const QList<EntityFix> fixes = historical ? m_entityFixes : QList<EntityFix>{};
+    const Countries countries = m_countries;
+    const ClubLogCty cty = m_ctyXml;
+    const QString version = historical ? cty.date().date().toString(Qt::ISODate) : countries.version();
+    m_bulkProgress = 0;
+    emit bulkChanged();
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, path, historical, fixes, countries, cty, version] {
+        LogDatabase db;
+        BulkEditResult result;
+        int requested = 0;
+        if (!db.open(path)) {
+            result.failed = historical ? int(fixes.size()) : 1;
+            requested = result.failed;
+            result.errors << db.lastError();
+        } else {
+            int lastPercent = -1;
+            result = processDxccBatch(db, historical, fixes, countries, cty, requested,
+                [self, &lastPercent](int done, int total) {
+                    const int percent = total ? done * 100 / total : 100;
+                    if (percent == lastPercent) return;
+                    lastPercent = percent;
+                    if (!self) return;
+                    QMetaObject::invokeMethod(self.data(), [self, percent] {
+                        if (!self) return;
+                        self->m_bulkProgress = percent / 100.0;
+                        emit self->bulkChanged();
+                    }, Qt::QueuedConnection);
+                });
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, historical, version, result, requested] {
+            if (!self) return;
+            self->m_bulkProgress = -1;
+            emit self->bulkChanged();
+            if (!self->m_db.isOpen() || self->m_db.path() != path) {
+                self->addActivity(QStringLiteral("DXCC"),
+                                  tr("A background log change finished on a log that is no longer open"),
+                                  QStringLiteral("warning"));
+                return;
+            }
+            self->finishDxccBatch(historical, result, requested, version);
+        }, Qt::QueuedConnection);
+    });
+    return true;
 }
 
 // ── Award ─────────────────────────────────────────────────────────────────────
@@ -4015,11 +4149,14 @@ QString DecoLogController::editQsoField(qint64 id, const QString& columnKey, con
     return saveRecord(id, *record, -1);
 }
 
-QString DecoLogController::saveQso(qint64 id, const QVariantMap& fields, qint64 stationProfileId)
+QString DecoLogController::saveQso(qint64 id, const QVariantMap& fields, qint64 stationProfileId,
+                                   const QStringList& touchedFields)
 {
     AdifRecord r;
     for (auto it = fields.cbegin(); it != fields.cend(); ++it)
         r.set(it.key(), it.value().toString().trimmed());
+    if (const auto current = m_db.record(id))
+        LogDatabase::mergeUneditedQslFields(r, *current, QSet<QString>(touchedFields.cbegin(), touchedFields.cend()));
     return saveRecord(id, r, stationProfileId);
 }
 
@@ -4053,7 +4190,7 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
     }
     // Dove il QSO si puo' correggere (CRX), la correzione va anche li'.
     timed(tr("Queueing the remote edit"), [&] { m_db.queueRemoteEdit(id); });
-    timed(tr("Queueing automatic QSL"), [&] { m_qsl->qsoLogged(id); });
+    timed(tr("Queueing automatic QSL"), [&] { m_qsl->qsoEdited(id); });
     const auto meta = m_db.meta(id);
     const int revision = meta ? meta->revision : 0;
     addActivity(QStringLiteral("LOG"),
@@ -4155,10 +4292,13 @@ int DecoLogController::resendQsosViaUdp(const QVariantList& ids)
     }
 
     QList<qint64> uniqueIds;
+    QSet<qint64> seenIds;
     for (const QVariant& value : ids) {
         const qint64 id = value.toLongLong();
-        if (id > 0 && !uniqueIds.contains(id))
+        if (id > 0 && !seenIds.contains(id)) {
             uniqueIds.append(id);
+            seenIds.insert(id);
+        }
     }
 
     int resent = 0;
@@ -4181,6 +4321,60 @@ int DecoLogController::resendQsosViaUdp(const QVariantList& ids)
     return resent;
 }
 
+bool DecoLogController::resendQsosViaUdpAsync(const QVariantList& values)
+{
+    if (m_udpResendActive) {
+        addActivity(QStringLiteral("UDP"), tr("A UDP resend is already in progress"), QStringLiteral("warning"));
+        return false;
+    }
+    if (!m_db.isOpen() || m_udp.forwardTargets().isEmpty()) {
+        addActivity(QStringLiteral("UDP"), tr("QSO not sent: configure a UDP forwarding destination first"),
+                    QStringLiteral("warning"));
+        return false;
+    }
+    struct Job { QList<qint64> ids; int next{0}; int sent{0}; int datagrams{0}; QString path; };
+    auto job = std::make_shared<Job>();
+    QSet<qint64> seen;
+    for (const QVariant& value : values) {
+        const qint64 id = value.toLongLong();
+        if (id > 0 && !seen.contains(id)) { seen.insert(id); job->ids << id; }
+    }
+    if (job->ids.isEmpty()) return false;
+    job->path = m_db.path();
+    m_udpResendActive = true;
+    emit udpChanged();
+    auto* timer = new QTimer(this);
+    timer->setInterval(0);
+    connect(timer, &QTimer::timeout, this, [this, timer, job] {
+        QElapsedTimer slice; slice.start();
+        while (job->next < job->ids.size() && slice.elapsed() < 8
+               && m_db.isOpen() && m_db.path() == job->path && !m_udp.forwardTargets().isEmpty()) {
+            const qint64 id = job->ids.at(job->next++);
+            const auto record = m_db.record(id);
+            if (!record) continue;
+            const int sent = broadcastN1mmQso(*record, id, false);
+            if (sent > 0) { ++job->sent; job->datagrams += sent; }
+        }
+        if (job->next < job->ids.size() && m_db.isOpen() && m_db.path() == job->path
+            && !m_udp.forwardTargets().isEmpty()) return;
+        timer->stop();
+        timer->deleteLater();
+        m_udpResendActive = false;
+        emit udpChanged();
+        if (job->next < job->ids.size()) {
+            addActivity(QStringLiteral("UDP"), tr("UDP resend stopped after %1 of %2 QSO")
+                        .arg(job->sent).arg(job->ids.size()), QStringLiteral("warning"));
+            return;
+        }
+        addActivity(QStringLiteral("UDP"),
+                    job->sent > 0 ? tr("Resent %n QSO via UDP (%1 datagram(s))", nullptr, job->sent).arg(job->datagrams)
+                                  : tr("No selected QSO was sent via UDP"),
+                    job->sent > 0 ? QStringLiteral("success") : QStringLiteral("warning"));
+    });
+    timer->start();
+    return true;
+}
+
 bool DecoLogController::deleteQso(qint64 id)
 {
     return deleteQsos({QVariant::fromValue(id)}) == 1;
@@ -4191,24 +4385,31 @@ int DecoLogController::deleteQsos(const QVariantList& ids)
 {
     int done = 0;
     QString lastCall;
+    QList<qint64> removedIds;
+    QStringList pendingServices;
     for (const auto& value : ids) {
         const qint64 id = value.toLongLong();
         const auto record = m_db.record(id);
         if (!m_db.softDeleteQso(id))
             continue;
         ++done;
-        // Anche la cancellazione, dove si puo' (CRX), parte da sola.
-        m_qsl->qsoLogged(id);
+        removedIds << id;
+        for (const QslState& state : m_db.qslStatus(id)) {
+            if (LogDatabase::editableServices().contains(state.service) && state.sent == QLatin1String("D")
+                && !state.remoteId.isEmpty() && !pendingServices.contains(state.service))
+                pendingServices << state.service;
+        }
         if (record)
             lastCall = record->value(QStringLiteral("CALL"));
     }
     if (done == 0)
         return 0;
+    m_qsl->scheduleAutomaticServices(pendingServices);
     addActivity(QStringLiteral("LOG"),
                 done == 1 ? tr("Deleted %1 (kept in history)").arg(lastCall)
                           : tr("Deleted %1 QSO (kept in history)").arg(done),
                 QStringLiteral("warning"));
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
+    timed(tr("reloading the log table"), [this, &removedIds] { m_model->removeDeletedIds(removedIds); });
     emit logChanged();
     m_decoLink.resendSnapshot();
     refreshCallInfo();
@@ -4221,9 +4422,9 @@ QString DecoLogController::restoreRevision(qint64 id, qint64 historyId)
     if (res.status != InsertResult::Status::Inserted)
         return res.message;
     m_db.queueRemoteEdit(id);
-    m_qsl->qsoLogged(id);
+    m_qsl->qsoEdited(id);
     addActivity(QStringLiteral("LOG"), tr("Restored an earlier revision of QSO #%1").arg(id), QStringLiteral("success"));
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
+    timed(tr("reloading the log table"), [this, id] { m_model->reloadAfterEdit(id); });
     emit logChanged();
     m_decoLink.resendSnapshot();
     refreshCallInfo();
@@ -4246,10 +4447,102 @@ int DecoLogController::tagQsos(const QVariantList& ids, const QString& tag, bool
                     : tr("Tag \"%1\" removed from %2 QSO").arg(clean).arg(changed),
                 changed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     if (changed > 0) {
-        timed(tr("reloading the log table"), [this] { m_model->reload(); });
+        timed(tr("reloading the log table"), [this] { m_model->reloadAfterQslUpdate(); });
         emit logChanged();
     }
     return changed;
+}
+
+bool DecoLogController::deleteQsosAsync(const QVariantList& ids)
+{
+    return startLogMutation(ids, {}, false, true);
+}
+
+bool DecoLogController::tagQsosAsync(const QVariantList& ids, const QString& tag, bool add)
+{
+    return startLogMutation(ids, tag, add, false);
+}
+
+bool DecoLogController::startLogMutation(const QVariantList& values, const QString& tag, bool add, bool deleting)
+{
+    if (m_bulkProgress >= 0) {
+        addActivity(QStringLiteral("LOG"), tr("A change on many QSO is already running: wait for it to finish."),
+                    QStringLiteral("warning"));
+        return false;
+    }
+    QList<qint64> ids;
+    QSet<qint64> seen;
+    for (const auto& value : values) {
+        const qint64 id = value.toLongLong();
+        if (id > 0 && !seen.contains(id)) { ids << id; seen.insert(id); }
+    }
+    const QString clean = tag.simplified().remove(QLatin1Char(','));
+    if (ids.isEmpty() || (!deleting && clean.isEmpty()) || !m_db.isOpen()) return false;
+    const QString path = m_db.path();
+    // An in-memory SQLite database cannot be opened by a worker connection.
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        if (deleting) deleteQsos(values); else tagQsos(values, clean, add);
+        return true;
+    }
+    m_bulkProgress = 0;
+    emit bulkChanged();
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, path, ids, clean, add, deleting] {
+        LogDatabase db;
+        BulkEditResult result;
+        if (!db.open(path)) {
+            result.failed = int(ids.size());
+            result.errors << db.lastError();
+        } else {
+            int lastPercent = -1;
+            auto progress = [self, &lastPercent](int done, int total) {
+                const int percent = total ? (done * 100 / total) : 100;
+                if (percent == lastPercent) return;
+                lastPercent = percent;
+                if (!self) return;
+                QMetaObject::invokeMethod(self.data(), [self, percent] {
+                    if (!self) return;
+                    self->m_bulkProgress = percent / 100.0;
+                    emit self->bulkChanged();
+                }, Qt::QueuedConnection);
+            };
+            result = deleting ? db.softDeleteBatch(ids, progress) : db.setTagBatch(ids, clean, add, progress);
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, clean, add, deleting, result] {
+            if (!self) return;
+            self->m_bulkProgress = -1;
+            emit self->bulkChanged();
+            if (!self->m_db.isOpen() || self->m_db.path() != path) {
+                self->addActivity(QStringLiteral("LOG"),
+                                  tr("A background log change finished on a log that is no longer open"),
+                                  QStringLiteral("warning"));
+                return;
+            }
+            self->addActivity(QStringLiteral("LOG"),
+                deleting ? tr("Deleted %1 QSO (kept in history); %2 failed").arg(result.changed).arg(result.failed)
+                         : add ? tr("Tag \"%1\" added to %2 QSO (%3 unchanged, %4 failed)")
+                                      .arg(clean).arg(result.changed).arg(result.unchanged).arg(result.failed)
+                               : tr("Tag \"%1\" removed from %2 QSO (%3 unchanged, %4 failed)")
+                                      .arg(clean).arg(result.changed).arg(result.unchanged).arg(result.failed),
+                result.failed ? QStringLiteral("warning") : result.changed ? QStringLiteral("success") : QStringLiteral("info"));
+            for (const QString& error : result.errors)
+                self->addActivity(QStringLiteral("LOG"), error, QStringLiteral("error"));
+            if (!result.changed) return;
+            if (deleting) {
+                self->m_qsl->scheduleAutomaticServices(result.pendingServices);
+                self->m_model->removeDeletedIds(result.changedIds);
+            } else {
+                self->m_model->reloadAfterQslUpdate();
+            }
+            emit self->logChanged();
+            if (deleting) {
+                self->m_decoLink.resendSnapshot();
+                self->refreshCallInfo();
+            }
+        }, Qt::QueuedConnection);
+    });
+    return true;
 }
 
 // ── Lavori sul log: modifica in blocco, doppioni ─────────────────────────────
@@ -4333,15 +4626,16 @@ void DecoLogController::bulkEdit(const QVariantList& ids, const QString& field, 
         return;
     }
     const QString dbPath = m_db.path();
+    const QStringList automaticServices = m_qsl->enabledAutomaticServices();
     // Un log di prova in memoria non si apre da un altro filo.
     if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:")) {
-        finishBulk(field, value, m_db.bulkEdit(list, field, value, onlyEmpty));
+        finishBulk(field, value, m_db.bulkEdit(list, field, value, onlyEmpty, {}, automaticServices));
         return;
     }
     m_bulkProgress = 0;
     emit bulkChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, list, field, value, onlyEmpty] {
+    m_importPool.start([self, dbPath, list, field, value, onlyEmpty, automaticServices] {
         LogDatabase db;
         BulkEditResult result;
         if (!db.open(dbPath)) {
@@ -4358,12 +4652,20 @@ void DecoLogController::bulkEdit(const QVariantList& ids, const QString& field, 
                         emit self->bulkChanged();
                     },
                     Qt::QueuedConnection);
-            });
+            }, automaticServices);
         }
         QMetaObject::invokeMethod(
-            self.data(), [self, field, value, result] {
-                if (self)
-                    self->finishBulk(field, value, result);
+            self.data(), [self, dbPath, field, value, result] {
+                if (!self) return;
+                if (!self->m_db.isOpen() || self->m_db.path() != dbPath) {
+                    self->m_bulkProgress = -1;
+                    emit self->bulkChanged();
+                    self->addActivity(QStringLiteral("LOG"),
+                        self->tr("A background log change finished on a log that is no longer open"),
+                        QStringLiteral("warning"));
+                    return;
+                }
+                self->finishBulk(field, value, result);
             },
             Qt::QueuedConnection);
     });
@@ -4392,12 +4694,10 @@ void DecoLogController::finishBulk(const QString& field, const QString& value, c
         addActivity(QStringLiteral("LOG"), e, QStringLiteral("error"));
     if (r.changed == 0)
         return;
-    // Dove il QSO si puo' correggere (CRX), la correzione va anche li'.
-    for (const qint64 id : r.changedIds) {
-        m_db.queueRemoteEdit(id);
-        m_qsl->qsoLogged(id);
-    }
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
+    // Remote edits were queued with each committed batch in the worker.
+    // Wake only services that have an edited contact actually pending.
+    m_qsl->scheduleAutomaticServices(r.pendingServices);
+    timed(tr("reloading the log table"), [this] { m_model->reloadAfterQslUpdate(); });
     m_awardsDirty = m_globalAwardsDirty = true;
     emit awardsChanged();
     emit logChanged();
@@ -4467,7 +4767,7 @@ QVariantList describeDuplicates(const LogDatabase& db, int windowSeconds, bool* 
 
 void DecoLogController::findDuplicates(int windowMinutes)
 {
-    if (m_duplicates.value(QStringLiteral("busy")).toBool())
+    if (m_duplicates.value(QStringLiteral("busy")).toBool() || m_bulkProgress >= 0)
         return;
     const int minutes = std::clamp(windowMinutes, 1, 24 * 60);
     m_duplicates = {{QStringLiteral("busy"), true}, {QStringLiteral("windowMinutes"), minutes},
@@ -4503,72 +4803,122 @@ void DecoLogController::findDuplicates(int windowMinutes)
     });
 }
 
-int DecoLogController::mergeDuplicates(const QVariantList& groups)
+namespace {
+QList<MergeGroup> mergeGroups(const QVariantList& groups)
 {
-    int merged = 0;
-    int removed = 0;
-    QStringList errors;
-    QList<qint64> kept;
-    QList<qint64> gone;
-    QSqlDatabase db = m_db.connection();
-    const bool transaction = db.transaction();
+    QList<MergeGroup> out;
     for (const QVariant& g : groups) {
         const QVariantMap m = g.toMap();
-        const qint64 keep = m.value(QStringLiteral("keep")).toLongLong();
-        QList<qint64> others;
+        MergeGroup group;
+        group.keep = m.value(QStringLiteral("keep")).toLongLong();
         for (const QVariant& v : m.value(QStringLiteral("ids")).toList()) {
-            if (v.toLongLong() != keep && v.toLongLong() > 0)
-                others << v.toLongLong();
+            if (v.toLongLong() != group.keep && v.toLongLong() > 0)
+                group.others << v.toLongLong();
         }
-        if (keep <= 0 || others.isEmpty())
-            continue;
-        const InsertResult r = m_db.mergeQsos(keep, others);
-        if (r.status != InsertResult::Status::Inserted) {
-            if (errors.size() < 5)
-                errors << tr("QSO #%1: %2").arg(keep).arg(r.message);
-            continue;
-        }
-        ++merged;
-        removed += int(others.size());
-        kept << keep;
-        gone << others;
+        if (group.keep > 0 && !group.others.isEmpty()) out << group;
     }
-    if (transaction)
-        db.commit();
-    for (const QString& e : errors)
+    return out;
+}
+} // namespace
+
+int DecoLogController::finishMergeBatch(const MergeBatchResult& result)
+{
+    for (const QString& e : result.errors)
         addActivity(QStringLiteral("LOG"), e, QStringLiteral("error"));
-    if (merged == 0)
+    if (result.keptIds.isEmpty()) {
+        if (result.failed)
+            addActivity(QStringLiteral("LOG"), tr("Could not merge %1 duplicate group(s)").arg(result.failed),
+                        QStringLiteral("warning"));
         return 0;
-    for (const qint64 id : std::as_const(kept)) {
-        m_db.queueRemoteEdit(id);
-        m_qsl->qsoLogged(id);
     }
-    // Anche la cancellazione, dove si puo' (CRX), parte da sola.
-    for (const qint64 id : std::as_const(gone))
-        m_qsl->qsoLogged(id);
-    // Dalla lista restano i gruppi non uniti.
+    m_qsl->scheduleAutomaticServices(result.pendingServices);
+    const QSet<qint64> removed(result.removedIds.cbegin(), result.removedIds.cend());
     QVariantList left;
     for (const QVariant& g : m_duplicates.value(QStringLiteral("groups")).toList()) {
-        if (!kept.contains(g.toMap().value(QStringLiteral("keep")).toLongLong()))
-            left << g;
+        bool merged = false;
+        for (const QVariant& row : g.toMap().value(QStringLiteral("rows")).toList())
+            merged |= removed.contains(row.toMap().value(QStringLiteral("id")).toLongLong());
+        if (!merged) left << g;
     }
     m_duplicates[QStringLiteral("groups")] = left;
     emit duplicatesChanged();
     addActivity(QStringLiteral("LOG"),
-                tr("Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)").arg(merged).arg(removed),
-                QStringLiteral("success"));
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
+                tr("Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed")
+                    .arg(result.keptIds.size()).arg(result.removedIds.size()).arg(result.failed),
+                result.failed ? QStringLiteral("warning") : QStringLiteral("success"));
+    m_model->removeDeletedIds(result.removedIds);
     m_awardsDirty = m_globalAwardsDirty = true;
     emit awardsChanged();
     emit logChanged();
     m_decoLink.resendSnapshot();
     refreshCallInfo();
-    return merged;
+    return int(result.keptIds.size());
+}
+
+int DecoLogController::mergeDuplicates(const QVariantList& groups)
+{
+    if (m_bulkProgress >= 0 || !m_db.isOpen()) return 0;
+    return finishMergeBatch(m_db.mergeBatch(mergeGroups(groups), m_qsl->enabledAutomaticServices()));
+}
+
+bool DecoLogController::mergeDuplicatesAsync(const QVariantList& values)
+{
+    if (m_bulkProgress >= 0 || m_duplicates.value(QStringLiteral("busy")).toBool()) return false;
+    const QList<MergeGroup> groups = mergeGroups(values);
+    if (groups.isEmpty() || !m_db.isOpen()) return false;
+    const QString path = m_db.path();
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        mergeDuplicates(values);
+        return true;
+    }
+    const QStringList automatic = m_qsl->enabledAutomaticServices();
+    m_bulkProgress = 0;
+    m_duplicates[QStringLiteral("merging")] = true;
+    emit bulkChanged();
+    emit duplicatesChanged();
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, path, groups, automatic] {
+        LogDatabase db;
+        MergeBatchResult result;
+        if (!db.open(path)) {
+            result.failed = int(groups.size());
+            result.errors << db.lastError();
+        } else {
+            int lastPercent = -1;
+            result = db.mergeBatch(groups, automatic, [self, &lastPercent](int done, int total) {
+                const int percent = total ? done * 100 / total : 100;
+                if (percent == lastPercent) return;
+                lastPercent = percent;
+                if (!self) return;
+                QMetaObject::invokeMethod(self.data(), [self, percent] {
+                    if (!self) return;
+                    self->m_bulkProgress = percent / 100.0;
+                    emit self->bulkChanged();
+                }, Qt::QueuedConnection);
+            });
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, result] {
+            if (!self) return;
+            self->m_bulkProgress = -1;
+            self->m_duplicates[QStringLiteral("merging")] = false;
+            emit self->bulkChanged();
+            emit self->duplicatesChanged();
+            if (!self->m_db.isOpen() || self->m_db.path() != path) {
+                self->addActivity(QStringLiteral("LOG"),
+                                  tr("A background log change finished on a log that is no longer open"),
+                                  QStringLiteral("warning"));
+                return;
+            }
+            self->finishMergeBatch(result);
+        }, Qt::QueuedConnection);
+    });
+    return true;
 }
 
 void DecoLogController::clearDuplicates()
 {
-    if (m_duplicates.value(QStringLiteral("busy")).toBool())
+    if (m_duplicates.value(QStringLiteral("busy")).toBool() || m_bulkProgress >= 0)
         return;
     m_duplicates.clear();
     emit duplicatesChanged();
@@ -4866,7 +5216,7 @@ bool DecoLogController::undoQsoEnrichment(qint64 qsoId, const QString& field)
 {
     if (!m_db.undoEnrichment(qsoId, field))
         return false;
-    m_model->refreshQso(qsoId);
+    m_model->reloadAfterEdit(qsoId);
     emit logChanged();
     return true;
 }
@@ -4879,19 +5229,11 @@ void DecoLogController::exportAdif(const QUrl& url)
 void DecoLogController::exportInBackground(const QList<qint64>& ids, bool all, const QString& path,
                                            const std::optional<std::pair<QString, QString>>& period)
 {
-    {
-        QFile probe(path);
-        if (!probe.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            addActivity(QStringLiteral("EXPORT"), tr("Cannot write %1: %2").arg(path, probe.errorString()),
-                        QStringLiteral("error"));
-            return;
-        }
-    }
     const QString dbPath = m_db.path();
     const QString programVersion = version();
     // Un log di prova in memoria non si apre da un altro filo: li' si scrive qui.
     if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:")) {
-        QFile file(path);
+        QSaveFile file(path);
         const QList<qint64> chosen = period ? m_db.qsoIdsBetween(period->first, period->second) : ids;
         if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             addActivity(QStringLiteral("EXPORT"), tr("Cannot write %1: %2").arg(path, file.errorString()),
@@ -4899,7 +5241,7 @@ void DecoLogController::exportInBackground(const QList<qint64>& ids, bool all, c
             return;
         }
         const QByteArray data = all ? m_db.exportAdif(programVersion) : m_db.exportAdif(chosen, programVersion);
-        if (file.write(data) != data.size()) {
+        if (file.write(data) != data.size() || !file.commit()) {
             addActivity(QStringLiteral("EXPORT"), tr("Cannot write %1: %2").arg(path, file.errorString()),
                         QStringLiteral("error"));
             return;
@@ -4910,13 +5252,15 @@ void DecoLogController::exportInBackground(const QList<qint64>& ids, bool all, c
         return;
     }
     addActivity(QStringLiteral("EXPORT"), tr("Exporting to %1…").arg(QFileInfo(path).fileName()));
+    ++m_exportsPending;
+    emit exportBusyChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, programVersion, ids, all, path, period] {
+    m_exportPool.start([self, dbPath, programVersion, ids, all, path, period] {
         QString error;
         int count = 0;
         {
             LogDatabase db;
-            QFile file(path);
+            QSaveFile file(path);
             if (!db.open(dbPath)) {
                 error = db.lastError();
             } else if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -4925,14 +5269,18 @@ void DecoLogController::exportInBackground(const QList<qint64>& ids, bool all, c
                 const QList<qint64> chosen = period ? db.qsoIdsBetween(period->first, period->second) : ids;
                 count = all ? db.qsoCount() : static_cast<int>(chosen.size());
                 const QByteArray data = all ? db.exportAdif(programVersion) : db.exportAdif(chosen, programVersion);
-                if (file.write(data) != data.size())
+                if (file.write(data) != data.size() || !file.commit())
                     error = file.errorString();
             }
         }
+        if (!self)
+            return;
         QMetaObject::invokeMethod(
             self.data(), [self, path, error, count] {
                 if (!self)
                     return;
+                --self->m_exportsPending;
+                emit self->exportBusyChanged();
                 if (error.isEmpty())
                     self->addActivity(QStringLiteral("EXPORT"), tr("%n QSO → %1", nullptr, count).arg(path),
                                       QStringLiteral("success"));
@@ -6848,9 +7196,68 @@ void DecoLogController::setLookupCall(const QString& call)
     if (c == m_lookupCall)
         return;
     m_lookupCall = c;
+    m_primaryProfileAttempted.clear();
+    updateCallbookProfiles();
     refreshCallInfo();
     if (m_callbook.provider() != CallbookClient::Provider::None)
         m_callbookDebounce.start();
+}
+
+void DecoLogController::updateCallbookProfiles()
+{
+    const QString call = m_lookupCall;
+    const auto found = m_callbookResults.constFind(call);
+    const bool cached = found != m_callbookResults.constEnd();
+    struct Profile { const char* id; const char* source; CallbookClient::Provider provider; CallbookProfileVerifier* verifier; };
+    const Profile profiles[] = {{"qrz", "QRZ.com", CallbookClient::Provider::Qrz, &m_qrzProfile},
+                                {"hamqth", "HamQTH", CallbookClient::Provider::HamQth, &m_hamqthProfile}};
+    for (const auto& profile : profiles) {
+        const QString service = QLatin1String(profile.id);
+        const bool hasCredential = m_credentials && m_credentials->hasSecret(service)
+                                   && !m_credentials->account(service).isEmpty();
+        // A merged record retains the primary provider's callsign only.
+        const bool cachedPrimary = cached && found->value(QStringLiteral("source")).toString().startsWith(QLatin1String(profile.source));
+        const bool independent = hasCredential && !cachedPrimary
+                                 && m_callbook.provider() != profile.provider
+                                 && (m_callbook.provider() == CallbookClient::Provider::None || cached);
+        profile.verifier->setCall(call, independent);
+        if (cachedPrimary) {
+            const QString returned = found->value(QStringLiteral("call")).toString();
+            if (returned.trimmed().compare(call, Qt::CaseInsensitive) == 0)
+                profile.verifier->observeVerified(call, returned);
+            else
+                profile.verifier->observeUnverified(call);
+        } else if (!hasCredential || (cached && m_callbook.provider() == profile.provider)) {
+            profile.verifier->observeUnverified(call);
+        }
+    }
+}
+
+void DecoLogController::finishCallbookProfiles(const QString& call)
+{
+    if (call != m_lookupCall) return;
+    const auto cached = m_callbookResults.constFind(call);
+    struct Profile { const char* id; const char* source; CallbookClient::Provider provider; CallbookProfileVerifier* verifier; };
+    const Profile profiles[] = {{"qrz", "QRZ.com", CallbookClient::Provider::Qrz, &m_qrzProfile},
+                                {"hamqth", "HamQTH", CallbookClient::Provider::HamQth, &m_hamqthProfile}};
+    for (const auto& profile : profiles) {
+        const QString service = QLatin1String(profile.id);
+        if (m_primaryProfileAttempted.contains(service) || profile.verifier->state() == QLatin1String("available"))
+            continue;
+        if (cached != m_callbookResults.constEnd()
+            && cached->value(QStringLiteral("source")).toString().startsWith(QLatin1String(profile.source))) {
+            const QString returned = cached->value(QStringLiteral("call")).toString();
+            if (returned.trimmed().compare(call, Qt::CaseInsensitive) == 0)
+                profile.verifier->observeVerified(call, returned);
+            else
+                profile.verifier->observeUnverified(call);
+        } else if (m_callbook.provider() != profile.provider && m_credentials->hasSecret(service)
+                   && !m_credentials->account(service).isEmpty()) {
+            profile.verifier->setCall(call, true);
+        } else {
+            profile.verifier->observeUnverified(call);
+        }
+    }
 }
 
 void DecoLogController::requestCallbook()
@@ -6876,6 +7283,8 @@ void DecoLogController::setCallbookProvider(const QString& id)
     m_callbookResults.clear();
     m_callbookErrors.clear();
     m_callbookStatus.clear();
+    m_primaryProfileAttempted.clear();
+    updateCallbookProfiles();
     QSettings().setValue(QStringLiteral("callbook/provider"), CallbookClient::providerId(provider));
     emit callbookChanged();
     refreshCallInfo();
@@ -6921,6 +7330,53 @@ int DecoLogController::completeQsoFromCallbook(qint64 id)
 
 int DecoLogController::completeShownFromCallbook()
 {
+    const QString path = m_db.path();
+    if (!m_db.isOpen() || m_callbook.provider() == CallbookClient::Provider::None)
+        return 0;
+    if (!path.isEmpty() && path != QLatin1String(":memory:")) {
+        const QVariantList shown = m_model->shownIds();
+        const quint64 generation = ++m_callbookScanGeneration;
+        m_callbookScanPending = true;
+        emit callbookChanged();
+        QPointer<DecoLogController> self(this);
+        m_importPool.start([self, path, shown, generation] {
+            QList<qint64> ids;
+            QString error;
+            LogDatabase db;
+            if (!db.open(path)) {
+                error = db.lastError();
+            } else {
+                QSet<QString> seen;
+                for (const QVariant& value : shown) {
+                    const qint64 id = value.toLongLong();
+                    const auto record = db.record(id);
+                    if (!record || (!record->value(QStringLiteral("NAME")).isEmpty()
+                                    && !record->value(QStringLiteral("GRIDSQUARE")).isEmpty()))
+                        continue;
+                    const QString call = record->value(QStringLiteral("CALL")).toUpper();
+                    if (call.isEmpty() || seen.contains(call))
+                        continue;
+                    seen.insert(call);
+                    ids << id;
+                    if (ids.size() >= 50)
+                        break;
+                }
+            }
+            if (!self) return;
+            QMetaObject::invokeMethod(self.data(), [self, path, generation, ids, error] {
+                if (!self || generation != self->m_callbookScanGeneration) return;
+                self->m_callbookScanPending = false;
+                emit self->callbookChanged();
+                if (!self->m_db.isOpen() || self->m_db.path() != path) return;
+                if (!error.isEmpty()) {
+                    self->addActivity(QStringLiteral("CALLBOOK"), error, QStringLiteral("error"));
+                    return;
+                }
+                self->enqueueCallbook(ids);
+            }, Qt::QueuedConnection);
+        });
+        return 0; // The count is reported when the asynchronous scan completes.
+    }
     // Le righe che si stanno guardando, non tutto il log: una ricerca per
     // nominativo costa, e l'abbonamento ha un limite.
     int asked = 0;
@@ -6954,6 +7410,38 @@ int DecoLogController::completeShownFromCallbook()
 
 int DecoLogController::completeMissingFromCallbook()
 {
+    const QString path = m_db.path();
+    if (!m_db.isOpen() || m_callbook.provider() == CallbookClient::Provider::None)
+        return 0;
+    if (!path.isEmpty() && path != QLatin1String(":memory:")) {
+        const quint64 generation = ++m_callbookScanGeneration;
+        m_callbookScanPending = true;
+        emit callbookChanged();
+        QPointer<DecoLogController> self(this);
+        m_importPool.start([self, path, generation] {
+            LogDatabase db;
+            QList<qint64> ids;
+            QString error;
+            if (db.open(path)) ids = db.idsMissingCallbookData();
+            else error = db.lastError();
+            if (!self) return;
+            QMetaObject::invokeMethod(self.data(), [self, path, generation, ids, error] {
+                if (!self || generation != self->m_callbookScanGeneration) return;
+                self->m_callbookScanPending = false;
+                emit self->callbookChanged();
+                if (!self->m_db.isOpen() || self->m_db.path() != path) return;
+                if (!error.isEmpty()) {
+                    self->addActivity(QStringLiteral("CALLBOOK"), error, QStringLiteral("error"));
+                } else if (ids.isEmpty() && self->m_callbookQueue.isEmpty()) {
+                    self->addActivity(QStringLiteral("CALLBOOK"), tr("Every QSO already has its grid."),
+                                      QStringLiteral("info"));
+                } else {
+                    self->enqueueCallbook(ids);
+                }
+            }, Qt::QueuedConnection);
+        });
+        return 0;
+    }
     const QList<qint64> ids = m_db.idsMissingCallbookData();
     if (ids.isEmpty() && m_callbookQueue.isEmpty()) {
         addActivity(QStringLiteral("CALLBOOK"), tr("Every QSO already has its grid."),
@@ -6977,15 +7465,17 @@ int DecoLogController::enqueueCallbook(const QList<qint64>& ids)
                 tr("%n QSO to complete from the callbook: one search at a time, it takes a while.",
                    nullptr, static_cast<int>(ids.size())),
                 QStringLiteral("info"));
-    m_callbookQueueTimer.start();
+    m_callbookQueueTimer.start(500);
     emit callbookChanged();
     return static_cast<int>(ids.size());
 }
 
 void DecoLogController::stopCallbookQueue()
 {
-    if (m_callbookQueue.isEmpty() && !m_callbookQueueTimer.isActive())
+    if (m_callbookQueue.isEmpty() && !m_callbookQueueTimer.isActive() && !m_callbookScanPending)
         return;
+    ++m_callbookScanGeneration;
+    m_callbookScanPending = false;
     m_callbookQueue.clear();
     m_callbookQueueTimer.stop();
     addActivity(QStringLiteral("CALLBOOK"),
@@ -6996,32 +7486,35 @@ void DecoLogController::stopCallbookQueue()
 
 void DecoLogController::serveCallbookQueue()
 {
-    // Un giro serve un QSO che ha bisogno della rete; quelli che il callbook ha
-    // gia' in tasca si fanno tutti insieme, perche' non costano niente.
-    int localOnes = 0;
+    // Even cached results can require disk writes. Yield after each record so
+    // that a long run of cached calls cannot monopolise the UI event loop.
+    bool cached = false;
     while (!m_callbookQueue.isEmpty()) {
         const qint64 id = m_callbookQueue.takeFirst();
         ++m_callbookQueueDone;
         const auto record = m_db.record(id);
-        if (!record)
-            continue;
+        if (!record) {
+            cached = true;
+            break;
+        }
         const QString call = record->value(QStringLiteral("CALL")).toUpper();
-        const bool cached = m_callbookResults.contains(call);
+        cached = m_callbookResults.contains(call);
         completeQsoFromCallbook(id);
-        if (!cached)
-            break;
-        if (++localOnes >= 50)
-            break;
+        break;
     }
     if (m_callbookQueue.isEmpty()) {
         m_callbookQueueTimer.stop();
         addActivity(QStringLiteral("CALLBOOK"),
                     tr("Callbook: %1 QSO looked at.").arg(m_callbookQueueDone),
                     QStringLiteral("success"));
-    } else if (m_callbookQueueDone % 50 == 0) {
-        addActivity(QStringLiteral("CALLBOOK"),
-                    tr("Callbook: %1 of %2…").arg(m_callbookQueueDone).arg(m_callbookQueueTotal),
-                    QStringLiteral("info"));
+    } else {
+        // A cached result does not need a network rate limit, but still gets a
+        // separate event-loop turn. Network lookups retain their 500 ms delay.
+        m_callbookQueueTimer.start(cached ? 0 : 500);
+        if (m_callbookQueueDone % 50 == 0)
+            addActivity(QStringLiteral("CALLBOOK"),
+                        tr("Callbook: %1 of %2…").arg(m_callbookQueueDone).arg(m_callbookQueueTotal),
+                        QStringLiteral("info"));
     }
     emit callbookChanged();
 }
@@ -7033,47 +7526,109 @@ int DecoLogController::damagedFieldCount() const
 
 int DecoLogController::repairImportedFields()
 {
-    const QList<qint64> ids = m_db.idsWithDamagedText();
-    QList<qint64> emptied;
-    int repaired = 0;
-    for (const qint64 id : ids) {
-        const auto record = m_db.record(id);
-        if (!record)
-            continue;
-        AdifRecord fixed = *record;
-        bool changed = false;
-        bool emptiedHere = false;
-        for (const char* name : {"NAME", "QTH", "ADDRESS", "COMMENT", "NOTES", "COUNTRY", "QSL_VIA"}) {
-            const QString value = fixed.value(QLatin1String(name));
-            if (value.isEmpty())
-                continue;
-            const QString clean = core::adif::repairTruncated(value);
-            if (clean == value)
-                continue;
-            fixed.set(QLatin1String(name), clean);
-            changed = true;
-            if (clean.isEmpty())
-                emptiedHere = true;
-        }
-        if (!changed)
-            continue;
-        if (m_db.updateQso(id, fixed, -1, QStringLiteral("repair")).status == InsertResult::Status::Inserted) {
-            ++repaired;
-            if (emptiedHere)
-                emptied << id;
-        }
-    }
-    if (repaired > 0) {
+    if (m_bulkProgress >= 0 || !m_db.isOpen()) return 0;
+    return finishRepairBatch(m_db.repairDamagedFields());
+}
+
+int DecoLogController::finishRepairBatch(const RepairBatchResult& result)
+{
+    const int repaired = result.changes.changed;
+    if (repaired > 0 || result.changes.failed > 0) {
         addActivity(QStringLiteral("LOG"),
-                    tr("%n QSO cleaned up from a bad old import (the previous text stays in the history).",
-                       nullptr, repaired),
-                    QStringLiteral("success"));
-        timed(tr("reloading the log table"), [this] { m_model->reload(); });
+                    tr("Repaired %1 QSO from an old import; %2 failed (previous text stays in history)")
+                        .arg(repaired).arg(result.changes.failed),
+                    result.changes.failed ? QStringLiteral("warning") : QStringLiteral("success"));
+    }
+    for (const QString& error : result.changes.errors)
+        addActivity(QStringLiteral("LOG"), error, QStringLiteral("error"));
+    if (repaired > 0) {
+        m_model->reloadAfterQslUpdate();
         emit logChanged();
-        // Quello che si e' dovuto svuotare lo riscrive il callbook, se lo sa.
-        enqueueCallbook(emptied);
+        enqueueCallbook(result.emptiedIds);
     }
     return repaired;
+}
+
+bool DecoLogController::repairImportedFieldsAsync()
+{
+    if (m_bulkProgress >= 0 || !m_db.isOpen()) return false;
+    const QString path = m_db.path();
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        repairImportedFields();
+        return true;
+    }
+    m_bulkProgress = 0;
+    emit bulkChanged();
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, path] {
+        LogDatabase db;
+        RepairBatchResult result;
+        if (!db.open(path)) {
+            result.changes.failed = 1;
+            result.changes.errors << db.lastError();
+        } else {
+            int lastPercent = -1;
+            result = db.repairDamagedFields([self, &lastPercent](int done, int total) {
+                const int percent = total ? done * 100 / total : 100;
+                if (percent == lastPercent) return;
+                lastPercent = percent;
+                if (!self) return;
+                QMetaObject::invokeMethod(self.data(), [self, percent] {
+                    if (!self) return;
+                    self->m_bulkProgress = percent / 100.0;
+                    emit self->bulkChanged();
+                }, Qt::QueuedConnection);
+            });
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, result] {
+            if (!self) return;
+            self->m_bulkProgress = -1;
+            emit self->bulkChanged();
+            if (!self->m_db.isOpen() || self->m_db.path() != path) {
+                self->addActivity(QStringLiteral("LOG"),
+                                  tr("A background log change finished on a log that is no longer open"),
+                                  QStringLiteral("warning"));
+                return;
+            }
+            self->finishRepairBatch(result);
+        }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+void DecoLogController::refreshDamagedFieldCount()
+{
+    const quint64 generation = ++m_damagedCountGeneration;
+    const QString path = m_db.path();
+    const quint64 logVersion = m_logVersion;
+    m_damagedFieldCount = -1;
+    emit damagedFieldCountChanged();
+    if (!m_db.isOpen()) {
+        m_damagedFieldCount = -2;
+        emit damagedFieldCountChanged();
+        return;
+    }
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        m_damagedFieldCount = damagedFieldCount();
+        emit damagedFieldCountChanged();
+        return;
+    }
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, path, logVersion, generation] {
+        LogDatabase db;
+        const int count = db.open(path) ? int(db.idsWithDamagedText().size()) : -2;
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, logVersion, generation, count] {
+            if (!self || generation != self->m_damagedCountGeneration || self->m_db.path() != path) return;
+            if (logVersion != self->m_logVersion) {
+                self->refreshDamagedFieldCount();
+                return;
+            }
+            self->m_damagedFieldCount = count;
+            emit self->damagedFieldCountChanged();
+        }, Qt::QueuedConnection);
+    });
 }
 
 void DecoLogController::setCallbookAutofill(bool autofill)
