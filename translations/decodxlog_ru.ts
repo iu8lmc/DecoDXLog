@@ -1179,6 +1179,34 @@ The call Decodium is working shows up here by itself.</source>
         <source>Open last QSO</source>
         <translation>Открыть последний QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Территория</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>Загрузка QSO…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>Не удалось загрузить QSO.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · щёлкните строку, чтобы открыть подробности</numerusform>
+            <numerusform>%n QSO · щёлкните строку, чтобы открыть подробности</numerusform>
+            <numerusform>%n QSO · щёлкните строку, чтобы открыть подробности</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Подтверждено</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Не подтверждено</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5536,12 +5564,24 @@ Extra fields are preserved: %8</source>
         <translation>Не удалось открыть журнал для предпросмотра</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Некорректная загрузка ADIF из Club Log</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>Журнал изменился; повторите предпросмотр</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Загрузка из Club Log содержит другой позывной станции; ничего не импортировано</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Загрузка из Club Log содержит некорректный идентификатор удалённого QSO; ничего не импортировано</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log вернул пустую или нераспознанную загрузку ADIF; ничего не импортировано</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Не удалось подготовить временную загрузку из Club Log для предпросмотра</translation>
     </message>
 </context>
 <context>
@@ -12661,10 +12701,6 @@ Extra fields are preserved: %8</source>
         <translation>Загрузка из Club Log не удалась (HTTP %1); связи не импортированы</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Загрузка завершена; проверьте предпросмотр импорта</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: для этого журнала нет загрузки, которую можно возобновить; проверьте ожидающую контрольную точку</translation>
     </message>
@@ -12735,6 +12771,10 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: удалённый результат получен, но локальное сохранение не удалось; контрольная точка сохранена для сверки</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Загрузка получена; см. предпросмотр импорта</translation>
     </message>
 </context>
 <context>

@@ -4065,7 +4065,7 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
                     tr("%1 had already gone to %2 with the wrong call: it will be sent again").arg(newCall, resent.join(QStringLiteral(", "))),
                     QStringLiteral("warning"));
     }
-    timed(tr("reloading the log table"), [this] { m_model->reload(); });
+    timed(tr("reloading the log table"), [this, id] { m_model->reloadAfterEdit(id); });
     timed(tr("Notifying views and services of the edited QSO"), [this] { emit logChanged(); });
     timed(tr("Updating the DecoLink snapshot"), [this] { m_decoLink.resendSnapshot(); });
     timed(tr("Refreshing callsign information"), [this] { refreshCallInfo(); });
@@ -4739,7 +4739,7 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb)
     return out;
 }
 
-void DecoLogController::previewImport(const QUrl& url, bool fromClubLog)
+void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const QString& stationCall)
 {
     const QString dbPath = m_db.path();
     const int digital = m_db.dedupWindowSeconds(false);
@@ -4749,7 +4749,7 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog)
     const qint64 profile = m_profiles ? m_profiles->activeProfileId() : 0;
     m_importPreviewFile = QUrl();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, url, dbPath, digital, manual, generation, logVersion, profile, fromClubLog] {
+    m_importPool.start([self, url, dbPath, digital, manual, generation, logVersion, profile, fromClubLog, stationCall] {
         QVariantMap result;
         LogDatabase db;
         if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:") || !db.open(dbPath)) {
@@ -4757,19 +4757,31 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog)
         } else {
             db.setDedupWindows(digital, manual);
             bool valid = true;
+            QString error;
             if (fromClubLog) {
                 QFile input(url.toLocalFile());
                 if (!input.open(QIODevice::ReadOnly)) valid = false;
-                const QByteArray converted = valid ? prepareClubLogDownload(input.readAll()) : QByteArray();
+                const auto prepared = valid ? prepareClubLogDownload(input.readAll(), stationCall) : ClubLogDownloadResult{};
+                const QByteArray converted = prepared.adif;
                 input.close();
                 valid = !converted.isEmpty();
+                if (!valid) {
+                    using Error = ClubLogDownloadResult::Error;
+                    if (prepared.error == Error::StationMismatch)
+                        error = QObject::tr("Club Log download contains a different station callsign; nothing was imported");
+                    else if (prepared.error == Error::InvalidRemoteId)
+                        error = QObject::tr("Club Log download contains an invalid remote QSO identifier; nothing was imported");
+                    else
+                        error = QObject::tr("Club Log returned an empty or unrecognised ADIF download; nothing was imported");
+                }
                 if (valid) {
                     QSaveFile output(url.toLocalFile());
                     valid = output.open(QIODevice::WriteOnly) && output.write(converted) == converted.size() && output.commit();
+                    if (!valid) error = QObject::tr("Cannot prepare the temporary Club Log download for preview");
                 }
             }
             result = valid ? makeImportPreview(url, db)
-                           : QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Invalid Club Log ADIF download")}};
+                           : QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), error}};
         }
         if (!self) return;
         QMetaObject::invokeMethod(self.data(), [self, url, dbPath, generation, logVersion, profile, result] {
@@ -7202,6 +7214,30 @@ void DecoLogController::refreshCallInfo()
         m_rotor->dxBearing(info.value(QStringLiteral("call")).toString(), m_rotor->bearingTo(dx->lat, dx->lon));
     }
     emit lookupChanged();
+}
+
+void DecoLogController::requestBandModeQsos(const QString& token, const QString& call, int dxcc,
+                                            const QString& band, const QString& group)
+{
+    const QString path = m_db.path();
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        bool ok = false;
+        const auto rows = m_db.qsosForBandModeSlot(call, dxcc, band, group, &ok);
+        emit bandModeQsosReady(token, rows, ok);
+        return;
+    }
+    QPointer<DecoLogController> self(this);
+    m_callInfoPool.start([self, path, token, call, dxcc, band, group] {
+        bool ok = false;
+        QVariantList rows;
+        {
+            LogDatabase db;
+            if (db.open(path)) rows = db.qsosForBandModeSlot(call, dxcc, band, group, &ok);
+        }
+        if (self) QMetaObject::invokeMethod(self.data(), [self, token, rows, ok] {
+            if (self) emit self->bandModeQsosReady(token, rows, ok);
+        }, Qt::QueuedConnection);
+    });
 }
 
 std::optional<DecoLogController::EntitySummary> DecoLogController::entitySummary(int dxcc)

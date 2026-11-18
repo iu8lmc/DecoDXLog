@@ -6,6 +6,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 import Decodium.UI
 
 GlassPanel {
@@ -16,6 +17,81 @@ GlassPanel {
     readonly property var info: decolog.callInfo
     readonly property bool hasCall: (info.call || "").length > 0
     readonly property bool worked: (info.count || 0) > 0
+
+    function showSlot(band, group, entity) {
+        slotWindow.rows = []
+        slotWindow.loading = true
+        slotWindow.failed = false
+        slotWindow.requestToken = Date.now().toString() + Math.random().toString()
+        slotWindow.title = (entity ? (root.info.entity || qsTr("Entity")) : root.info.call)
+                           + " · " + band + " · " + group
+        slotWindow.show()
+        slotWindow.raise()
+        decolog.requestBandModeQsos(slotWindow.requestToken, entity ? "" : root.info.call,
+                                    entity ? (root.info.entityDxcc || 0) : 0, band, group)
+    }
+
+    Window {
+        id: slotWindow
+        width: 680; height: 440
+        minimumWidth: 420; minimumHeight: 240
+        transientParent: root.Window.window
+        flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowSystemMenuHint
+        color: Theme.bgDeep
+        property string requestToken: ""
+        property var rows: []
+        property bool loading: false
+        property bool failed: false
+        Connections {
+            target: decolog
+            function onBandModeQsosReady(token, rows, ok) {
+                if (token !== slotWindow.requestToken) return
+                slotWindow.rows = rows
+                slotWindow.failed = !ok
+                slotWindow.loading = false
+            }
+        }
+        ColumnLayout {
+            anchors.fill: parent; anchors.margins: 14; spacing: 8
+            Text {
+                Layout.fillWidth: true
+                text: slotWindow.loading ? qsTr("Loading QSOs…")
+                      : slotWindow.failed ? qsTr("Could not load QSOs.")
+                      : qsTr("%n QSO(s) · click a row to open its details", "", slotWindow.rows.length)
+                color: Theme.textSecondary; font.pixelSize: 12
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true
+                clip: true; spacing: 2
+                model: slotWindow.rows
+                ScrollBar.vertical: PanelScrollBar {}
+                delegate: Rectangle {
+                    required property var modelData
+                    width: ListView.view.width; height: 36; radius: 3
+                    color: itemHover.hovered ? Theme.bgMedium : "transparent"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 12
+                        Text { text: modelData.call; Layout.preferredWidth: 100; color: Theme.accentColor; font.bold: true }
+                        Text { text: (modelData.date || "").replace("T", " ").slice(0, 16); Layout.fillWidth: true; color: Theme.textSecondary }
+                        Text { text: modelData.mode; Layout.preferredWidth: 55; color: Theme.textSecondary }
+                        Text {
+                            text: modelData.confirmed ? qsTr("Confirmed") + " · " + modelData.services : qsTr("Unconfirmed")
+                            Layout.preferredWidth: 180; elide: Text.ElideRight
+                            color: modelData.confirmed ? Theme.successColor : Theme.warningColor
+                        }
+                    }
+                    HoverHandler { id: itemHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler {
+                        onTapped: {
+                            const qsoId = modelData.id
+                            slotWindow.close()
+                            Qt.callLater(function() { root.openQso(qsoId) })
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     title: qsTr("Call info")
     dotColor: Theme.secondaryColor
@@ -355,6 +431,7 @@ GlassPanel {
                 BandModeGrid {
                     Layout.fillWidth: true
                     grid: root.info.slots || ({})
+                    onSlotClicked: (band, group) => root.showSlot(band, group, false)
                 }
             }
 
@@ -370,6 +447,7 @@ GlassPanel {
                 BandModeGrid {
                     Layout.fillWidth: true
                     grid: root.info.entitySlots || ({})
+                    onSlotClicked: (band, group) => root.showSlot(band, group, true)
                 }
             }
 

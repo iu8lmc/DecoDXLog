@@ -1171,6 +1171,32 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <source>Open last QSO</source>
         <translation>Az utolsó QSO megnyitása</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Entitás</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>QSO-k betöltése…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>A QSO-kat nem sikerült betölteni.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · kattintson egy sorra a részletek megnyitásához</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Megerősítve</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Nincs megerősítve</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5512,12 +5538,24 @@ A további mezők megmaradnak: %8</translation>
         <translation>A naplót nem lehet megnyitni az előnézethez</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Érvénytelen ADIF-letöltés a Club Logból</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>A napló megváltozott; készítse újra az előnézetet</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>A Club Log letöltés más állomáshívójelet tartalmaz; semmi sem lett importálva</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>A Club Log letöltés érvénytelen távoli QSO-azonosítót tartalmaz; semmi sem lett importálva</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>A Club Log üres vagy felismerhetetlen ADIF-letöltést küldött; semmi sem lett importálva</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Az ideiglenes Club Log letöltés nem készíthető elő az előnézethez</translation>
     </message>
 </context>
 <context>
@@ -12533,10 +12571,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>A Club Log letöltése sikertelen (HTTP %1); egyetlen kapcsolat sem lett importálva</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Letöltés kész; tekintse át az importálási előnézetet</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: ehhez a naplóhoz nincs folytatható feltöltés; tekintse át a függőben lévő ellenőrzőpontot</translation>
     </message>
@@ -12605,6 +12639,10 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: a távoli eredmény megérkezett, de a helyi mentés sikertelen; az ellenőrzőpont egyeztetésre megmarad</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>A letöltés megérkezett; lásd az importálási előnézetet</translation>
     </message>
 </context>
 <context>

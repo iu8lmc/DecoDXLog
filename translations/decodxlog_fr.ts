@@ -1175,6 +1175,33 @@ L&apos;indicatif que Decodium travaille apparaît ici tout seul.</translation>
         <source>Open last QSO</source>
         <translation>Ouvrir le dernier QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Entité</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>Chargement des QSO…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>Impossible de charger les QSO.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · cliquez sur une ligne pour ouvrir ses détails</numerusform>
+            <numerusform>%n QSO · cliquez sur une ligne pour ouvrir ses détails</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Confirmés</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Non confirmé</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5524,12 +5551,24 @@ Champs supplémentaires conservés : %8</translation>
         <translation>Impossible d&apos;ouvrir le journal pour l&apos;aperçu</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Téléchargement ADIF de Club Log invalide</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>Journal modifié ; refaire l&apos;aperçu</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Le téléchargement Club Log contient un indicatif de station différent ; rien n&apos;a été importé</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Le téléchargement Club Log contient un identifiant de QSO distant invalide ; rien n&apos;a été importé</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log a renvoyé un téléchargement ADIF vide ou non reconnu ; rien n&apos;a été importé</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Impossible de préparer le téléchargement Club Log temporaire pour l&apos;aperçu</translation>
     </message>
 </context>
 <context>
@@ -12597,10 +12636,6 @@ Champs supplémentaires conservés : %8</translation>
         <translation>Échec du téléchargement de Club Log (HTTP %1) ; aucun contact importé</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Téléchargement terminé ; vérifiez l&apos;aperçu de l&apos;importation</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log : aucun envoi reprenable pour ce journal ; vérifiez le point de contrôle en attente</translation>
     </message>
@@ -12670,6 +12705,10 @@ Champs supplémentaires conservés : %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log : résultat distant reçu mais enregistrement local échoué ; point de contrôle conservé pour la réconciliation</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Téléchargement reçu ; voir l&apos;aperçu de l&apos;importation</translation>
     </message>
 </context>
 <context>

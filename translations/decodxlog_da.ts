@@ -1175,6 +1175,33 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
         <source>Open last QSO</source>
         <translation>Åbn sidste QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Entitet</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>Indlæser QSO&apos;er…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>QSO&apos;erne kunne ikke indlæses.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · klik på en række for at åbne detaljerne</numerusform>
+            <numerusform>%n QSO&apos;er · klik på en række for at åbne detaljerne</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Bekræftet</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Ikke bekræftet</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5524,12 +5551,24 @@ Ekstra felter bevares: %8</translation>
         <translation>Logbogen kan ikke åbnes til forhåndsvisning</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Ugyldig ADIF-download fra Club Log</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>Logbogen er ændret; lav forhåndsvisningen igen</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Club Log-downloadet indeholder et andet stationskaldesignal; intet blev importeret</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Club Log-downloadet indeholder en ugyldig ekstern QSO-identifikator; intet blev importeret</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log returnerede en tom eller ukendt ADIF-download; intet blev importeret</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Den midlertidige Club Log-download kan ikke klargøres til forhåndsvisning</translation>
     </message>
 </context>
 <context>
@@ -12597,10 +12636,6 @@ Ekstra felter bevares: %8</translation>
         <translation>Download fra Club Log mislykkedes (HTTP %1); ingen forbindelser blev importeret</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Download fuldført; gennemgå importforhåndsvisningen</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: ingen overførsel kan genoptages for denne logbog; gennemgå det ventende checkpoint</translation>
     </message>
@@ -12670,6 +12705,10 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: fjernresultat modtaget, men lokal lagring mislykkedes; checkpoint bevaret til afstemning</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Download modtaget; se importforhåndsvisningen</translation>
     </message>
 </context>
 <context>

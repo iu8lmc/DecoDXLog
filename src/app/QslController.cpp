@@ -593,8 +593,8 @@ void QslController::downloadClubLog()
             const QUrl file = QUrl::fromLocalFile(m_downloadFile->fileName());
             m_downloadFile->close();
             m_downloadFile = nullptr; // The parent keeps the temporary file until shutdown.
-            m_downloadStatus = tr("Download complete; review the import preview"); emit changed();
-            emit clubLogDownloadReady(file);
+            m_downloadStatus = tr("Download received; see the import preview"); emit changed();
+            emit clubLogDownloadReady(file, call);
         });
     });
 }

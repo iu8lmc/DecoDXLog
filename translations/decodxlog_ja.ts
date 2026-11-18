@@ -1171,6 +1171,32 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <source>Open last QSO</source>
         <translation>最後の QSO を開く</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">エンティティ</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>QSO を読み込み中…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>QSO を読み込めませんでした。</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n 件の QSO · 行をクリックすると詳細を開きます</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>確認済</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>未確認</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5512,12 +5538,24 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>プレビュー用にログブックを開けません</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Club Log からの ADIF ダウンロードが無効です</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>ログブックが変更されました。プレビューをやり直してください</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Club Log のダウンロードに別の局のコールサインが含まれています。何もインポートされていません</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Club Log のダウンロードに無効なリモート QSO 識別子が含まれています。何もインポートされていません</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log から空または認識できない ADIF ダウンロードが返されました。何もインポートされていません</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>プレビュー用の一時的な Club Log ダウンロードを準備できません</translation>
     </message>
 </context>
 <context>
@@ -12533,10 +12571,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>Club Log のダウンロードに失敗しました（HTTP %1）。交信はインポートされていません</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>ダウンロードが完了しました。インポートのプレビューを確認してください</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: このログブックには再開できるアップロードがありません。保留中のチェックポイントを確認してください</translation>
     </message>
@@ -12605,6 +12639,10 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: リモートの結果を受け取りましたが、ローカルへの保存に失敗しました。照合のためチェックポイントを保持しています</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>ダウンロードを受信しました。インポートのプレビューをご確認ください</translation>
     </message>
 </context>
 <context>

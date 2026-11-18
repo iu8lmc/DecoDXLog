@@ -1179,6 +1179,34 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <source>Open last QSO</source>
         <translation>Deschide ultimul QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Entitate</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>Se încarcă QSO-urile…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>QSO-urile nu au putut fi încărcate.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · apasă pe un rând pentru a deschide detaliile</numerusform>
+            <numerusform>%n QSO-uri · apasă pe un rând pentru a deschide detaliile</numerusform>
+            <numerusform>%n de QSO-uri · apasă pe un rând pentru a deschide detaliile</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Confirmate</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Neconfirmat</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5536,12 +5564,24 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Jurnalul nu poate fi deschis pentru previzualizare</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Descărcare ADIF invalidă din Club Log</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>Jurnalul s-a modificat; reface previzualizarea</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Descărcarea din Club Log conține un alt indicativ de stație; nu s-a importat nimic</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Descărcarea din Club Log conține un identificator de QSO la distanță nevalid; nu s-a importat nimic</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log a returnat o descărcare ADIF goală sau nerecunoscută; nu s-a importat nimic</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Descărcarea temporară din Club Log nu poate fi pregătită pentru previzualizare</translation>
     </message>
 </context>
 <context>
@@ -12661,10 +12701,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Descărcarea din Club Log a eșuat (HTTP %1); nu s-a importat nicio legătură</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Descărcare finalizată; verifică previzualizarea importului</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: nu există nicio încărcare reluabilă pentru acest jurnal; verifică punctul de control în așteptare</translation>
     </message>
@@ -12735,6 +12771,10 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: rezultatul de la distanță a fost primit, dar salvarea locală a eșuat; punctul de control este păstrat pentru reconciliere</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Descărcare primită; vezi previzualizarea importului</translation>
     </message>
 </context>
 <context>

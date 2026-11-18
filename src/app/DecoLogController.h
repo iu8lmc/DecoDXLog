@@ -709,7 +709,7 @@ public:
     Q_INVOKABLE QString subdivisionName(const QString& code, int dxcc) const;
 
     Q_INVOKABLE void importAdif(const QUrl& file);
-    Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false);
+    Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false, const QString& stationCall = {});
     Q_INVOKABLE bool undoLastImport();
     Q_INVOKABLE QVariantList qsoEnrichments(qint64 qsoId) const;
     Q_INVOKABLE bool undoQsoEnrichment(qint64 qsoId, const QString& field);
@@ -760,6 +760,8 @@ public:
     // Misura locale, senza telemetria: la UI registra solo durate aggregate
     // per poter documentare p50/p95 durante un collaudo esplicito.
     Q_INVOKABLE void recordUiLatency(const QString& scenario, qint64 elapsedMs);
+    Q_INVOKABLE void requestBandModeQsos(const QString& token, const QString& call, int dxcc,
+                                         const QString& band, const QString& group);
     // Per le prove: un evento del mouse vero ("press", "move", "release") nel
     // punto x, y della finestra, come se l'avesse fatto l'operatore. Serve a
     // provare che un clic arrivi davvero al pulsante giusto.
@@ -776,6 +778,7 @@ signals:
     void activityChanged();
     void countsChanged();
     void lookupChanged();
+    void bandModeQsosReady(const QString& token, const QVariantList& rows, bool ok);
     // Un DX scelto altrove — per ora dal cluster — da mettere nel riquadro del
     // QSO nuovo: call, mhz, mode, grid.
     void qsoPrepared(const QVariantMap& fields);

@@ -195,6 +195,7 @@ public:
     // Rilegge una riga che e' cambiata (una conferma, il callbook che completa
     // un QSO): la tabella non si ricostruisce per una riga sola.
     void refreshQso(qint64 id);
+    void reloadAfterEdit(qint64 id);
 
 signals:
     void countChanged();
@@ -300,7 +301,8 @@ private:
     bool m_busy{false};
     QString idsSql(QVariantList& binds, bool scan) const;
     bool scanWholeLog() const;
-    void adoptIds(QVector<qint64>&& ids);
+    void reloadImpl(bool preserveIfUnchanged);
+    void adoptIds(QVector<qint64>&& ids, bool preserveIfUnchanged);
 };
 
 } // namespace decolog::app

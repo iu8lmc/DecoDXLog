@@ -1175,6 +1175,33 @@ El indicativo que Decodium está trabajando aparece aquí solo.</translation>
         <source>Open last QSO</source>
         <translation>Abrir el último QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Entidad</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>Cargando QSO…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>No se pudieron cargar los QSO.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · haz clic en una fila para abrir sus detalles</numerusform>
+            <numerusform>%n QSO · haz clic en una fila para abrir sus detalles</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Confirmados</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>No confirmado</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5524,12 +5551,24 @@ Campos extra conservados: %8</translation>
         <translation>No se puede abrir el registro para la vista previa</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Descarga ADIF de Club Log no válida</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>El registro ha cambiado; vuelve a generar la vista previa</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>La descarga de Club Log contiene un indicativo de estación distinto; no se ha importado nada</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>La descarga de Club Log contiene un identificador remoto de QSO no válido; no se ha importado nada</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log devolvió una descarga ADIF vacía o no reconocida; no se ha importado nada</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>No se puede preparar la descarga temporal de Club Log para la vista previa</translation>
     </message>
 </context>
 <context>
@@ -12597,10 +12636,6 @@ Campos extra conservados: %8</translation>
         <translation>La descarga de Club Log ha fallado (HTTP %1); no se ha importado ningún contacto</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Descarga completada; revisa la vista previa de la importación</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: no hay subida reanudable para este registro; revisa el punto de control pendiente</translation>
     </message>
@@ -12670,6 +12705,10 @@ Campos extra conservados: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: resultado remoto recibido pero el guardado local ha fallado; punto de control conservado para la conciliación</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Descarga recibida; consulta la vista previa de la importación</translation>
     </message>
 </context>
 <context>

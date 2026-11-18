@@ -944,6 +944,22 @@ private slots:
                  QStringList({"15m/PHONE/1", "20m/CW/1", "20m/DATA/2/Le", "40m/PHONE/1"}));
         QVERIFY(db.bandModeSlotsForCall("N0NE").isEmpty());
         QVERIFY(db.bandModeSlotsForDxcc(0).isEmpty());
+        bool ok = false;
+        auto rows = db.qsosForBandModeSlot("ja1zzz", 0, "20m", "DATA", &ok);
+        QVERIFY(ok);
+        QCOMPARE(rows.size(), 2);
+        QCOMPARE(rows.at(0).toMap().value("mode").toString(), QString("RTTY"));
+        QVERIFY(rows.at(0).toMap().value("confirmed").toBool());
+        QVERIFY(rows.at(1).toMap().value("services").toString().contains("lotw"));
+        rows = db.qsosForBandModeSlot({}, 339, "15m", "PHONE", &ok);
+        QVERIFY(ok);
+        QCOMPARE(rows.size(), 1);
+        QCOMPARE(rows.at(0).toMap().value("call").toString(), QString("JA3ABC"));
+        QVERIFY(!rows.at(0).toMap().value("confirmed").toBool());
+        QCOMPARE(db.qsosForBandModeSlot({}, 339, "20m", "CW", &ok).size(), 1);
+        QVERIFY(ok);
+        QVERIFY(db.qsosForBandModeSlot({}, 339, "20m", "invalid", &ok).isEmpty());
+        QVERIFY(!ok);
     }
 };
 

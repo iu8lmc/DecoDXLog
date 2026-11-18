@@ -1175,6 +1175,33 @@ Das Rufzeichen, an dem Decodium arbeitet, erscheint hier von selbst.</translatio
         <source>Open last QSO</source>
         <translation>Letztes QSO öffnen</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Gebiet</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>QSOs werden geladen…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>QSOs konnten nicht geladen werden.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · klicke auf eine Zeile, um die Details zu öffnen</numerusform>
+            <numerusform>%n QSOs · klicke auf eine Zeile, um die Details zu öffnen</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Bestätigt</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Unbestätigt</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5524,12 +5551,24 @@ Zusatzfelder bleiben erhalten: %8</translation>
         <translation>Logbuch für die Vorschau kann nicht geöffnet werden</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Ungültiger ADIF-Download von Club Log</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>Logbuch geändert; Vorschau erneut erstellen</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Der Club-Log-Download enthält ein anderes Stationsrufzeichen; es wurde nichts importiert</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Der Club-Log-Download enthält eine ungültige Remote-QSO-Kennung; es wurde nichts importiert</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log hat einen leeren oder nicht erkannten ADIF-Download geliefert; es wurde nichts importiert</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Der temporäre Club-Log-Download kann nicht für die Vorschau vorbereitet werden</translation>
     </message>
 </context>
 <context>
@@ -12597,10 +12636,6 @@ Zusatzfelder bleiben erhalten: %8</translation>
         <translation>Club-Log-Download fehlgeschlagen (HTTP %1); keine Kontakte importiert</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Download abgeschlossen; Importvorschau prüfen</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: kein fortsetzbarer Upload für dieses Logbuch; den ausstehenden Checkpoint prüfen</translation>
     </message>
@@ -12670,6 +12705,10 @@ Zusatzfelder bleiben erhalten: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: Ergebnis vom Server erhalten, aber lokales Speichern fehlgeschlagen; Checkpoint für den Abgleich behalten</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Download erhalten; siehe die Importvorschau</translation>
     </message>
 </context>
 <context>

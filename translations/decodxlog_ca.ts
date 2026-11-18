@@ -1175,6 +1175,33 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <source>Open last QSO</source>
         <translation>Obre l&apos;últim QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Entitat</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>S&apos;estan carregant els QSO…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>No s&apos;han pogut carregar els QSO.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · fes clic a una fila per obrir-ne els detalls</numerusform>
+            <numerusform>%n QSO · fes clic a una fila per obrir-ne els detalls</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Confirmats</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>No confirmat</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5524,12 +5551,24 @@ Camps extra conservats: %8</translation>
         <translation>No es pot obrir el registre per a la vista prèvia</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Descàrrega ADIF de Club Log no vàlida</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>El registre ha canviat; torna a generar la vista prèvia</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>La descàrrega de Club Log conté un indicatiu d&apos;estació diferent; no s&apos;ha importat res</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>La descàrrega de Club Log conté un identificador remot de QSO no vàlid; no s&apos;ha importat res</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log ha retornat una descàrrega ADIF buida o no reconeguda; no s&apos;ha importat res</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>No es pot preparar la descàrrega temporal de Club Log per a la vista prèvia</translation>
     </message>
 </context>
 <context>
@@ -12597,10 +12636,6 @@ Camps extra conservats: %8</translation>
         <translation>La descàrrega de Club Log ha fallat (HTTP %1); no s&apos;ha importat cap contacte</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Descàrrega completada; revisa la vista prèvia de la importació</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: no hi ha cap pujada reprenable per a aquest registre; revisa el punt de control pendent</translation>
     </message>
@@ -12670,6 +12705,10 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: resultat remot rebut però el desat local ha fallat; punt de control conservat per a la conciliació</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Descàrrega rebuda; consulta la vista prèvia de la importació</translation>
     </message>
 </context>
 <context>

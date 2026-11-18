@@ -1174,6 +1174,33 @@ The call Decodium is working shows up here by itself.</source>
         <source>Open last QSO</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5517,11 +5544,23 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
+        <source>Logbook changed; preview again</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Logbook changed; preview again</source>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -12590,10 +12629,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation type="unfinished"></translation>
     </message>
@@ -12662,6 +12697,10 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

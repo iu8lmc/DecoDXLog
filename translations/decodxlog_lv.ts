@@ -1179,6 +1179,34 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
         <source>Open last QSO</source>
         <translation>Atvērt pēdējo QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">Vienība</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>Notiek QSO ielāde…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>QSO nevarēja ielādēt.</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n QSO · noklikšķiniet uz rindas, lai atvērtu tās detaļas</numerusform>
+            <numerusform>%n QSO · noklikšķiniet uz rindas, lai atvērtu tās detaļas</numerusform>
+            <numerusform>%n QSO · noklikšķiniet uz rindas, lai atvērtu tās detaļas</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>Apstiprināti</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>Nav apstiprināts</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5536,12 +5564,24 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Žurnālu nevar atvērt priekšskatījumam</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Nederīga ADIF lejupielāde no Club Log</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>Žurnāls ir mainījies; atkārtojiet priekšskatījumu</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Club Log lejupielādē ir cits stacijas izsaukuma zīme; nekas nav importēts</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Club Log lejupielādē ir nederīgs attālā QSO identifikators; nekas nav importēts</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log atgrieza tukšu vai neatpazītu ADIF lejupielādi; nekas nav importēts</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>Pagaidu Club Log lejupielādi nevar sagatavot priekšskatījumam</translation>
     </message>
 </context>
 <context>
@@ -12661,10 +12701,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Club Log lejupielāde neizdevās (HTTP %1); sakari nav importēti</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>Lejupielāde pabeigta; pārskatiet importa priekšskatījumu</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log: šim žurnālam nav atsākamas augšupielādes; pārskatiet gaidošo kontrolpunktu</translation>
     </message>
@@ -12735,6 +12771,10 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log: attālais rezultāts saņemts, bet vietējā saglabāšana neizdevās; kontrolpunkts saglabāts saskaņošanai</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>Lejupielāde saņemta; skatiet importa priekšskatījumu</translation>
     </message>
 </context>
 <context>

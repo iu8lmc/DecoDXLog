@@ -2073,6 +2073,37 @@ QList<LogDatabase::BandModeSlot> LogDatabase::bandModeSlotsForDxcc(int dxcc) con
     return slotsFrom(q);
 }
 
+QVariantList LogDatabase::qsosForBandModeSlot(const QString& call, int dxcc, const QString& band,
+                                             const QString& group, bool* ok) const
+{
+    if (ok) *ok = false;
+    if ((dxcc <= 0 && call.trimmed().isEmpty()) || band.isEmpty()
+        || (group != QLatin1String("CW") && group != QLatin1String("DATA") && group != QLatin1String("PHONE")))
+        return {};
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral(
+        "SELECT q.id, q.call, q.qso_datetime_on, q.band, q.mode, q.submode, "
+        "GROUP_CONCAT(CASE WHEN s.rcvd = 'Y' AND s.service IN ('lotw','eqsl','card','clublog','qrz') "
+        "THEN s.service END) FROM qso q LEFT JOIN qsl_status s ON s.qso_id = q.id "
+        "WHERE q.deleted = 0 AND q.band = ? AND ")
+        + (dxcc > 0 ? QStringLiteral("q.dxcc = ? ") : QStringLiteral("q.call = ? "))
+        + QStringLiteral("GROUP BY q.id ORDER BY q.qso_datetime_on DESC, q.id DESC"));
+    q.addBindValue(band);
+    q.addBindValue(dxcc > 0 ? QVariant(dxcc) : QVariant(call.trimmed().toUpper()));
+    if (!q.exec()) return {};
+    QVariantList result;
+    while (q.next()) {
+        const QString mode = displayMode(q.value(4).toString(), q.value(5).toString());
+        if (modes::groupFor(mode) != group) continue;
+        result << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("call"), q.value(1)},
+                              {QStringLiteral("date"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
+                              {QStringLiteral("mode"), mode}, {QStringLiteral("confirmed"), !q.value(6).toString().isEmpty()},
+                              {QStringLiteral("services"), q.value(6)}};
+    }
+    if (ok) *ok = true;
+    return result;
+}
+
 QJsonArray LogDatabase::workedRow(const QString& call, const QString& band, const QString& mode,
                                   const QString& submode, const QString& isoOn, const QString& grid, bool confirmed)
 {

@@ -14,6 +14,7 @@ ColumnLayout {
 
     // La mappa che arriva dal controller: { bands: [...], rows: [{label, cells}] }
     property var grid: ({})
+    signal slotClicked(string band, string group)
     readonly property var bandList: (grid && grid.bands) || []
     readonly property var rowList: (grid && grid.rows) || []
 
@@ -66,6 +67,7 @@ ColumnLayout {
         model: root.rowList
         RowLayout {
             required property var modelData
+            readonly property string modeGroup: modelData.group
             Layout.fillWidth: true
             spacing: 2
             Text {
@@ -105,6 +107,7 @@ ColumnLayout {
                         elide: Text.ElideRight
                     }
                     HoverHandler { id: hover }
+                    TapHandler { enabled: worked; onTapped: root.slotClicked(modelData.band, parent.parent.modeGroup) }
                     ToolTip.visible: hover.hovered && worked
                     ToolTip.text: qsTr("%1 · %n QSO", "", modelData.count || 0).arg(modelData.band)
                                   + (confirmed ? " · " + qsTr("confirmed: %1").arg(modelData.marks) : "")

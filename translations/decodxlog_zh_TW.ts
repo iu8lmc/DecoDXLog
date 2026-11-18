@@ -1171,6 +1171,32 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
         <source>Open last QSO</source>
         <translation>開啟最後一個 QSO</translation>
     </message>
+    <message>
+        <source>Entity</source>
+        <translation type="unfinished">實體</translation>
+    </message>
+    <message>
+        <source>Loading QSOs…</source>
+        <translation>正在載入 QSO…</translation>
+    </message>
+    <message>
+        <source>Could not load QSOs.</source>
+        <translation>無法載入 QSO。</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSO(s) · click a row to open its details</source>
+        <translation>
+            <numerusform>%n 筆 QSO · 點選一列即可開啟其詳情</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>Confirmed</source>
+        <translation>已確認</translation>
+    </message>
+    <message>
+        <source>Unconfirmed</source>
+        <translation>未確認</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -5512,12 +5538,24 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>無法開啟日誌以進行預覽</translation>
     </message>
     <message>
-        <source>Invalid Club Log ADIF download</source>
-        <translation>Club Log ADIF 下載無效</translation>
-    </message>
-    <message>
         <source>Logbook changed; preview again</source>
         <translation>日誌已變更；請重新預覽</translation>
+    </message>
+    <message>
+        <source>Club Log download contains a different station callsign; nothing was imported</source>
+        <translation>Club Log 下載包含其他電台呼號；未匯入任何內容</translation>
+    </message>
+    <message>
+        <source>Club Log download contains an invalid remote QSO identifier; nothing was imported</source>
+        <translation>Club Log 下載包含無效的遠端 QSO 識別碼；未匯入任何內容</translation>
+    </message>
+    <message>
+        <source>Club Log returned an empty or unrecognised ADIF download; nothing was imported</source>
+        <translation>Club Log 回傳了空白或無法辨識的 ADIF 下載；未匯入任何內容</translation>
+    </message>
+    <message>
+        <source>Cannot prepare the temporary Club Log download for preview</source>
+        <translation>無法為預覽準備暫存的 Club Log 下載</translation>
     </message>
 </context>
 <context>
@@ -12533,10 +12571,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>Club Log 下載失敗（HTTP %1）；未匯入任何通聯</translation>
     </message>
     <message>
-        <source>Download complete; review the import preview</source>
-        <translation>下載完成；請檢視匯入預覽</translation>
-    </message>
-    <message>
         <source>Club Log: no resumable upload for this logbook; review the pending checkpoint</source>
         <translation>Club Log：此日誌沒有可恢復的上傳；請檢查待處理的檢查點</translation>
     </message>
@@ -12605,6 +12639,10 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Club Log: remote result received but local save failed; checkpoint retained for reconciliation</source>
         <translation>Club Log：已收到遠端結果但本機儲存失敗；檢查點已保留以便核對</translation>
+    </message>
+    <message>
+        <source>Download received; see the import preview</source>
+        <translation>已收到下載；請查看匯入預覽</translation>
     </message>
 </context>
 <context>
