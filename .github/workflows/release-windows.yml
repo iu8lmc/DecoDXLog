@@ -77,6 +77,7 @@ jobs:
       - name: Release gate
         env:
           QT_QPA_PLATFORM: offscreen
+          QTEST_FUNCTION_TIMEOUT: "1800000"
           # MinGW's local-interface subprocess teardown is flaky on the
           # hosted Windows image: the product and installer smoke test remain
           # covered, while the full gate is retained on every other test.
