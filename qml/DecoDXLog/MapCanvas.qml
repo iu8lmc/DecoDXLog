@@ -31,10 +31,12 @@ Rectangle {
 
     function repaintAll() {
         background.requestPaint()
+        spotLayer.requestPaint()
         overlay.requestPaint()
     }
     function repaintBackground() { background.requestPaint() }
     function repaintOverlay() { overlay.requestPaint() }
+    function repaintSpots() { spotLayer.requestPaint() }
 
     Canvas {
         id: background
@@ -127,11 +129,14 @@ Rectangle {
     }
 
     Canvas {
-        id: overlay
+        id: spotLayer
+        objectName: "mapSpotLayer"
         anchors.fill: parent
         anchors.margins: 1
         renderTarget: root.cpuCanvas ? Canvas.Image : Canvas.FramebufferObject
         renderStrategy: root.cpuCanvas ? Canvas.Immediate : Canvas.Cooperative
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
 
         function px(lon) { return (lon + 180) / 360 * width }
         function py(lat) { return (90 - lat) / 180 * height }
@@ -164,6 +169,25 @@ Rectangle {
                 }
             }
 
+        }
+    }
+
+    Canvas {
+        id: overlay
+        objectName: "mapTargetLayer"
+        anchors.fill: parent
+        anchors.margins: 1
+        renderTarget: root.cpuCanvas ? Canvas.Image : Canvas.FramebufferObject
+        renderStrategy: root.cpuCanvas ? Canvas.Immediate : Canvas.Cooperative
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+
+        function px(lon) { return (lon + 180) / 360 * width }
+        function py(lat) { return (90 - lat) / 180 * height }
+
+        onPaint: {
+            const ctx = getContext("2d")
+            ctx.reset()
             if (root.target && root.target.lat !== undefined) {
                 ctx.fillStyle = Theme.accentColor
                 ctx.beginPath()

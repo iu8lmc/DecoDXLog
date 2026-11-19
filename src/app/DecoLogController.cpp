@@ -7199,6 +7199,7 @@ QVariantList DecoLogController::gridPoints() const
 
 void DecoLogController::setLookupCall(const QString& call)
 {
+    decolog::StartupSpan trace("DecoLogController::setLookupCall");
     const QString c = call.trimmed().toUpper();
     if (c == m_lookupCall)
         return;
@@ -7649,6 +7650,7 @@ void DecoLogController::setCallbookAutofill(bool autofill)
 
 void DecoLogController::refreshCallInfo()
 {
+    decolog::StartupSpan trace("DecoLogController::refreshCallInfo");
     const WorkedBefore wb = m_db.workedBefore(m_lookupCall);
     QVariantList recent;
     for (const WorkedEntry& e : wb.recent) {

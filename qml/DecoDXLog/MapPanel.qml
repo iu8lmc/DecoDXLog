@@ -50,7 +50,10 @@ GlassPanel {
     }
     function reloadSpots() {
         spots = root.showSpots ? decolog.cluster.mapSpots() : []
-        root.repaintOverlay()
+        if (mapRenderer && mapRenderer.item && typeof mapRenderer.item.repaintSpots === "function")
+            mapRenderer.item.repaintSpots()
+        else
+            root.repaintOverlay()
     }
 
     // In gara gli spot arrivano a raffica: si aggiorna al massimo una volta

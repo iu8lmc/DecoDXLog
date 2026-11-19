@@ -899,6 +899,7 @@ void ClusterController::tune(const QString& spotKey)
 
 void ClusterController::lookupSpot(const QString& spotKey)
 {
+    decolog::StartupSpan trace("ClusterController::lookupSpot");
     const EnrichedSpot* e = m_model.find(spotKey);
     if (!e)
         return;
