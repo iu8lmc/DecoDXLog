@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.60
+    VERSION 1.17.62
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -104,6 +104,8 @@ add_library(decolog_core STATIC
     src/core/Cabrillo.h
     src/core/Callbook.cpp
     src/core/Callbook.h
+    src/core/CallbookProfileVerifier.cpp
+    src/core/CallbookProfileVerifier.h
     src/core/CloudSettings.cpp
     src/core/CloudSettings.h
     src/core/CloudSync.cpp
@@ -693,7 +695,7 @@ if(DECODXLOG_BUILD_TESTS)
             $<TARGET_FILE:clublog_live50> $<TARGET_FILE:clublog_stage_existing>)
         set_tests_properties(clublog_live50_simulation PROPERTIES TIMEOUT 60)
     endif()
-    foreach(name adif protocol database countries credentials callbook awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc)
+    foreach(name adif protocol database countries credentials callbook callbookprofile awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc)
         qt_add_executable(tst_${name} tests/tst_${name}.cpp)
         target_link_libraries(tst_${name} PRIVATE decolog_core Qt6::Test)
         set_target_properties(tst_${name} PROPERTIES WIN32_EXECUTABLE OFF)
@@ -776,6 +778,10 @@ if(DECODXLOG_BUILD_TESTS)
     add_test(NAME dxcalendarcache COMMAND tst_dxcalendarcache)
     add_test(NAME newqsotuning COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_newqsotuning.qml)
     set_tests_properties(newqsotuning PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
+    add_test(NAME panelscrollbar COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_panelscrollbar.qml)
+    set_tests_properties(panelscrollbar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
+    add_test(NAME callinfoqrz COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_callinfoqrz.qml)
+    set_tests_properties(callinfoqrz PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
     add_test(NAME clublogcredentials COMMAND tst_maplayers -input ${CMAKE_SOURCE_DIR}/tests/qml/tst_clublogcredentials.qml)
     set_tests_properties(clublogcredentials PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QUICK_CONTROLS_STYLE=Basic")
     # I popup in una finestra sua col campo di testo senza il fuoco non ricevono i tasti:
@@ -787,6 +793,22 @@ if(DECODXLOG_BUILD_TESTS)
     target_link_libraries(tst_qmlpopups PRIVATE Qt6::Test)
     set_target_properties(tst_qmlpopups PROPERTIES WIN32_EXECUTABLE OFF)
     add_test(NAME qmlpopups COMMAND tst_qmlpopups)
+
+    qt_add_executable(tst_journeycolumn tests/tst_journeycolumn.cpp)
+    target_compile_definitions(tst_journeycolumn PRIVATE DECOLOG_APP="$<TARGET_FILE:decolog>")
+    target_include_directories(tst_journeycolumn PRIVATE src)
+    target_link_libraries(tst_journeycolumn PRIVATE decolog_core Qt6::Core Qt6::Test)
+    set_target_properties(tst_journeycolumn PROPERTIES WIN32_EXECUTABLE OFF)
+    add_dependencies(tst_journeycolumn decolog)
+    add_test(NAME journeycolumn COMMAND tst_journeycolumn)
+
+    qt_add_executable(tst_bulkresponsiveness tests/tst_bulkresponsiveness.cpp)
+    target_include_directories(tst_bulkresponsiveness PRIVATE src)
+    target_compile_definitions(tst_bulkresponsiveness PRIVATE DECOLOG_APP="$<TARGET_FILE:decolog>")
+    target_link_libraries(tst_bulkresponsiveness PRIVATE decolog_core Qt6::Core Qt6::Test)
+    set_target_properties(tst_bulkresponsiveness PROPERTIES WIN32_EXECUTABLE OFF)
+    add_dependencies(tst_bulkresponsiveness decolog)
+    add_test(NAME bulkresponsiveness COMMAND tst_bulkresponsiveness)
 
     if(APPLE)
         qt_add_executable(tst_softwaresettings tests/tst_softwaresettings.cpp)

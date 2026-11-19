@@ -40,6 +40,144 @@ class TestQsoModel : public QObject {
     Q_OBJECT
 
 private slots:
+    void deletingRowsPreservesTheTableAndCellAlignment()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); fill(db);
+        QsoTableModel model(&db);
+        model.setSort("call", true);
+        QCOMPARE(model.count(), 4);
+        const qint64 first = model.idAt(0), third = model.idAt(2);
+        const qint64 survivor = model.idAt(1);
+        const QString survivorCall = model.callAt(1);
+        QVERIFY(db.softDeleteQso(first)); QVERIFY(db.softDeleteQso(third));
+        QSignalSpy reset(&model, &QAbstractItemModel::modelReset);
+        QSignalSpy removed(&model, &QAbstractItemModel::rowsRemoved);
+        model.removeDeletedIds({first, third});
+        QCOMPARE(reset.size(), 0);
+        QCOMPARE(removed.size(), 2);
+        QCOMPARE(model.count(), 2);
+        QCOMPARE(model.totalCount(), 2);
+        QCOMPARE(model.idAt(0), survivor);
+        QCOMPARE(model.callAt(0), survivorCall);
+        QCOMPARE(model.rowForId(first), -1);
+        QCOMPARE(model.rowForId(third), -1);
+    }
+    void deletingAHiddenRowRefreshesAChangedVisibleRow()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); fill(db);
+        QsoTableModel model(&db);
+        model.setFilterText("K1ABC");
+        QCOMPARE(model.count(), 1);
+        const qint64 kept = model.idAt(0);
+        QCOMPARE(model.valueAt(0, QsoTableModel::Name), QString()); // populate cache
+        const qint64 hidden = db.latestIds("JA1XX", 1).first();
+        auto record = *db.record(kept);
+        record.set("NAME", "Updated by merge");
+        QCOMPARE(db.updateQso(kept, record).status, InsertResult::Status::Inserted);
+        QVERIFY(db.softDeleteQso(hidden));
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        model.removeDeletedIds({hidden});
+        QCOMPARE(resets.size(), 0);
+        QCOMPARE(model.count(), 1);
+        QCOMPARE(model.valueAt(0, QsoTableModel::Name), QString("Updated by merge"));
+    }
+    void journeyColumnCanBeReorderedAndDoesNotSort()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const qint64 id = db.insertQso({{"CALL", "K1ABC"}, {"QSO_DATE", "20261118"},
+                                       {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        QsoTableModel model(&db);
+        QVERIFY(model.columnLayout().contains("journey"));
+        int available = 0;
+        for (const QVariant& item : model.availableColumns()) {
+            const QVariantMap column = item.toMap();
+            if (column.value("key") == "journey") {
+                ++available;
+                QCOMPARE(column.value("title").toString(), QString("QSO map"));
+            }
+        }
+        QCOMPARE(available, 1);
+        model.setColumnLayout({"journey", "call", "band"});
+        QCOMPARE(model.columnKey(0), QString("journey"));
+        QCOMPARE(model.columnTitle(0), QString("QSO map"));
+        QCOMPARE(model.columnWidthHint(0), 130);
+        QCOMPARE(model.idAt(0), id);
+        QCOMPARE(model.data(model.index(0, 0)).toString(), QString());
+        QCOMPARE(model.data(model.index(0, 1)).toString(), QString("K1ABC"));
+        const QString sort = model.sortKey();
+        model.sortBy("journey");
+        QCOMPARE(model.sortKey(), sort);
+        model.setSort("journey", true);
+        QCOMPARE(model.sortKey(), sort);
+        model.setColumnLayout({"call", "band"});
+        QVERIFY(!model.columnLayout().contains("journey"));
+        model.setColumnLayout({"call", "journey", "band"});
+        QCOMPARE(model.columnKey(1), QString("journey"));
+        QCOMPARE(model.data(model.index(0, 0)).toString(), QString("K1ABC"));
+    }
+    void qslUpdatesPreserveStableRowsAndReapplySortAndFilters()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto add = [&db](const char* call, const char* time) {
+            return db.insertQso({{"CALL", call}, {"QSO_DATE", "20261117"},
+                                 {"TIME_ON", time}, {"BAND", "20m"}, {"MODE", "CW"}}, "manual").id;
+        };
+        const qint64 a = add("K1AAA", "1200");
+        const qint64 b = add("K1BBB", "1201");
+        QVERIFY(a > 0 && b > 0);
+        decolog::core::QslState state;
+        state.service = "eqsl";
+        QVERIFY(db.setQslState(a, state));
+        QVERIFY(db.setQslState(b, state));
+
+        QsoTableModel model(&db);
+        model.setColumnLayout({"call", "eqsl_qsl_sent"});
+        QCOMPARE(model.valueFor(model.rowForId(a), "eqsl_qsl_sent"), QString("N"));
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        QSignalSpy changed(&model, &QAbstractItemModel::dataChanged);
+
+        // A: il vecchio percorso di upload ricostruiva sempre il modello.
+        state.sent = "Y";
+        QVERIFY(db.setQslState(a, state));
+        model.reload();
+        QCOMPARE(resets.size(), 1);
+        QCOMPARE(model.valueFor(model.rowForId(a), "eqsl_qsl_sent"), QString("Y"));
+
+        // B: stessa lista e celle aggiornate, senza reset del TableView.
+        state.sent = "N";
+        QVERIFY(db.setQslState(a, state));
+        model.reloadAfterQslUpdate();
+        QCOMPARE(resets.size(), 1);
+        QVERIFY(!changed.isEmpty());
+        QCOMPARE(model.valueFor(model.rowForId(a), "eqsl_qsl_sent"), QString("N"));
+
+        // Se un ordinamento dipende dallo stato QSL, il cambio di posizione
+        // richiede invece un reset e la lista deve essere riordinata.
+        model.setSort("eqsl_qsl_sent", true);
+        resets.clear();
+        QCOMPARE(model.idAt(0), b);
+        state.sent = "Y";
+        QVERIFY(db.setQslState(b, state));
+        model.reloadAfterQslUpdate();
+        QCOMPARE(resets.size(), 1);
+        QCOMPARE(model.idAt(1), b);
+        QCOMPARE(model.valueFor(model.rowForId(b), "eqsl_qsl_sent"), QString("Y"));
+
+        // I filtri sulle conferme devono includere un QSO appena confermato.
+        model.setQslFilter("eqsl");
+        QCOMPARE(model.count(), 0);
+        resets.clear();
+        state.sent = "N";
+        state.rcvd = "Y";
+        QVERIFY(db.writeQslState(a, state, true));
+        model.reloadAfterQslUpdate();
+        QCOMPARE(resets.size(), 1);
+        QCOMPARE(model.count(), 1);
+        QCOMPARE(model.idAt(0), a);
+    }
+
     void editedRowsAvoidResetUnlessTheirPositionChanges()
     {
         LogDatabase db;

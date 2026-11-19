@@ -1197,6 +1197,38 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <source>Unconfirmed</source>
         <translation>未確認</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>QRZ.com で見る</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>この呼出符号を QRZ.com で開く</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>QRZ.com のプロフィールを確認中…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>QRZ.com のプロフィールを確認できません。接続と QRZ コールブックの設定を確認してください</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>HamQTH で見る</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>この呼出符号を HamQTH で開く（データ: HamQTH.com）</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>HamQTH のプロフィールを確認中…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>HamQTH のプロフィールを確認できません。接続と HamQTH コールブックの設定を確認してください</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3362,6 +3394,10 @@ Decodium で: Settings → Reporting → UDP Server 127.0.0.1、ポート %1、�
         <source>Merge %1 groups</source>
         <translation>%1 グループを統合</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>統合中… %1%</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4418,6 +4454,14 @@ DecoDXLog で一度開いて更新してください。</translation>
     <message>
         <source>QSO map</source>
         <translation>QSO マップ</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>破損した QSO を確認中…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>破損した QSO を確認できませんでした</translation>
     </message>
 </context>
 <context>
@@ -5557,6 +5601,14 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>プレビュー用の一時的な Club Log ダウンロードを準備できません</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>元の QSO がログと一致しなくなりました。</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>元のログは利用できません。</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5713,6 +5765,13 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: コマンドの構文エラー (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">カードにする QSO がありません。</translation>
     </message>
 </context>
 <context>
@@ -6104,6 +6163,18 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>PDF ファイル (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>紙の QSL を書き込み中…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>紙の QSL を更新中…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>紙の QSL を読み込み中…</translation>
     </message>
 </context>
 <context>
@@ -7623,10 +7694,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>足りない DXCC を補う</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 件の QSO を補いました。どれも新しい版として残します。</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>新しい cty.csv を読み込む…</translation>
     </message>
@@ -8433,10 +8500,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>%1 件の QSO を修正</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 件の QSO を修正し、それぞれ新しいリビジョンとして保存しました。</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>削除済み</translation>
     </message>
@@ -9111,6 +9174,14 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>有効な局の直接の OQRS リクエストです。これらは受信した QSL 確認ではありません。</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 件の QSO を更新、%2 件失敗。以前のバージョンは履歴に残ります。</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>バックグラウンドで DXCC を更新中…</translation>
     </message>
 </context>
 <context>
@@ -11125,16 +11196,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>cty.xml of %1: %2 entities</source>
         <translation>%1 の cty.xml: %2 エンティティ</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>%n 件の QSO のエンティティを QSO の日付で修正しました（Club Log）</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>%2 件中 %1 件の QSO に DXCC を入れました (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Decodium から局プロファイルを作りました: %1</translation>
@@ -11667,14 +11728,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>%1 → %2（%3 件の QSO、%4 件変更なし、%5 件失敗）</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO #%1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>重複 %1 グループを統合: %2 件の QSO を削除（履歴に残ります）</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>インポートはすでに実行中です。終わるまでお待ちください。</translation>
     </message>
@@ -11948,12 +12001,6 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Callbook: %1 of %2…</source>
         <translation>コールブック: %2 件中 %1 件…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>古いよくない取り込みで壊れた QSO を %n 件直しました (前の文字は履歴に残ります)。</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>ビルド日 %1 · %2 @ %3</translation>
@@ -12041,6 +12088,50 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Refreshing callsign information</source>
         <translation>コールサイン情報を更新中</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>エンティティの確認中にログが変更されました。もう一度確認してください</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>%2 件中 %1 件の QSO で DXCC を更新（%3 件変更なし、%4 件失敗、データ %5）</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>開いていないログに対するバックグラウンドの変更が完了しました</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>UDP の再送信は既に実行中です</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>UDP の再送信を %2 件中 %1 件で停止しました</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>%1 件の QSO を削除（履歴に保持）、%2 件失敗</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>%2 件の QSO に タグ「%1」を追加（%3 件変更なし、%4 件失敗）</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>%2 件の QSO からタグ「%1」を削除（%3 件変更なし、%4 件失敗）</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>重複グループ %1 件を統合できませんでした</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>重複グループ %1 件を統合：%2 件の QSO を削除（履歴に保持）、%3 件失敗</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>古いインポートの QSO %1 件を修復、%2 件失敗（以前のテキストは履歴に残ります）</translation>
     </message>
 </context>
 <context>
@@ -12330,6 +12421,72 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>Sending stopped.</source>
         <translation>送信をやめました。</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>紙の QSL を読み込めませんでした: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>紙の QSL を集計できませんでした: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>紙の QSL の操作は既に実行中です</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n 件の QSL 確認を更新</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 件失敗: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>前のログでの紙の QSL 操作：%1 件完了、%2 件失敗。%3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>紙の QSL を書き込み中…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>紙の QSL の出力を書き込めませんでした</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>元のログは利用できません。</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>%1 へ QSL を送信しましたが、送信状態を記録できませんでした: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>元の QSO の識別情報がありません。</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>メール用に QSO を読み込み中…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>メールの準備が完了する前にログが変更されました。</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>送信前にログが変更されたため、残りの QSL を停止しました。</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>メールまたはカードの設定が変更されました。送信前に確認してください。</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>ログが変更されたため、残りの QSL を停止しました。</translation>
     </message>
 </context>
 <context>
@@ -13709,6 +13866,14 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>No Club Log credential is stored</source>
         <translation>保存されている Club Log の認証情報はありません</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>読み込み中に認証情報が変更されました。もう一度お試しください</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>システムのキーストアを読み取れません</translation>
     </message>
 </context>
 <context>

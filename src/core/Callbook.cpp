@@ -406,6 +406,7 @@ void CallbookClient::lookup(const QString& callsign)
     // servizio. L'altro, se c'e', si prova lo stesso.
     const QString mark = serviceId(m_provider) + QLatin1Char('|') + call;
     if (const auto it = m_notFound.constFind(mark); it != m_notFound.constEnd() && it->secsTo(now) < 3600) {
+        emit providerResult(call, serviceId(m_provider), {});
         if (!tryFallback(m_provider, call))
             emit failed(call, tr("%1 not found on %2").arg(call, sourceName(m_provider)));
         return;
@@ -420,8 +421,10 @@ void CallbookClient::ask(Provider provider, const QString& call, bool allowFallb
         login(provider, [this, provider, call, allowFallback](const QString& error) {
             if (error.isEmpty()) {
                 query(provider, call, false, allowFallback);
-            } else if (!resolvePending(call) && (!allowFallback || !tryFallback(provider, call))) {
-                emit failed(call, error);
+            } else {
+                emit providerResult(call, serviceId(provider), {});
+                if (!resolvePending(call) && (!allowFallback || !tryFallback(provider, call)))
+                    emit failed(call, error);
             }
         });
     } else {
@@ -500,6 +503,7 @@ void CallbookClient::query(Provider provider, const QString& call, bool retried,
     connect(reply, &QNetworkReply::finished, this, [this, provider, reply, call, retried, allowFallback] {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
+            emit providerResult(call, serviceId(provider), {});
             if (resolvePending(call))
                 return;
             if (!allowFallback || !tryFallback(provider, call))
@@ -510,6 +514,7 @@ void CallbookClient::query(Provider provider, const QString& call, bool retried,
         const auto record = provider == Provider::Qrz ? callbook::parseQrzCallsign(body)
                                                       : callbook::parseHamQthSearch(body);
         if (record) {
+            emit providerResult(call, serviceId(provider), record->call);
             CallbookRecord answer = *record;
             if (const auto waiting = m_pending.constFind(call); waiting != m_pending.constEnd()) {
                 answer = merge(*waiting, *record);
@@ -532,11 +537,15 @@ void CallbookClient::query(Provider provider, const QString& call, bool retried,
             login(provider, [this, provider, call, allowFallback](const QString& error) {
                 if (error.isEmpty())
                     query(provider, call, true, allowFallback);
-                else if (!resolvePending(call) && (!allowFallback || !tryFallback(provider, call)))
-                    emit failed(call, error);
+                else {
+                    emit providerResult(call, serviceId(provider), {});
+                    if (!resolvePending(call) && (!allowFallback || !tryFallback(provider, call)))
+                        emit failed(call, error);
+                }
             });
             return;
         }
+        emit providerResult(call, serviceId(provider), {});
         if (session.error.contains(QLatin1String("not found"), Qt::CaseInsensitive))
             m_notFound.insert(serviceId(provider) + QLatin1Char('|') + call, QDateTime::currentDateTimeUtc());
         // Questo non lo sa: lo sapra' l'altro? E se si stava gia' aspettando

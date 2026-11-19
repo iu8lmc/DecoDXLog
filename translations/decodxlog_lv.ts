@@ -1207,6 +1207,38 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
         <source>Unconfirmed</source>
         <translation>Nav apstiprināts</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Skatīt QRZ.com</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Atvērt šo izsaukuma zīmi QRZ.com</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>Pārbauda QRZ.com profilu…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>QRZ.com profils nav pārbaudīts; pārbaudiet savienojumu un QRZ callbook iestatījumus</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Skatīt HamQTH</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Atvērt šo izsaukuma zīmi HamQTH (dati no HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>Pārbauda HamQTH profilu…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>HamQTH profils nav pārbaudīts; pārbaudiet savienojumu un HamQTH callbook iestatījumus</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3382,6 +3414,10 @@ Decodium: Settings → Reporting → UDP Server 127.0.0.1, ports %1, un &quot;Ac
         <source>Merge %1 groups</source>
         <translation>Apvienot %1 grupas</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Apvieno… %1%</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4438,6 +4474,14 @@ Atver to vienreiz DecoDXLog, lai atjauninātu.</translation>
     <message>
         <source>QSO map</source>
         <translation>QSO karte</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Pārbauda bojātos QSO…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>Bojātos QSO nevarēja pārbaudīt</translation>
     </message>
 </context>
 <context>
@@ -5583,6 +5627,14 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>Pagaidu Club Log lejupielādi nevar sagatavot priekšskatījumam</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>Sākotnējais QSO vairs neatbilst žurnālam.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Sākotnējais žurnāls nav pieejams.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5741,6 +5793,13 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: komandas sintakses kļūda (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Nav neviena QSO, par ko taisīt kartīti.</translation>
     </message>
 </context>
 <context>
@@ -6134,6 +6193,18 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>PDF faili (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Raksta papīra QSL…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Atjaunina papīra QSL…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Ielādē papīra QSL…</translation>
     </message>
 </context>
 <context>
@@ -7667,10 +7738,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Aizpildīt trūkstošos DXCC</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO papildināti, katrs saglabāts kā jauna redakcija.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Ielādēt jaunāku cty.csv…</translation>
     </message>
@@ -8479,10 +8546,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Labot %1 QSO</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>Laboti %1 QSO, katrs saglabāts kā jauna redakcija.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>dzēsta</translation>
     </message>
@@ -9157,6 +9220,14 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Tiešie OQRS pieprasījumi aktīvajai stacijai. Tie nav saņemti QSL apstiprinājumi.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>Atjaunināti %1 QSO, %2 neizdevās; iepriekšējās versijas paliek vēsturē.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>DXCC atjaunināšana fonā…</translation>
     </message>
 </context>
 <context>
@@ -11199,18 +11270,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>%1 cty.xml: %2 teritorijas</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>%n QSO teritorija labota pēc QSO datuma (Club Log)</numerusform>
-            <numerusform>%n QSO teritorijas labotas pēc QSO datuma (Club Log)</numerusform>
-            <numerusform>%n QSO teritorijas labotas pēc QSO datuma (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC aizpildīts %1 no %2 QSO (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Stacijas profils izveidots no Decodium: %1</translation>
@@ -11749,14 +11808,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>%1 → %2 %3 QSO (%4 nemainīti, %5 neizdevās)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO nr. %1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>Apvienotas %1 dubulto grupas: %2 QSO dzēsti (paliek vēsturē)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Jau notiek importēšana: pagaidiet, līdz tā beigsies.</translation>
     </message>
@@ -12044,14 +12095,6 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %1 no %2…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO sakārtots pēc slikta veca importa (iepriekšējais teksts paliek vēsturē).</numerusform>
-            <numerusform>%n QSO sakārtoti pēc slikta veca importa (iepriekšējais teksts paliek vēsturē).</numerusform>
-            <numerusform>%n QSO sakārtoti pēc slikta veca importa (iepriekšējais teksts paliek vēsturē).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>kompilēts %1 · %2 @ %3</translation>
@@ -12139,6 +12182,50 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>Izsaukuma zīmes informācijas atsvaidzināšana</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>Žurnāls mainījās vienību pārbaudes laikā; palaidiet pārbaudi vēlreiz</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC atjaunināts %2 QSO %1 (%3 nemainīti, %4 neizdevās; dati %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>Fona izmaiņas beidzās žurnālā, kas vairs nav atvērts</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>UDP atkārtota sūtīšana jau notiek</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>UDP atkārtota sūtīšana apturēta pēc %1 no %2 QSO</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>Dzēsti %1 QSO (saglabāti vēsturē); %2 neizdevās</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Birka &quot;%1&quot; pievienota %2 QSO (%3 nemainīti, %4 neizdevās)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Birka &quot;%1&quot; noņemta no %2 QSO (%3 nemainīti, %4 neizdevās)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>Nevarēja apvienot %1 dublikātu grupu(as)</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>Apvienotas %1 dublikātu grupas: dzēsti %2 QSO (saglabāti vēsturē); %3 neizdevās</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>Salaboti %1 QSO no vecāka importa; %2 neizdevās (iepriekšējais teksts paliek vēsturē)</translation>
     </message>
 </context>
 <context>
@@ -12444,6 +12531,74 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>Sūtīšana apturēta.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>Nevarēja ielādēt papīra QSL: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>Nevarēja saskaitīt papīra QSL: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>Papīra QSL darbība jau notiek</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n QSL apstiprinājums atjaunināts</numerusform>
+            <numerusform>%n QSL apstiprinājumi atjaunināti</numerusform>
+            <numerusform>%n QSL apstiprinājumu atjaunināti</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 neizdevās: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Papīra QSL darbība iepriekšējā žurnālā: %1 pabeigti, %2 neizdevās. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Raksta papīra QSL…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>Nevarēja ierakstīt papīra QSL izvadi</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Sākotnējais žurnāls nav pieejams.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL nosūtīta uz %1, bet tās nosūtīšanas statusu nevarēja ierakstīt: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>Trūkst sākotnējā QSO identitātes.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>Ielādē QSO e-pastam…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>Žurnāls mainījās, pirms e-pasta sagatavošana bija pabeigta.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>Žurnāls mainījās pirms sūtīšanas; pārējās QSL tika apturētas.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>E-pasta vai kartes iestatījumi mainījās; pārskatiet tos pirms sūtīšanas.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>Žurnāls mainījās; pārējās QSL tika apturētas.</translation>
     </message>
 </context>
 <context>
@@ -13843,6 +13998,14 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>Nav saglabātu Club Log pieteikšanās datu</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>Pieteikšanās dati mainījās lasīšanas laikā; mēģiniet vēlreiz</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>Nevar nolasīt sistēmas atslēgu glabātuvi</translation>
     </message>
 </context>
 <context>

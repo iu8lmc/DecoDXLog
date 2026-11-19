@@ -140,6 +140,31 @@ private slots:
         m_store->m_secretCache.remove(service);
     }
 
+    void simultaneousReadsShareBackendAndRejectStaleResults()
+    {
+        if (!CredentialStore::compiledWithKeychain()) QSKIP("built without qtkeychain");
+        CredentialStore store(QStringLiteral("isolated-mock"));
+        QList<CredentialStore::ReadCallback> backendReplies;
+        store.m_readBackendForTest = [&](const QString&, CredentialStore::ReadCallback reply) {
+            backendReplies.append(std::move(reply));
+        };
+        QStringList received;
+        auto collect = [&](const QString& value, const QString&) { received << value; };
+        store.readSecret("qrz", collect);
+        store.readSecret("qrz", collect);
+        QCOMPARE(backendReplies.size(), 1);
+        backendReplies.takeFirst()("first", {});
+        QCOMPARE(received, QStringList({"first", "first"}));
+        store.m_secretCache.remove("qrz");
+        store.readSecret("qrz", collect);
+        QCOMPARE(backendReplies.size(), 1);
+        ++store.m_secretGeneration["qrz"];
+        store.m_secretCache.insert("qrz", "replacement");
+        backendReplies.takeFirst()("stale", {});
+        QCOMPARE(received.last(), QString());
+        QCOMPARE(store.m_secretCache.value("qrz"), QString("replacement"));
+    }
+
     void deletingClubLogCredentialBlocksReadsBeforeKeystoreCompletes()
     {
         const QString service = QStringLiteral("clublog");
@@ -194,6 +219,35 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(done, 10000);
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(read, m_secret);
+
+        // A: concurrent requests for one service share one keystore job.
+        m_store->m_secretCache.remove(QStringLiteral("qrz"));
+        int completed = 0;
+        QStringList values;
+        for (int i = 0; i < 2; ++i) {
+            m_store->readSecret(QStringLiteral("qrz"), [&](const QString& value, const QString& failure) {
+                if (failure.isEmpty()) values << value;
+                ++completed;
+            });
+        }
+        QCOMPARE(m_store->m_pendingReads.size(), 1);
+        QCOMPARE(m_store->m_pendingReads.cbegin().value().size(), 2);
+        QTRY_COMPARE_WITH_TIMEOUT(completed, 2, 10000);
+        QCOMPARE(values, QStringList({m_secret, m_secret}));
+
+        // B: a read started before replacement must not overwrite a new cache.
+        m_store->m_secretCache.remove(QStringLiteral("qrz"));
+        completed = 0;
+        QString staleError;
+        m_store->readSecret(QStringLiteral("qrz"), [&](const QString&, const QString& failure) {
+            staleError = failure; ++completed;
+        });
+        ++m_store->m_secretGeneration[QStringLiteral("qrz")];
+        m_store->m_secretCache.insert(QStringLiteral("qrz"), QStringLiteral("new-fixture"));
+        QTRY_COMPARE_WITH_TIMEOUT(completed, 1, 10000);
+        QVERIFY(!staleError.isEmpty());
+        QCOMPARE(m_store->m_secretCache.value(QStringLiteral("qrz")), QString("new-fixture"));
+        m_store->m_secretCache.remove(QStringLiteral("qrz"));
 
         // Un segreto vuoto cambia l'account e lascia il segreto.
         spy.clear();

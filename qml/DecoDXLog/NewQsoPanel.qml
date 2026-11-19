@@ -236,6 +236,17 @@ GlassPanel {
             clearForm()
     }
 
+    // Used only by the isolated, explicitly enabled 20k-log UI probe.
+    function probeManualSubmit() {
+        callField.text = "K1MANUAL"
+        dateField.text = decolog.showDate("20000102")
+        timeField.text = "12:00:00"
+        freqField.text = "14.074"
+        modeBox.editText = "FT8"
+        submit()
+        return formError.text
+    }
+
     Component.onCompleted: {
         resetTime()
         txPwrField.text = root.defaultTxPower()

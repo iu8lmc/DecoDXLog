@@ -1201,6 +1201,38 @@ The call Decodium is working shows up here by itself.</source>
         <source>Unconfirmed</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3369,6 +3401,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <source>Merge %1 groups</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4423,6 +4459,14 @@ Open it once in DecoDXLog to bring it up to date.</source>
     </message>
     <message>
         <source>QSO map</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -5563,6 +5607,14 @@ Extra fields are preserved: %8</source>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5720,6 +5772,13 @@ Extra fields are preserved: %8</source>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">No QSO to make a card for.</translation>
     </message>
 </context>
 <context>
@@ -6111,6 +6170,18 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>PDF files (*.pdf)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -7638,10 +7709,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8449,10 +8516,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9126,6 +9189,14 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -11155,17 +11226,6 @@ Extra fields are preserved: %8</source>
         <source>cty.xml of %1: %2 entities</source>
         <translation type="unfinished"></translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation type="unfinished"></translation>
@@ -11701,14 +11761,6 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -11989,13 +12041,6 @@ Extra fields are preserved: %8</source>
         <source>Callbook: %1 of %2…</source>
         <translation type="unfinished"></translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation type="unfinished"></translation>
@@ -12082,6 +12127,50 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>Refreshing callsign information</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -12380,6 +12469,73 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Sending stopped.</source>
         <translation>Sending stopped.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -13768,6 +13924,14 @@ Extra fields are preserved: %8</source>
     </message>
     <message>
         <source>No Club Log credential is stored</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

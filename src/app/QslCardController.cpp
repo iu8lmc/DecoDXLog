@@ -6,6 +6,13 @@
 #include "core/QslCards.h"
 
 #include <QDateTime>
+#include <QElapsedTimer>
+#include <QFileInfo>
+#include <QTimer>
+#include <QPointer>
+#include <QSqlDatabase>
+#include <QSqlError>
+#include <QSqlQuery>
 
 #include <algorithm>
 #include <QDir>
@@ -19,6 +26,7 @@
 #include <QImageReader>
 #include <QPainter>
 #include <QSettings>
+#include <QSet>
 #include <QUrl>
 
 namespace decolog::app {
@@ -44,26 +52,148 @@ QList<qint64> toIds(const QVariantList& list)
     return ids;
 }
 
+QList<QVariantMap> chosenCardRows(LogDatabase& db, const QList<qint64>& ids)
+{
+    if (ids.isEmpty()) return db.cardRows(QStringLiteral("queue"));
+    if (ids.size() <= 500) return db.cardRows(QStringLiteral("all"), 0, ids);
+    const QSet<qint64> wanted(ids.cbegin(), ids.cend());
+    QList<QVariantMap> out;
+    for (const QVariantMap& row : db.cardRows(QStringLiteral("all"))) {
+        if (wanted.contains(row.value(QStringLiteral("id")).toLongLong())) out << row;
+    }
+    return out;
+}
+
+struct CardBatchResult {
+    int changed{0};
+    int failed{0};
+    QString error;
+};
+
+// Runs with a thread-local connection for file-backed logs. Keeping each
+// transaction small allows other log operations to obtain the writer lock.
+CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QString& sent,
+                                const QString& via, bool unanswered, const QString& received,
+                                const QString& expectedUuid = {})
+{
+    CardBatchResult result;
+    if (unanswered) {
+        ids.clear();
+        for (const QVariantMap& row : db.cardRows(QStringLiteral("received"))) {
+            if (row.value(QStringLiteral("sent")).toString() != QLatin1String("Y"))
+                ids << row.value(QStringLiteral("id")).toLongLong();
+        }
+    }
+    if (ids.isEmpty()) return result;
+    QSqlDatabase connection = db.connection();
+    if (!connection.transaction()) {
+        result.failed = int(ids.size()); result.error = connection.lastError().text(); return result;
+    }
+    QElapsedTimer held; held.start();
+    int inBlock = 0;
+    auto commit = [&] {
+        if (connection.commit()) result.changed += inBlock;
+        else {
+            result.failed += inBlock;
+            result.error = connection.lastError().text();
+            connection.rollback();
+        }
+        inBlock = 0;
+    };
+    int done = 0;
+    for (const qint64 id : std::as_const(ids)) {
+        ++done;
+        if (!expectedUuid.isEmpty()) {
+            const auto meta = db.meta(id);
+            if (!meta || meta->uuid != expectedUuid) {
+                ++result.failed;
+                result.error = QObject::tr("The original QSO no longer matches the log.");
+                connection.rollback();
+                result.failed += inBlock + int(ids.size()) - done;
+                return result;
+            }
+        }
+        QslState card; card.service = QStringLiteral("card");
+        for (const QslState& existing : db.qslStatus(id)) {
+            if (existing.service == QLatin1String("card")) { card = existing; break; }
+        }
+        if (!sent.isEmpty()) {
+            if (sent == QLatin1String("Y") && card.sent != QLatin1String("Y")) card.sentDate = today();
+            card.sent = sent;
+        }
+        if (!received.isEmpty()) {
+            if (received == QLatin1String("Y") && card.rcvd != QLatin1String("Y")) card.rcvdDate = today();
+            else if (received == QLatin1String("N")) card.rcvdDate.clear();
+            card.rcvd = received;
+        }
+        if (!via.isEmpty()) card.via = via;
+        QSqlQuery row(connection);
+        bool unrecoverable = false;
+        if (!row.exec(QStringLiteral("SAVEPOINT qsl_card_row"))) {
+            ++result.failed;
+            if (result.error.isEmpty()) result.error = row.lastError().text();
+            unrecoverable = true;
+        } else if (!db.setCardState(id, card)) {
+            ++result.failed;
+            if (result.error.isEmpty()) result.error = db.lastError();
+            QSqlQuery rollback(connection);
+            const bool rolledBack = rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT qsl_card_row"));
+            const bool released = rolledBack && rollback.exec(QStringLiteral("RELEASE SAVEPOINT qsl_card_row"));
+            if (!released) {
+                if (result.error.isEmpty()) result.error = rollback.lastError().text();
+                unrecoverable = true;
+            }
+        } else if (row.exec(QStringLiteral("RELEASE SAVEPOINT qsl_card_row"))) {
+            ++inBlock;
+        } else {
+            ++result.failed;
+            if (result.error.isEmpty()) result.error = row.lastError().text();
+            unrecoverable = true;
+        }
+        if (unrecoverable) {
+            // A trigger may have rolled back the entire transaction. Never
+            // start another savepoint outside it: RELEASE would commit it.
+            connection.rollback();
+            result.failed += inBlock + int(ids.size()) - done;
+            return result;
+        }
+        if (done % 200 == 0 || held.elapsed() >= 250 || done == ids.size()) {
+            commit();
+            if (done < ids.size() && !connection.transaction()) {
+                result.failed += int(ids.size()) - done;
+                if (result.error.isEmpty()) result.error = connection.lastError().text();
+                break;
+            }
+            held.restart();
+        }
+    }
+    return result;
+}
+
 } // namespace
 
 QslCardController::QslCardController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
 {
+    m_cardPool.setMaxThreadCount(1);
+    m_readPool.setMaxThreadCount(1);
+    m_exportPool.setMaxThreadCount(1);
     loadCard();
     loadMail();
 
-    connect(&m_mail, &core::MailSender::sent, this, [this](qint64 id, const QString& to) {
-        ++m_mailSent;
-        // Una QSL partita e' una QSL mandata: la coda lo registra, con la via
-        // elettronica, cosi' non si rimanda la stessa cartolina due volte.
-        touch(id, QStringLiteral("Y"), QString(), QStringLiteral("E"));
-        note(tr("QSL sent to %1").arg(to), QStringLiteral("success"));
-        emit changed();
+    connect(&m_mail, &core::MailSender::sent, this, [this](qint64 tag, const QString& to) {
+        if (!m_mailTargets.contains(tag)) return;
+        const MailTarget target = m_mailTargets.take(tag);
+        if (target.generation == m_mailGeneration) ++m_mailSent;
+        recordConfirmedMail(target.path, target.id, target.uuid, to);
         emit mailChanged();
     });
     connect(&m_mail, &core::MailSender::failed, this,
-            [this](qint64, const QString& to, const QString& error) {
+            [this](qint64 tag, const QString& to, const QString& error) {
+                if (!m_mailTargets.contains(tag)) return;
+                const MailTarget target = m_mailTargets.take(tag);
+                if (target.generation != m_mailGeneration) return;
                 ++m_mailFailed;
                 note(to.isEmpty() ? error : tr("QSL not sent to %1: %2").arg(to, error),
                      QStringLiteral("error"));
@@ -82,12 +212,44 @@ QslCardController::QslCardController(Context context, QObject* parent)
 QVariantList QslCardController::rows(const QString& state, int limit) const
 {
     decolog::StartupSpan trace("QslCardController::rows");
-    QVariantList out;
     if (!m_ctx.db || !m_ctx.db->isOpen())
-        return out;
-    for (const QVariantMap& row : m_ctx.db->cardRows(state, limit))
-        out << row;
-    return out;
+        return {};
+    if (m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:")) {
+        QVariantList rows;
+        for (const QVariantMap& row : m_ctx.db->cardRows(state, limit)) rows << row;
+        return rows;
+    }
+    ensureCacheIdentity();
+    const QString key = state + QLatin1Char(':') + QString::number(limit);
+    const quint64 generation = m_cacheGeneration;
+    if (m_rowsVersion.value(key) != generation && m_rowsPending.value(key) != generation) {
+        m_rowsPending.insert(key, generation);
+        auto* self = const_cast<QslCardController*>(this);
+        emit self->cacheLoadingChanged();
+        QPointer<QslCardController> weak(self);
+        const QString path = m_cachePath;
+        const auto latest = m_cacheLatest;
+        m_readPool.start([weak, path, state, limit, key, generation, latest] {
+            if (latest->load() != generation) return;
+            LogDatabase db;
+            QVariantList rows;
+            const bool ok = db.open(path);
+            if (ok) for (const QVariantMap& row : db.cardRows(state, limit)) rows << row;
+            const QString error = ok ? QString() : db.lastError();
+            if (!weak) return;
+            QMetaObject::invokeMethod(weak.data(), [weak, path, key, generation, ok, error, rows = std::move(rows)]() mutable {
+                if (!weak || weak->m_cacheGeneration != generation || !weak->m_ctx.db
+                    || weak->m_ctx.db->path() != path) return;
+                weak->m_rowsPending.remove(key);
+                weak->m_rowsVersion.insert(key, generation);
+                if (ok) weak->m_cachedRows.insert(key, std::move(rows));
+                else weak->note(weak->tr("Could not load paper QSL: %1").arg(error), QStringLiteral("warning"));
+                emit weak->cacheLoadingChanged();
+                emit weak->changed();
+            }, Qt::QueuedConnection);
+        });
+    }
+    return m_cachedRows.value(key);
 }
 
 QVariantMap QslCardController::counts() const
@@ -96,9 +258,61 @@ QVariantMap QslCardController::counts() const
     if (!m_ctx.db || !m_ctx.db->isOpen())
         return QVariantMap{{QStringLiteral("queue"), 0}, {QStringLiteral("sent"), 0},
                            {QStringLiteral("received"), 0}, {QStringLiteral("unanswered"), 0}};
-    // Contate da SQLite: leggere tutte le cartoline per contarle, su un log
-    // grande, era un secondo a ogni sguardo al pannello.
-    return m_ctx.db->cardCounts();
+    if (m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:"))
+        return m_ctx.db->cardCounts();
+    ensureCacheIdentity();
+    const quint64 generation = m_cacheGeneration;
+    if (m_countsVersion != generation && m_countsPending != generation) {
+        m_countsPending = generation;
+        auto* self = const_cast<QslCardController*>(this);
+        emit self->cacheLoadingChanged();
+        QPointer<QslCardController> weak(self);
+        const QString path = m_cachePath;
+        const auto latest = m_cacheLatest;
+        m_readPool.start([weak, path, generation, latest] {
+            if (latest->load() != generation) return;
+            LogDatabase db;
+            const bool ok = db.open(path);
+            const QVariantMap counts = ok ? db.cardCounts() : QVariantMap();
+            const QString error = ok ? QString() : db.lastError();
+            if (!weak) return;
+            QMetaObject::invokeMethod(weak.data(), [weak, path, generation, ok, error, counts] {
+                if (!weak || weak->m_cacheGeneration != generation || !weak->m_ctx.db
+                    || weak->m_ctx.db->path() != path) return;
+                weak->m_countsPending = 0;
+                weak->m_countsVersion = generation;
+                if (ok) weak->m_cachedCounts = counts;
+                else weak->note(weak->tr("Could not count paper QSL: %1").arg(error), QStringLiteral("warning"));
+                emit weak->cacheLoadingChanged();
+                emit weak->changed();
+            }, Qt::QueuedConnection);
+        });
+    }
+    return m_cachedCounts.isEmpty() ? QVariantMap{{QStringLiteral("queue"), 0}, {QStringLiteral("sent"), 0},
+                                                   {QStringLiteral("received"), 0}, {QStringLiteral("unanswered"), 0}}
+                                    : m_cachedCounts;
+}
+
+void QslCardController::ensureCacheIdentity() const
+{
+    const QString path = m_ctx.db ? m_ctx.db->path() : QString();
+    if (path == m_cachePath) return;
+    m_cachePath = path;
+    ++m_cacheGeneration;
+    m_cacheLatest->store(m_cacheGeneration);
+    m_cachedRows.clear(); m_rowsVersion.clear(); m_rowsPending.clear();
+    m_cachedCounts.clear(); m_countsVersion = m_countsPending = 0;
+}
+
+void QslCardController::invalidateCache()
+{
+    if (m_notifyingLogChange) return;
+    ensureCacheIdentity();
+    ++m_cacheGeneration;
+    m_cacheLatest->store(m_cacheGeneration);
+    m_rowsPending.clear(); m_countsPending = 0;
+    emit cacheLoadingChanged();
+    emit changed();
 }
 
 QVariantList QslCardController::sheets() const
@@ -149,62 +363,90 @@ void QslCardController::touch(qint64 id, const QString& sent, const QString& rcv
     m_ctx.db->setCardState(id, card);
 }
 
+int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent,
+                                   const QString& via, bool unanswered, const QString& received)
+{
+    if (!m_ctx.db || !m_ctx.db->isOpen() || (!unanswered && ids.isEmpty())) return 0;
+    if (m_operationBusy) {
+        note(tr("A paper QSL operation is already running"), QStringLiteral("warning"));
+        return 0;
+    }
+    const QString path = m_ctx.db->path();
+    auto done = [this, sent, unanswered, received](const CardBatchResult& result) {
+        m_operationBusy = false;
+        emit operationChanged();
+        m_status = !received.isEmpty() ? tr("%n QSL confirmation(s) updated", nullptr, result.changed)
+                   : unanswered ? (result.changed ? tr("%n QSL to answer put in the queue", nullptr, result.changed)
+                                                 : tr("no QSL waiting for an answer"))
+                   : sent == QLatin1String("Q") ? tr("%n QSO in the paper queue", nullptr, result.changed)
+                   : sent == QLatin1String("Y") ? tr("%n QSL marked as sent", nullptr, result.changed)
+                                                  : tr("%n QSO taken out of the queue", nullptr, result.changed);
+        if (result.failed > 0)
+            m_status += tr("; %1 failed: %2").arg(result.failed).arg(result.error);
+        note(m_status, result.failed ? QStringLiteral("warning") : QStringLiteral("info"));
+        refresh();
+    };
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        const CardBatchResult result = changeCardBatch(*m_ctx.db, ids, sent, via, unanswered, received);
+        done(result);
+        return result.changed;
+    }
+    m_operationBusy = true;
+    emit operationChanged();
+    QPointer<QslCardController> self(this);
+    m_cardPool.start([self, path, ids, sent, via, unanswered, received] {
+        LogDatabase db;
+        CardBatchResult result;
+        if (db.open(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received);
+        else { result.failed = qMax(1, int(ids.size())); result.error = db.lastError(); }
+        QMetaObject::invokeMethod(self.data(), [self, path, sent, unanswered, received, result] {
+            if (!self) return;
+            self->m_operationBusy = false;
+            emit self->operationChanged();
+            if (!self->m_ctx.db || self->m_ctx.db->path() != path) {
+                self->note(self->tr("Paper QSL operation on the previous log: %1 completed, %2 failed. %3")
+                               .arg(result.changed).arg(result.failed).arg(result.error),
+                           result.failed ? QStringLiteral("warning") : QStringLiteral("info"));
+                return;
+            }
+            self->m_status = !received.isEmpty() ? self->tr("%n QSL confirmation(s) updated", nullptr, result.changed)
+                : unanswered ? (result.changed ? self->tr("%n QSL to answer put in the queue", nullptr, result.changed)
+                                                          : self->tr("no QSL waiting for an answer"))
+                : sent == QLatin1String("Q") ? self->tr("%n QSO in the paper queue", nullptr, result.changed)
+                : sent == QLatin1String("Y") ? self->tr("%n QSL marked as sent", nullptr, result.changed)
+                                               : self->tr("%n QSO taken out of the queue", nullptr, result.changed);
+            if (result.failed > 0)
+                self->m_status += self->tr("; %1 failed: %2").arg(result.failed).arg(result.error);
+            self->note(self->m_status, result.failed ? QStringLiteral("warning") : QStringLiteral("info"));
+            self->refresh();
+        }, Qt::QueuedConnection);
+    });
+    return -1;
+}
+
 void QslCardController::enqueue(const QVariantList& ids, const QString& via)
 {
-    const QList<qint64> list = toIds(ids);
-    for (qint64 id : list)
-        touch(id, QStringLiteral("Q"), QString(), via);
-    if (!list.isEmpty()) {
-        m_status = tr("%n QSO in the paper queue", nullptr, static_cast<int>(list.size()));
-        note(m_status, QStringLiteral("info"));
-    }
-    refresh();
+    changeCards(toIds(ids), QStringLiteral("Q"), via);
 }
 
 int QslCardController::enqueueUnanswered(const QString& via)
 {
-    if (!m_ctx.db || !m_ctx.db->isOpen())
-        return 0;
-    int count = 0;
-    for (const QVariantMap& row : m_ctx.db->cardRows(QStringLiteral("received"))) {
-        if (row.value(QStringLiteral("sent")).toString() == QLatin1String("Y"))
-            continue;
-        touch(row.value(QStringLiteral("id")).toLongLong(), QStringLiteral("Q"), QString(), via);
-        ++count;
-    }
-    m_status = count > 0 ? tr("%n QSL to answer put in the queue", nullptr, count)
-                         : tr("no QSL waiting for an answer");
-    note(m_status, QStringLiteral("info"));
-    refresh();
-    return count;
+    return changeCards({}, QStringLiteral("Q"), via, true);
 }
 
 void QslCardController::markSent(const QVariantList& ids, const QString& via)
 {
-    const QList<qint64> list = toIds(ids);
-    for (qint64 id : list)
-        touch(id, QStringLiteral("Y"), QString(), via);
-    if (!list.isEmpty()) {
-        m_status = tr("%n QSL marked as sent", nullptr, static_cast<int>(list.size()));
-        note(m_status, QStringLiteral("success"));
-    }
-    refresh();
+    changeCards(toIds(ids), QStringLiteral("Y"), via);
 }
 
 void QslCardController::markReceived(qint64 id, bool received)
 {
-    touch(id, QString(), received ? QStringLiteral("Y") : QStringLiteral("N"), QString());
-    refresh();
+    changeCards({id}, {}, {}, false, received ? QStringLiteral("Y") : QStringLiteral("N"));
 }
 
 void QslCardController::drop(const QVariantList& ids)
 {
-    const QList<qint64> list = toIds(ids);
-    for (qint64 id : list)
-        touch(id, QStringLiteral("N"), QString(), QString());
-    if (!list.isEmpty())
-        m_status = tr("%n QSO taken out of the queue", nullptr, static_cast<int>(list.size()));
-    refresh();
+    changeCards(toIds(ids), QStringLiteral("N"), QString());
 }
 
 QString QslCardController::writeLabels(const QUrl& file, const QString& sheetId, int perLabel, bool guides)
@@ -212,6 +454,10 @@ QString QslCardController::writeLabels(const QUrl& file, const QString& sheetId,
     if (!m_ctx.db || !m_ctx.db->isOpen())
         return {};
     const QString path = file.isLocalFile() ? file.toLocalFile() : file.toString();
+    if (!m_ctx.db->path().isEmpty() && m_ctx.db->path() != QLatin1String(":memory:")) {
+        startOutput(0, path, {}, sheetId, perLabel, guides);
+        return {};
+    }
     const QList<QVariantMap> queued = m_ctx.db->cardRows(QStringLiteral("queue"));
     const QList<qslcard::Label> labels = qslcard::group(queued, perLabel);
     const QVariantMap station = m_ctx.station ? m_ctx.station() : QVariantMap{};
@@ -228,6 +474,69 @@ QString QslCardController::writeLabels(const QUrl& file, const QString& sheetId,
     note(tr("QSL labels: %1 (%2)").arg(m_status, path), QStringLiteral("success"));
     emit changed();
     return path;
+}
+
+void QslCardController::startOutput(int kind, const QString& path, const QVariantList& selected,
+                                    const QString& sheetId, int perPage, bool guides)
+{
+    if (m_exportBusy || !m_ctx.db || !m_ctx.db->isOpen()) return;
+    if (m_operationBusy) {
+        note(tr("A paper QSL operation is already running"), QStringLiteral("warning"));
+        return;
+    }
+    const QString dbPath = m_ctx.db->path();
+    const QList<qint64> ids = toIds(selected);
+    const QVariantMap station = stationInfo();
+    const auto card = m_card;
+    m_exportBusy = true;
+    m_status = tr("Writing paper QSL…");
+    emit exportBusyChanged();
+    emit changed();
+    QPointer<QslCardController> self(this);
+    m_exportPool.start([self, kind, path, dbPath, ids, sheetId, perPage, guides, station, card] {
+        LogDatabase db;
+        bool ok = db.open(dbPath);
+        QString error = ok ? QString() : db.lastError();
+        QString last = path;
+        int count = 0;
+        if (ok && kind == 0) {
+            const auto labels = qslcard::group(db.cardRows(QStringLiteral("queue")), perPage);
+            count = int(labels.size());
+            ok = qslcard::writePdf(path, labels, qslcard::sheetById(sheetId), station, guides, &error);
+        } else if (ok) {
+            const QList<QVariantMap> qsos = chosenCardRows(db, ids);
+            count = int(qsos.size());
+            if (qsos.isEmpty()) {
+                ok = false;
+                error = QCoreApplication::translate("QslCardController", "No QSO to make a card for.");
+            } else if (kind == 1) {
+                ok = qsldesign::writePdf(path, card, qsos, station, perPage, &error);
+            } else {
+                QStringList written;
+                ok = qsldesign::writePng(path, card, qsos, station, &written, &error);
+                count = int(written.size());
+                if (!written.isEmpty()) last = written.last();
+            }
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, kind, path, ok, error, last, count] {
+            if (!self) return;
+            self->m_exportBusy = false;
+            emit self->exportBusyChanged();
+            if (!ok) {
+                self->m_status = error.isEmpty() ? self->tr("Could not write the paper QSL output") : error;
+                self->note(self->m_status, QStringLiteral("error"));
+            } else {
+                self->m_lastFile = last;
+                self->m_status = kind == 0 ? self->tr("%n label(s) written", nullptr, count)
+                                           : self->tr("%n card(s) written", nullptr, count);
+                self->note(kind == 0 ? self->tr("QSL labels: %1 (%2)").arg(self->m_status, path)
+                                     : self->tr("QSL cards: %1 (%2)").arg(self->m_status, QDir::toNativeSeparators(path)),
+                           QStringLiteral("success"));
+            }
+            emit self->changed();
+        }, Qt::QueuedConnection);
+    });
 }
 
 
@@ -476,26 +785,19 @@ QVariantMap QslCardController::sampleQso() const
 
 QList<QVariantMap> QslCardController::chosenQsos(const QVariantList& ids) const
 {
-    QList<QVariantMap> out;
     if (!m_ctx.db || !m_ctx.db->isOpen())
-        return out;
-    if (ids.isEmpty()) {
-        // Senza scelta si stampa la coda: e' quello che si vuole quasi sempre.
-        for (const QVariantMap& row : m_ctx.db->cardRows(QStringLiteral("queue")))
-            out << row;
-        return out;
-    }
-    const QList<qint64> wanted = toIds(ids);
-    for (const QVariantMap& row : m_ctx.db->cardRows(QStringLiteral("all"))) {
-        if (wanted.contains(row.value(QStringLiteral("id")).toLongLong()))
-            out << row;
-    }
-    return out;
+        return {};
+    return chosenCardRows(*m_ctx.db, toIds(ids));
 }
 
 QString QslCardController::writeCardsPdf(const QUrl& file, const QVariantList& ids, int perPage)
 {
     const QString path = file.isLocalFile() ? file.toLocalFile() : file.toString();
+    if (m_ctx.db && m_ctx.db->isOpen() && !m_ctx.db->path().isEmpty()
+        && m_ctx.db->path() != QLatin1String(":memory:")) {
+        startOutput(1, path, ids, {}, perPage, false);
+        return {};
+    }
     const QList<QVariantMap> qsos = chosenQsos(ids);
     if (qsos.isEmpty()) {
         m_status = tr("No QSO to make a card for.");
@@ -520,6 +822,11 @@ QString QslCardController::writeCardsPdf(const QUrl& file, const QVariantList& i
 QString QslCardController::writeCardsPng(const QUrl& folder, const QVariantList& ids)
 {
     const QString dir = folder.isLocalFile() ? folder.toLocalFile() : folder.toString();
+    if (m_ctx.db && m_ctx.db->isOpen() && !m_ctx.db->path().isEmpty()
+        && m_ctx.db->path() != QLatin1String(":memory:")) {
+        startOutput(2, dir, ids, {}, 0, false);
+        return {};
+    }
     const QList<QVariantMap> qsos = chosenQsos(ids);
     if (qsos.isEmpty()) {
         m_status = tr("No QSO to make a card for.");
@@ -618,7 +925,7 @@ QVariantMap QslCardController::mail() const
 
 bool QslCardController::mailBusy() const
 {
-    return m_mailWaiting > 0 || m_mail.busy();
+    return m_mailPreparing || m_mailWaiting > 0 || m_mail.busy() || m_mailPendingRecords > 0;
 }
 
 void QslCardController::setMail(const QVariantMap& settings)
@@ -678,6 +985,59 @@ void QslCardController::setMailRoute(const QString& route)
     emit mailChanged();
 }
 
+bool QslCardController::mailOriginIsCurrent() const
+{
+    return m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path() == m_mailOriginPath;
+}
+
+void QslCardController::recordConfirmedMail(const QString& path, qint64 id,
+                                            const QString& uuid, const QString& email)
+{
+    ++m_mailPendingRecords;
+    emit mailChanged();
+    const auto complete = [this, path, email](const CardBatchResult& result) {
+        --m_mailPendingRecords;
+        if (result.changed == 1 && result.failed == 0) {
+            note(tr("QSL sent to %1").arg(email), QStringLiteral("success"));
+            if (m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path() == path) refresh();
+        } else {
+            const QString detail = result.error.isEmpty() ? tr("The original log is unavailable.") : result.error;
+            note(tr("QSL sent to %1, but its sent status could not be recorded: %2")
+                     .arg(email, detail), QStringLiteral("warning"));
+        }
+        emit mailChanged();
+    };
+    if (uuid.isEmpty()) {
+        CardBatchResult result; result.failed = 1;
+        result.error = tr("The original QSO identity is missing.");
+        complete(result);
+        return;
+    }
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        CardBatchResult result;
+        if (mailOriginIsCurrent())
+            result = changeCardBatch(*m_ctx.db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid);
+        else { result.failed = 1; result.error = tr("The original log is unavailable."); }
+        complete(result);
+        return;
+    }
+    QPointer<QslCardController> self(this);
+    m_cardPool.start([self, path, id, uuid, complete] {
+        CardBatchResult result;
+        LogDatabase db;
+        if (!QFileInfo::exists(path)) {
+            result.failed = 1; result.error = QObject::tr("The original log is unavailable.");
+        } else if (!db.open(path)) {
+            result.failed = 1; result.error = db.lastError();
+        } else {
+            result = changeCardBatch(db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid);
+        }
+        if (self) QMetaObject::invokeMethod(self.data(), [self, complete, result] {
+            if (self) complete(result);
+        }, Qt::QueuedConnection);
+    });
+}
+
 // Il Cloud fa da ponte: la cartolina va li', e la casella ce l'ha il server.
 // Cosi' sul computer dell'operatore non c'e' nessuna password di posta.
 void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& email,
@@ -717,20 +1077,30 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
     };
 
     ++m_mailWaiting;
+    const quint64 generation = m_mailGeneration;
+    const QString originPath = m_mailOriginPath;
+    const QString uuid = qso.value(QStringLiteral("uuid")).toString();
     QNetworkReply* reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, id, call, email] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, id, email, generation, originPath, uuid] {
         reply->deleteLater();
         // Fermato a meta': i conti sono gia' azzerati, non si tocca piu' niente.
         if (reply->error() == QNetworkReply::OperationCanceledError)
             return;
-        --m_mailWaiting;
         const int code = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (generation != m_mailGeneration) {
+            // A confirmed response may already have been delivered when the
+            // user pressed Stop. Preserve the real sent state without touching
+            // counters of any newer batch.
+            if (code == 200) {
+                recordConfirmedMail(originPath, id, uuid, email);
+            }
+            return;
+        }
+        --m_mailWaiting;
         const QJsonObject answer = QJsonDocument::fromJson(reply->readAll()).object();
         if (code == 200) {
             ++m_mailSent;
-            touch(id, QStringLiteral("Y"), QString(), QStringLiteral("E"));
-            note(tr("QSL sent to %1").arg(email), QStringLiteral("success"));
-            emit changed();
+            recordConfirmedMail(originPath, id, uuid, email);
         } else {
             ++m_mailFailed;
             const QString detail = answer.value(QStringLiteral("detail")).toString();
@@ -757,7 +1127,10 @@ void QslCardController::queueCard(const QVariantMap& qso, const QString& email)
 
     const QString call = qso.value(QStringLiteral("call")).toString().toUpper();
     core::MailMessage message;
-    message.tag = qso.value(QStringLiteral("id")).toLongLong();
+    message.tag = ++m_mailNextTag;
+    m_mailTargets.insert(message.tag, MailTarget{m_mailOriginPath,
+        qso.value(QStringLiteral("id")).toLongLong(),
+        qso.value(QStringLiteral("uuid")).toString(), m_mailGeneration});
     message.to = email;
     message.subject = fill(QSettings().value(QStringLiteral("mail/subject"),
                                              QLatin1String(kDefaultSubject)).toString(),
@@ -772,10 +1145,9 @@ void QslCardController::queueCard(const QVariantMap& qso, const QString& email)
 
 void QslCardController::sendCardsByEmail(const QVariantList& ids)
 {
-    const QList<QVariantMap> qsos = chosenQsos(ids);
-    if (qsos.isEmpty()) {
-        m_mailStatus = tr("No QSO to send a card to.");
-        note(m_mailStatus, QStringLiteral("warning"));
+    if (mailBusy()) return;
+    if (m_operationBusy) {
+        m_mailStatus = tr("A paper QSL operation is already running");
         emit mailChanged();
         return;
     }
@@ -799,7 +1171,63 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
         emit mailChanged();
         return;
     }
+    const quint64 generation = ++m_mailGeneration;
+    if (!m_ctx.db || !m_ctx.db->isOpen()) {
+        m_mailStatus = tr("No QSO to send a card to.");
+        emit mailChanged();
+        return;
+    }
+    const QString path = m_ctx.db->path();
+    m_mailOriginPath = path;
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        beginMail(chosenQsos(ids), generation);
+        return;
+    }
+    m_mailPreparing = true;
+    m_mailStatus = tr("Loading QSO for email…");
+    emit mailChanged();
+    QPointer<QslCardController> self(this);
+    const QList<qint64> selected = toIds(ids);
+    m_readPool.start([self, path, selected, generation] {
+        LogDatabase db;
+        const bool ok = db.open(path);
+        const QList<QVariantMap> rows = ok ? chosenCardRows(db, selected) : QList<QVariantMap>();
+        const QString error = ok ? QString() : db.lastError();
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, generation, ok, error, rows] {
+            if (!self || self->m_mailGeneration != generation) return;
+            self->m_mailPreparing = false;
+            if (!ok || !self->m_ctx.db || self->m_ctx.db->path() != path) {
+                self->m_mailStatus = ok ? self->tr("The log changed before email preparation completed.") : error;
+                self->note(self->m_mailStatus, QStringLiteral("warning"));
+                emit self->mailChanged();
+                return;
+            }
+            self->beginMail(rows, generation);
+        }, Qt::QueuedConnection);
+    });
+}
 
+void QslCardController::beginMail(const QList<QVariantMap>& qsos, quint64 generation)
+{
+    if (generation != m_mailGeneration) return;
+    if (!mailOriginIsCurrent()) {
+        m_mailStatus = tr("The log changed before sending; the remaining QSLs were stopped.");
+        note(m_mailStatus, QStringLiteral("warning"));
+        emit mailChanged();
+        return;
+    }
+    if (qsos.isEmpty()) {
+        m_mailStatus = tr("No QSO to send a card to.");
+        note(m_mailStatus, QStringLiteral("warning"));
+        emit mailChanged();
+        return;
+    }
+    if (!mail().value(QStringLiteral("ready")).toBool() || m_card.fields.isEmpty() || !m_ctx.emailFor) {
+        m_mailStatus = tr("The email or card settings changed; review them before sending.");
+        emit mailChanged();
+        return;
+    }
     m_mailSent = 0;
     m_mailFailed = 0;
     m_mailWaiting = static_cast<int>(qsos.size());
@@ -808,7 +1236,7 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
 
     // Dal Cloud la password non serve: ce l'ha il server. Si parte e basta.
     if (mailRoute() == QLatin1String("cloud")) {
-        lookupAndSend(qsos);
+        lookupAndSend(qsos, generation);
         return;
     }
     // Dalla propria casella invece serve, e sta nel portachiavi: si chiede una
@@ -819,48 +1247,88 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
         emit mailChanged();
         return;
     }
-    m_ctx.credentials->readSecret(QStringLiteral("mail"), [this, qsos](const QString& secret,
+    QPointer<QslCardController> self(this);
+    m_ctx.credentials->readSecret(QStringLiteral("mail"), [self, qsos, generation](const QString& secret,
                                                                       const QString& error) {
+        if (!self || self->m_mailGeneration != generation) return;
         if (secret.isEmpty()) {
-            m_mailWaiting = 0;
-            m_mailStatus = error.isEmpty()
-                               ? tr("No password for the outgoing mailbox.")
+            self->m_mailWaiting = 0;
+            self->m_mailStatus = error.isEmpty()
+                               ? self->tr("No password for the outgoing mailbox.")
                                : error;
-            note(m_mailStatus, QStringLiteral("error"));
-            emit mailChanged();
+            self->note(self->m_mailStatus, QStringLiteral("error"));
+            emit self->mailChanged();
             return;
         }
-        core::MailAccount account = m_mail.account();
+        core::MailAccount account = self->m_mail.account();
         account.password = secret;
-        m_mail.setAccount(account);
-        lookupAndSend(qsos);
+        self->m_mail.setAccount(account);
+        self->lookupAndSend(qsos, generation);
     });
 }
 
-void QslCardController::lookupAndSend(const QList<QVariantMap>& qsos)
+void QslCardController::lookupAndSend(const QList<QVariantMap>& qsos, quint64 generation)
 {
-    for (const QVariantMap& qso : qsos) {
-        const QString call = qso.value(QStringLiteral("call")).toString();
-        m_ctx.emailFor(call, [this, qso, call](const QString& email, const QString& why) {
-            --m_mailWaiting;
-            if (email.isEmpty()) {
-                ++m_mailFailed;
-                note(tr("%1: no email in the callbook (%2)").arg(call, why),
-                     QStringLiteral("warning"));
-                emit mailChanged();
-            } else {
-                queueCard(qso, email);
-            }
-            if (m_mailWaiting == 0 && !m_mail.busy()) {
-                m_mailStatus = tr("%1 sent, %2 not").arg(m_mailSent).arg(m_mailFailed);
-                emit mailChanged();
-            }
-        });
-    }
+    // Callbook hits can answer synchronously and render a card immediately.
+    // Yield between small groups so a large selection cannot monopolize the
+    // event loop and Stop can prevent further lookup/send requests.
+    const auto rows = std::make_shared<QList<QVariantMap>>(qsos);
+    const auto next = std::make_shared<qsizetype>(0);
+    const auto pump = std::make_shared<std::function<void()>>();
+    const std::weak_ptr<std::function<void()>> weakPump = pump;
+    QPointer<QslCardController> self(this);
+    *pump = [self, rows, next, weakPump, generation] {
+        if (!self || self->m_mailGeneration != generation) return;
+        if (!self->mailOriginIsCurrent()) {
+            self->cancelMail();
+            self->m_mailStatus = self->tr("The log changed; the remaining QSLs were stopped.");
+            self->note(self->m_mailStatus, QStringLiteral("warning"));
+            emit self->mailChanged();
+            return;
+        }
+        QElapsedTimer slice; slice.start();
+        int started = 0;
+        while (self && self->m_mailGeneration == generation && *next < rows->size()
+               && started < 8 && (started == 0 || slice.elapsed() < 10)) {
+            const QVariantMap qso = rows->at((*next)++);
+            const QString call = qso.value(QStringLiteral("call")).toString();
+            ++started;
+            self->m_ctx.emailFor(call, [self, qso, call, generation](const QString& email, const QString& why) {
+                if (!self || self->m_mailGeneration != generation) return;
+                if (!self->mailOriginIsCurrent()) {
+                    self->cancelMail();
+                    self->m_mailStatus = self->tr("The log changed; the remaining QSLs were stopped.");
+                    self->note(self->m_mailStatus, QStringLiteral("warning"));
+                    emit self->mailChanged();
+                    return;
+                }
+                --self->m_mailWaiting;
+                if (email.isEmpty()) {
+                    ++self->m_mailFailed;
+                    self->note(self->tr("%1: no email in the callbook (%2)").arg(call, why),
+                               QStringLiteral("warning"));
+                    emit self->mailChanged();
+                } else {
+                    self->queueCard(qso, email);
+                }
+                if (self->m_mailWaiting == 0 && !self->m_mail.busy()) {
+                    self->m_mailStatus = self->tr("%1 sent, %2 not").arg(self->m_mailSent).arg(self->m_mailFailed);
+                    emit self->mailChanged();
+                }
+            });
+        }
+        if (self && self->m_mailGeneration == generation && *next < rows->size()) {
+            if (const auto continuation = weakPump.lock())
+                QTimer::singleShot(0, self.data(), [continuation] { (*continuation)(); });
+        }
+    };
+    (*pump)();
 }
 
 void QslCardController::cancelMail()
 {
+    ++m_mailGeneration;
+    m_mailPreparing = false;
     // Quelle gia' consegnate al Cloud sono partite e non tornano indietro; le
     // altre si fermano qui, prima di uscire.
     if (m_network) {
@@ -870,15 +1338,19 @@ void QslCardController::cancelMail()
     }
     m_mailWaiting = 0;
     m_mail.cancel();
+    m_mailTargets.clear();
     m_mailStatus = tr("Sending stopped.");
     emit mailChanged();
 }
 
 void QslCardController::refresh()
 {
-    if (m_ctx.logChanged)
+    invalidateCache();
+    if (m_ctx.logChanged) {
+        m_notifyingLogChange = true;
         m_ctx.logChanged();
-    emit changed();
+        m_notifyingLogChange = false;
+    }
 }
 
 } // namespace decolog::app

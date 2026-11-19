@@ -60,6 +60,25 @@ struct BulkEditResult {
     int failed{0};
     QStringList errors;     // i primi, con il nominativo
     QList<qint64> changedIds;
+    QStringList pendingServices;
+};
+
+struct MergeGroup {
+    qint64 keep{0};
+    QList<qint64> others;
+};
+
+struct RepairBatchResult {
+    BulkEditResult changes;
+    QList<qint64> emptiedIds;
+};
+
+struct MergeBatchResult {
+    QList<qint64> keptIds;
+    QList<qint64> removedIds;
+    int failed{0};
+    QStringList errors;
+    QStringList pendingServices;
 };
 
 struct ApiIdempotencyRecord {
@@ -237,6 +256,8 @@ public:
     // Cancellazione morbida: la riga resta, marcata deleted, e lo storico la
     // conserva.
     bool softDeleteQso(qint64 id);
+    BulkEditResult softDeleteBatch(const QList<qint64>& ids,
+                                   const std::function<void(int, int)>& progress = {});
     bool recordEnrichment(const QList<EnrichmentEntry>& entries);
     QList<EnrichmentEntry> enrichments(qint64 qsoId) const;
     bool undoEnrichment(qint64 qsoId, const QString& field);
@@ -246,9 +267,10 @@ public:
     // `onlyEmpty`: solo dove il campo e' vuoto. Un valore vuoto svuota il campo.
     // Uno stato QSL messo a Y prende la data di oggi, se non ne ha una. Il campo
     // "@profile" e' il profilo di stazione (il valore e' il suo id). A blocchi
-    // di 500 QSO, ognuno nella sua transazione, e dopo ogni blocco `progress`.
+    // a blocchi, ognuno nella sua transazione, e dopo ogni blocco `progress`.
     BulkEditResult bulkEdit(const QList<qint64>& ids, const QString& field, const QString& value, bool onlyEmpty,
-                            const std::function<void(int done, int total)>& progress = {});
+                            const std::function<void(int done, int total)>& progress = {},
+                            const QStringList& automaticServices = {});
 
     // I doppioni: stesso nominativo, banda, gruppo di modo (CW, fonia, digitali)
     // e profilo di stazione, e ognuno entro `windowSeconds` dal QSO prima. Un
@@ -259,6 +281,8 @@ public:
     // le conferme (una Y vince), le etichette e il riferimento remoto dove lui
     // non ne ha; gli altri si cancellano (morbido, restano nello storico).
     InsertResult mergeQsos(qint64 keep, const QList<qint64>& others);
+    MergeBatchResult mergeBatch(const QList<MergeGroup>& groups, const QStringList& automaticServices = {},
+                                const std::function<void(int, int)>& progress = {});
 
     // Il log conosce gia' questo QSO? Stessa banda, ora entro la finestra dei
     // doppioni digitali, e lo stesso nominativo: adesso o in una versione
@@ -367,6 +391,10 @@ public:
     // contata in byte anziche' in caratteri tagliava il valore a meta' e ci
     // lasciava dentro il pezzo del tag successivo ("Vilnius<GRIDSQ").
     QList<qint64> idsWithDamagedText() const;
+    RepairBatchResult repairDamagedFields(const std::function<void(int, int)>& progress = {});
+    BulkEditResult updateRecordsBatch(const QList<qint64>& ids, const QString& reason,
+                                      const std::function<bool(qint64, AdifRecord&)>& change,
+                                      const std::function<void(int, int)>& progress = {});
 
     // E' il primo QSO FT2 con il suo DXCC, in ordine di tempo?
     bool isFirstFt2Dxcc(qint64 id) const;
@@ -415,6 +443,9 @@ public:
     // vecchio. `limit` 0 = tutti.
     // `since`: solo i QSO da quel giorno in poi (UTC); non valida = tutti.
     QList<qint64> qsosToUpload(const QString& service, int limit = 0, const QDate& since = {}) const;
+    // Preserve changes made by background QSL operations while an editor is open.
+    static void mergeUneditedQslFields(AdifRecord& edited, const AdifRecord& current,
+                                       const QSet<QString>& touched);
     // Conta anche le cancellazioni da mandare (CRX).
     int uploadPendingCount(const QString& service, const QDate& since = {}) const;
     // I servizi dove un QSO si corregge e si cancella, non solo si aggiunge:
@@ -422,7 +453,7 @@ public:
     static QStringList editableServices();
     // Un QSO gia' su quei servizi e poi corretto qui torna in coda ("R"), e
     // partira' come modifica del QSO che hanno gia'.
-    void queueRemoteEdit(qint64 id);
+    bool queueRemoteEdit(qint64 id);
     // Il nominativo di un QSO e' stato corretto: quello che LoTW, QRZ, Club Log, HRDLog ed eQSL
     // hanno ricevuto, senza che nessuno lo confermasse, e' il QSO sbagliato, e il giusto non e'
     // mai partito. Quei servizi tornano «da mandare» (R); i confermati restano come sono — una
@@ -465,7 +496,7 @@ public:
     // ── QSL di carta ─────────────────────────────────────────────────────────
     // La coda delle cartacee: `state` e' "queue" (da mandare), "sent", "received"
     // o "all". Ogni riga ha quello che serve a un'etichetta e alla tabella.
-    QList<QVariantMap> cardRows(const QString& state, int limit = 0) const;
+    QList<QVariantMap> cardRows(const QString& state, int limit = 0, const QList<qint64>& ids = {}) const;
     // Quante cartoline in coda, inviate, ricevute, e ricevute senza risposta:
     // contate da SQLite, senza leggere le righe.
     QVariantMap cardCounts() const;
@@ -489,6 +520,8 @@ public:
     // Aggiunge o toglie un'etichetta a piu' QSO; ognuno cambiato diventa una
     // nuova revisione. Restituisce quanti QSO sono cambiati.
     int setTag(const QList<qint64>& ids, const QString& tag, bool add);
+    BulkEditResult setTagBatch(const QList<qint64>& ids, const QString& tag, bool add,
+                               const std::function<void(int, int)>& progress = {});
 
     // ── Profili stazione ─────────────────────────────────────────────────────
     QList<StationProfile> stationProfiles(bool includeDeleted = true) const;

@@ -843,6 +843,19 @@ int main(int argc, char* argv[])
     DxCalendarCache dxCalendarCache;
     engine.rootContext()->setContextProperty(QStringLiteral("dxCalendarCache"), &dxCalendarCache);
     engine.rootContext()->setContextProperty(QStringLiteral("decolog"), &controller);
+    // The bulk UI regression probe can modify and delete records. Only allow
+    // it against an explicitly marked test root with isolated settings and DB.
+    const QString bulkTestRoot = QFileInfo(qEnvironmentVariable("DECODXLOG_DATA_ROOT")).canonicalFilePath();
+    const QString bulkTestDb = QFileInfo(dbPath).canonicalFilePath();
+    const QString bulkTestSettings = settingsAt >= 0 && settingsAt + 1 < rawArguments.size()
+        ? QFileInfo(rawArguments.at(settingsAt + 1)).canonicalFilePath() : QString();
+    const QString rootPrefix = bulkTestRoot + QLatin1Char('/');
+    QFile bulkMarker(QDir(bulkTestRoot).filePath(QStringLiteral(".decodxlog-bulk-test")));
+    const bool markerValid = bulkMarker.open(QIODevice::ReadOnly) && bulkMarker.readAll() == QByteArrayLiteral("synthetic-test-only\n");
+    const bool bulkTestProbeAllowed = qEnvironmentVariableIntValue("DECODXLOG_BULK_TEST_MODE") == 1
+        && parser.isSet(dbOption) && !bulkTestRoot.isEmpty() && bulkTestRoot != QDir::rootPath()
+        && bulkTestDb.startsWith(rootPrefix) && bulkTestSettings.startsWith(rootPrefix) && markerValid;
+    engine.rootContext()->setContextProperty(QStringLiteral("bulkTestProbeAllowed"), bulkTestProbeAllowed);
     // La finestra principale puo' sparire prima che QObject inizi a distruggere
     // i controller. Chiudiamo esplicitamente socket, timer e code mentre Qt e'
     // ancora in grado di consegnare gli ultimi eventi di spegnimento.

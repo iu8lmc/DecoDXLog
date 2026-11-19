@@ -1202,6 +1202,38 @@ El indicativo que Decodium está trabajando aparece aquí solo.</translation>
         <source>Unconfirmed</source>
         <translation>No confirmado</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Ver en QRZ.com</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Abrir este indicativo en QRZ.com</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>Comprobando el perfil de QRZ.com…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>Perfil de QRZ.com no verificado; comprueba la conexión y la configuración del callbook de QRZ</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Ver en HamQTH</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Abrir este indicativo en HamQTH (datos de HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>Comprobando el perfil de HamQTH…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>Perfil de HamQTH no verificado; comprueba la conexión y la configuración del callbook de HamQTH</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3372,6 +3404,10 @@ En Decodium: Settings → Reporting → UDP Server 127.0.0.1, puerto %1, y &quot
         <source>Merge %1 groups</source>
         <translation>Unir %1 grupos</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Uniendo… %1 %</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4428,6 +4464,14 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>QSO map</source>
         <translation>Mapa de QSO</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Comprobando QSO dañados…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>No se pudieron comprobar los QSO dañados</translation>
     </message>
 </context>
 <context>
@@ -5570,6 +5614,14 @@ Campos extra conservados: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>No se puede preparar la descarga temporal de Club Log para la vista previa</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>El QSO original ya no coincide con el registro.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>El registro original no está disponible.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5727,6 +5779,13 @@ Campos extra conservados: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: error de sintaxis del comando (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Ningún QSO del que hacer una tarjeta.</translation>
     </message>
 </context>
 <context>
@@ -6119,6 +6178,18 @@ Campos extra conservados: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>Ficheros PDF (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Escribiendo QSL en papel…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Actualizando QSL en papel…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Cargando QSL en papel…</translation>
     </message>
 </context>
 <context>
@@ -7645,10 +7716,6 @@ Campos extra conservados: %8</translation>
         <translation>Completar los DXCC que faltan</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO completados, cada uno guardado como versión nueva.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Cargar un cty.csv más reciente…</translation>
     </message>
@@ -8456,10 +8523,6 @@ Campos extra conservados: %8</translation>
         <translation>Corregir %1 QSO</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 QSO corregidos, cada uno guardado como nueva revisión.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>eliminada</translation>
     </message>
@@ -9134,6 +9197,14 @@ Campos extra conservados: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Solicitudes OQRS directas para la estación activa. No son confirmaciones QSL recibidas.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO actualizados, %2 con error; las versiones anteriores se conservan en el historial.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>Actualizando DXCC en segundo plano…</translation>
     </message>
 </context>
 <context>
@@ -11162,17 +11233,6 @@ Campos extra conservados: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>cty.xml del %1: %2 entidades</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>Entidad de %n QSO corregida con la fecha del QSO (Club Log)</numerusform>
-            <numerusform>Entidades de %n QSO corregidas con la fecha del QSO (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC completado en %1 de %2 QSO (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Perfil de estación creado desde Decodium: %1</translation>
@@ -11708,14 +11768,6 @@ Campos extra conservados: %8</translation>
         <translation>%1 → %2 en %3 QSO (%4 sin cambios, %5 fallidos)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO n.º %1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>Unidos %1 grupos de duplicados: %2 QSO borrados (quedan en el historial)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Ya hay una importación en marcha: espera a que termine.</translation>
     </message>
@@ -11996,13 +12048,6 @@ Campos extra conservados: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %1 de %2…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO arreglado tras una importación antigua defectuosa (el texto anterior se queda en el historial).</numerusform>
-            <numerusform>%n QSO arreglados tras una importación antigua defectuosa (el texto anterior se queda en el historial).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>compilado el %1 · %2 @ %3</translation>
@@ -12090,6 +12135,50 @@ Campos extra conservados: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>Actualizando la información del indicativo</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>El registro cambió durante la comprobación de entidades; repite la comprobación</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC actualizado en %1 de %2 QSO (%3 sin cambios, %4 con error; datos %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>Un cambio en segundo plano terminó en un registro que ya no está abierto</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>Ya hay un reenvío UDP en curso</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>Reenvío UDP detenido tras %1 de %2 QSO</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>Eliminados %1 QSO (conservados en el historial); %2 con error</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Etiqueta &quot;%1&quot; añadida a %2 QSO (%3 sin cambios, %4 con error)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Etiqueta &quot;%1&quot; quitada de %2 QSO (%3 sin cambios, %4 con error)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>No se pudieron fusionar %1 grupo(s) de duplicados</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>Fusionados %1 grupo(s) de duplicados: %2 QSO eliminados (conservados en el historial); %3 con error</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>Reparados %1 QSO de una importación antigua; %2 con error (el texto anterior queda en el historial)</translation>
     </message>
 </context>
 <context>
@@ -12387,6 +12476,73 @@ Campos extra conservados: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>Envío detenido.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>No se pudo cargar la QSL en papel: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>No se pudo contar la QSL en papel: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>Ya hay una operación de QSL en papel en curso</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n confirmación QSL actualizada</numerusform>
+            <numerusform>%n confirmaciones QSL actualizadas</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 con error: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Operación de QSL en papel en el registro anterior: %1 completadas, %2 con error. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Escribiendo QSL en papel…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>No se pudo escribir el archivo de la QSL en papel</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>El registro original no está disponible.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL enviada a %1, pero no se pudo registrar su estado de envío: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>Falta la identidad del QSO original.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>Cargando el QSO para el correo…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>El registro cambió antes de terminar la preparación del correo.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>El registro cambió antes del envío; se detuvieron las QSL restantes.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>Los ajustes del correo o de la tarjeta han cambiado; revísalos antes de enviar.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>El registro cambió; se detuvieron las QSL restantes.</translation>
     </message>
 </context>
 <context>
@@ -13776,6 +13932,14 @@ Campos extra conservados: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>No hay ninguna credencial de Club Log guardada</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>La credencial cambió mientras se leía; inténtalo de nuevo</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>No se puede leer el llavero del sistema</translation>
     </message>
 </context>
 <context>

@@ -1207,6 +1207,38 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <source>Unconfirmed</source>
         <translation>Neconfirmat</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Vezi pe QRZ.com</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Deschide acest indicativ pe QRZ.com</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>Se verifică profilul QRZ.com…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>Profil QRZ.com neverificat; verifică conexiunea și setările callbook-ului QRZ</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Vezi pe HamQTH</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Deschide acest indicativ pe HamQTH (date furnizate de HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>Se verifică profilul HamQTH…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>Profil HamQTH neverificat; verifică conexiunea și setările callbook-ului HamQTH</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3382,6 +3414,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <source>Merge %1 groups</source>
         <translation>Unește %1 grupuri</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Se unesc… %1%</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4438,6 +4474,14 @@ Deschide-l o dată în DecoDXLog ca să-l actualizezi.</translation>
     <message>
         <source>QSO map</source>
         <translation>Harta QSO-urilor</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Se verifică QSO-urile deteriorate…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>Nu s-au putut verifica QSO-urile deteriorate</translation>
     </message>
 </context>
 <context>
@@ -5583,6 +5627,14 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>Descărcarea temporară din Club Log nu poate fi pregătită pentru previzualizare</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>QSO-ul original nu mai corespunde jurnalului.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Jurnalul original nu este disponibil.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5741,6 +5793,13 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: eroare de sintaxă a comenzii (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Niciun QSO din care să faci o carte.</translation>
     </message>
 </context>
 <context>
@@ -6134,6 +6193,18 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>Fișiere PDF (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Se scrie QSL-ul pe hârtie…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Se actualizează QSL-ul pe hârtie…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Se încarcă QSL-ul pe hârtie…</translation>
     </message>
 </context>
 <context>
@@ -7667,10 +7738,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Completează DXCC lipsă</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO completate, fiecare păstrat ca versiune nouă.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Încarcă un cty.csv mai nou…</translation>
     </message>
@@ -8479,10 +8546,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Corectează %1 QSO</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 QSO corectate, fiecare păstrat ca revizie nouă.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>ștearsă</translation>
     </message>
@@ -9157,6 +9220,14 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Cereri OQRS directe pentru stația activă. Nu sunt confirmări QSL primite.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO actualizate, %2 eșuate; versiunile anterioare rămân în istoric.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>Se actualizează DXCC în fundal…</translation>
     </message>
 </context>
 <context>
@@ -11199,18 +11270,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>cty.xml din %1: %2 entități</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>Entitatea a %n QSO corectată cu data QSO-ului (Club Log)</numerusform>
-            <numerusform>Entitățile a %n QSO-uri corectate cu data QSO-ului (Club Log)</numerusform>
-            <numerusform>Entitățile a %n de QSO-uri corectate cu data QSO-ului (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC completat la %1 din %2 QSO (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Profil de stație creat din Decodium: %1</translation>
@@ -11749,14 +11808,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>%1 → %2 în %3 QSO (%4 neschimbate, %5 eșuate)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO nr. %1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>Unite %1 grupuri de duble: %2 QSO șterse (rămân în istoric)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Un import rulează deja: așteaptă să se termine.</translation>
     </message>
@@ -12044,14 +12095,6 @@ Câmpuri suplimentare păstrate: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %1 din %2…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO curățat după un import vechi prost (textul dinainte rămâne în istoric).</numerusform>
-            <numerusform>%n QSO curățate după un import vechi prost (textul dinainte rămâne în istoric).</numerusform>
-            <numerusform>%n de QSO curățate după un import vechi prost (textul dinainte rămâne în istoric).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>compilat la %1 · %2 @ %3</translation>
@@ -12139,6 +12182,50 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>Se reîmprospătează informațiile despre indicativ</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>Jurnalul s-a schimbat în timpul verificării entităților; rulează din nou verificarea</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC actualizat pentru %1 din %2 QSO (%3 neschimbate, %4 eșuate; date %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>O modificare în fundal s-a încheiat pe un jurnal care nu mai este deschis</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>O retrimitere UDP este deja în curs</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>Retrimiterea UDP s-a oprit după %1 din %2 QSO</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>%1 QSO șterse (păstrate în istoric); %2 eșuate</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Eticheta &quot;%1&quot; adăugată la %2 QSO (%3 neschimbate, %4 eșuate)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Eticheta &quot;%1&quot; eliminată de la %2 QSO (%3 neschimbate, %4 eșuate)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>Nu s-au putut uni %1 grup(uri) de duplicate</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>Unite %1 grup(uri) de duplicate: %2 QSO șterse (păstrate în istoric); %3 eșuate</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>Reparate %1 QSO dintr-un import vechi; %2 eșuate (textul anterior rămâne în istoric)</translation>
     </message>
 </context>
 <context>
@@ -12444,6 +12531,74 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>Trimiterea s-a oprit.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>Nu s-a putut încărca QSL-ul pe hârtie: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>Nu s-a putut număra QSL-ul pe hârtie: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>O operațiune cu QSL-ul pe hârtie rulează deja</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n confirmare QSL actualizată</numerusform>
+            <numerusform>%n confirmări QSL actualizate</numerusform>
+            <numerusform>%n de confirmări QSL actualizate</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 eșuate: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Operațiune QSL pe hârtie pe jurnalul anterior: %1 finalizate, %2 eșuate. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Se scrie QSL-ul pe hârtie…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>Nu s-a putut scrie fișierul QSL-ului pe hârtie</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Jurnalul original nu este disponibil.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL trimis la %1, dar starea trimiterii nu a putut fi înregistrată: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>Lipsește identitatea QSO-ului original.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>Se încarcă QSO-ul pentru e-mail…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>Jurnalul s-a schimbat înainte de finalizarea pregătirii e-mailului.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>Jurnalul s-a schimbat înainte de trimitere; QSL-urile rămase au fost oprite.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>Setările e-mailului sau ale cardului s-au schimbat; verifică-le înainte de trimitere.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>Jurnalul s-a schimbat; QSL-urile rămase au fost oprite.</translation>
     </message>
 </context>
 <context>
@@ -13843,6 +13998,14 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>Nu este salvat niciun credențial Club Log</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>Credențialul s-a schimbat în timpul citirii; încearcă din nou</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>Nu se poate citi keystore-ul sistemului</translation>
     </message>
 </context>
 <context>

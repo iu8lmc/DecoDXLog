@@ -3,6 +3,10 @@
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 
+## 1.17.62 — 19 novembre 2026
+
+**Allineata alla 1.17.61 di elisir80** (la nostra era la 1.17.60). Dalla loro 1.17.61 arrivano la verifica del profilo su QRZ.com e HamQTH con collegamenti diretti dalla scheda nominativo, le operazioni in blocco sul log (eliminazione, etichette, unione dei duplicati) con cronologia conservata, la gestione più robusta delle QSL cartacee e delle QSL via email, e i test di reattività su log grandi. Nessuna funzione nostra toccata: l'unione è automatica, senza conflitti.
+
 ## 1.17.60 — 19 novembre 2026
 
 **Allineata alla 1.17.59 di elisir80** (la nostra era la 1.17.58). Dalla loro 1.17.59 arrivano la scheda nominativo con i QSO per banda e modo (con stato delle conferme), la ricostruzione più leggera della tabella dei log grandi, l'anteprima Club Log che accetta gli export senza identificativo remoto e i test su griglia DXCC, ordinamento del log e download Club Log simulato. Nessuna funzione nostra toccata: l'unione è automatica, senza conflitti.

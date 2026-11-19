@@ -14,6 +14,7 @@ DialogFrame {
     property var qsoId: 0
     property var detail: ({})
     property var fields: ({})
+    property var touchedFields: ({})
     property int formRev: 0
     property bool edited: false
     // Cresce a ogni tasto scritto in un campo: chi guarda cosa e' cambiato lo rilegge.
@@ -54,6 +55,7 @@ DialogFrame {
         decolog.recordUiLatency("qso.detail.record", Date.now() - started)
         started = Date.now()
         fields = Object.assign({}, detail.fields || {})
+        touchedFields = ({})
         profileId = detail.stationProfileId || 0
         enrichments = decolog.qsoEnrichments(qsoId)
         attachments = detail.attachments || []
@@ -70,6 +72,7 @@ DialogFrame {
     function setField(key, value) {
         if (!key)
             return
+        touchedFields[key] = true
         if (value === "" || value === undefined)
             delete fields[key]
         else
@@ -103,7 +106,7 @@ DialogFrame {
         // Un'ora di fine senza data di fine vale per lo stesso giorno.
         if (fields.TIME_OFF && !fields.QSO_DATE_OFF && fields.QSO_DATE)
             fields.QSO_DATE_OFF = fields.QSO_DATE
-        const error = decolog.saveQso(qsoId, fields, profileId)
+        const error = decolog.saveQso(qsoId, fields, profileId, Object.keys(touchedFields))
         errorText.text = error
         if (error.length === 0)
             reload()

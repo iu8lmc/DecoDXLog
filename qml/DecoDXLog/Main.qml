@@ -429,6 +429,19 @@ RoundedWindow {
     }
 
     Timer { id: exitProbe; interval: 900; onTriggered: window.exitContestMode() }
+    Timer {
+        id: maintenanceAfterRepair
+        property string logPath: ""
+        interval: 100
+        repeat: true
+        onTriggered: {
+            if (decolog.bulkProgress < 0) {
+                stop()
+                if (decolog.databasePath === logPath)
+                    decolog.completeMissingFromCallbook()
+            }
+        }
+    }
     // Il tempo fra due fotogrammi disegnati, mentre si trascina.
     QtObject {
         id: frameGap
@@ -592,16 +605,74 @@ RoundedWindow {
             }
         }
     }
+    // UI responsiveness probe, only started by --show bulkcheck. It measures
+    // the event loop until several ticks after the controller reports done.
+    Timer {
+        id: bulkCheckHeartbeat
+        interval: 10; repeat: true
+        property bool sawRunning: false
+        property int settledTicks: 0
+        property int heartbeatTicks: 0
+        property double startedAt: 0
+        property double lastAt: 0
+        property double maxGap: 0
+        property int rows: 0
+        property string mode: ""
+        onTriggered: {
+            const now = Date.now()
+            maxGap = Math.max(maxGap, now - lastAt)
+            lastAt = now
+            if ((mode === "tag" || mode === "tagremove") && ++heartbeatTicks % 500 === 0)
+                console.warn("PROBE heartbeat mode=" + mode + " elapsed=" + (now - startedAt) + " progress=" + decolog.bulkProgress)
+            const done = mode === "udp" ? !decolog.udpResendBusy
+                       : mode === "export" || mode === "export-fail" ? !decolog.exportBusy
+                       : mode === "import" ? decolog.importProgress < 0
+                       : mode === "callbookscan" ? (now - startedAt >= 1000 && decolog.callbookQueued === 0)
+                       : decolog.bulkProgress < 0 && ((mode !== "filtered" && mode !== "manual") || !window.panelItem("logbook").item.model.busy)
+            if (sawRunning && done && ++settledTicks >= 5) {
+                if (mode === "manual") console.warn("PROBE manual-model-count=" + window.panelItem("logbook").item.model.count)
+                console.warn("PROBE bulkcheck mode=" + mode + " rows=" + rows + " maxgap=" + maxGap
+                             + " elapsed=" + (now - startedAt))
+                stop()
+                Qt.quit()
+            }
+        }
+    }
+    Connections {
+        target: decolog
+        function onBulkChanged() {
+            if (bulkCheckHeartbeat.running && decolog.bulkProgress >= 0)
+                bulkCheckHeartbeat.sawRunning = true
+        }
+        function onImportChanged() {
+            if (bulkCheckHeartbeat.running && bulkCheckHeartbeat.mode === "import" && decolog.importProgress >= 0)
+                bulkCheckHeartbeat.sawRunning = true
+        }
+        function onImportPreviewReady(file, result) {
+            if (!bulkCheckHeartbeat.running || bulkCheckHeartbeat.mode !== "import") return
+            if (!result.ok) { console.warn("PROBE bulkcheck error=import preview failed"); Qt.quit(); return }
+            Qt.callLater(function() { importPreviewDialog.accept() })
+        }
+    }
     Timer {
         id: pointerProbe
         property var args: []
         property int step: 0
         property var start0: null
+        property bool filteredPrepared: false
         // Le prove "mboard…" lavorano sulla lavagna di tutti i giorni.
         property bool useMain: false
         interval: 60
         repeat: true
         function send(win, kind, pt) { decolog.testPointer(win, kind, pt.x, pt.y) }
+        function bulkFixtureUrl(name) {
+            const args = Qt.application.arguments
+            const at = args.indexOf("--db")
+            const db = at >= 0 ? String(args[at + 1]) : ""
+            const slash = db.lastIndexOf("/")
+            const path = db.slice(0, slash + 1) + name
+            return "file://" + (path.startsWith("/") ? "" : "/") + encodeURI(path)
+        }
         // Il comando della testata con questo simbolo, cercato fra i figli.
         function findGlyph(item, glyph) {
             if (!item)
@@ -621,7 +692,130 @@ RoundedWindow {
             // Si aspetta che la lavagna abbia preso le misure.
             if (step++ < 10)
                 return
-            if (kind === "clustercols") {
+            if (kind === "bulkcheck") {
+                const lp = window.panelItem("logbook").item
+                if (step === 11) {
+                    bulkCheckHeartbeat.mode = key
+                    if (key === "filtered") {
+                        lp.model.filterText = "K123"
+                        lp.model.setSort("call", true)
+                    } else if (key === "one" || key === "all" || key === "noop") {
+                        bulkCheckHeartbeat.rows = lp.prepareBulkProbe(key !== "one", "COMMENT", "BULK-TEST", false)
+                    } else {
+                        pointerProbe.args = args.concat([lp.bulkProbeIds(key === "tag" || key === "tagremove" || key === "delete" || key === "udp" || key === "repair" || key === "dxcc" || key === "bulk-close")])
+                    }
+                    return
+                }
+                if (key === "filtered" && !pointerProbe.filteredPrepared) {
+                    if (lp.model.busy) return
+                    bulkCheckHeartbeat.rows = lp.prepareBulkProbe(true, "NOTES", "FILTER-TEST", false)
+                    pointerProbe.filteredPrepared = true
+                    return
+                }
+                if (key === "inline" || key.indexOf("inline-") === 0 || key === "restore" || key === "tag" || key === "tagremove"
+                    || key === "delete" || key === "delete-one" || key === "detail" || key.indexOf("qsl-") === 0
+                    || key === "export" || key === "export-fail" || key === "export-close" || key === "attachment" || key === "undo" || key === "merge" || key === "udp" || key === "repair" || key === "dxcc" || key === "import" || key === "callbookscan" || key === "manual" || key === "bulk-close") {
+                    const ids = args[args.length - 1]
+                    bulkCheckHeartbeat.rows = ids.length
+                    bulkCheckHeartbeat.startedAt = bulkCheckHeartbeat.lastAt = Date.now()
+                    bulkCheckHeartbeat.start()
+                    if (key === "bulk-close") {
+                        decolog.completeMissingFromCallbook()
+                        decolog.bulkEdit(ids, "NOTES", "CLOSE-TEST", false)
+                        console.warn("PROBE bulk-close started=" + (decolog.bulkProgress >= 0))
+                        Qt.quit()
+                        stop()
+                        return
+                    } else if (key === "manual") {
+                        bulkCheckHeartbeat.sawRunning = true
+                        const error = window.panelItem("newqso").item.probeManualSubmit()
+                        if (error) console.warn("PROBE bulkcheck error=" + error)
+                    } else if (key === "inline") {
+                        bulkCheckHeartbeat.sawRunning = true
+                        const error = decolog.editQsoField(ids[0], "comment", "INLINE-TEST")
+                        if (error) console.warn("PROBE bulkcheck error=" + error)
+                    } else if (key.indexOf("inline-") === 0) {
+                        bulkCheckHeartbeat.sawRunning = true
+                        const field = key.slice(7)
+                        const values = {call: "K1NEW", rst_sent: "58", rst_rcvd: "57", grid: "JN58AA",
+                                        name: "INLINE-NAME", qth: "INLINE-QTH", comment: "INLINE-COMMENT", bad: ""}
+                        const error = decolog.editQsoField(ids[0], field === "bad" ? "call" : field, values[field])
+                        if ((field === "bad" && !error) || (field !== "bad" && error))
+                            console.warn("PROBE bulkcheck error=" + (error || "invalid value accepted"))
+                    } else if (key === "restore") {
+                        bulkCheckHeartbeat.sawRunning = true
+                        const history = decolog.qsoDetail(ids[0]).history || []
+                        const error = history.length ? decolog.restoreRevision(ids[0], history[0].id) : "no history"
+                        if (error) console.warn("PROBE bulkcheck error=" + error)
+                    } else if (key === "detail" || key.indexOf("qsl-") === 0) {
+                        bulkCheckHeartbeat.sawRunning = true
+                        window.openQso(ids[0])
+                        if (key === "detail") qsoDialog.setField("NAME", "DETAIL-TEST")
+                        else {
+                            const parts = key.split("-")
+                            const field = {eqsl: "EQSL_QSL_SENT", qrz: "QRZCOM_QSO_UPLOAD_STATUS",
+                                           club: "CLUBLOG_QSO_UPLOAD_STATUS", lotw: "LOTW_QSL_SENT",
+                                           hrd: "HRDLOG_QSO_UPLOAD_STATUS", card: "QSL_SENT",
+                                           eqslrcvd: "EQSL_QSL_RCVD", lotwrcvd: "LOTW_QSL_RCVD",
+                                           qrzrcvd: "QRZCOM_QSO_DOWNLOAD_STATUS", cardrcvd: "QSL_RCVD"}[parts[1]]
+                            qsoDialog.setField(field, parts[2] === "N" ? "" : parts[2])
+                        }
+                        qsoDialog.save()
+                    } else if (key === "callbookscan") {
+                        bulkCheckHeartbeat.sawRunning = true
+                        decolog.completeMissingFromCallbook()
+                        if (decolog.callbookQueued < 1) console.warn("PROBE bulkcheck error=callbook scan did not start")
+                        decolog.stopCallbookQueue()
+                    } else if (key === "import") {
+                        bulkCheckHeartbeat.rows = 2
+                        decolog.previewImport(bulkFixtureUrl("import.adi"), false)
+                    } else if (key === "export-close") {
+                        decolog.exportQsos(ids, bulkFixtureUrl("close.adi"))
+                        console.warn("PROBE export-close started=" + decolog.exportBusy)
+                        Qt.quit()
+                        stop()
+                        return
+                    } else if (key === "export" || key === "export-fail") {
+                        decolog.exportQsos(ids, bulkFixtureUrl(key === "export" ? "one.adi" : "blocked"))
+                        if (decolog.exportBusy) bulkCheckHeartbeat.sawRunning = true
+                        else console.warn("PROBE bulkcheck error=export refused")
+                    } else if (key === "attachment") {
+                        bulkCheckHeartbeat.sawRunning = true
+                        const error = decolog.importQslAttachment(ids, bulkFixtureUrl("fixture.pdf"))
+                        if (error) console.warn("PROBE bulkcheck error=" + error)
+                    } else if (key === "undo") {
+                        bulkCheckHeartbeat.sawRunning = true
+                        if (!decolog.undoQsoEnrichment(ids[0], "NAME")) console.warn("PROBE bulkcheck error=undo failed")
+                    } else if (key === "dxcc") {
+                        if (!decolog.fillMissingDxccAsync()) console.warn("PROBE bulkcheck error=dxcc refused")
+                    } else if (key === "repair") {
+                        if (!decolog.repairImportedFieldsAsync()) console.warn("PROBE bulkcheck error=repair refused")
+                    } else if (key === "udp") {
+                        if (decolog.resendQsosViaUdpAsync(ids)) bulkCheckHeartbeat.sawRunning = true
+                        else console.warn("PROBE bulkcheck error=udp refused")
+                    } else if (key === "merge") {
+                        bulkCheckHeartbeat.rows = 4
+                        if (!decolog.mergeDuplicatesAsync([{keep: 1, ids: [1, 2]}, {keep: 3, ids: [3, 4]}]))
+                            console.warn("PROBE bulkcheck error=merge refused")
+                    } else if (key === "tag" || key === "tagremove") {
+                        if (!decolog.tagQsosAsync(ids, "bulk-test", key === "tag")) console.warn("PROBE bulkcheck error=tag refused")
+                    } else {
+                        if (key === "delete-one") console.warn("PROBE delete-id=" + ids[0])
+                        if (!decolog.deleteQsosAsync(ids)) console.warn("PROBE bulkcheck error=delete refused")
+                    }
+                    stop()
+                    return
+                }
+                const button = lp.bulkProbeButton()
+                if (!button || !button.Window.window) { console.warn("PROBE bulkcheck missing button"); stop(); Qt.quit(); return }
+                const at = button.mapToItem(null, button.width / 2, button.height / 2)
+                bulkCheckHeartbeat.startedAt = bulkCheckHeartbeat.lastAt = Date.now()
+                bulkCheckHeartbeat.start()
+                send(button.Window.window, "hover", at)
+                send(button.Window.window, "press", at)
+                send(button.Window.window, "release", at)
+                stop()
+            } else if (kind === "clustercols") {
                 contestLayout.panelFor("cluster").item.openColumns()
                 stop()
             } else if (kind === "clusterresize") {
@@ -670,6 +864,24 @@ RoundedWindow {
                 Qt.callLater(function () {
                     console.warn("PROBE clustermove " + from + "->" + to + ": " + args[args.length - 1]
                                  + " => " + JSON.stringify(cp.columns))
+                })
+            } else if (kind === "journeyclick") {
+                const lp = window.panelItem("logbook").item
+                const row = parseInt(args[1])
+                const cell = lp.journeyProbeCell(row)
+                if (!cell) {
+                    console.warn("PROBE journeyclick cell unavailable")
+                    stop()
+                    return
+                }
+                const at = cell.mapToItem(null, cell.width / 2, cell.height / 2)
+                const expected = lp.model.idAt(row)
+                send(window, "hover", at)
+                send(window, "press", at)
+                send(window, "release", at)
+                stop()
+                Qt.callLater(function () {
+                    console.warn("PROBE journeyclick expected=" + expected + " opened=" + lp.journeyProbeId())
                 })
             } else if (kind === "headermove") {
                 const lp = args[1] === "board" ? contestLayout.panelFor("logbook").item : window.panelItem("logbook").item
@@ -1063,9 +1275,13 @@ RoundedWindow {
         // "newqsy:40m:CW": nel Nuovo QSO si sceglie banda (e modo), come dalla
         // tendina; la radio deve andarci.
         else if (what[0] === "newqsy") newQsyTimer.start()
-        else if (what[0] === "repair") decolog.repairImportedFields()
+        else if (what[0] === "repair") decolog.repairImportedFieldsAsync()
         else if (what[0] === "fillall") decolog.completeMissingFromCallbook()
-        else if (what[0] === "maintenance") { decolog.repairImportedFields(); decolog.completeMissingFromCallbook() }
+        else if (what[0] === "maintenance") {
+            maintenanceAfterRepair.logPath = decolog.databasePath
+            if (decolog.repairImportedFieldsAsync())
+                maintenanceAfterRepair.start()
+        }
         else if (what[0] === "tab") window.panelItem("tabs").setTab(parseInt(what[1]))
         // «editfield:id:colonna:valore»: corregge una cella del log come farebbe F2, e lo scrive nei registri.
         else if (what[0] === "editfield")
@@ -1233,6 +1449,21 @@ RoundedWindow {
         }
         else if (what[0] === "clustermove" || what[0] === "clustercols" || what[0] === "clusterresize") {
             window.openContestDesk()
+            pointerProbe.args = what
+            pointerProbe.step = 0
+            pointerProbe.start()
+        }
+        else if (what[0] === "bulkcheck") {
+            if (!bulkTestProbeAllowed) {
+                console.warn("PROBE bulkcheck denied: isolated test root required")
+                Qt.callLater(function() { Qt.quit() })
+            } else {
+                pointerProbe.args = what
+                pointerProbe.step = 0
+                pointerProbe.start()
+            }
+        }
+        else if (what[0] === "journeyclick") {
             pointerProbe.args = what
             pointerProbe.step = 0
             pointerProbe.start()

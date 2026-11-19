@@ -1197,6 +1197,38 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <source>Unconfirmed</source>
         <translation>Nincs megerősítve</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Megtekintés a QRZ.com oldalon</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Hívójel megnyitása a QRZ.com oldalon</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>A QRZ.com profil ellenőrzése…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>A QRZ.com profil nincs ellenőrizve; ellenőrizze a kapcsolatot és a QRZ callbook beállításait</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Megtekintés a HamQTH oldalon</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Hívójel megnyitása a HamQTH oldalon (adatok: HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>A HamQTH profil ellenőrzése…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>A HamQTH profil nincs ellenőrizve; ellenőrizze a kapcsolatot és a HamQTH callbook beállításait</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3362,6 +3394,10 @@ A Decodiumban: Settings → Reporting → UDP Server 127.0.0.1, port: %1, és &q
         <source>Merge %1 groups</source>
         <translation>%1 csoport egyesítése</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Egyesítés… %1%</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4418,6 +4454,14 @@ Nyisd meg egyszer a DecoDXLog-ban a frissítéshez.</translation>
     <message>
         <source>QSO map</source>
         <translation>QSO-térkép</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Sérült QSO-k ellenőrzése…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>A sérült QSO-kat nem lehetett ellenőrizni</translation>
     </message>
 </context>
 <context>
@@ -5557,6 +5601,14 @@ A további mezők megmaradnak: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>Az ideiglenes Club Log letöltés nem készíthető elő az előnézethez</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>Az eredeti QSO már nem egyezik a naplóval.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Az eredeti napló nem érhető el.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5713,6 +5765,13 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: szintaktikai hiba a parancsban (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Nincs QSO, amiről lapot lehetne készíteni.</translation>
     </message>
 </context>
 <context>
@@ -6104,6 +6163,18 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>PDF-fájlok (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Papír QSL írása…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Papír QSL frissítése…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Papír QSL betöltése…</translation>
     </message>
 </context>
 <context>
@@ -7623,10 +7694,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>Hiányzó DXCC pótlása</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO kiegészítve, mindegyik új változatként megőrizve.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Újabb cty.csv betöltése…</translation>
     </message>
@@ -8433,10 +8500,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>%1 QSO javítása</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 QSO javítva, mindegyik új revízióként megőrizve.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>törölt</translation>
     </message>
@@ -9111,6 +9174,14 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Közvetlen OQRS-kérések az aktív állomáshoz. Ezek nem kapott QSL-visszaigazolások.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO frissítve, %2 sikertelen; a korábbi változatok az előzményekben maradnak.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>DXCC frissítése a háttérben…</translation>
     </message>
 </context>
 <context>
@@ -11125,16 +11196,6 @@ A további mezők megmaradnak: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>%1 cty.xml: %2 entitás</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>%n QSO entitása javítva a QSO dátumával (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC pótolva %2 QSO közül %1-en (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Állomásprofil létrehozva a Decodiumból: %1</translation>
@@ -11667,14 +11728,6 @@ A további mezők megmaradnak: %8</translation>
         <translation>%1 → %2 %3 QSO-ban (%4 változatlan, %5 sikertelen)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>%1. QSO: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>%1 duplikátumcsoport egyesítve: %2 QSO törölve (az előzményekben megmaradnak)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Már fut egy importálás: várd meg, amíg befejeződik.</translation>
     </message>
@@ -11948,12 +12001,6 @@ A további mezők megmaradnak: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %2/%1…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO rendbe téve egy rossz régi import után (az előző szöveg az előzményekben marad).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>fordítva: %1 · %2 @ %3</translation>
@@ -12041,6 +12088,50 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>A hívójel adatainak frissítése</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>A napló megváltozott az entitások ellenőrzése közben; futtassa újra az ellenőrzést</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC frissítve %2 QSO-ból %1 esetben (%3 változatlan, %4 sikertelen; adatok: %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>Háttérben végzett naplómódosítás olyan naplón fejeződött be, amely már nincs megnyitva</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>UDP-újraküldés már folyamatban van</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>UDP-újraküldés leállt %2 QSO-ból %1 után</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>%1 QSO törölve (az előzményekben megmarad); %2 sikertelen</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>A(z) &quot;%1&quot; címke hozzáadva %2 QSO-hoz (%3 változatlan, %4 sikertelen)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>A(z) &quot;%1&quot; címke eltávolítva %2 QSO-ról (%3 változatlan, %4 sikertelen)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>%1 duplikátumcsoport nem egyesíthető</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>%1 duplikátumcsoport egyesítve: %2 QSO törölve (az előzményekben megmarad); %3 sikertelen</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>%1 QSO javítva egy régi importból; %2 sikertelen (a korábbi szöveg az előzményekben marad)</translation>
     </message>
 </context>
 <context>
@@ -12330,6 +12421,72 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>A küldés leállt.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>A papír QSL nem tölthető be: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>A papír QSL nem számolható meg: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>Papír QSL művelet már folyamatban van</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n QSL-visszaigazolás frissítve</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 sikertelen: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Papír QSL művelet az előző naplón: %1 befejezve, %2 sikertelen. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Papír QSL írása…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>A papír QSL kimenetét nem lehet kiírni</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Az eredeti napló nem érhető el.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL elküldve ide: %1, de a küldési állapotát nem lehetett rögzíteni: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>Hiányzik az eredeti QSO azonosítója.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>QSO betöltése e-mailhez…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>A napló megváltozott, mielőtt az e-mail előkészítése befejeződött volna.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>A napló megváltozott küldés előtt; a hátralévő QSL-ek leálltak.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>Az e-mail vagy a kártya beállításai megváltoztak; küldés előtt ellenőrizze őket.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>A napló megváltozott; a hátralévő QSL-ek leálltak.</translation>
     </message>
 </context>
 <context>
@@ -13709,6 +13866,14 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>Nincs mentett Club Log-hitelesítő adat</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>A hitelesítő adat olvasás közben megváltozott; próbálja újra</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>A rendszer kulcstárolója nem olvasható</translation>
     </message>
 </context>
 <context>

@@ -1202,6 +1202,38 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <source>Unconfirmed</source>
         <translation>No confirmat</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Veure a QRZ.com</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Obrir aquest indicatiu a QRZ.com</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>Comprovant el perfil de QRZ.com…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>Perfil de QRZ.com no verificat; comprova la connexió i la configuració del callbook de QRZ</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Veure a HamQTH</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Obrir aquest indicatiu a HamQTH (dades de HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>Comprovant el perfil de HamQTH…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>Perfil de HamQTH no verificat; comprova la connexió i la configuració del callbook de HamQTH</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3372,6 +3404,10 @@ A Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, i &quot;Ac
         <source>Merge %1 groups</source>
         <translation>Uneix %1 grups</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Unint… %1 %</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4428,6 +4464,14 @@ Obre&apos;l una vegada a DecoDXLog per actualitzar-lo.</translation>
     <message>
         <source>QSO map</source>
         <translation>Mapa de QSO</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Comprovant els QSO danyats…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>No s&apos;han pogut comprovar els QSO danyats</translation>
     </message>
 </context>
 <context>
@@ -5570,6 +5614,14 @@ Camps extra conservats: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>No es pot preparar la descàrrega temporal de Club Log per a la vista prèvia</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>El QSO original ja no coincideix amb el registre.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>El registre original no està disponible.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5727,6 +5779,13 @@ Camps extra conservats: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: error de sintaxi de l’ordre (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Cap QSO del qual fer una targeta.</translation>
     </message>
 </context>
 <context>
@@ -6119,6 +6178,18 @@ Camps extra conservats: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>Fitxers PDF (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Escrivint la QSL en paper…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Actualitzant la QSL en paper…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Carregant la QSL en paper…</translation>
     </message>
 </context>
 <context>
@@ -7645,10 +7716,6 @@ Camps extra conservats: %8</translation>
         <translation>Omple els DXCC que falten</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO completats, cadascun desat com una revisió nova.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Carrega una cty.csv més nova…</translation>
     </message>
@@ -8456,10 +8523,6 @@ Camps extra conservats: %8</translation>
         <translation>Corregeix %1 QSO</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 QSO corregits, cadascun guardat com a revisió nova.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>esborrada</translation>
     </message>
@@ -9134,6 +9197,14 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Sol·licituds OQRS directes per a l&apos;estació activa. No són confirmacions QSL rebudes.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO actualitzats, %2 amb error; les versions anteriors es conserven a l&apos;historial.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>Actualitzant el DXCC en segon pla…</translation>
     </message>
 </context>
 <context>
@@ -11162,17 +11233,6 @@ Camps extra conservats: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>cty.xml del %1: %2 entitats</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>Entitat de %n QSO corregida amb la data del QSO (Club Log)</numerusform>
-            <numerusform>Entitats de %n QSO corregides amb la data del QSO (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC completat en %1 de %2 QSO (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Perfil d&apos;estació creat des de Decodium: %1</translation>
@@ -11708,14 +11768,6 @@ Camps extra conservats: %8</translation>
         <translation>%1 → %2 en %3 QSO (%4 sense canvis, %5 fallits)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO núm. %1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>Units %1 grups de duplicats: %2 QSO esborrats (queden a l&apos;historial)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Ja hi ha una importació en marxa: espera que acabi.</translation>
     </message>
@@ -11996,13 +12048,6 @@ Camps extra conservats: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %1 de %2…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO netejat d&apos;una importació antiga dolenta (el text anterior es queda a l&apos;historial).</numerusform>
-            <numerusform>%n QSO netejats d&apos;una importació antiga dolenta (el text anterior es queda a l&apos;historial).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>compilat el %1 · %2 @ %3</translation>
@@ -12090,6 +12135,50 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>Actualitzant la informació de l&apos;indicatiu</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>El registre ha canviat durant la comprovació d&apos;entitats; torna a fer la comprovació</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC actualitzat a %1 de %2 QSO (%3 sense canvis, %4 amb error; dades %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>Un canvi en segon pla ha acabat en un registre que ja no està obert</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>Ja hi ha un reenviament UDP en curs</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>Reenviament UDP aturat després de %1 de %2 QSO</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>%1 QSO esborrats (conservats a l&apos;historial); %2 amb error</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Etiqueta &quot;%1&quot; afegida a %2 QSO (%3 sense canvis, %4 amb error)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Etiqueta &quot;%1&quot; treta de %2 QSO (%3 sense canvis, %4 amb error)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>No s&apos;han pogut unir %1 grup(s) de duplicats</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>Units %1 grup(s) de duplicats: %2 QSO esborrats (conservats a l&apos;historial); %3 amb error</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>Reparats %1 QSO d&apos;una importació antiga; %2 amb error (el text anterior queda a l&apos;historial)</translation>
     </message>
 </context>
 <context>
@@ -12387,6 +12476,73 @@ Camps extra conservats: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>Enviament aturat.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>No s&apos;ha pogut carregar la QSL en paper: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>No s&apos;ha pogut comptar la QSL en paper: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>Ja hi ha una operació de QSL en paper en curs</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n confirmació QSL actualitzada</numerusform>
+            <numerusform>%n confirmacions QSL actualitzades</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 amb error: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Operació de QSL en paper al registre anterior: %1 completades, %2 amb error. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Escrivint la QSL en paper…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>No s&apos;ha pogut escriure el fitxer de la QSL en paper</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>El registre original no està disponible.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL enviada a %1, però no s&apos;ha pogut registrar el seu estat d&apos;enviament: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>Falta la identitat del QSO original.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>Carregant el QSO per al correu…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>El registre ha canviat abans d&apos;acabar la preparació del correu.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>El registre ha canviat abans de l&apos;enviament; s&apos;han aturat les QSL restants.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>Els ajustos del correu o de la targeta han canviat; revisa&apos;ls abans d&apos;enviar.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>El registre ha canviat; s&apos;han aturat les QSL restants.</translation>
     </message>
 </context>
 <context>
@@ -13776,6 +13932,14 @@ Camps extra conservats: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>No hi ha cap credencial de Club Log desada</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>La credencial ha canviat mentre es llegia; torna-ho a provar</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>No es pot llegir el clauer del sistema</translation>
     </message>
 </context>
 <context>

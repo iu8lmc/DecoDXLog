@@ -273,6 +273,114 @@ private slots:
         QCOMPARE(db.bulkEdit(ids, "@profile", "0", true).changed, 0);
     }
 
+    void bulkEditQueuesRemoteChangesAndOnlyPendingServices()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const qint64 id = db.insertQso({{"CALL", "W1AW"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                       {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        QVERIFY(id > 0);
+        for (const QString& service : {QStringLiteral("eqsl"), QStringLiteral("clublog"), QStringLiteral("crx")}) {
+            QslState state; state.service = service; state.sent = "Y";
+            if (service == QLatin1String("crx")) state.remoteId = "42";
+            QVERIFY(db.setQslState(id, state));
+        }
+        const QStringList automatic{"eqsl", "clublog", "crx"};
+        const auto edited = db.bulkEdit({id}, "COMMENT", "test", false, {}, automatic);
+        QCOMPARE(edited.changed, 1);
+        QCOMPARE(edited.pendingServices, QStringList{"crx"});
+        QCOMPARE(db.qsosToUpload("eqsl"), QList<qint64>{});
+        QCOMPARE(db.qsosToUpload("clublog"), QList<qint64>{});
+        QCOMPARE(db.qsosToUpload("crx"), QList<qint64>{id});
+        QCOMPARE(db.history(id).size(), 1);
+        const auto unset = db.bulkEdit({id}, "EQSL_QSL_SENT", "N", false, {}, automatic);
+        QCOMPARE(unset.changed, 1);
+        QVERIFY(unset.pendingServices.contains("eqsl"));
+        QVERIFY(unset.pendingServices.contains("crx"));
+        QVERIFY(!unset.pendingServices.contains("clublog"));
+    }
+
+    void bulkEditReleasesLocksDuringUnchangedRuns()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = dir.filePath("bulk.sqlite");
+        LogDatabase db; QVERIFY(db.open(path));
+        QList<qint64> ids;
+        for (int i = 0; i < 401; ++i) {
+            AdifRecord r{{"CALL", QStringLiteral("K%1ABC").arg(i)}, {"QSO_DATE", "20261118"},
+                         {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            if (i > 0) r.set("COMMENT", "already set");
+            const auto inserted = db.insertQso(r, "test");
+            QVERIFY(inserted.id > 0); ids << inserted.id;
+        }
+        LogDatabase other; QVERIFY(other.open(path));
+        int firstProgress = 0;
+        bool otherWriterSucceeded = false;
+        const auto result = db.bulkEdit(ids, "COMMENT", "new", true, [&](int done, int) {
+            if (firstProgress) return;
+            firstProgress = done;
+            QSqlQuery q(other.connection());
+            otherWriterSucceeded = q.exec(QStringLiteral("UPDATE qso SET dirty = 1 WHERE id = %1").arg(ids.last()));
+        });
+        QVERIFY(firstProgress > 0 && firstProgress <= 200);
+        QVERIFY(otherWriterSucceeded);
+        QCOMPARE(result.changed, 1);
+        QCOMPARE(result.unchanged, 400);
+        QCOMPARE(result.failed, 0);
+    }
+
+    void bulkEditRollsBackFailedRemoteQueuePerQso()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const qint64 a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                       {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        const qint64 b = db.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1201"},
+                                       {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        QslState state; state.service = "crx"; state.sent = "Y"; state.remoteId = "42";
+        QVERIFY(db.setQslState(a, state));
+        QSqlQuery trigger(db.connection());
+        QVERIFY(trigger.exec(QStringLiteral("CREATE TRIGGER reject_remote BEFORE UPDATE OF sent ON qsl_status "
+                                             "WHEN NEW.qso_id = %1 BEGIN SELECT RAISE(ABORT, 'fixture failure'); END").arg(a)));
+        const auto result = db.bulkEdit({a, b}, "COMMENT", "test", false, {}, {"crx"});
+        QCOMPARE(result.changed, 1);
+        QCOMPARE(result.changedIds, QList<qint64>{b});
+        QCOMPARE(result.failed, 1);
+        QVERIFY(db.record(a)->value("COMMENT").isEmpty());
+        QCOMPARE(db.meta(a)->revision, 1);
+        QCOMPARE(db.history(a).size(), 0);
+        QCOMPARE(db.qslStatus(a).first().sent, QStringLiteral("Y"));
+        QCOMPARE(db.record(b)->value("COMMENT"), QStringLiteral("test"));
+    }
+
+    void bulkEditStopsWhenTriggerRollsBackTheTransaction()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        QList<qint64> ids;
+        for (int i = 0; i < 3; ++i) {
+            const auto inserted = db.insertQso({{"CALL", QStringLiteral("K%1ABC").arg(i)},
+                {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+            QVERIFY(inserted.id > 0); ids << inserted.id;
+            QslState state; state.service = "crx"; state.sent = "Y"; state.remoteId = "42";
+            QVERIFY(db.setQslState(inserted.id, state));
+        }
+        QSqlQuery trigger(db.connection());
+        QVERIFY(trigger.exec(QStringLiteral("CREATE TRIGGER abort_bulk_transaction BEFORE UPDATE OF sent ON qsl_status "
+            "WHEN NEW.qso_id = %1 BEGIN SELECT RAISE(ROLLBACK, 'fixture rollback'); END").arg(ids.at(1))));
+        const auto result = db.bulkEdit(ids, "COMMENT", "test", false, {}, {"crx"});
+        QCOMPARE(result.changed, 0);
+        QCOMPARE(result.failed, 3);
+        QCOMPARE(result.unchanged, 0);
+        QVERIFY(result.changedIds.isEmpty());
+        QVERIFY(result.pendingServices.isEmpty());
+        QVERIFY(!result.errors.isEmpty());
+        for (const qint64 id : ids) {
+            QVERIFY(db.record(id)->value("COMMENT").isEmpty());
+            QCOMPARE(db.meta(id)->revision, 1);
+            QCOMPARE(db.history(id).size(), 0);
+            QCOMPARE(db.qslStatus(id).first().sent, QStringLiteral("Y"));
+        }
+        QVERIFY(db.qsosToUpload("crx").isEmpty());
+    }
+
     void duplicatesAreFoundAndMerged()
     {
         LogDatabase db;

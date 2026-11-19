@@ -15,6 +15,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QSqlQuery>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
@@ -107,6 +108,101 @@ private slots:
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, m_settingsDir.path());
     }
     void init() { QSettings().clear(); }
+
+    void sentStateOverridesExplicitAdifNo_data()
+    {
+        QTest::addColumn<QString>("service");
+        QTest::addColumn<QString>("sentField");
+        QTest::addColumn<QString>("sentDateField");
+        QTest::newRow("eqsl") << "eqsl" << "EQSL_QSL_SENT" << "EQSL_QSLSDATE";
+        QTest::newRow("lotw") << "lotw" << "LOTW_QSL_SENT" << "LOTW_QSLSDATE";
+        QTest::newRow("qrz") << "qrz" << "QRZCOM_QSO_UPLOAD_STATUS" << "QRZCOM_QSO_UPLOAD_DATE";
+        QTest::newRow("clublog") << "clublog" << "CLUBLOG_QSO_UPLOAD_STATUS" << "CLUBLOG_QSO_UPLOAD_DATE";
+        QTest::newRow("hrdlog") << "hrdlog" << "HRDLOG_QSO_UPLOAD_STATUS" << "HRDLOG_QSO_UPLOAD_DATE";
+    }
+
+    void sentStateOverridesExplicitAdifNo()
+    {
+        QFETCH(QString, service);
+        QFETCH(QString, sentField);
+        QFETCH(QString, sentDateField);
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        AdifRecord initial{{"CALL", "K1ABC"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "120000"},
+                           {"BAND", "20m"}, {"MODE", "FT8"}};
+        initial.set(sentField, "N");
+        initial.set(sentDateField, "20200101");
+        const auto inserted = db.insertQso(initial, "test");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        QCOMPARE(db.record(inserted.id)->value(sentField), QString("N"));
+        QCOMPARE(db.qsosToUpload(service), QList<qint64>{inserted.id});
+
+        QslState sent;
+        sent.service = service;
+        sent.sent = "Y";
+        sent.sentDate = "20261118";
+        QVERIFY(db.setQslState(inserted.id, sent));
+        QVERIFY(db.qsosToUpload(service).isEmpty());
+        auto record = db.record(inserted.id);
+        QVERIFY(record.has_value());
+        QCOMPARE(record->value(sentField), QString("Y"));
+        QCOMPARE(record->value(sentDateField), QString("20261118"));
+        record->set("COMMENT", "edited");
+        QCOMPARE(db.updateQso(inserted.id, *record).status, InsertResult::Status::Inserted);
+        QCOMPARE(db.record(inserted.id)->value(sentField), QString("Y"));
+        QVERIFY(db.qsosToUpload(service).isEmpty());
+    }
+
+    void cardStateOverridesStaleAdifSentAndReceived()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto inserted = db.insertQso({{"CALL", "K1ABC"}, {"QSO_DATE", "20261118"},
+                                            {"TIME_ON", "120000"}, {"BAND", "20m"}, {"MODE", "FT8"},
+                                            {"QSL_SENT", "N"}, {"QSLSDATE", "20200101"},
+                                            {"QSL_RCVD", "N"}, {"QSLRDATE", "20200102"},
+                                            {"APP_EXAMPLE_NOTE", "kept"}}, "test");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        QslState card;
+        card.service = "card";
+        card.sent = "Y";
+        card.sentDate = "20261118";
+        card.rcvd = "Y";
+        card.rcvdDate = "20261119";
+        QVERIFY(db.setCardState(inserted.id, card));
+        auto record = db.record(inserted.id);
+        QVERIFY(record.has_value());
+        QCOMPARE(record->value("QSL_SENT"), QString("Y"));
+        QCOMPARE(record->value("QSLSDATE"), QString("20261118"));
+        QCOMPARE(record->value("QSL_RCVD"), QString("Y"));
+        QCOMPARE(record->value("QSLRDATE"), QString("20261119"));
+        QCOMPARE(record->value("APP_EXAMPLE_NOTE"), QString("kept"));
+
+        card.sent = "N";
+        card.rcvd = "N";
+        card.sentDate.clear();
+        card.rcvdDate.clear();
+        QVERIFY(db.setCardState(inserted.id, card));
+        record = db.record(inserted.id);
+        QCOMPARE(record->value("QSL_SENT"), QString("N"));
+        QCOMPARE(record->value("QSL_RCVD"), QString("N"));
+        QVERIFY(record->value("QSLSDATE").isEmpty());
+        QVERIFY(record->value("QSLRDATE").isEmpty());
+
+        // Legacy or interrupted writes may also leave contradictory Y values
+        // in extras; the current N must not resurrect either confirmation.
+        QSqlQuery extra(db.connection());
+        extra.prepare("UPDATE qso SET adif_extra = ? WHERE id = ?");
+        extra.addBindValue(QStringLiteral(R"({"QSL_SENT":"Y","QSLSDATE":"20200101","QSL_RCVD":"Y","QSLRDATE":"20200102","APP_EXAMPLE_NOTE":"kept"})"));
+        extra.addBindValue(inserted.id);
+        QVERIFY(extra.exec());
+        record = db.record(inserted.id);
+        QVERIFY(record->value("QSL_SENT").isEmpty());
+        QVERIFY(record->value("QSL_RCVD").isEmpty());
+        QVERIFY(record->value("QSLSDATE").isEmpty());
+        QVERIFY(record->value("QSLRDATE").isEmpty());
+        QCOMPARE(record->value("APP_EXAMPLE_NOTE"), QString("kept"));
+    }
 
     void clubLogOqrsPaginatesDirectRequestsWithoutConfirmingQsos()
     {
@@ -357,6 +453,12 @@ private slots:
                      QStringLiteral("eqsl"), QStringLiteral("lotw")});
         QCOMPARE(queue.takeNext(false), QStringLiteral("lotw"));
         QCOMPARE(queue.takeNext(false), QStringLiteral("eqsl"));
+        QVERIFY(queue.isEmpty());
+
+        queue.reset({QStringLiteral("eqsl")});
+        queue.append({QStringLiteral("clublog"), QStringLiteral("eqsl")});
+        QCOMPARE(queue.takeNext(false), QStringLiteral("eqsl"));
+        QCOMPARE(queue.takeNext(false), QStringLiteral("clublog"));
         QVERIFY(queue.isEmpty());
     }
 

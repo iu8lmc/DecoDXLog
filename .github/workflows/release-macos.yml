@@ -11,7 +11,7 @@ on:
       tag:
         description: Release tag
         required: true
-        default: v1.17.60
+        default: v1.17.62
       arch:
         description: Architettura da costruire (all, arm64, x86_64)
         required: true
@@ -49,6 +49,7 @@ jobs:
       - name: Release gate
         env:
           QT_QPA_PLATFORM: offscreen
+          QTEST_FUNCTION_TIMEOUT: "1800000"
         run: bash scripts/release-gate.sh build build/DecoDXLog.app/Contents/MacOS/DecoDXLog
 
       - name: Deploy app bundle

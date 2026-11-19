@@ -370,6 +370,7 @@ private slots:
         giveCredentials(client, "right");
         QSignalSpy found(&client, &CallbookClient::found);
         QSignalSpy failed(&client, &CallbookClient::failed);
+        QSignalSpy providerResults(&client, &CallbookClient::providerResult);
 
         client.lookup("EA8OH");
         QVERIFY(found.wait(5000));
@@ -378,6 +379,12 @@ private slots:
         QCOMPARE(record.call, QStringLiteral("EA8OH"));
         QCOMPARE(record.source, QStringLiteral("QRZ.com"));
         QCOMPARE(record.grid, QStringLiteral("IL18QI"));
+        QCOMPARE(providerResults.size(), 2);
+        QCOMPARE(providerResults.at(0).at(0).toString(), QStringLiteral("EA8OH"));
+        QCOMPARE(providerResults.at(0).at(1).toString(), QStringLiteral("hamqth"));
+        QVERIFY(providerResults.at(0).at(2).toString().isEmpty());
+        QCOMPARE(providerResults.at(1).at(1).toString(), QStringLiteral("qrz"));
+        QCOMPARE(providerResults.at(1).at(2).toString(), QStringLiteral("EA8OH"));
 
         // Spento il ripiego, resta il "non lo so" del primo.
         CallbookClient alone;

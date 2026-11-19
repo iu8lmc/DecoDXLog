@@ -78,6 +78,188 @@ private slots:
     }
     void init() { QSettings().clear(); }
 
+    void selectedUploadOnTwentyThousandQsoLog_data()
+    {
+        QTest::addColumn<QString>("service");
+        QTest::newRow("eqsl") << QStringLiteral("eqsl");
+        QTest::newRow("qrz") << QStringLiteral("qrz");
+    }
+
+    void selectedUploadOnTwentyThousandQsoLog()
+    {
+        QFETCH(QString, service);
+        LogDatabase db; QVERIFY(db.open(m_dir.filePath("large-" + service + ".sqlite")));
+        QByteArray adif;
+        for (int i = 0; i < 20000; ++i) {
+            const QByteArray call = "K" + QByteArray::number(i) + "ABC";
+            adif += "<CALL:" + QByteArray::number(call.size()) + ">" + call
+                + "<QSO_DATE:8>20261117<TIME_ON:6>120000<BAND:3>20m<MODE:3>FT8<EOR>\n";
+        }
+        QCOMPARE(db.importAdif(adif).inserted, 20000);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT id FROM qso ORDER BY qso_datetime_on DESC,id DESC LIMIT 1 OFFSET 10000"));
+        QVERIFY(q.next()); const qint64 selected = q.value(0).toLongLong();
+        const QString credential = service == QLatin1String("qrz") ? QStringLiteral("qrzlogbook") : service;
+        QSettings().setValue(QStringLiteral("credentials/%1/stored").arg(credential), true);
+        CredentialStore credentials("test-only-large-log");
+        credentials.m_secretCache.insert(credential, QStringLiteral("fixture-password"));
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        int requests = 0, ticks = 0;
+        QTimer heartbeat; heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket* socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                socket->readAll();
+                if (socket->property("answered").toBool()) return;
+                socket->setProperty("answered", true); ++requests;
+                QTimer::singleShot(120, socket, [&, socket] {
+                    const QByteArray body = service == QLatin1String("qrz") ? QByteArray("RESULT=OK&LOGID=12")
+                                                                              : QByteArray("Result: 0 out of 1 record. Duplicate");
+                    socket->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(body.size())
+                                  + "\r\nConnection: close\r\n\r\n" + body);
+                    socket->disconnectFromHost();
+                });
+            });
+        });
+        int refreshes = 0;
+        QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
+        ctx.logChanged = [&] { ++refreshes; };
+        QslController controller(ctx);
+        const QUrl endpoint(QStringLiteral("http://127.0.0.1:%1/test").arg(server.serverPort()));
+        controller.m_web.setEndpoints(endpoint, endpoint);
+        QElapsedTimer prepare; prepare.start();
+        QCOMPARE(controller.uploadQsos({selected, selected}, service), 1);
+        const qint64 prepareMs = prepare.elapsed();
+        QTRY_COMPARE_WITH_TIMEOUT(requests, 1, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 5000);
+        QVERIFY(ticks >= 5);
+        QCOMPARE(refreshes, 1);
+        QCOMPARE(db.qslStatus(selected).first().sent, QStringLiteral("Y"));
+        QCOMPARE(controller.uploadQsos({selected}, service), 0);
+        QCOMPARE(requests, 1);
+        qInfo() << service << "one selected of 20000, preparation ms" << prepareMs << "heartbeat ticks" << ticks;
+    }
+
+    void bulkSchedulingWakesOnlyEnabledRequestedServices()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        QslController::Context ctx; ctx.db = &db;
+        QslController controller(ctx);
+        controller.setAutoUpload("eqsl", true);
+        controller.setAutoUpload("crx", true);
+        QCOMPARE(controller.enabledAutomaticServices(), (QStringList{"eqsl", "crx"}));
+        controller.setAutoUpload("eqsl", false);
+        controller.scheduleAutomaticServices({"eqsl", "crx", "qrz"});
+        QVERIFY(controller.m_autoDelay.isActive());
+        QCOMPARE(controller.m_autoServices, QSet<QString>{QStringLiteral("crx")});
+        controller.cancel();
+    }
+
+    void editorMergesConcurrentQslChanges()
+    {
+        AdifRecord stale{{"EQSL_QSL_SENT", "N"}, {"LOTW_QSL_RCVD", "N"},
+                         {"QRZCOM_QSO_UPLOAD_STATUS", "Y"}};
+        AdifRecord current{{"EQSL_QSL_SENT", "Y"}, {"EQSL_QSLSDATE", "20261118"},
+                           {"LOTW_QSL_RCVD", "Y"}};
+        LogDatabase::mergeUneditedQslFields(stale, current, {QStringLiteral("LOTW_QSL_RCVD")});
+        QCOMPARE(stale.value("EQSL_QSL_SENT"), QStringLiteral("Y"));
+        QCOMPARE(stale.value("EQSL_QSLSDATE"), QStringLiteral("20261118"));
+        QCOMPARE(stale.value("LOTW_QSL_RCVD"), QStringLiteral("N"));
+        QVERIFY(stale.value("QRZCOM_QSO_UPLOAD_STATUS").isEmpty());
+    }
+
+    void editedSentContactDoesNotWakeUnrelatedServices_data()
+    {
+        QTest::addColumn<QString>("service");
+        for (const char* service : {"lotw", "qrz", "clublog", "eqsl", "crx", "hrdlog", "wavelog"})
+            QTest::newRow(service) << QString::fromLatin1(service);
+    }
+
+    void editedSentContactDoesNotWakeUnrelatedServices()
+    {
+        QFETCH(QString, service);
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261117"},
+                                     {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        const auto b = db.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20261117"},
+                                     {"TIME_ON", "1201"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        QslState state; state.service = service; state.sent = "Y";
+        QVERIFY(db.setQslState(a, state));
+        QVERIFY(db.qsosToUpload(service).contains(b));
+        QslController::Context ctx; ctx.db = &db;
+        QslController controller(ctx);
+        controller.setAutoUpload(service, true);
+        controller.qsoEdited(a);
+        QVERIFY(!controller.m_autoDelay.isActive());
+        QVERIFY(controller.m_autoServices.isEmpty());
+        controller.qsoEdited(b);
+        QVERIFY(controller.m_autoDelay.isActive());
+        QVERIFY(controller.m_autoServices.contains(service));
+        controller.cancel();
+        QVERIFY(!controller.m_autoDelay.isActive());
+        QVERIFY(controller.m_autoServices.isEmpty());
+    }
+
+    void eqslDuplicateAndAutomaticEditAB_data()
+    {
+        QTest::addColumn<bool>("legacyTrigger");
+        QTest::newRow("A-previous-edit-trigger") << true;
+        QTest::newRow("B-filtered-edit-trigger") << false;
+    }
+
+    void eqslDuplicateAndAutomaticEditAB()
+    {
+        QFETCH(bool, legacyTrigger);
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261117"},
+                                     {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        const auto b = db.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20261117"},
+                                     {"TIME_ON", "1201"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "test").id;
+        QslState state; state.service = "eqsl"; state.sent = "Y";
+        QVERIFY(db.setQslState(a, state));
+        QSettings().setValue("credentials/eqsl/stored", true);
+        CredentialStore credentials("test-only");
+        credentials.m_secretCache.insert("eqsl", "test-password");
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        int requests = 0, ticks = 0;
+        QTimer heartbeat; heartbeat.setInterval(5);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket* socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                socket->readAll();
+                if (socket->property("answered").toBool()) return;
+                socket->setProperty("answered", true);
+                ++requests;
+                QTimer::singleShot(60, socket, [socket] {
+                    const QByteArray body = "Result: 0 out of 1 record. Duplicate";
+                    socket->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(body.size())
+                                  + "\r\nConnection: close\r\n\r\n" + body);
+                    socket->disconnectFromHost();
+                });
+            });
+        });
+        QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
+        QslController controller(ctx);
+        controller.m_web.setEndpoints(QUrl(), QUrl(QStringLiteral("http://127.0.0.1:%1/eqsl").arg(server.serverPort())));
+        controller.setAutoUpload("eqsl", true);
+        controller.m_autoDelay.setInterval(1);
+        if (legacyTrigger) controller.qsoLogged(a); else controller.qsoEdited(a);
+        QTest::qWait(200);
+        QCOMPARE(requests, legacyTrigger ? 1 : 0);
+        if (!legacyTrigger) {
+            controller.qsoEdited(b);
+            QTRY_COMPARE_WITH_TIMEOUT(requests, 1, 3000);
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 3000);
+        QCOMPARE(db.qslStatus(b).first().sent, QStringLiteral("Y"));
+        controller.qsoEdited(b);
+        QTest::qWait(100);
+        QCOMPARE(requests, 1);
+        QVERIFY(ticks >= 10);
+    }
+
 
     void clubLogStatusEditResponsiveness_data()
     {

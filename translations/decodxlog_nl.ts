@@ -1202,6 +1202,38 @@ De roepletters waar Decodium mee bezig is, verschijnen hier vanzelf.</translatio
         <source>Unconfirmed</source>
         <translation>Niet bevestigd</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Bekijken op QRZ.com</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Dit roepteken openen op QRZ.com</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>QRZ.com-profiel wordt gecontroleerd…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>QRZ.com-profiel niet geverifieerd; controleer je verbinding en de QRZ-callbookinstellingen</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Bekijken op HamQTH</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Dit roepteken openen op HamQTH (gegevens van HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>HamQTH-profiel wordt gecontroleerd…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>HamQTH-profiel niet geverifieerd; controleer je verbinding en de HamQTH-callbookinstellingen</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3372,6 +3404,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, poort %1, en &quot
         <source>Merge %1 groups</source>
         <translation>%1 groepen samenvoegen</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Samenvoegen… %1%</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4428,6 +4464,14 @@ Open het één keer in DecoDXLog om het bij te werken.</translation>
     <message>
         <source>QSO map</source>
         <translation>QSO-kaart</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Beschadigde QSO&apos;s worden gecontroleerd…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>Beschadigde QSO&apos;s konden niet worden gecontroleerd</translation>
     </message>
 </context>
 <context>
@@ -5570,6 +5614,14 @@ Extra velden blijven behouden: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>De tijdelijke Club Log-download kan niet worden voorbereid voor het voorbeeld</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>De oorspronkelijke QSO past niet meer bij het logboek.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Het oorspronkelijke logboek is niet beschikbaar.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5727,6 +5779,13 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: syntaxisfout in de opdracht (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Geen QSO om een kaart van te maken.</translation>
     </message>
 </context>
 <context>
@@ -6119,6 +6178,18 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>PDF-bestanden (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Papieren QSL wordt geschreven…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Papieren QSL wordt bijgewerkt…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Papieren QSL wordt geladen…</translation>
     </message>
 </context>
 <context>
@@ -7645,10 +7716,6 @@ Extra velden blijven behouden: %8</translation>
         <translation>Ontbrekende DXCC aanvullen</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO aangevuld, elk bewaard als een nieuwe versie.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Nieuwere cty.csv laden…</translation>
     </message>
@@ -8456,10 +8523,6 @@ Extra velden blijven behouden: %8</translation>
         <translation>%1 QSO corrigeren</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 QSO gecorrigeerd, elk bewaard als nieuwe revisie.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>geschrapt</translation>
     </message>
@@ -9134,6 +9197,14 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Directe OQRS-verzoeken voor het actieve station. Dit zijn geen ontvangen QSL-bevestigingen.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO bijgewerkt, %2 mislukt; eerdere versies blijven in de geschiedenis.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>DXCC wordt op de achtergrond bijgewerkt…</translation>
     </message>
 </context>
 <context>
@@ -11162,17 +11233,6 @@ Extra velden blijven behouden: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>cty.xml van %1: %2 entiteiten</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>Entiteit van %n QSO gecorrigeerd met de datum van het QSO (Club Log)</numerusform>
-            <numerusform>Entiteit van %n QSO&apos;s gecorrigeerd met de datum van het QSO (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC aangevuld op %1 van %2 QSO (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Stationsprofiel gemaakt vanuit Decodium: %1</translation>
@@ -11708,14 +11768,6 @@ Extra velden blijven behouden: %8</translation>
         <translation>%1 → %2 in %3 QSO (%4 ongewijzigd, %5 mislukt)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO nr. %1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>%1 groepen dubbele samengevoegd: %2 QSO verwijderd (blijven in de geschiedenis)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Er loopt al een import: wacht tot die klaar is.</translation>
     </message>
@@ -11996,13 +12048,6 @@ Extra velden blijven behouden: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %1 van %2…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO opgeschoond na een slechte oude import (de vorige tekst blijft in de geschiedenis).</numerusform>
-            <numerusform>%n QSO opgeschoond na een slechte oude import (de vorige tekst blijft in de geschiedenis).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>gebouwd op %1 · %2 @ %3</translation>
@@ -12090,6 +12135,50 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>Roepteeminformatie wordt vernieuwd</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>Het logboek is gewijzigd tijdens de controle van entiteiten; voer de controle opnieuw uit</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC bijgewerkt bij %1 van %2 QSO (%3 ongewijzigd, %4 mislukt; gegevens %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>Een wijziging op de achtergrond is voltooid op een logboek dat niet meer open is</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>Er loopt al een UDP-herverzending</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>UDP-herverzending gestopt na %1 van %2 QSO</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>%1 QSO verwijderd (bewaard in de geschiedenis); %2 mislukt</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Label &quot;%1&quot; toegevoegd aan %2 QSO (%3 ongewijzigd, %4 mislukt)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Label &quot;%1&quot; verwijderd van %2 QSO (%3 ongewijzigd, %4 mislukt)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>Kon %1 groep(en) met dubbele QSO&apos;s niet samenvoegen</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>%1 groep(en) met dubbele QSO&apos;s samengevoegd: %2 QSO verwijderd (bewaard in de geschiedenis); %3 mislukt</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>%1 QSO hersteld uit een oude import; %2 mislukt (de vorige tekst blijft in de geschiedenis)</translation>
     </message>
 </context>
 <context>
@@ -12387,6 +12476,73 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>Versturen gestopt.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>Papieren QSL kon niet worden geladen: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>Papieren QSL kon niet worden geteld: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>Er loopt al een bewerking van de papieren QSL</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n QSL-bevestiging bijgewerkt</numerusform>
+            <numerusform>%n QSL-bevestigingen bijgewerkt</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 mislukt: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Bewerking van papieren QSL op het vorige logboek: %1 voltooid, %2 mislukt. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Papieren QSL wordt geschreven…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>De uitvoer van de papieren QSL kon niet worden geschreven</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Het oorspronkelijke logboek is niet beschikbaar.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL verzonden naar %1, maar de verzendstatus kon niet worden opgeslagen: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>De identiteit van de oorspronkelijke QSO ontbreekt.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>QSO wordt geladen voor e-mail…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>Het logboek is gewijzigd voordat de e-mailvoorbereiding was voltooid.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>Het logboek is gewijzigd voor het verzenden; de overige QSL&apos;s zijn gestopt.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>De e-mail- of kaartinstellingen zijn gewijzigd; controleer ze voor het verzenden.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>Het logboek is gewijzigd; de overige QSL&apos;s zijn gestopt.</translation>
     </message>
 </context>
 <context>
@@ -13776,6 +13932,14 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>Er zijn geen Club Log-inloggegevens opgeslagen</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>Inloggegevens zijn gewijzigd tijdens het lezen; probeer het opnieuw</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>Systeemsleutelhanger kan niet worden gelezen</translation>
     </message>
 </context>
 <context>

@@ -1197,6 +1197,38 @@ Decodium 正在通聯的呼號會自己出現在這裡。</translation>
         <source>Unconfirmed</source>
         <translation>未確認</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>在 QRZ.com 上查看</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>在 QRZ.com 上開啟此呼號</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>正在檢查 QRZ.com 設定檔…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>QRZ.com 設定檔未驗證；請檢查網路連線與 QRZ 呼號庫設定</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>在 HamQTH 上查看</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>在 HamQTH 上開啟此呼號（資料來自 HamQTH.com）</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>正在檢查 HamQTH 設定檔…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>HamQTH 設定檔未驗證；請檢查網路連線與 HamQTH 呼號庫設定</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3362,6 +3394,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <source>Merge %1 groups</source>
         <translation>合併 %1 組</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>正在合併… %1%</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4418,6 +4454,14 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>QSO map</source>
         <translation>QSO 地圖</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>正在檢查損毀的 QSO…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>無法檢查損毀的 QSO</translation>
     </message>
 </context>
 <context>
@@ -5557,6 +5601,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>無法為預覽準備暫存的 Club Log 下載</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>原始 QSO 已與日誌不再一致。</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>原始日誌無法使用。</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5713,6 +5765,13 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL：命令語法錯誤 (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">沒有可以做卡片的 QSO。</translation>
     </message>
 </context>
 <context>
@@ -6104,6 +6163,18 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>PDF 檔案 (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>正在寫入紙本 QSL…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>正在更新紙本 QSL…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>正在載入紙本 QSL…</translation>
     </message>
 </context>
 <context>
@@ -7623,10 +7694,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>補上缺少的 DXCC</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>補全了 %1 個 QSO，每一個都作為新版本保存。</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>載入更新的 cty.csv…</translation>
     </message>
@@ -8433,10 +8500,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>修正 %1 筆 QSO</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>已修正 %1 筆 QSO，每筆都存為新的修訂。</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>已刪除</translation>
     </message>
@@ -9111,6 +9174,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>目前電台的直接 OQRS 請求。這些請求不是已收到的 QSL 確認。</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>已更新 %1 筆 QSO，%2 筆失敗；先前的版本保留在歷程中。</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>正在背景更新 DXCC…</translation>
     </message>
 </context>
 <context>
@@ -11125,16 +11196,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>cty.xml of %1: %2 entities</source>
         <translation>%1 的 cty.xml：%2 個實體</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>已依 QSO 日期修正 %n 筆 QSO 的實體（Club Log）</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>%2 個 QSO 中有 %1 個補上了 DXCC (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>已從 Decodium 建出電台設定檔：%1</translation>
@@ -11667,14 +11728,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>%1 → %2，%3 筆 QSO（%4 筆未變，%5 筆失敗）</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO #%1：%2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>已合併 %1 組重複：刪除 %2 筆 QSO（保留在歷史中）</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>已有匯入正在進行：請等待完成。</translation>
     </message>
@@ -11948,12 +12001,6 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>Callbook: %1 of %2…</source>
         <translation>呼號簿：%2 個裡的第 %1 個…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>整理了 %n 個被舊匯入弄壞的 QSO（原來的文字留在歷史裡）。</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>建置於 %1 · %2 @ %3</translation>
@@ -12041,6 +12088,50 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Refreshing callsign information</source>
         <translation>正在重新整理呼號資訊</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>檢查實體時日誌已變更；請重新檢查</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>已更新 %2 筆 QSO 中的 %1 筆的 DXCC（%3 筆未變，%4 筆失敗；資料 %5）</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>背景日誌變更在一個已不再開啟的日誌上完成</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>UDP 重送已在進行中</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>UDP 重送在 %2 筆 QSO 中的第 %1 筆後停止</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>已刪除 %1 筆 QSO（保留在歷程中）；%2 筆失敗</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>已為 %2 筆 QSO 新增標籤&quot;%1&quot;（%3 筆未變，%4 筆失敗）</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>已從 %2 筆 QSO 移除標籤&quot;%1&quot;（%3 筆未變，%4 筆失敗）</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>無法合併 %1 組重複記錄</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>已合併 %1 組重複記錄：刪除 %2 筆 QSO（保留在歷程中）；%3 筆失敗</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>已修復舊匯入中的 %1 筆 QSO；%2 筆失敗（原文字保留在歷程中）</translation>
     </message>
 </context>
 <context>
@@ -12330,6 +12421,72 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Sending stopped.</source>
         <translation>傳送已停止。</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>無法載入紙本 QSL：%1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>無法統計紙本 QSL：%1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>紙本 QSL 操作已在進行中</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>已更新 %n 筆 QSL 確認</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>；%1 筆失敗：%2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>上一個日誌上的紙本 QSL 操作：%1 筆完成，%2 筆失敗。%3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>正在寫入紙本 QSL…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>無法寫入紙本 QSL 輸出</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>原始日誌無法使用。</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>已向 %1 傳送 QSL，但無法記錄其傳送狀態：%2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>缺少原始 QSO 的識別。</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>正在載入用於電子郵件的 QSO…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>郵件準備完成前日誌已變更。</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>傳送前日誌已變更；剩餘的 QSL 已停止。</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>電子郵件或卡片設定已變更；傳送前請檢查。</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>日誌已變更；剩餘的 QSL 已停止。</translation>
     </message>
 </context>
 <context>
@@ -13709,6 +13866,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>No Club Log credential is stored</source>
         <translation>未儲存 Club Log 憑證</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>讀取時憑證已變更；請重試</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>無法讀取系統金鑰圈</translation>
     </message>
 </context>
 <context>

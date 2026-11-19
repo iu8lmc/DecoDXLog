@@ -1202,6 +1202,38 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
         <source>Unconfirmed</source>
         <translation>Ikke bekræftet</translation>
     </message>
+    <message>
+        <source>View on QRZ.com</source>
+        <translation>Vis på QRZ.com</translation>
+    </message>
+    <message>
+        <source>Open this callsign on QRZ.com</source>
+        <translation>Åbn dette kaldesignal på QRZ.com</translation>
+    </message>
+    <message>
+        <source>Checking the QRZ.com profile…</source>
+        <translation>Kontrollerer QRZ.com-profilen…</translation>
+    </message>
+    <message>
+        <source>QRZ.com profile not verified; check your connection and QRZ callbook settings</source>
+        <translation>QRZ.com-profil ikke bekræftet; kontroller forbindelsen og QRZ-callbookindstillingerne</translation>
+    </message>
+    <message>
+        <source>View on HamQTH</source>
+        <translation>Vis på HamQTH</translation>
+    </message>
+    <message>
+        <source>Open this callsign on HamQTH (data provided by HamQTH.com)</source>
+        <translation>Åbn dette kaldesignal på HamQTH (data fra HamQTH.com)</translation>
+    </message>
+    <message>
+        <source>Checking the HamQTH profile…</source>
+        <translation>Kontrollerer HamQTH-profilen…</translation>
+    </message>
+    <message>
+        <source>HamQTH profile not verified; check your connection and HamQTH callbook settings</source>
+        <translation>HamQTH-profil ikke bekræftet; kontroller forbindelsen og HamQTH-callbookindstillingerne</translation>
+    </message>
 </context>
 <context>
     <name>CallListMatches</name>
@@ -3372,6 +3404,10 @@ I Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, og &quot;A
         <source>Merge %1 groups</source>
         <translation>Flet %1 grupper</translation>
     </message>
+    <message>
+        <source>Merging… %1%</source>
+        <translation>Fletter… %1 %</translation>
+    </message>
 </context>
 <context>
     <name>DvkPanel</name>
@@ -4428,6 +4464,14 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>QSO map</source>
         <translation>QSO-kort</translation>
+    </message>
+    <message>
+        <source>Checking for damaged QSOs…</source>
+        <translation>Kontrollerer beskadigede QSO&apos;er…</translation>
+    </message>
+    <message>
+        <source>Could not check damaged QSOs</source>
+        <translation>Beskadigede QSO&apos;er kunne ikke kontrolleres</translation>
     </message>
 </context>
 <context>
@@ -5570,6 +5614,14 @@ Ekstra felter bevares: %8</translation>
         <source>Cannot prepare the temporary Club Log download for preview</source>
         <translation>Den midlertidige Club Log-download kan ikke klargøres til forhåndsvisning</translation>
     </message>
+    <message>
+        <source>The original QSO no longer matches the log.</source>
+        <translation>Den oprindelige QSO stemmer ikke længere med logbogen.</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Den oprindelige logbog er ikke tilgængelig.</translation>
+    </message>
 </context>
 <context>
     <name>Qsl</name>
@@ -5727,6 +5779,13 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>TQSL: command syntax error (%1)</source>
         <translation>TQSL: Syntaksfejl i kommandoen (%1)</translation>
+    </message>
+</context>
+<context>
+    <name>QslCardController</name>
+    <message>
+        <source>No QSO to make a card for.</source>
+        <translation type="unfinished">Ingen QSO at lave et kort af.</translation>
     </message>
 </context>
 <context>
@@ -6119,6 +6178,18 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>PDF files (*.pdf)</source>
         <translation>PDF-filer (*.pdf)</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Skriver papir-QSL…</translation>
+    </message>
+    <message>
+        <source>Updating paper QSL…</source>
+        <translation>Opdaterer papir-QSL…</translation>
+    </message>
+    <message>
+        <source>Loading paper QSL…</source>
+        <translation>Indlæser papir-QSL…</translation>
     </message>
 </context>
 <context>
@@ -7645,10 +7716,6 @@ Ekstra felter bevares: %8</translation>
         <translation>Udfyld manglende DXCC</translation>
     </message>
     <message>
-        <source>%1 QSO completed, each kept as a new revision.</source>
-        <translation>%1 QSO udfyldt, hvert gemt som en ny revision.</translation>
-    </message>
-    <message>
         <source>Load newer cty.csv…</source>
         <translation>Hent en nyere cty.csv…</translation>
     </message>
@@ -8456,10 +8523,6 @@ Ekstra felter bevares: %8</translation>
         <translation>Ret %1 QSO</translation>
     </message>
     <message>
-        <source>%1 QSO corrected, each kept as a new revision.</source>
-        <translation>%1 QSO rettet, hver gemt som en ny revision.</translation>
-    </message>
-    <message>
         <source>deleted</source>
         <translation>slettet</translation>
     </message>
@@ -9134,6 +9197,14 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Direct OQRS requests for the active station. These requests are not received QSL confirmations.</source>
         <translation>Direkte OQRS-anmodninger for den aktive station. Det er ikke modtagne QSL-bekræftelser.</translation>
+    </message>
+    <message>
+        <source>%1 QSO updated, %2 failed; previous versions remain in history.</source>
+        <translation>%1 QSO opdateret, %2 mislykkedes; tidligere versioner bevares i historikken.</translation>
+    </message>
+    <message>
+        <source>Updating DXCC in the background…</source>
+        <translation>Opdaterer DXCC i baggrunden…</translation>
     </message>
 </context>
 <context>
@@ -11162,17 +11233,6 @@ Ekstra felter bevares: %8</translation>
         <source>cty.xml of %1: %2 entities</source>
         <translation>cty.xml fra %1: %2 entiteter</translation>
     </message>
-    <message numerus="yes">
-        <source>Entity of %n QSO(s) corrected with the date of the QSO (Club Log)</source>
-        <translation>
-            <numerusform>Entitet for %n QSO rettet med QSO&apos;ens dato (Club Log)</numerusform>
-            <numerusform>Entitet for %n QSO&apos;er rettet med QSO&apos;ens dato (Club Log)</numerusform>
-        </translation>
-    </message>
-    <message>
-        <source>DXCC filled on %1 of %2 QSO (cty.csv %3)</source>
-        <translation>DXCC udfyldt på %1 af %2 QSO (cty.csv %3)</translation>
-    </message>
     <message>
         <source>Station profile created from Decodium: %1</source>
         <translation>Stationsprofil oprettet fra Decodium: %1</translation>
@@ -11708,14 +11768,6 @@ Ekstra felter bevares: %8</translation>
         <translation>%1 → %2 i %3 QSO (%4 uændret, %5 fejlede)</translation>
     </message>
     <message>
-        <source>QSO #%1: %2</source>
-        <translation>QSO nr. %1: %2</translation>
-    </message>
-    <message>
-        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history)</source>
-        <translation>%1 grupper af dubletter flettet: %2 QSO slettet (bliver i historikken)</translation>
-    </message>
-    <message>
         <source>An import is already running: wait for it to finish.</source>
         <translation>Der kører allerede en import: vent, til den er færdig.</translation>
     </message>
@@ -11996,13 +12048,6 @@ Ekstra felter bevares: %8</translation>
         <source>Callbook: %1 of %2…</source>
         <translation>Callbook: %1 af %2…</translation>
     </message>
-    <message numerus="yes">
-        <source>%n QSO cleaned up from a bad old import (the previous text stays in the history).</source>
-        <translation>
-            <numerusform>%n QSO ryddet op efter en dårlig gammel import (den tidligere tekst bliver i historikken).</numerusform>
-            <numerusform>%n QSO ryddet op efter en dårlig gammel import (den tidligere tekst bliver i historikken).</numerusform>
-        </translation>
-    </message>
     <message>
         <source>built on %1 · %2 @ %3</source>
         <translation>bygget den %1 · %2 @ %3</translation>
@@ -12090,6 +12135,50 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Refreshing callsign information</source>
         <translation>Opdaterer oplysninger om kaldesignalet</translation>
+    </message>
+    <message>
+        <source>The log changed while checking entities; run the check again</source>
+        <translation>Logbogen ændrede sig under enhedskontrollen; kør kontrollen igen</translation>
+    </message>
+    <message>
+        <source>DXCC updated on %1 of %2 QSO (%3 unchanged, %4 failed; data %5)</source>
+        <translation>DXCC opdateret for %1 af %2 QSO (%3 uændret, %4 mislykkedes; data %5)</translation>
+    </message>
+    <message>
+        <source>A background log change finished on a log that is no longer open</source>
+        <translation>En baggrundsændring blev afsluttet på en logbog, som ikke længere er åben</translation>
+    </message>
+    <message>
+        <source>A UDP resend is already in progress</source>
+        <translation>Et UDP-genudsendelse kører allerede</translation>
+    </message>
+    <message>
+        <source>UDP resend stopped after %1 of %2 QSO</source>
+        <translation>UDP-genudsendelse stoppet efter %1 af %2 QSO</translation>
+    </message>
+    <message>
+        <source>Deleted %1 QSO (kept in history); %2 failed</source>
+        <translation>%1 QSO slettet (bevaret i historikken); %2 mislykkedes</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; added to %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Mærket &quot;%1&quot; tilføjet til %2 QSO (%3 uændret, %4 mislykkedes)</translation>
+    </message>
+    <message>
+        <source>Tag &quot;%1&quot; removed from %2 QSO (%3 unchanged, %4 failed)</source>
+        <translation>Mærket &quot;%1&quot; fjernet fra %2 QSO (%3 uændret, %4 mislykkedes)</translation>
+    </message>
+    <message>
+        <source>Could not merge %1 duplicate group(s)</source>
+        <translation>Kunne ikke flette %1 dublet-gruppe(r)</translation>
+    </message>
+    <message>
+        <source>Merged %1 group(s) of duplicates: %2 QSO deleted (kept in history); %3 failed</source>
+        <translation>Fletter %1 dublet-gruppe(r): %2 QSO slettet (bevaret i historikken); %3 mislykkedes</translation>
+    </message>
+    <message>
+        <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
+        <translation>Reparerede %1 QSO fra en gammel import; %2 mislykkedes (den tidligere tekst bevares i historikken)</translation>
     </message>
 </context>
 <context>
@@ -12387,6 +12476,73 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>Sending stopped.</source>
         <translation>Afsendelse stoppet.</translation>
+    </message>
+    <message>
+        <source>Could not load paper QSL: %1</source>
+        <translation>Kunne ikke indlæse papir-QSL: %1</translation>
+    </message>
+    <message>
+        <source>Could not count paper QSL: %1</source>
+        <translation>Kunne ikke tælle papir-QSL: %1</translation>
+    </message>
+    <message>
+        <source>A paper QSL operation is already running</source>
+        <translation>En papir-QSL-handling kører allerede</translation>
+    </message>
+    <message numerus="yes">
+        <source>%n QSL confirmation(s) updated</source>
+        <translation>
+            <numerusform>%n QSL-bekræftelse opdateret</numerusform>
+            <numerusform>%n QSL-bekræftelser opdateret</numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>; %1 failed: %2</source>
+        <translation>; %1 mislykkedes: %2</translation>
+    </message>
+    <message>
+        <source>Paper QSL operation on the previous log: %1 completed, %2 failed. %3</source>
+        <translation>Papir-QSL-handling på den forrige logbog: %1 gennemført, %2 mislykkedes. %3</translation>
+    </message>
+    <message>
+        <source>Writing paper QSL…</source>
+        <translation>Skriver papir-QSL…</translation>
+    </message>
+    <message>
+        <source>Could not write the paper QSL output</source>
+        <translation>Papir-QSL-outputtet kunne ikke skrives</translation>
+    </message>
+    <message>
+        <source>The original log is unavailable.</source>
+        <translation>Den oprindelige logbog er ikke tilgængelig.</translation>
+    </message>
+    <message>
+        <source>QSL sent to %1, but its sent status could not be recorded: %2</source>
+        <translation>QSL sendt til %1, men dens afsendelsesstatus kunne ikke registreres: %2</translation>
+    </message>
+    <message>
+        <source>The original QSO identity is missing.</source>
+        <translation>Den oprindelige QSO&apos;s identitet mangler.</translation>
+    </message>
+    <message>
+        <source>Loading QSO for email…</source>
+        <translation>Indlæser QSO til e-mail…</translation>
+    </message>
+    <message>
+        <source>The log changed before email preparation completed.</source>
+        <translation>Logbogen ændrede sig, før e-mailforberedelsen var færdig.</translation>
+    </message>
+    <message>
+        <source>The log changed before sending; the remaining QSLs were stopped.</source>
+        <translation>Logbogen ændrede sig før afsendelsen; de resterende QSL&apos;er blev stoppet.</translation>
+    </message>
+    <message>
+        <source>The email or card settings changed; review them before sending.</source>
+        <translation>E-mail- eller kortindstillingerne er ændret; kontroller dem før afsendelse.</translation>
+    </message>
+    <message>
+        <source>The log changed; the remaining QSLs were stopped.</source>
+        <translation>Logbogen ændrede sig; de resterende QSL&apos;er blev stoppet.</translation>
     </message>
 </context>
 <context>
@@ -13776,6 +13932,14 @@ Ekstra felter bevares: %8</translation>
     <message>
         <source>No Club Log credential is stored</source>
         <translation>Der er ingen Club Log-legitimation gemt</translation>
+    </message>
+    <message>
+        <source>Credential changed while it was being read; try again</source>
+        <translation>Legitimationen ændrede sig, mens den blev læst; prøv igen</translation>
+    </message>
+    <message>
+        <source>Cannot read the system keystore</source>
+        <translation>Systemnøgleringen kan ikke læses</translation>
     </message>
 </context>
 <context>

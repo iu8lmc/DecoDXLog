@@ -17,6 +17,11 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QElapsedTimer>
+#include <QFileInfo>
+#include <QFile>
 
 using namespace decolog;
 using namespace decolog::app;
@@ -119,6 +124,189 @@ private slots:
     void init()
     {
         QSettings().clear();
+    }
+
+    void largePaperOperationsAndCachedRowsStayResponsive()
+    {
+        core::LogDatabase db;
+        QVERIFY(db.open(m_dir.filePath("paper-20k.sqlite")));
+        QSqlQuery seed(db.connection());
+        QVERIFY2(seed.exec(QStringLiteral(
+            "WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<20000) "
+            "INSERT INTO qso(id,uuid,call,qso_datetime_on,band,mode,created_at,updated_at) "
+            "SELECT i,'fixture-'||i,'K'||i||'ABC','2026-11-18T12:00:00Z','20m','CW',"
+            "'2026-11-18T12:00:00Z','2026-11-18T12:00:00Z' FROM n")), qPrintable(seed.lastError().text()));
+        QVariantList ids; ids.reserve(20000);
+        for (int id = 1; id <= 20000; ++id) ids << id;
+        QslCardController::Context ctx; ctx.db = &db;
+        QslCardController cards(ctx);
+        int ticks = 0; qint64 longestGap = 0;
+        QElapsedTimer heartbeatClock; heartbeatClock.start();
+        QTimer heartbeat; heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] {
+            ++ticks;
+            longestGap = qMax(longestGap, heartbeatClock.restart());
+        });
+        heartbeat.start();
+        QElapsedTimer start; start.start();
+        cards.enqueue(ids, "B");
+        QVERIFY(cards.operationBusy());
+        QVERIFY(start.elapsed() < 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 30000);
+        const qint64 enqueueMs = start.elapsed();
+        QVERIFY(ticks > 2);
+        QCOMPARE(db.cardCounts().value("queue").toInt(), 20000);
+        const auto chosen = db.cardRows("all", 0, {20000, 1});
+        QCOMPARE(chosen.size(), 2);
+        QCOMPARE(chosen.at(0).value("call").toString(), QStringLiteral("K1ABC"));
+        QCOMPARE(chosen.at(1).value("call").toString(), QStringLiteral("K20000ABC"));
+        const QString templatePath = m_dir.filePath("tiny-card.png");
+        QImage templateImage(4, 4, QImage::Format_RGB32); templateImage.fill(Qt::white);
+        QVERIFY(templateImage.save(templatePath));
+        cards.setCardTemplate(QUrl::fromLocalFile(templatePath));
+        start.restart();
+        cards.writeLabels(QUrl::fromLocalFile(m_dir.filePath("labels-20k.pdf")), "l7160", 4, false);
+        QVERIFY(cards.exportBusy()); QVERIFY(start.elapsed() < 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.exportBusy(), 30000);
+        const qint64 labelsMs = start.elapsed();
+        QVERIFY(QFileInfo(m_dir.filePath("labels-20k.pdf")).size() > 0);
+        start.restart();
+        cards.writeCardsPdf(QUrl::fromLocalFile(m_dir.filePath("cards-20k.pdf")), ids, 4);
+        QVERIFY(cards.exportBusy()); QVERIFY(start.elapsed() < 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.exportBusy(), 30000);
+        const qint64 pdfMs = start.elapsed();
+        QVERIFY(QFileInfo(m_dir.filePath("cards-20k.pdf")).size() > 0);
+        start.restart();
+        cards.writeCardsPng(QUrl::fromLocalFile(m_dir.filePath("png-20k")), ids);
+        QVERIFY(cards.exportBusy()); QVERIFY(start.elapsed() < 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.exportBusy(), 30000);
+        const qint64 pngMs = start.elapsed();
+        QVERIFY(QFileInfo::exists(m_dir.filePath("png-20k/K1ABC-20261118-1200.png")));
+        QVERIFY(QFileInfo::exists(m_dir.filePath("png-20k/K20000ABC-20261118-1200.png")));
+        qInfo() << "paper 20k async outputs ms labels" << labelsMs << "pdf" << pdfMs << "png" << pngMs;
+        // Initial rows/counts are populated asynchronously. The old snapshot
+        // remains available while a refresh is in progress.
+        start.restart();
+        cards.rows("queue"); cards.counts();
+        QVERIFY(start.elapsed() < 1000);
+        QTRY_COMPARE_WITH_TIMEOUT(cards.rows("queue").size(), 20000, 30000);
+        QTRY_COMPARE_WITH_TIMEOUT(cards.counts().value("queue").toInt(), 20000, 30000);
+        const int beforeTicks = ticks;
+        start.restart();
+        cards.markSent(ids, "");
+        QVERIFY(cards.operationBusy());
+        QCOMPARE(cards.rows("queue").size(), 20000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 30000);
+        const qint64 sentMs = start.elapsed();
+        QVERIFY(ticks > beforeTicks);
+        QCOMPARE(db.cardCounts().value("sent").toInt(), 20000);
+        QTRY_COMPARE_WITH_TIMEOUT(cards.rows("queue").size(), 0, 30000);
+        QTRY_COMPARE_WITH_TIMEOUT(cards.counts().value("sent").toInt(), 20000, 30000);
+        start.restart(); cards.drop(ids);
+        QVERIFY(cards.operationBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 30000);
+        const qint64 dropMs = start.elapsed();
+        QCOMPARE(db.cardCounts().value("sent").toInt(), 0);
+        QVERIFY(seed.exec("UPDATE qsl_status SET rcvd='Y' WHERE service='card' AND qso_id IN (1,2,3)"));
+        QVERIFY(seed.exec("UPDATE qsl_status SET sent='Y' WHERE service='card' AND qso_id=1"));
+        start.restart(); QCOMPARE(cards.enqueueUnanswered("B"), -1);
+        QVERIFY(cards.operationBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 30000);
+        const qint64 unansweredMs = start.elapsed();
+        QCOMPARE(db.cardCounts().value("queue").toInt(), 2);
+        QCOMPARE(db.cardCounts().value("sent").toInt(), 1);
+        qInfo() << "paper 20k database" << db.path() << "enqueue ms" << enqueueMs
+                << "sent ms" << sentMs << "drop ms" << dropMs << "unanswered ms" << unansweredMs
+                << "heartbeat ticks" << ticks << "maximum gap ms" << longestGap;
+    }
+
+    void paperFailureRollsBackJustTheAffectedQso()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("paper-failure.sqlite")));
+        const auto a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                      {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        const auto b = db.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1201"},
+                                      {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        QSqlQuery trigger(db.connection());
+        QVERIFY(trigger.exec(QStringLiteral("CREATE TRIGGER reject_dirty BEFORE UPDATE OF dirty ON qso "
+                                             "WHEN OLD.id=%1 BEGIN SELECT RAISE(ABORT, 'fixture failure'); END").arg(a)));
+        QslCardController::Context ctx; ctx.db = &db;
+        QslCardController cards(ctx);
+        cards.enqueue({a, b}, "B");
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 10000);
+        QVERIFY(cards.status().contains("1 failed"));
+        QVERIFY(db.qslStatus(a).isEmpty());
+        QCOMPARE(db.qslStatus(b).first().sent, QStringLiteral("Q"));
+        cards.markReceived(b, true);
+        QVERIFY(cards.operationBusy());
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 10000);
+        QCOMPARE(db.qslStatus(b).first().sent, QStringLiteral("Q"));
+        QCOMPARE(db.qslStatus(b).first().rcvd, QStringLiteral("Y"));
+    }
+
+    void paperTransactionRollbackDoesNotCommitLaterRows()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("paper-rollback.sqlite")));
+        QVariantList ids;
+        for (const char* call : {"K1AAA", "K1BBB", "K1CCC"}) {
+            const auto id = db.insertQso({{"CALL", call}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                          {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+            QVERIFY(id > 0);
+            ids << id;
+        }
+        QSqlQuery trigger(db.connection());
+        QVERIFY(trigger.exec(QStringLiteral("CREATE TRIGGER abort_paper_transaction BEFORE UPDATE OF dirty ON qso "
+                         "WHEN OLD.id=%1 BEGIN SELECT RAISE(ROLLBACK, 'fixture rollback'); END")
+                                 .arg(ids.at(1).toLongLong())));
+        QslCardController::Context ctx; ctx.db = &db;
+        QslCardController cards(ctx);
+        cards.enqueue(ids, "B");
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 10000);
+        QVERIFY2(cards.status().contains("3 failed"), qPrintable(cards.status()));
+        for (const QVariant& id : ids) QVERIFY(db.qslStatus(id.toLongLong()).isEmpty());
+        QCOMPARE(db.cardCounts().value("queue").toInt(), 0);
+    }
+
+    void cachedPaperRowsFollowLogSwitchAndExternalInvalidation()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("paper-first.sqlite")));
+        const auto id = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                       {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        QslCardController::Context ctx; ctx.db = &db;
+        QslCardController cards(ctx);
+        cards.enqueue({id}, "B");
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(cards.rows("queue").size(), 1, 10000);
+        core::QslState state; state.service = "card"; state.sent = "Y";
+        QVERIFY(db.setCardState(id, state));
+        cards.invalidateCache();
+        QTRY_COMPARE_WITH_TIMEOUT(cards.rows("queue").size(), 0, 10000);
+        QTRY_COMPARE_WITH_TIMEOUT(cards.rows("sent").size(), 1, 10000);
+        db.close(); QVERIFY(db.open(m_dir.filePath("paper-second.sqlite")));
+        QCOMPARE(cards.rows("sent").size(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.cacheLoading(), 10000);
+    }
+
+    void paperOutputFailureDoesNotReportSuccess()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("paper-output-errors.sqlite")));
+        const auto id = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                       {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        QslCardController::Context ctx; ctx.db = &db;
+        QslCardController cards(ctx); cards.enqueue({id}, "B");
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(), 10000);
+        const QString blockerPath = m_dir.filePath("paper-not-a-directory");
+        QFile blocker(blockerPath); QVERIFY(blocker.open(QIODevice::WriteOnly)); blocker.close();
+        const QUrl invalid = QUrl::fromLocalFile(blockerPath + QStringLiteral("/output"));
+        cards.writeLabels(invalid, "l7160", 4, false);
+        QVERIFY(cards.exportBusy()); QTRY_VERIFY_WITH_TIMEOUT(!cards.exportBusy(), 10000);
+        QVERIFY(!cards.status().isEmpty()); QVERIFY(cards.lastFile().isEmpty());
+        cards.writeCardsPdf(invalid, {id}, 4);
+        QVERIFY(cards.exportBusy()); QTRY_VERIFY_WITH_TIMEOUT(!cards.exportBusy(), 10000);
+        QVERIFY(!cards.status().isEmpty()); QVERIFY(cards.lastFile().isEmpty());
+        cards.writeCardsPng(invalid, {id});
+        QVERIFY(cards.exportBusy()); QTRY_VERIFY_WITH_TIMEOUT(!cards.exportBusy(), 10000);
+        QVERIFY(!cards.status().isEmpty()); QVERIFY(cards.lastFile().isEmpty());
     }
 
     void theUsualFieldsLandInTheirBoxes()
@@ -309,6 +497,68 @@ private slots:
         QCOMPARE(cards.rows(QStringLiteral("sent")).size(), 0);
     }
 
+    void delayedAddressAfterCancelCannotSendOrAffectNextBatch()
+    {
+        core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto id = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"}, {"TIME_ON", "1200"},
+                                       {"BAND", "20m"}, {"MODE", "CW"}}, "test").id;
+        FakeCloud cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        QList<std::function<void(const QString&, const QString&)>> callbacks;
+        QslCardController::Context ctx; ctx.db = &db;
+        ctx.cloudAccess = [&] { return QPair<QString, QString>{cloud.url(), "fixture-token"}; };
+        ctx.emailFor = [&](const QString&, auto done) { callbacks << std::move(done); };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.enqueue({id}, "E");
+        cards.sendCardsByEmail({});
+        QVERIFY(cards.mailBusy()); QCOMPARE(callbacks.size(), 1);
+        cards.cancelMail(); QVERIFY(!cards.mailBusy());
+        cards.sendCardsByEmail({});
+        QVERIFY(cards.mailBusy()); QCOMPARE(callbacks.size(), 2);
+        callbacks.at(0)(QStringLiteral("old@example.invalid"), {});
+        QTest::qWait(100);
+        QVERIFY(cards.mailBusy());
+        QVERIFY(cloud.request.isEmpty());
+        callbacks.at(1)({}, QStringLiteral("no email"));
+        QVERIFY(!cards.mailBusy());
+        QCOMPARE(cards.rows("queue").size(), 1);
+        QCOMPARE(cards.rows("sent").size(), 0);
+        QCOMPARE(cards.mailStatus(), QStringLiteral("0 sent, 1 not"));
+    }
+
+    void manyMockEmailLookupsYieldAndStopBeforeAnySend()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("mail-20k.sqlite")));
+        QSqlQuery seed(db.connection());
+        QVERIFY(seed.exec(QStringLiteral(
+            "WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<20000) "
+            "INSERT INTO qso(id,uuid,call,qso_datetime_on,band,mode,created_at,updated_at) "
+            "SELECT i,'fixture-'||i,'K'||i||'ABC','2026-11-18T12:00:00Z','20m','CW',"
+            "'2026-11-18T12:00:00Z','2026-11-18T12:00:00Z' FROM n")));
+        QVERIFY(seed.exec("INSERT INTO qsl_status(qso_id,service,sent,rcvd) SELECT id,'card','Q','N' FROM qso"));
+        FakeCloud cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        QslCardController* active = nullptr;
+        int lookups = 0, ticks = 0;
+        QslCardController::Context ctx; ctx.db = &db;
+        ctx.cloudAccess = [&] { return QPair<QString, QString>{cloud.url(), "fixture-token"}; };
+        ctx.emailFor = [&](const QString&, auto done) {
+            ++lookups;
+            if (lookups == 10) QTimer::singleShot(0, active, [&] { active->cancelMail(); });
+            done({}, QStringLiteral("fixture: no address"));
+        };
+        QslCardController cards(ctx); active = &cards; cards.addStandardCardFields();
+        QTimer heartbeat; heartbeat.setInterval(5);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        QElapsedTimer start; start.start();
+        cards.sendCardsByEmail({});
+        QVERIFY(cards.mailBusy()); QVERIFY(start.elapsed() < 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(), 30000);
+        QVERIFY(lookups >= 10 && lookups < 20000);
+        QVERIFY(ticks > 0);
+        QVERIFY(cloud.request.isEmpty());
+        QCOMPARE(db.cardCounts().value("queue").toInt(), 20000);
+        QCOMPARE(db.cardCounts().value("sent").toInt(), 0);
+        QCOMPARE(cards.mailStatus(), QStringLiteral("Sending stopped."));
+    }
+
     void withoutACloudNothingLeavesAndItSaysSo()
     {
         core::LogDatabase db;
@@ -327,6 +577,103 @@ private slots:
         // Non si prova nemmeno, e non si dice "mandata": si dice cosa manca.
         QVERIFY(!cards.mailStatus().isEmpty());
         QCOMPARE(cards.rows(QStringLiteral("queue")).size(), 1);
+    }
+
+    void emailLookupStopsWhenLogChanges()
+    {
+        core::LogDatabase db;
+        const QString first = m_dir.filePath("mail-origin-lookup.sqlite");
+        const QString second = m_dir.filePath("mail-other-lookup.sqlite");
+        QVERIFY(db.open(first));
+        const auto a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"},
+                                     {"TIME_ON", "101500"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        core::QslState state; state.service = "card"; state.sent = "Q"; state.via = "E";
+        QVERIFY(db.setCardState(a.id, state));
+        db.close();
+        QVERIFY(db.open(second));
+        const auto b = db.insertQso({{"CALL", "K2BBB"}, {"QSO_DATE", "20261118"},
+                                     {"TIME_ON", "101500"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        QCOMPARE(a.id, b.id);
+        QVERIFY(db.setCardState(b.id, state));
+        db.close(); QVERIFY(db.open(first));
+        FakeCloud cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        std::function<void(const QString&, const QString&)> callback;
+        QslCardController::Context ctx; ctx.db = &db;
+        ctx.cloudAccess = [&] { return QPair<QString, QString>{cloud.url(), "fake"}; };
+        ctx.emailFor = [&](const QString&, auto done) { callback = std::move(done); };
+        QslCardController cards(ctx); cards.addStandardCardFields();
+        cards.sendCardsByEmail({QVariant(a.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(bool(callback), 15000);
+        db.close(); QVERIFY(db.open(second));
+        callback(QStringLiteral("test@example.invalid"), {});
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(), 5000);
+        QVERIFY(cloud.request.isEmpty());
+        QCOMPARE(db.qslStatus(b.id).first().sent, QStringLiteral("Q"));
+        QVERIFY(cards.mailStatus().contains(QStringLiteral("log changed"), Qt::CaseInsensitive));
+    }
+
+    void confirmedEmailIsRecordedOnlyInOriginalLog()
+    {
+        core::LogDatabase db;
+        const QString first = m_dir.filePath("mail-origin-confirm.sqlite");
+        const QString second = m_dir.filePath("mail-other-confirm.sqlite");
+        QVERIFY(db.open(first));
+        const auto a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"},
+                                     {"TIME_ON", "101500"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        core::QslState state; state.service = "card"; state.sent = "Q"; state.via = "E";
+        QVERIFY(db.setCardState(a.id, state));
+        db.close(); QVERIFY(db.open(second));
+        const auto b = db.insertQso({{"CALL", "K2BBB"}, {"QSO_DATE", "20261118"},
+                                     {"TIME_ON", "101500"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        QCOMPARE(a.id, b.id); QVERIFY(db.setCardState(b.id, state));
+        db.close(); QVERIFY(db.open(first));
+        QTcpServer cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        QslCardController::Context ctx; ctx.db = &db;
+        ctx.cloudAccess = [&] { return QPair<QString, QString>{QStringLiteral("http://127.0.0.1:%1").arg(cloud.serverPort()), "fake"}; };
+        ctx.emailFor = [](const QString&, auto done) { done(QStringLiteral("test@example.invalid"), {}); };
+        QslCardController cards(ctx); cards.addStandardCardFields();
+        cards.sendCardsByEmail({QVariant(a.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(cloud.hasPendingConnections(), 15000);
+        QTcpSocket* socket = cloud.nextPendingConnection(); QVERIFY(socket);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable() > 0, 5000);
+        db.close(); QVERIFY(db.open(second));
+        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}");
+        socket->flush();
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(), 15000);
+        QCOMPARE(db.qslStatus(b.id).first().sent, QStringLiteral("Q"));
+        db.close(); QVERIFY(db.open(first));
+        QCOMPARE(db.qslStatus(a.id).first().sent, QStringLiteral("Y"));
+    }
+
+    void confirmedEmailDoesNotMarkReplacementQso()
+    {
+        core::LogDatabase db;
+        const QString path = m_dir.filePath("mail-replacement.sqlite");
+        QVERIFY(db.open(path));
+        const auto a = db.insertQso({{"CALL", "K1AAA"}, {"QSO_DATE", "20261118"},
+                                     {"TIME_ON", "101500"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        core::QslState state; state.service = "card"; state.sent = "Q"; state.via = "E";
+        QVERIFY(db.setCardState(a.id, state));
+        QTcpServer cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        QStringList notes;
+        QslCardController::Context ctx; ctx.db = &db;
+        ctx.cloudAccess = [&] { return QPair<QString, QString>{QStringLiteral("http://127.0.0.1:%1").arg(cloud.serverPort()), "fake"}; };
+        ctx.emailFor = [](const QString&, auto done) { done(QStringLiteral("test@example.invalid"), {}); };
+        ctx.activity = [&](const QString&, const QString& message, const QString&) { notes << message; };
+        QslCardController cards(ctx); cards.addStandardCardFields();
+        cards.sendCardsByEmail({QVariant(a.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(cloud.hasPendingConnections(), 15000);
+        QTcpSocket* socket = cloud.nextPendingConnection(); QVERIFY(socket);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable() > 0, 5000);
+        db.close(); QVERIFY(QFile::rename(path, path + ".original")); QVERIFY(db.open(path));
+        const auto b = db.insertQso({{"CALL", "K2BBB"}, {"QSO_DATE", "20261118"},
+                                     {"TIME_ON", "101500"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        QCOMPARE(a.id, b.id); QVERIFY(db.setCardState(b.id, state));
+        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}");
+        socket->flush();
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(), 15000);
+        QCOMPARE(db.qslStatus(b.id).first().sent, QStringLiteral("Q"));
+        QVERIFY(notes.join(' ').contains(QStringLiteral("could not be recorded")));
     }
 
     void whatWasPutByHandAndIsNotUsualStays()
