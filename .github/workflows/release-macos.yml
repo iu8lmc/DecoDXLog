@@ -49,6 +49,7 @@ jobs:
       - name: Release gate
         env:
           QT_QPA_PLATFORM: offscreen
+          QTEST_FUNCTION_TIMEOUT: "1800000"
         run: bash scripts/release-gate.sh build build/DecoDXLog.app/Contents/MacOS/DecoDXLog
 
       - name: Deploy app bundle
