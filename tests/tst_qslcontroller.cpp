@@ -101,6 +101,7 @@ private slots:
         QVERIFY(q.next()); const qint64 selected = q.value(0).toLongLong();
         const QString credential = service == QLatin1String("qrz") ? QStringLiteral("qrzlogbook") : service;
         QSettings().setValue(QStringLiteral("credentials/%1/stored").arg(credential), true);
+        QSettings().setValue(QStringLiteral("credentials/%1/account").arg(credential), QStringLiteral("K1TEST"));
         CredentialStore credentials("test-only-large-log");
         credentials.m_secretCache.insert(credential, QStringLiteral("fixture-password"));
         QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
@@ -219,6 +220,7 @@ private slots:
         QslState state; state.service = "eqsl"; state.sent = "Y";
         QVERIFY(db.setQslState(a, state));
         QSettings().setValue("credentials/eqsl/stored", true);
+        QSettings().setValue("credentials/eqsl/account", "K1TEST");
         CredentialStore credentials("test-only");
         credentials.m_secretCache.insert("eqsl", "test-password");
         QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));

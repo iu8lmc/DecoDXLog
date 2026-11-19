@@ -113,6 +113,21 @@ class TestQslDownload : public QObject {
     Q_OBJECT
 
 private slots:
+    void missingCredentialsNeverOpenConnection()
+    {
+        FakeServer server;
+        ConfirmationDownloader downloader;
+        downloader.setEndpoints(server.url("/eqsl"), server.url("/qrz"));
+        QSignalSpy done(&downloader, &ConfirmationDownloader::finished);
+        downloader.downloadQrz(QStringLiteral("  "));
+        downloader.downloadEqsl(QStringLiteral("K1ABC"), QStringLiteral(" "));
+        downloader.downloadEqsl(QStringLiteral(" "), QStringLiteral("secret"));
+        QCOMPARE(done.size(), 3);
+        QTest::qWait(100);
+        QVERIFY(server.requests.isEmpty());
+        QVERIFY(!downloader.busy());
+    }
+
     void eqslLinkFromThePage()
     {
         const QUrl page("https://www.eqsl.cc/qslcard/DownloadInBox.cfm?UserName=X");

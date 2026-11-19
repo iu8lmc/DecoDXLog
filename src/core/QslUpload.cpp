@@ -695,6 +695,8 @@ void WebQslUploader::setEndpoints(const QUrl& qrz, const QUrl& eqsl)
 
 void WebQslUploader::uploadQrz(const QString& apiKey, const QString& adifRecord)
 {
+    if (m_busy) return;
+    if (apiKey.trimmed().isEmpty()) { QslUploadResult result; result.message = tr("QRZ: API key is required"); emit finished(result); return; }
     QUrlQuery form;
     form.addQueryItem(QStringLiteral("KEY"), apiKey);
     form.addQueryItem(QStringLiteral("ACTION"), QStringLiteral("INSERT"));
@@ -704,6 +706,8 @@ void WebQslUploader::uploadQrz(const QString& apiKey, const QString& adifRecord)
 
 void WebQslUploader::uploadEqsl(const QString& user, const QString& password, const QString& adifRecord)
 {
+    if (m_busy) return;
+    if (user.trimmed().isEmpty() || password.trimmed().isEmpty()) { QslUploadResult result; result.message = tr("eQSL: username and password are required"); emit finished(result); return; }
     // eQSL vuole utente e password nell'intestazione dell'ADIF.
     const QString document = QStringLiteral("<EQSL_USER:%1>%2<EQSL_PSWD:%3>%4<EOH>\n%5")
                                  .arg(user.size())
@@ -718,6 +722,8 @@ void WebQslUploader::uploadEqsl(const QString& user, const QString& password, co
 
 void WebQslUploader::uploadHrdLog(const QString& callsign, const QString& uploadCode, const QString& adifRecord)
 {
+    if (m_busy) return;
+    if (callsign.trimmed().isEmpty() || uploadCode.trimmed().isEmpty()) { QslUploadResult result; result.message = tr("HRDLog: callsign and upload code are required"); emit finished(result); return; }
     QUrlQuery form;
     form.addQueryItem(QStringLiteral("Callsign"), callsign);
     form.addQueryItem(QStringLiteral("Code"), uploadCode);
@@ -734,6 +740,7 @@ void WebQslUploader::uploadWavelog(const QString& server, const QString& apiKey,
 {
     if (m_busy)
         return;
+    if (apiKey.trimmed().isEmpty() || stationId.trimmed().isEmpty()) { QslUploadResult result; result.message = tr("Wavelog: API key and station are required"); emit finished(result); return; }
     const QUrl url = qsl::wavelogApiUrl(server, QStringLiteral("qso"));
     if (!url.isValid() || url.host().isEmpty()) {
         QslUploadResult failed;
@@ -757,6 +764,7 @@ void WebQslUploader::uploadWavelog(const QString& server, const QString& apiKey,
 
 void WebQslUploader::listWavelogStations(const QString& server, const QString& apiKey)
 {
+    if (apiKey.trimmed().isEmpty()) { emit wavelogStationsListed({}, tr("API key is required")); return; }
     const QUrl url = qsl::wavelogApiUrl(server, QStringLiteral("station_info/") + apiKey);
     if (!url.isValid() || url.host().isEmpty()) {
         emit wavelogStationsListed({}, tr("write the address of your Wavelog"));
@@ -1285,6 +1293,7 @@ void WebQslUploader::uploadCrx(const QString& apiKeyAsSaved, const QJsonObject& 
     const QString apiKey = apiKeyAsSaved.trimmed();
     if (m_busy)
         return;
+    if (apiKey.isEmpty()) { QslUploadResult result; result.message = tr("CRX: API key is required"); emit finished(result); return; }
     m_busy = true;
     const QByteArray body = crxRequest(QStringLiteral("edit_myqso"), apiKey,
                                        QJsonObject{{QStringLiteral("qsoData"), qsoData}});
@@ -1296,6 +1305,7 @@ void WebQslUploader::deleteCrx(const QString& apiKeyAsSaved, qint64 remoteQsoId)
     const QString apiKey = apiKeyAsSaved.trimmed();
     if (m_busy)
         return;
+    if (apiKey.isEmpty()) { QslUploadResult result; result.message = tr("CRX: API key is required"); emit finished(result); return; }
     m_busy = true;
     const QByteArray body = crxRequest(QStringLiteral("edit_myqso"), apiKey,
                                        QJsonObject{{QStringLiteral("qso_id"), remoteQsoId},
@@ -1305,6 +1315,7 @@ void WebQslUploader::deleteCrx(const QString& apiKeyAsSaved, qint64 remoteQsoId)
 
 void WebQslUploader::listCrxLogs(const QString& apiKey)
 {
+    if (apiKey.trimmed().isEmpty()) { emit crxLogsListed({}, tr("API key is required")); return; }
     QNetworkReply* reply = m_net->post(crxHttpRequest(m_crxUrl),
                                        crxRequest(QStringLiteral("get_mylogs"), apiKey.trimmed(), {}));
     connect(reply, &QNetworkReply::finished, this, [this, reply] {

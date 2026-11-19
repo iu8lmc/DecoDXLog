@@ -102,6 +102,31 @@ class TestCallbook : public QObject {
     Q_OBJECT
 
 private slots:
+    void removedCredentialsPreventFurtherNetworkRequests()
+    {
+        FakeHttp server;
+        server.respond = [](const QUrlQuery& q) { return q.hasQueryItem("username") ? kQrzLogin : kQrzCallsign; };
+        bool configured = false;
+        CallbookClient client;
+        client.setEndpoints(server.url(), server.url());
+        client.setProvider(CallbookClient::Provider::Qrz);
+        client.setFallbackEnabled(false);
+        client.setCredentialReaders([&](const QString&) { return configured ? QStringLiteral("K1TEST") : QString(); },
+            [](const QString&, std::function<void(const QString&, const QString&)> done) { done(QStringLiteral("secret"), {}); });
+        client.lookup("K1AAA");
+        QTest::qWait(100);
+        QCOMPARE(server.requests.size(), 0);
+        configured = true;
+        QSignalSpy found(&client, &CallbookClient::found);
+        client.lookup("EA8OH");
+        QTRY_COMPARE_WITH_TIMEOUT(found.size(), 1, 5000);
+        QCOMPARE(server.requests.size(), 2);
+        configured = false;
+        client.lookup("K1BBB");
+        QTest::qWait(100);
+        QCOMPARE(server.requests.size(), 2);
+    }
+
     void parseQrz()
     {
         const auto session = callbook::parseQrzSession(kQrzLogin);

@@ -52,6 +52,12 @@ void LotwClient::download(const QString& user, const QString& password, const QS
 {
     if (m_reply)
         return;
+    if (user.trimmed().isEmpty() || password.trimmed().isEmpty()) {
+        lotw::Report report;
+        report.error = tr("LoTW: username and password are required");
+        emit finished(report);
+        return;
+    }
     QUrlQuery q;
     q.addQueryItem(QStringLiteral("login"), user);
     q.addQueryItem(QStringLiteral("password"), password);

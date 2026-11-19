@@ -250,6 +250,13 @@ void ConfirmationDownloader::downloadEqsl(const QString& user, const QString& pa
 {
     if (m_reply)
         return;
+    if (user.trimmed().isEmpty() || password.trimmed().isEmpty()) {
+        confirmations::Report report;
+        report.service = QStringLiteral("eqsl");
+        report.error = Tr::tr("eQSL: username and password are required");
+        finish(report);
+        return;
+    }
     QUrl url = m_eqslUrl;
     QUrlQuery q;
     q.addQueryItem(QStringLiteral("UserName"), user);
@@ -331,6 +338,13 @@ void ConfirmationDownloader::downloadQrz(const QString& apiKey, const QDate& sin
 {
     if (m_reply)
         return;
+    if (apiKey.trimmed().isEmpty()) {
+        confirmations::Report report;
+        report.service = QStringLiteral("qrz");
+        report.error = Tr::tr("QRZ: logbook API key is required");
+        finish(report);
+        return;
+    }
     m_qrzKey = apiKey;
     m_qrzSince = since;
     m_qrzFrom = from;

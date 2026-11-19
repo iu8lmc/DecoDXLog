@@ -100,6 +100,34 @@ class TestQsl : public QObject {
     Q_OBJECT
     QTemporaryDir m_settingsDir;
 private slots:
+    void unconfiguredUploadServicesDoNotConnect()
+    {
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        QSignalSpy connections(&server, &QTcpServer::newConnection);
+        const QUrl url(QStringLiteral("http://127.0.0.1:%1/api/").arg(server.serverPort()));
+        WebQslUploader web;
+        web.setEndpoints(url, url);
+        web.setHrdLogEndpoint(url);
+        web.setCrxEndpoint(url);
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        QSignalSpy crx(&web, &WebQslUploader::crxLogsListed);
+        QSignalSpy wavelog(&web, &WebQslUploader::wavelogStationsListed);
+        web.uploadQrz(QStringLiteral(" "), QStringLiteral("<EOR>"));
+        web.uploadEqsl(QStringLiteral("K1ABC"), QStringLiteral(" "), QStringLiteral("<EOR>"));
+        web.uploadEqsl(QStringLiteral(" "), QStringLiteral("secret"), QStringLiteral("<EOR>"));
+        web.uploadHrdLog(QStringLiteral("K1ABC"), QStringLiteral(" "), QStringLiteral("<EOR>"));
+        web.uploadWavelog(url.toString(), QStringLiteral(" "), QStringLiteral("1"), QStringLiteral("<EOR>"));
+        web.uploadCrx(QStringLiteral(" "), {});
+        web.deleteCrx(QStringLiteral(" "), 1);
+        web.listCrxLogs(QStringLiteral(" "));
+        web.listWavelogStations(url.toString(), QStringLiteral(" "));
+        QCOMPARE(done.size(), 7);
+        QCOMPARE(crx.size(), 1);
+        QCOMPARE(wavelog.size(), 1);
+        QTest::qWait(100);
+        QCOMPARE(connections.size(), 0);
+    }
+
     void initTestCase() {
         QVERIFY(m_settingsDir.isValid());
         QCoreApplication::setOrganizationName(QStringLiteral("DecoDXLogTests"));

@@ -501,8 +501,14 @@ DecoLogController::DecoLogController(QObject* parent)
             });
 
     m_callbook.setCredentialReaders(
-        [this](const QString& service) { return m_credentials->account(service); },
+        [this](const QString& service) {
+            return m_credentials->hasSecret(service) ? m_credentials->account(service) : QString();
+        },
         [this](const QString& service, std::function<void(const QString&, const QString&)> done) {
+            if (!m_credentials->hasSecret(service)) {
+                done({}, tr("no credentials configured"));
+                return;
+            }
             m_credentials->readSecret(service, std::move(done));
         });
     m_callbook.setProvider(CallbookClient::providerFromId(
@@ -6117,7 +6123,7 @@ QList<DecoLogController::ConfirmAccount> DecoLogController::confirmAccounts(cons
     const QString base = service == QLatin1String("qrz") ? QStringLiteral("qrzlogbook") : service;
     auto usable = [this, &service](const QString& credential) {
         return m_credentials->hasSecret(credential)
-               && (service != QLatin1String("eqsl") || !m_credentials->account(credential).isEmpty());
+               && (service != QLatin1String("eqsl") || !m_credentials->account(credential).trimmed().isEmpty());
     };
     QList<ConfirmAccount> out;
     QList<qint64> own;
@@ -6232,18 +6238,19 @@ void DecoLogController::startNextConfirmAccount()
               ? tr("%1: downloading the confirmations since %2…")
                     .arg(a.label, dates::show(since.date().toString(Qt::ISODate)))
               : tr("%1: downloading all the confirmations…").arg(a.label);
-    addActivity(confirmLabel(a.service).toUpper(), m_confirmStatus);
     emit confirmChanged();
     const QString account = m_credentials->account(a.credential);
     m_credentials->readSecret(a.credential, [this, a, account, since, from, to](const QString& secret, const QString& error) {
         m_confirmStarting.clear();
-        if (!error.isEmpty() || secret.isEmpty()) {
+        if (!error.isEmpty() || secret.trimmed().isEmpty() || !m_credentials->hasSecret(a.credential)
+            || (a.service == QLatin1String("eqsl") && account.trimmed().isEmpty())) {
             confirmations::Report failed;
             failed.service = a.service;
             failed.error = tr("%1: password or key not available (%2)").arg(a.label, error);
             onConfirmationReport(failed);
             return;
         }
+        addActivity(confirmLabel(a.service).toUpper(), m_confirmStatus);
         if (a.service == QLatin1String("qrz"))
             m_confirmDownloader.downloadQrz(secret, since.isValid() ? since.date() : QDate(), from, to);
         else

@@ -789,7 +789,19 @@ void QslController::readSecret(const QString& service, std::function<void(const 
         done({}, tr("no keystore"));
         return;
     }
-    m_ctx.credentials->readSecret(service, std::move(done));
+    if (!m_ctx.credentials->hasSecret(service)) {
+        done({}, tr("no credentials configured"));
+        return;
+    }
+    QPointer<QslController> self(this);
+    m_ctx.credentials->readSecret(service, [self, service, done = std::move(done)](const QString& secret, const QString& error) {
+        if (!self) return;
+        if (!self->m_ctx.credentials || !self->m_ctx.credentials->hasSecret(service) || secret.trimmed().isEmpty()) {
+            done({}, error.isEmpty() ? self->tr("no credentials configured") : error);
+            return;
+        }
+        done(secret, error);
+    });
 }
 
 // ── Invio ─────────────────────────────────────────────────────────────────────

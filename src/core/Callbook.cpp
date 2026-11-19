@@ -279,7 +279,7 @@ CallbookClient::Provider CallbookClient::otherProvider(Provider p) const
 
 bool CallbookClient::hasCredentials(Provider p) const
 {
-    return p != Provider::None && m_accounts && !m_accounts(serviceId(p)).isEmpty() && m_secrets;
+    return p != Provider::None && m_accounts && !m_accounts(serviceId(p)).trimmed().isEmpty() && m_secrets;
 }
 
 CallbookRecord CallbookClient::merge(const CallbookRecord& base, const CallbookRecord& extra)
@@ -417,6 +417,13 @@ void CallbookClient::lookup(const QString& callsign)
 
 void CallbookClient::ask(Provider provider, const QString& call, bool allowFallback)
 {
+    if (!hasCredentials(provider)) {
+        m_sessionKeys.remove(static_cast<int>(provider));
+        emit providerResult(call, serviceId(provider), {});
+        if (!resolvePending(call) && (!allowFallback || !tryFallback(provider, call)))
+            emit failed(call, tr("%1: no credentials. Add them in Setup → Callbook.").arg(sourceName(provider)));
+        return;
+    }
     if (m_sessionKeys.value(static_cast<int>(provider)).isEmpty()) {
         login(provider, [this, provider, call, allowFallback](const QString& error) {
             if (error.isEmpty()) {
@@ -436,13 +443,13 @@ void CallbookClient::login(Provider provider, std::function<void(const QString& 
 {
     const QString service = serviceId(provider);
     const QString user = m_accounts ? m_accounts(service) : QString();
-    if (user.isEmpty() || !m_secrets) {
+    if (user.trimmed().isEmpty() || !m_secrets) {
         done(tr("%1: no credentials. Add them in Setup → Callbook.").arg(sourceName(provider)));
         return;
     }
 
     m_secrets(service, [this, provider, user, done](const QString& secret, const QString& error) {
-        if (!error.isEmpty() || secret.isEmpty()) {
+        if (!error.isEmpty() || secret.trimmed().isEmpty() || !hasCredentials(provider)) {
             done(tr("%1: password not available (%2)").arg(sourceName(provider), error));
             return;
         }

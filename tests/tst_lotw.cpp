@@ -109,6 +109,19 @@ class TestLotw : public QObject {
     Q_OBJECT
 
 private slots:
+    void missingCredentialsNeverOpenConnection()
+    {
+        FakeLotw server;
+        LotwClient client;
+        client.setEndpoint(server.url());
+        QSignalSpy done(&client, &LotwClient::finished);
+        client.download(QStringLiteral("K1ABC"), QStringLiteral(" "), {});
+        client.download(QStringLiteral(" "), QStringLiteral("secret"), {});
+        QCOMPARE(done.size(), 2);
+        QTest::qWait(100);
+        QVERIFY(server.requests.isEmpty());
+    }
+
     void modeGroups()
     {
         QCOMPARE(adif::modeGroup("MFSK", "FT2"), QString("DATA"));
