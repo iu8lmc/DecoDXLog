@@ -1140,7 +1140,7 @@ bool DecoLogController::openDatabase(const QString& path)
         addActivity(category, text, level);
     };
     cloudCtx.logChanged = [this] {
-        timed(tr("reloading the log table"), [this] { m_model->reload(); });
+        timed(tr("reloading the log table"), [this] { m_model->reloadAfterQslUpdate(); });
         emit logChanged();
     };
     m_cloud = new CloudController(std::move(cloudCtx), this);

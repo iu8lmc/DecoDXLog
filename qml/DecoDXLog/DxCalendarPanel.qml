@@ -285,15 +285,5 @@ GlassPanel {
             wrapMode: Text.Wrap
             text: qsTr("Announcements: NG3K ADXO · calendar feed: DXCAL / KK7DS. Dates may change; verify with the operation.")
         }
-        RowLayout {
-            CalendarButton {
-                text: qsTr("Open NG3K source")
-                onClicked: Qt.openUrlExternally(root.sourceUrl)
-            }
-            CalendarButton {
-                text: qsTr("Open DXCAL feed")
-                onClicked: Qt.openUrlExternally(root.feedUrl)
-            }
-        }
     }
 }
