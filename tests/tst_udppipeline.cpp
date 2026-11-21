@@ -182,6 +182,15 @@ private slots:
             legacy.stationCallsign = QStringLiteral("IU8LMC");
             legacy.operatorCall = QStringLiteral("IU8LMC");
             QVERIFY(seed.saveStationProfile(legacy) > 0);
+            if (qEnvironmentVariableIntValue("DECODXLOG_TEST_UDP_LARGE_LOG") != 0) {
+                QSqlQuery fixture(seed.connection());
+                QVERIFY(fixture.exec(QStringLiteral(
+                    "WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<56387) "
+                    "INSERT INTO qso (uuid, call, band, mode, qso_datetime_on, created_at, updated_at, source) "
+                    "SELECT 'synthetic-'||i, 'K'||i||'ABC', '20m', 'FT8', '2026-11-20T19:00:00Z', "
+                    "'2026-11-20T19:00:00Z', '2026-11-20T19:00:00Z', 'test' FROM n")));
+                QCOMPARE(seed.qsoCount(), 56387);
+            }
             seed.close();
         }
 
@@ -494,6 +503,8 @@ private slots:
 
     void aBurstIsAllLogged()
     {
+        QElapsedTimer elapsed;
+        elapsed.start();
         // Venti QSO uno dietro l'altro, come a fine gara quando si svuota la coda.
         for (int i = 1; i <= 20; ++i) {
             const QString call = QStringLiteral("EA1%1").arg(QChar(QLatin1Char('A' + i)));
@@ -506,6 +517,7 @@ private slots:
             return scalar(QStringLiteral("SELECT COUNT(*) FROM qso WHERE deleted = 0 AND call LIKE 'EA1_B'")).toInt()
                    == 20;
         }, 20000));
+        qInfo() << "Time until the app persisted 20 UDP QSOs:" << elapsed.elapsed() << "ms (100 ms polling)";
         QCOMPARE(m_app.state(), QProcess::Running);
     }
 };

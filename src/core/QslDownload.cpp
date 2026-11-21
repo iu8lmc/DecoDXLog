@@ -185,9 +185,10 @@ QDateTime downloadSince(const QDateTime& lastSuccess, bool everything)
     return lastSuccess.addDays(-1);
 }
 
-bool autoDownloadDue(const QDateTime& lastSuccess, const QDateTime& lastAttempt, const QDateTime& now, int hours)
+bool autoDownloadDue(const QDateTime& lastSuccess, const QDateTime& lastAttempt, const QDateTime& now, int hours,
+                     bool enabled)
 {
-    if (hours <= 0)
+    if (!enabled || hours <= 0)
         return false;
     QDateTime last = lastSuccess;
     if (lastAttempt.isValid() && (!last.isValid() || lastAttempt > last))
@@ -345,7 +346,7 @@ void ConfirmationDownloader::downloadQrz(const QString& apiKey, const QDate& sin
         finish(report);
         return;
     }
-    m_qrzKey = apiKey;
+    m_qrzKey = apiKey.trimmed();
     m_qrzSince = since;
     m_qrzFrom = from;
     m_qrzTo = to;
@@ -378,9 +379,15 @@ void ConfirmationDownloader::fetchQrzPage()
         confirmations::Report report;
         report.service = QStringLiteral("qrz");
         if (reply->error() != QNetworkReply::NoError) {
-            report.error = reply->error() == QNetworkReply::OperationCanceledError
-                               ? Tr::tr("QRZ: download stopped")
-                               : Tr::tr("QRZ: %1").arg(network::safeErrorString(reply));
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (status == 401 || status == 403) {
+                report.error = Tr::tr("QRZ Logbook refused the confirmation request (HTTP %1). "
+                                      "Check the Logbook API key and subscription.").arg(status);
+            } else {
+                report.error = reply->error() == QNetworkReply::OperationCanceledError
+                                   ? Tr::tr("QRZ: download stopped")
+                                   : Tr::tr("QRZ: %1").arg(network::safeErrorString(reply));
+            }
             finish(report);
             return;
         }

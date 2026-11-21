@@ -125,7 +125,8 @@ private slots:
         });
         int refreshes = 0;
         QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
-        ctx.logChanged = [&] { ++refreshes; };
+        QSet<qint64> refreshedIds;
+        ctx.uploadStateChanged = [&](const QSet<qint64>& ids) { ++refreshes; refreshedIds = ids; };
         QslController controller(ctx);
         const QUrl endpoint(QStringLiteral("http://127.0.0.1:%1/test").arg(server.serverPort()));
         controller.m_web.setEndpoints(endpoint, endpoint);
@@ -136,6 +137,7 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 5000);
         QVERIFY(ticks >= 5);
         QCOMPARE(refreshes, 1);
+        QCOMPARE(refreshedIds, QSet<qint64>{selected});
         QCOMPARE(db.qslStatus(selected).first().sent, QStringLiteral("Y"));
         QCOMPARE(controller.uploadQsos({selected}, service), 0);
         QCOMPARE(requests, 1);
@@ -155,6 +157,64 @@ private slots:
         QVERIFY(controller.m_autoDelay.isActive());
         QCOMPARE(controller.m_autoServices, QSet<QString>{QStringLiteral("crx")});
         controller.cancel();
+    }
+
+    void batchStatusWriteAB()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(m_dir.filePath("lotw-batch.sqlite")));
+        QList<qint64> ids;
+        for (int i = 0; i < 500; ++i) {
+            const auto contact = db.insertQso({{"CALL", QStringLiteral("K%1ABC").arg(i)},
+                                                {"QSO_DATE", "20261121"}, {"TIME_ON", "1900"},
+                                                {"BAND", "20m"}, {"MODE", "FT8"}}, "test");
+            QVERIFY(contact.id > 0);
+            ids.append(contact.id);
+        }
+        QslState received;
+        received.service = "lotw";
+        received.rcvd = "Y";
+        received.rcvdDate = "20261121";
+        QVERIFY(db.writeQslState(ids.first(), received, true));
+        QslController::Context ctx;
+        ctx.db = &db;
+        QSet<qint64> notified;
+        ctx.uploadStateChanged = [&](const auto& changed) { notified = changed; };
+        QslController controller(ctx);
+        QslUploadResult result;
+        result.ok = true;
+        result.accepted = 1;
+
+        QElapsedTimer clock;
+        clock.start();
+        for (qint64 id : ids)
+            QVERIFY(controller.markSent(id, "lotw", result));
+        const qint64 separateUs = clock.nsecsElapsed() / 1000;
+        notified.clear();
+        controller.m_uploadChanges.clear();
+        controller.m_accepted = 0;
+        controller.m_batch = ids;
+
+        clock.restart();
+        QVERIFY(controller.saveBatchStates("lotw", result));
+        const qint64 transactionUs = clock.nsecsElapsed() / 1000;
+        controller.publishUploadChanges();
+        QCOMPARE(notified.size(), ids.size());
+        QCOMPARE(controller.m_accepted, ids.size());
+        QCOMPARE(db.qslStatus(ids.first()).first().sent, QString("Y"));
+        QCOMPARE(db.qslStatus(ids.first()).first().rcvd, QString("Y"));
+        QCOMPARE(db.qslStatus(ids.first()).first().rcvdDate, QString("20261121"));
+        qInfo() << "LoTW status A/B, 500 writes: individual commits" << separateUs
+                << "us; one transaction" << transactionUs << "us";
+
+        QslUploadResult failure;
+        failure.message = "test rollback";
+        notified.clear();
+        controller.m_batch = {ids.first(), -1}; // second write fails its foreign key
+        QVERIFY(!controller.saveBatchStates("lotw", failure));
+        controller.publishUploadChanges();
+        QVERIFY(notified.isEmpty());
+        QCOMPARE(db.qslStatus(ids.first()).first().sent, QString("Y"));
     }
 
     void editorMergesConcurrentQslChanges()

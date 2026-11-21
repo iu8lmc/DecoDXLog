@@ -198,6 +198,7 @@ public:
     void reloadAfterEdit(qint64 id);
     // Gli upload QSL possono aggiornare piu' righe contemporaneamente.
     void reloadAfterQslUpdate();
+    void refreshQslUpload(const QSet<qint64>& ids);
     // Remove confirmed deletions without resetting a deeply scrolled view.
     void removeDeletedIds(const QList<qint64>& ids);
 

@@ -18,8 +18,27 @@ GlassPanel {
     readonly property bool hasCall: (info.call || "").length > 0
     readonly property bool worked: (info.count || 0) > 0
     readonly property string profileCall: String(info.call || "").trim().toUpperCase()
+    readonly property var journeyOrigin: decolog.myPosition
+    readonly property bool canShowJourney: hasCall && hasCoordinates(journeyOrigin) && hasCoordinates(info.position)
     function openQrzUrl(url) { Qt.openUrlExternally(url) }
     function openHamqthUrl(url) { Qt.openUrlExternally(url) }
+
+    function hasCoordinates(point) {
+        return !!point && Number.isFinite(point.lat) && Math.abs(point.lat) <= 90
+                       && Number.isFinite(point.lon) && Math.abs(point.lon) <= 180
+    }
+
+    function showJourney() {
+        if (!canShowJourney)
+            return
+        const profile = decolog.stationProfiles.activeProfile || {}
+        journey.openJourney({
+            fields: {STATION_CALLSIGN: profile.stationCallsign || decolog.deCall, CALL: profileCall},
+            preview: {origin: journeyOrigin, destination: info.position, approximate: !!info.positionApprox}
+        })
+    }
+
+    QsoJourneyLauncher { id: journey; objectName: "callJourneyLauncher" }
 
     function showSlot(band, group, entity) {
         slotWindow.rows = []
@@ -375,6 +394,23 @@ GlassPanel {
                     ToolTip.visible: hamqthHover.hovered
                     ToolTip.delay: 500
                     ToolTip.text: hamqthButton.Accessible.description
+                }
+                Item {
+                    width: journeyButton.implicitWidth; height: journeyButton.implicitHeight
+                    GlassButton {
+                        id: journeyButton
+                        objectName: "callJourneyButton"
+                        text: qsTr("Show map")
+                        tone: Theme.primaryColor
+                        enabled: root.canShowJourney
+                        Accessible.description: enabled ? qsTr("Preview the flight from your station to this callsign")
+                                               : qsTr("The station and destination positions are needed to show the map")
+                        onClicked: root.showJourney()
+                    }
+                    HoverHandler { id: journeyHover }
+                    ToolTip.visible: journeyHover.hovered
+                    ToolTip.delay: 500
+                    ToolTip.text: journeyButton.Accessible.description
                 }
             }
 

@@ -535,7 +535,8 @@ RoundedWindow {
                     GlassButton {
                         text: qsTr("Remove saved password")
                         tone: Theme.errorColor
-                        visible: sourceEditor.source.id && sourceEditor.source.passwordStored && !sourceEditor.passwordRemoved
+                        visible: !!sourceEditor.source.id && sourceEditor.source.passwordStored === true
+                                 && !sourceEditor.passwordRemoved
                         onClicked: {
                             root.cluster.removeSourcePassword(sourceEditor.source.id)
                             sourceEditor.passwordRemoved = true

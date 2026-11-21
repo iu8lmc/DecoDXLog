@@ -1523,6 +1523,12 @@ DialogFrame {
                             currentIndex: Math.max(0, hours.indexOf(decolog.confirmAutoHours))
                             onActivated: decolog.confirmAutoHours = hours[currentIndex]
                         }
+                        ToggleSwitch {
+                            text: qsTr("Include QRZ Logbook")
+                            enabled: decolog.confirmAutoHours > 0
+                            checked: decolog.confirmQrzAuto
+                            onToggled: decolog.confirmQrzAuto = checked
+                        }
                     }
                     Note {
                         visible: decolog.confirmStatus.length > 0
@@ -1532,9 +1538,9 @@ DialogFrame {
                     Note {
                         text: qsTr("eQSL: the eQSLs received in the Inbox, without the SWL reports. QRZ Logbook: the QSOs of "
                                    + "your logbook on QRZ that the other station confirmed. Only what arrived after the last "
-                                   + "download; the automatic download runs only for the services with their credentials "
-                                   + "(below, the same used for sending). Matched as LoTW confirmations; the paper QSL "
-                                   + "fields are not touched.")
+                                   + "download. Auto sync uses credentials from QSL services or a station profile. "
+                                   + "Enable QRZ Logbook here to include it in automatic confirmation checks. "
+                                   + "Confirmations are matched as for LoTW.")
                     }
                     SectionTitle { text: qsTr("Sending to LoTW (TQSL)") }
                     Note { text: decolog.qsl.tqslStatus }

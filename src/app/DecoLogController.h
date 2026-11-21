@@ -246,6 +246,7 @@ class DecoLogController : public QObject {
     // Scarico automatico delle conferme di eQSL e QRZ: ore (0 = spento), e per
     // ogni servizio l'ultimo scarico riuscito, gia' scritto per lo schermo.
     Q_PROPERTY(int confirmAutoHours READ confirmAutoHours WRITE setConfirmAutoHours NOTIFY confirmChanged)
+    Q_PROPERTY(bool confirmQrzAuto READ confirmQrzAuto WRITE setConfirmQrzAuto NOTIFY confirmChanged)
     Q_PROPERTY(QVariantMap confirmLastSync READ confirmLastSync NOTIFY confirmChanged)
     Q_PROPERTY(bool confirmFailed READ confirmFailed NOTIFY confirmChanged)
     // Recupero dal log di Decodium: i QSO registrati la' mentre DecoDXLog era
@@ -571,6 +572,7 @@ public:
     QString confirmBusyService() const { return m_confirmService; }
     QString confirmStatus() const { return m_confirmStatus; }
     int confirmAutoHours() const { return m_confirmAutoHours; }
+    bool confirmQrzAuto() const { return m_confirmQrzAuto; }
     bool confirmFailed() const { return m_confirmFailed; }
     bool decodiumRecovery() const { return m_recoveryEnabled; }
     void setDecodiumRecovery(bool on);
@@ -596,6 +598,7 @@ public:
     Q_INVOKABLE void setAdifWatchEnabled(const QString& path, bool on);
     Q_INVOKABLE void checkAdifWatch(const QString& path, int days);
     void setConfirmAutoHours(int hours);
+    void setConfirmQrzAuto(bool enabled);
     QVariantMap confirmLastSync() const;
     // Scarica le conferme di "eqsl" o "qrz": solo le nuove dall'ultimo scarico,
     // o tutte con `full`.
@@ -1011,6 +1014,7 @@ private:
     QTimer m_recoveryTimer;
     QThreadPool m_recoveryPool;
     int m_confirmAutoHours{12};
+    bool m_confirmQrzAuto{false};
     bool      m_lotwAuto{false};
     QString   m_lotwStatus;
     int       m_lotwAutoHours{12};

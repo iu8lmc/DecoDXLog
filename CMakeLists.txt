@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.64
+    VERSION 1.17.65
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -508,6 +508,7 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/RotorStatus.qml
     qml/DecoDXLog/RotorLocatorBar.qml
     qml/DecoDXLog/QsoJourney.qml
+    qml/DecoDXLog/QsoJourneyLauncher.qml
     qml/DecoDXLog/RotorMap.qml
     qml/DecoDXLog/RotorDial.qml
     qml/DecoDXLog/RotorControlPage.qml

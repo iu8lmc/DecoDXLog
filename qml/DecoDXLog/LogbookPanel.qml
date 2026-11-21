@@ -10,22 +10,10 @@ import Decodium.UI
 GlassPanel {
     id: root
 
-    Loader {
-        id: journey
-        active: false
-        source: "QsoJourney.qml"
-        property var detail
-        onLoaded: item.present(detail)
-        Connections {
-            target: journey.item
-            function onClosing() { Qt.callLater(function() { journey.active = false }) }
-        }
-    }
+    QsoJourneyLauncher { id: journey }
 
     function showJourney(id) {
-        journey.detail = decolog.qsoDetail(id)
-        if (journey.item) journey.item.present(journey.detail)
-        else journey.active = true
+        journey.openJourney(decolog.qsoDetail(id))
     }
 
     // Colonne, larghezze e filtri salvati li tiene il log stesso, nelle

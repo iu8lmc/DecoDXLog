@@ -69,7 +69,7 @@ public:
         std::function<QString()> stationCallsign;   // il nominativo del profilo attivo
         std::function<QString()> stationProfileName; // nome del profilo attivo
         std::function<void(const QString& category, const QString& text, const QString& level)> activity;
-        std::function<void()> logChanged;
+        std::function<void(const QSet<qint64>&)> uploadStateChanged;
     };
 
     explicit QslController(Context context, QObject* parent = nullptr);
@@ -149,6 +149,8 @@ private:
     void uploadNextWeb();
     void finishBatch(const core::QslUploadResult& result);
     bool markSent(qint64 id, const QString& service, const core::QslUploadResult& result);
+    bool saveBatchStates(const QString& service, const core::QslUploadResult& state);
+    void publishUploadChanges();
     bool reconcileClubLogBatch(const QHash<qint64, QString>& identities, const QVariantList& rows);
     void reconcileClubLogPresence(const core::QslUploadResult& pending);
     bool clubLogCheckpointMatches() const;
@@ -184,6 +186,7 @@ private:
     QString m_tqslLocation;
     QString m_busyService;
     QList<qint64> m_batch;          // i QSO dell'invio in corso
+    QSet<qint64> m_uploadChanges;
     bool m_clubLogRestJournalThisRun{false};
     QString m_clubLogRestStage;
     QString m_clubLogRestCall;

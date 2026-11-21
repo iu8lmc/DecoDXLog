@@ -3,6 +3,9 @@
 #include "app/QsoTableModel.h"
 #include "core/LogDatabase.h"
 
+#include <QElapsedTimer>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QSignalSpy>
 #include <QTest>
@@ -176,6 +179,71 @@ private slots:
         QCOMPARE(resets.size(), 1);
         QCOMPARE(model.count(), 1);
         QCOMPARE(model.idAt(0), a);
+    }
+
+    void uploadStatusRefreshOnLargeLogAB()
+    {
+        constexpr int contacts = 56387;
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        LogDatabase db;
+        QVERIFY(db.open(dir.filePath("qsl-refresh.sqlite")));
+        QSqlQuery seed(db.connection());
+        QVERIFY2(seed.exec(QStringLiteral(
+            "WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<%1) "
+            "INSERT INTO qso (uuid, call, band, mode, qso_datetime_on, created_at, updated_at, source) "
+            "SELECT 'synthetic-'||i, 'K'||i||'ABC', '20m', 'FT8', '2026-11-21T19:00:00Z', "
+            "'2026-11-21T19:00:00Z', '2026-11-21T19:00:00Z', 'test' FROM n").arg(contacts)),
+            qPrintable(seed.lastError().text()));
+        seed.finish();
+        QsoTableModel model(&db);
+        model.setColumnLayout({"call", "eqsl_qsl_sent", "lotw_qsl_sent"});
+        QCOMPARE(model.count(), contacts);
+        const int deepRow = contacts / 2;
+        const qint64 id = model.idAt(deepRow);
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        QSignalSpy updates(&model, &QAbstractItemModel::dataChanged);
+        QslState sent;
+        sent.service = "eqsl";
+        sent.sent = "N";
+        QVERIFY(db.setQslState(id, sent));
+        QCOMPARE(model.valueFor(deepRow, "eqsl_qsl_sent"), QString("N"));
+
+        // A models the released callback. B updates the same row at depth.
+        QElapsedTimer timing;
+        sent.sent = "Y";
+        QVERIFY(db.setQslState(id, sent));
+        timing.start();
+        model.reloadAfterQslUpdate();
+        const qint64 oldUs = timing.nsecsElapsed() / 1000;
+        QCOMPARE(updates.first().at(0).value<QModelIndex>().row(), 0);
+        QCOMPARE(updates.first().at(1).value<QModelIndex>().row(), contacts - 1);
+        QCOMPARE(model.valueFor(deepRow, "eqsl_qsl_sent"), QString("Y"));
+
+        updates.clear();
+        sent.sent = "N";
+        QVERIFY(db.setQslState(id, sent));
+        timing.restart();
+        model.refreshQslUpload({id});
+        const qint64 newUs = timing.nsecsElapsed() / 1000;
+        QCOMPARE(resets.size(), 0);
+        QCOMPARE(updates.size(), 1);
+        QCOMPARE(updates.first().at(0).value<QModelIndex>().row(), deepRow);
+        QCOMPARE(updates.first().at(1).value<QModelIndex>().row(), deepRow);
+        QCOMPARE(model.valueFor(deepRow, "eqsl_qsl_sent"), QString("N"));
+        qInfo() << "QSL table A/B" << contacts << "QSO: all rows" << oldUs
+                << "us; one affected row" << newUs << "us";
+
+        // With a sent-state sort the changed row must still move.
+        const qint64 other = model.idAt(0);
+        QVERIFY(db.setQslState(other, sent));
+        model.setSort("eqsl_qsl_sent", true);
+        QTRY_COMPARE(model.idAt(0), other);
+        sent.sent = "Y";
+        QVERIFY(db.setQslState(other, sent));
+        model.refreshQslUpload({other});
+        QTRY_COMPARE(model.idAt(0), id);
+        QCOMPARE(model.valueFor(model.rowForId(other), "eqsl_qsl_sent"), QString("Y"));
     }
 
     void editedRowsAvoidResetUnlessTheirPositionChanges()

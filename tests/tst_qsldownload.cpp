@@ -128,6 +128,43 @@ private slots:
         QVERIFY(!downloader.busy());
     }
 
+    void qrzAutomaticOptInAB()
+    {
+        FakeServer server;
+        server.status = 403;
+        ConfirmationDownloader downloader;
+        downloader.setEndpoints(server.url("/eqsl"), server.url("/qrz"));
+        QSignalSpy done(&downloader, &ConfirmationDownloader::finished);
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+        const QString fixtureKey = QStringLiteral("ABCD-1234-EF01-5678");
+        auto scheduledCheck = [&](bool qrzEnabled) {
+            if (confirmations::autoDownloadDue({}, {}, now, 6, qrzEnabled))
+                downloader.downloadQrz(fixtureKey);
+        };
+
+        scheduledCheck(true); // Previous schedule included QRZ whenever a key was present.
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 5000);
+        QCOMPARE(server.requests.size(), 1);
+        QCOMPARE(server.requests.first().form.queryItemValue("ACTION"), QStringLiteral("FETCH"));
+        const auto report = done.first().first().value<confirmations::Report>();
+        QVERIFY(!report.ok);
+        QVERIFY(report.error.contains(QStringLiteral("HTTP 403")));
+        QVERIFY(!report.error.contains(fixtureKey));
+
+        scheduledCheck(false); // Identical local key, but QRZ not selected for automatic use.
+        QTest::qWait(100);
+        QCOMPARE(done.size(), 1);
+        QCOMPARE(server.requests.size(), 1);
+        QVERIFY(confirmations::autoDownloadDue({}, {}, now, 6)); // eQSL keeps its existing schedule.
+
+        server.status = 200;
+        server.answer = [](const FakeServer::Request&) { return QByteArray("RESULT=OK&COUNT=0&ADIF="); };
+        downloader.downloadQrz(fixtureKey); // Manual FETCH does not depend on the schedule.
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, 5000);
+        QCOMPARE(server.requests.size(), 2);
+        QVERIFY(done.last().first().value<confirmations::Report>().ok);
+    }
+
     void eqslLinkFromThePage()
     {
         const QUrl page("https://www.eqsl.cc/qslcard/DownloadInBox.cfm?UserName=X");

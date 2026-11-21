@@ -98,7 +98,7 @@ Rectangle {
         anchors.fill: parent
         z: -1
         acceptedButtons: Qt.LeftButton
-        onPressed: {
+        onPressed: function(mouse) {
             const p = mapToGlobal(mouse.x, mouse.y)
             root.beginManualDrag()
             root.manualDragAnchorGlobal = p
@@ -107,13 +107,13 @@ Rectangle {
             root.manualDragPending = false
             root.manualDragActive = !!root.window
         }
-        onPositionChanged: {
+        onPositionChanged: function(mouse) {
             if (!pressed)
                 return
             const p = mapToGlobal(mouse.x, mouse.y)
             root.moveManualDrag(p.x, p.y)
         }
-        onReleased: {
+        onReleased: function(mouse) {
             const p = mapToGlobal(mouse.x, mouse.y)
             root.endManualDrag(p.x, p.y)
         }

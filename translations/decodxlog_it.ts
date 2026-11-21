@@ -1082,6 +1082,18 @@
 <context>
     <name>CallInfoPanel</name>
     <message>
+        <source>Show map</source>
+        <translation>Mostra mappa</translation>
+    </message>
+    <message>
+        <source>Preview the flight from your station to this callsign</source>
+        <translation>Mostra il volo dalla tua stazione a questo nominativo</translation>
+    </message>
+    <message>
+        <source>The station and destination positions are needed to show the map</source>
+        <translation>Per mostrare la mappa servono le posizioni della tua stazione e della destinazione</translation>
+    </message>
+    <message>
         <source>View on QRZ.com</source>
         <translation>Vedi su QRZ.com</translation>
     </message>
@@ -6195,6 +6207,10 @@ Campi extra conservati: %8</translation>
 <context>
     <name>QslDownload</name>
     <message>
+        <source>QRZ Logbook refused the confirmation request (HTTP %1). Check the Logbook API key and subscription.</source>
+        <translation>QRZ Logbook ha rifiutato la richiesta di conferme (HTTP %1). Controlla la chiave API del Logbook e l’abbonamento.</translation>
+    </message>
+    <message>
         <source>QRZ: unexpected answer</source>
         <translation>QRZ: risposta inattesa</translation>
     </message>
@@ -6728,6 +6744,14 @@ Campi extra conservati: %8</translation>
 <context>
     <name>QsoJourney</name>
     <message>
+        <source>Path preview</source>
+        <translation>Anteprima del percorso</translation>
+    </message>
+    <message>
+        <source>Approximate destination (DXCC centre)</source>
+        <translation>Destinazione approssimativa (centro dell&apos;entità DXCC)</translation>
+    </message>
+    <message>
         <source>QSO map</source>
         <translation>Mappa dei QSO</translation>
     </message>
@@ -6741,7 +6765,7 @@ Campi extra conservati: %8</translation>
     </message>
     <message>
         <source>Replay</source>
-        <translation type="unfinished">Ripeti decodifiche</translation>
+        <translation>Ripeti il volo</translation>
     </message>
 </context>
 <context>
@@ -8779,8 +8803,12 @@ Campi extra conservati: %8</translation>
         <translation>%1: tutto da capo</translation>
     </message>
     <message>
-        <source>eQSL: the eQSLs received in the Inbox, without the SWL reports. QRZ Logbook: the QSOs of your logbook on QRZ that the other station confirmed. Only what arrived after the last download; the automatic download runs only for the services with their credentials (below, the same used for sending). Matched as LoTW confirmations; the paper QSL fields are not touched.</source>
-        <translation>eQSL: le eQSL arrivate nella casella, senza le segnalazioni SWL. QRZ Logbook: i QSO del tuo logbook su QRZ che l&apos;altra stazione ha confermato. Solo quello arrivato dopo l&apos;ultimo scarico; lo scarico automatico parte solo per i servizi con le loro credenziali (qui sotto, le stesse dell&apos;invio). Abbinate come le conferme LoTW; i campi della cartolina non si toccano.</translation>
+        <source>Include QRZ Logbook</source>
+        <translation>Includi QRZ Logbook</translation>
+    </message>
+    <message>
+        <source>eQSL: the eQSLs received in the Inbox, without the SWL reports. QRZ Logbook: the QSOs of your logbook on QRZ that the other station confirmed. Only what arrived after the last download. Auto sync uses credentials from QSL services or a station profile. Enable QRZ Logbook here to include it in automatic confirmation checks. Confirmations are matched as for LoTW.</source>
+        <translation>eQSL: le eQSL arrivate nella casella, senza le segnalazioni SWL. QRZ Logbook: i QSO del tuo logbook su QRZ che l’altra stazione ha confermato. Vengono scaricate le conferme arrivate dopo l’ultimo scarico. La sincronizzazione automatica usa le credenziali nei Servizi QSL o in un profilo di stazione. Includi QRZ Logbook qui per controllare automaticamente anche le sue conferme. Le conferme vengono abbinate come per LoTW.</translation>
     </message>
     <message>
         <source>Station on Wavelog</source>
@@ -11039,6 +11067,14 @@ Campi extra conservati: %8</translation>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message>
+        <source>General QSL settings</source>
+        <translation>Impostazioni QSL generali</translation>
+    </message>
+    <message>
+        <source>Station profile: %1</source>
+        <translation>Profilo di stazione: %1</translation>
+    </message>
     <message>
         <source>Logbook or station changed; preview the import again</source>
         <translation>Il log o la stazione sono cambiati; ripeti l’anteprima</translation>

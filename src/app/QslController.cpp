@@ -18,6 +18,7 @@
 #include <QMetaObject>
 #include <QPointer>
 #include <QSettings>
+#include <utility>
 #include <QSet>
 #include <QSqlDatabase>
 #include <QStandardPaths>
@@ -178,7 +179,8 @@ QslController::QslController(Context context, QObject* parent)
             // Tolto, o CRX non l'aveva piu': in tutti e due i casi li' non c'e'.
             if (!result.ok)
                 note(tr("CRX Logbook: deleting QSO %1: %2").arg(id).arg(result.message), QStringLiteral("warning"));
-            m_ctx.db->forgetRemote(id, m_busyService);
+            if (m_ctx.db->forgetRemote(id, m_busyService))
+                m_uploadChanges.insert(id);
             ++m_removed;
             uploadNextWeb();
             return;
@@ -1108,7 +1110,8 @@ void QslController::uploadNextWeb()
         const auto [id, key] = m_deletions.takeFirst();
         const qint64 remote = key.section(QLatin1Char(':'), -1).toLongLong();
         if (remote <= 0) {
-            m_ctx.db->forgetRemote(id, m_busyService);
+            if (m_ctx.db->forgetRemote(id, m_busyService))
+                m_uploadChanges.insert(id);
             uploadNextWeb();
             return;
         }
@@ -1256,7 +1259,11 @@ void QslController::reconcileClubLogPresence(const QslUploadResult& pending)
                             if (!markSent(it.key(), QStringLiteral("clublog"), found)) { ok = false; break; }
                         }
                         if (ok) ok = db.commit();
-                        if (!ok) db.rollback();
+                        if (!ok) {
+                            db.rollback();
+                            for (auto it = identities.cbegin(); it != identities.cend(); ++it)
+                                m_uploadChanges.remove(it.key());
+                        }
                         return ok;
                     });
                     if (saved) {
@@ -1305,7 +1312,11 @@ bool QslController::reconcileClubLogBatch(const QHash<qint64, QString>& identiti
             if (!markSent(id, QStringLiteral("clublog"), individual)) { committed = false; break; }
         }
         if (committed) committed = db.commit();
-        if (!committed) db.rollback();
+        if (!committed) {
+            db.rollback();
+            for (qint64 id : std::as_const(m_batch))
+                m_uploadChanges.remove(id);
+        }
         return committed;
     });
     if (!saved) {
@@ -1318,6 +1329,7 @@ bool QslController::reconcileClubLogBatch(const QHash<qint64, QString>& identiti
 
 bool QslController::markSent(qint64 id, const QString& service, const QslUploadResult& result)
 {
+    decolog::StartupSpan trace("QSL save upload status");
     countsDirty();
     QslState state;
     state.service = service;
@@ -1332,26 +1344,56 @@ bool QslController::markSent(qint64 id, const QString& service, const QslUploadR
                    : service == QLatin1String("crx") ? qsl::crxRemoteKey(m_crxLogId, result.remoteId)
                                                      : result.remoteId;
     state.lastError = result.ok ? QString() : result.message;
-    // La conferma ricevuta non si tocca: la scrive il download delle conferme.
-    for (const QslState& existing : m_ctx.db->qslStatus(id)) {
-        if (existing.service == service) {
-            state.rcvd = existing.rcvd;
-            state.rcvdDate = existing.rcvdDate;
-        }
-    }
+    // setQslState preserves the received fields in the existing row.
     if (!m_ctx.db->setQslState(id, state)) return false;
+    m_uploadChanges.insert(id);
     m_accepted += result.accepted;
     m_duplicates += result.duplicates;
     m_rejected += result.rejected;
     return true;
 }
 
+void QslController::publishUploadChanges()
+{
+    const auto ids = std::exchange(m_uploadChanges, {});
+    if (!ids.isEmpty() && m_ctx.uploadStateChanged)
+        m_ctx.uploadStateChanged(ids);
+}
+
+bool QslController::saveBatchStates(const QString& service, const QslUploadResult& state)
+{
+    decolog::StartupSpan trace("QSL save batch upload statuses");
+    if (m_batch.isEmpty()) return true;
+    if (m_batch.size() == 1) return markSent(m_batch.first(), service, state);
+
+    // Group local status writes after a single remote batch response, avoiding
+    // a separate durable commit for every contact in a LoTW or Club Log batch.
+    QSqlDatabase db = m_ctx.db->connection();
+    if (!db.transaction()) return false;
+    const int accepted = m_accepted, duplicates = m_duplicates, rejected = m_rejected;
+    const auto previousChanges = m_uploadChanges;
+    bool saved = true;
+    for (qint64 id : std::as_const(m_batch)) {
+        if (!markSent(id, service, state)) {
+            saved = false;
+            break;
+        }
+    }
+    if (saved && db.commit()) return true;
+    db.rollback();
+    m_accepted = accepted;
+    m_duplicates = duplicates;
+    m_rejected = rejected;
+    m_uploadChanges = previousChanges;
+    return false;
+}
+
 void QslController::finishBatch(const QslUploadResult& result)
 {
-    decolog::StartupSpan trace("QSL process upload result");
     countsDirty();
     const QString service = m_busyService;
     bool clubLogStatePersisted = true;
+    bool batchStateSaved = true;
     if (service == QLatin1String("clublog") && !result.ok && m_auto.value(service)
         && (!result.requiresReconciliation || result.httpStatus == 401 || result.httpStatus == 403 || result.httpStatus == 429)) {
         setAutoUpload(service, false);
@@ -1375,24 +1417,29 @@ void QslController::finishBatch(const QslUploadResult& result)
                 if (clubLogStatePersisted) m_clubLogRestJournalThisRun = false;
             } else {
                 clubLogStatePersisted = markSent(m_batch.first(), service, result);
+                batchStateSaved = clubLogStatePersisted;
             }
         } else if (result.ok) {
-            for (qint64 id : m_batch)
-                markSent(id, service, result.duplicates > 0 && result.accepted == 0
-                                          ? [] { QslUploadResult r; r.ok = true; r.duplicates = 1; return r; }()
-                                          : [] { QslUploadResult r; r.ok = true; r.accepted = 1; return r; }());
+            QslUploadResult state;
+            state.ok = true;
+            if (result.duplicates > 0 && result.accepted == 0)
+                state.duplicates = 1;
+            else
+                state.accepted = 1;
+            batchStateSaved = saveBatchStates(service, state);
         } else if (service != QLatin1String("lotw") && !result.requiresReconciliation) {
-            for (qint64 id : m_batch) {
-                QslUploadResult failed = result;
-                failed.accepted = failed.duplicates = 0;
-                markSent(id, service, failed);
-            }
+            QslUploadResult failed = result;
+            failed.accepted = failed.duplicates = 0;
+            batchStateSaved = saveBatchStates(service, failed);
         }
         if (!m_adifFile.isEmpty()) {
             QFile::remove(m_adifFile);
             m_adifFile.clear();
         }
     }
+
+    if (!batchStateSaved && m_auto.value(service))
+        setAutoUpload(service, false);
 
     if (m_clubLogRestJournalThisRun) {
         if (!result.requiresReconciliation && (!result.ok || clubLogStatePersisted)) {
@@ -1430,12 +1477,13 @@ void QslController::finishBatch(const QslUploadResult& result)
         : result.message;
     if (result.ok && m_removed > 0)
         summary += tr(", %n deleted", nullptr, m_removed);
+    if (!batchStateSaved)
+        summary = tr("%1: could not save the upload status locally. Check the remote log before retrying.").arg(service);
     m_lastResult.insert(service, summary);
-    note(summary, result.ok ? QStringLiteral("success") : QStringLiteral("error"));
+    note(summary, result.ok && batchStateSaved ? QStringLiteral("success") : QStringLiteral("error"));
     if (!result.ok && !result.message.isEmpty() && result.message != summary)
         note(QStringLiteral("  ") + result.message, QStringLiteral("warning"));
-    if (m_ctx.logChanged)
-        m_ctx.logChanged();
+    publishUploadChanges();
     emit changed();
     // Uscire prima completamente dal callback del servizio appena concluso;
     // poi avviare il prossimo automatico. Evita di riusare nello stesso stack
@@ -1460,6 +1508,7 @@ void QslController::cancel()
     m_automaticUploads.clear();
     m_autoDelay.stop();
     m_autoServices.clear();
+    publishUploadChanges();
     emit changed();
 }
 

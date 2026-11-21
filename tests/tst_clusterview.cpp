@@ -1,21 +1,25 @@
 // Issue #5: exercise the actual cluster QML, not just source-text assertions.
 // No external cluster, ARRL download, radio or user settings are used.
 #include "app/ClusterController.h"
+#include "core/CredentialStore.h"
 #include "ThemeManager.h"
 
 #include <QDir>
 #include <QFontDatabase>
+#include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlPropertyMap>
 #include <QQuickItem>
 #include <QQuickStyle>
 #include <QQuickView>
+#include <QRegularExpression>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <memory>
 
 using namespace decolog::core;
 using decolog::app::ClusterController;
@@ -87,6 +91,43 @@ private slots:
     }
 
     void init() { QSettings().clear(); }
+
+    void clusterWindowStartsAndDragsWithoutWarnings()
+    {
+        ClusterController cluster({});
+        ContestFixture activation;
+        CredentialStore credentials(QStringLiteral("DecoDXLog-clusterview-test"));
+        ViewContext decolog;
+        decolog.insert("cluster", QVariant::fromValue<QObject*>(&cluster));
+        decolog.insert("activation", QVariant::fromValue<QObject*>(&activation));
+        decolog.insert("credentials", QVariant::fromValue<QObject*>(&credentials));
+        decolog.insert("stationProfiles", QVariantMap{{"activeProfile", QVariantMap{}}});
+        decolog.insert("rotor", QVariantMap{{"enabled", false}});
+        decolog.insert("clientConnected", false);
+
+        QTest::failOnWarning(QRegularExpression(QStringLiteral(
+            "(ClusterWindow\\.qml:.*Unable to assign \\[undefined\\] to bool|"
+            "WindowTitleBar\\.qml:.*Parameter \"mouse\" is not declared)")));
+        QQmlEngine engine;
+        engine.rootContext()->setContextProperty("decolog", &decolog);
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QStringLiteral(QML_DIR "/ClusterWindow.qml")));
+        QVERIFY2(component.isReady(), qPrintable(component.errorString()));
+        const std::unique_ptr<QObject> instance(component.create());
+        auto* window = qobject_cast<QQuickWindow*>(instance.get());
+        QVERIFY(window);
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+
+        auto* titleBar = qvariant_cast<QQuickItem*>(window->property("header"));
+        QVERIFY(titleBar);
+        const QPoint press(titleBar->width() / 2, titleBar->height() / 2);
+        const QPoint before = window->position();
+        QTest::mousePress(window, Qt::LeftButton, Qt::NoModifier, press);
+        QVERIFY(titleBar->property("manualDragActive").toBool());
+        QTest::mouseMove(window, press + QPoint(24, 12));
+        QCOMPARE(window->position(), before + QPoint(24, 12));
+        QTest::mouseRelease(window, Qt::LeftButton, Qt::NoModifier, press);
+        QVERIFY(!titleBar->property("manualDragActive").toBool());
+    }
 
     void lotwRoleMatchesFilterAndUpdates()
     {

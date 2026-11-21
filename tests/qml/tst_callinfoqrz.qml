@@ -21,6 +21,12 @@ TestCase {
         property string qrzProfileCall: ""
         property string hamqthProfileState: "unknown"
         property string hamqthProfileCall: ""
+        property var myPosition: ({lat: 35.9, lon: 14.5})
+        property string deCall: "K1HOME"
+        property QtObject stationProfiles: QtObject {
+            property var activeProfile: ({stationCallsign: "9H1TEST"})
+            function byId(id) { return {} }
+        }
         property QtObject callLists: QtObject {
             property int revision: 0
             property var sources: []
@@ -40,6 +46,39 @@ TestCase {
         }
     }
     SignalSpy { id: clicks; signalName: "clicked" }
+
+    function test_journeyFromUnworkedCall() {
+        const panel = createTemporaryObject(panelComponent, testCase)
+        verify(panel)
+        const button = findChild(panel, "callJourneyButton")
+        const launcher = findChild(panel, "callJourneyLauncher")
+        verify(button && launcher, "Expected a map button and a lazy flight window in the callsign card")
+        fakeDecolog.callInfo = {call: "K1DX", count: 0}
+        compare(button.enabled, false)
+        compare(launcher.active, false)
+        fakeDecolog.callInfo = {call: "K1DX", count: 0, position: {lat: 0, lon: -42}, positionApprox: true}
+        compare(button.enabled, true)
+        fakeDecolog.myPosition = {}
+        compare(button.enabled, false)
+        fakeDecolog.myPosition = {lat: 35.9, lon: 0}
+        compare(button.enabled, true)
+        mouseClick(button, button.width / 2, button.height / 2)
+        tryVerify(function() { return launcher.item && launcher.item.visible }, 8000)
+        const flight = launcher.item
+        compare(flight.fields.STATION_CALLSIGN, "9H1TEST")
+        compare(flight.fields.CALL, "K1DX")
+        compare(flight.fields.QSO_DATE, undefined)
+        compare(flight.origin.longitude, 0)
+        compare(flight.destination.latitude, 0)
+        compare(flight.destination.longitude, -42)
+        compare(flight.approximateDestination, true)
+        tryVerify(function() { return flight.progress > 0 }, 8000)
+        fakeDecolog.callInfo = {call: "K2DX", count: 0, position: {lat: 1, lon: -40}}
+        compare(flight.fields.CALL, "K1DX") // An open flight keeps its endpoints.
+        flight.close()
+        tryCompare(launcher, "active", false)
+        fakeDecolog.myPosition = {lat: 35.9, lon: 14.5}
+    }
 
     function test_profileButtonFollowsVerifiedCall() {
         const panel = createTemporaryObject(panelComponent, testCase)

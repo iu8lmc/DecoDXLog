@@ -82,7 +82,8 @@ QDateTime downloadSince(const QDateTime& lastSuccess, bool everything);
 // Lo scarico automatico ogni `hours` ore: tocca se non si e' mai provato, o
 // se dall'ultimo tentativo (riuscito o no) sono passate le ore. Un tentativo
 // fallito non si ripete a ogni controllo, ma al giro dopo.
-bool autoDownloadDue(const QDateTime& lastSuccess, const QDateTime& lastAttempt, const QDateTime& now, int hours);
+bool autoDownloadDue(const QDateTime& lastSuccess, const QDateTime& lastAttempt, const QDateTime& now, int hours,
+                     bool enabled = true);
 
 } // namespace confirmations
 

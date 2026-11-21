@@ -8,6 +8,8 @@ Window {
     id: view
     title: qsTr("QSO map")
     property var fields: ({})
+    property bool preview: false
+    property bool approximateDestination: false
     property var origin: QtPositioning.coordinate()
     property var destination: QtPositioning.coordinate()
     property real progress: 0
@@ -16,7 +18,7 @@ Window {
     readonly property real bearing: ready ? origin.azimuthTo(destination) : 0
 
     function degrees(value) {
-        const s = String(value || "").trim()
+        const s = String(value ?? "").trim()
         const m = /^([NSEW])\s*(\d+)\s+(\d+(?:\.\d+)?)$/i.exec(s)
         if (m && Number(m[3]) < 60)
             return (Number(m[2]) + Number(m[3])/60) * (/[SW]/i.test(m[1]) ? -1 : 1)
@@ -45,9 +47,17 @@ Window {
     }
     function present(detail) {
         fields = detail.fields || {}
-        const profile = decolog.stationProfiles.byId(detail.stationProfileId || 0) || {}
-        origin = position(fields.MY_LAT, fields.MY_LON, fields.MY_GRIDSQUARE || profile.myGridsquare)
-        destination = position(fields.LAT, fields.LON, fields.GRIDSQUARE)
+        const routePreview = detail.preview
+        preview = !!routePreview
+        approximateDestination = preview && !!routePreview.approximate
+        if (preview) {
+            origin = QtPositioning.coordinate(routePreview.origin.lat, routePreview.origin.lon)
+            destination = QtPositioning.coordinate(routePreview.destination.lat, routePreview.destination.lon)
+        } else {
+            const profile = decolog.stationProfiles.byId(detail.stationProfileId || 0) || {}
+            origin = position(fields.MY_LAT, fields.MY_LON, fields.MY_GRIDSQUARE || profile.myGridsquare)
+            destination = position(fields.LAT, fields.LON, fields.GRIDSQUARE)
+        }
         showMaximized()
         raise()
         Qt.callLater(frame)
@@ -207,8 +217,14 @@ Window {
             anchors.centerIn: parent
             spacing: 5
             Label { color: "white"; font.pixelSize: 23; font.bold: true; text: (view.fields.STATION_CALLSIGN || "QTH") + "  →  " + (view.fields.CALL || "") }
-            Label { color: "#bce7ed"; text: [view.fields.BAND,view.fields.SUBMODE || view.fields.MODE,view.fields.QSO_DATE,view.fields.TIME_ON].filter(Boolean).join("  ·  ") }
+            Label {
+                color: "#bce7ed"
+                text: view.preview ? qsTr("Path preview")
+                                   : [view.fields.BAND, view.fields.SUBMODE || view.fields.MODE,
+                                      view.fields.QSO_DATE, view.fields.TIME_ON].filter(Boolean).join("  ·  ")
+            }
             Label { color: "white"; text: view.ready ? Math.round(view.distance/1000) + " km" : qsTr("Station or contact coordinates missing") }
+            Label { visible: view.approximateDestination; color: "#bce7ed"; text: qsTr("Approximate destination (DXCC centre)") }
             Button { text: view.satellite ? "OpenStreetMap" : qsTr("Satellite"); onClicked: view.satellite = !view.satellite }
             Button { visible: view.ready; text: "↻"; Accessible.name: qsTr("Replay"); onClicked: flight.restart() }
         }

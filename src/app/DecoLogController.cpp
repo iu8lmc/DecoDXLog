@@ -593,6 +593,7 @@ DecoLogController::DecoLogController(QObject* parent)
 
     m_lotwAutoHours = s.value(QStringLiteral("lotw/autoSyncHours"), 12).toInt();
     m_confirmAutoHours = s.value(QStringLiteral("confirmations/autoSyncHours"), 12).toInt();
+    m_confirmQrzAuto = s.value(QStringLiteral("confirmations/qrzAutomatic"), false).toBool();
     m_recoveryEnabled = s.value(QStringLiteral("decodium/recoverFromLog"), true).toBool();
     m_decodiumLogPath = s.value(QStringLiteral("decodium/logPath")).toString();
     m_recoveryPool.setMaxThreadCount(1);
@@ -964,9 +965,9 @@ bool DecoLogController::openDatabase(const QString& path)
     qslCtx.activity = [this](const QString& category, const QString& text, const QString& level) {
         addActivity(category, text, level);
     };
-    qslCtx.logChanged = [this] {
-        timed(tr("reloading the log table"), [this] { m_model->reloadAfterQslUpdate(); });
-        emit logChanged();
+    qslCtx.uploadStateChanged = [this](const QSet<qint64>& ids) {
+        timed(tr("updating QSL upload status in the log table"), [this, &ids] { m_model->refreshQslUpload(ids); });
+        m_countsTimer.start();
     };
     m_qsl = new QslController(std::move(qslCtx), this);
     connect(m_qsl, &QslController::changed, this, &DecoLogController::ctyChanged);
@@ -3207,6 +3208,7 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
                         .arg(enriched.value(QStringLiteral("CALL")).toUpper(),
                              enriched.value(QStringLiteral("BAND")), dupeMode);
     } else {
+        decolog::StartupSpan trace("Incoming QSO: SQLite insert");
         r = m_db.insertQso(enriched, source, sourceApp, false, profileId);
     }
 
@@ -3242,7 +3244,10 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
         if (m_net)
             m_net->qsoLogged(r.id);
         m_cloud->qsoLogged();
-        m_model->insertQso(r.id);
+        {
+            decolog::StartupSpan trace("Incoming QSO: update log table");
+            m_model->insertQso(r.id);
+        }
         const auto meta = m_db.meta(r.id);
         QString text = tr("%1 from %2 → %3 %4 %5 saved (uuid %6)")
                            .arg(item.value(QStringLiteral("message")).toString(), sourceApp, call,
@@ -3255,7 +3260,10 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
                                                          : enriched.value(QStringLiteral("COUNTRY")));
         item[QStringLiteral("newDxcc")] = newDxcc;
         addActivity(QStringLiteral("UDP"), text, newDxcc ? QStringLiteral("highlight") : QStringLiteral("success"));
-        emit logChanged();
+        {
+            decolog::StartupSpan trace("Incoming QSO: notify panels");
+            emit logChanged();
+        }
         // Decodium manda l'essenziale: nome, locatore e indirizzo li sa il
         // callbook, e il QSO se li prende da solo.
         completeFromCallbook(r.id, call);
@@ -6207,6 +6215,8 @@ void DecoLogController::startConfirmations(const QString& service, bool full, co
 
 void DecoLogController::startNextConfirmAccount()
 {
+    if (m_confirmAuto && m_confirmService == QLatin1String("qrz") && !m_confirmQrzAuto)
+        m_confirmQueue.clear();
     if (m_confirmQueue.isEmpty()) {
         m_confirmService.clear();
         // Un periodo vale per questo scarico soltanto.
@@ -6242,6 +6252,10 @@ void DecoLogController::startNextConfirmAccount()
     const QString account = m_credentials->account(a.credential);
     m_credentials->readSecret(a.credential, [this, a, account, since, from, to](const QString& secret, const QString& error) {
         m_confirmStarting.clear();
+        if (m_confirmAuto && a.service == QLatin1String("qrz") && !m_confirmQrzAuto) {
+            startNextConfirmAccount();
+            return;
+        }
         if (!error.isEmpty() || secret.trimmed().isEmpty() || !m_credentials->hasSecret(a.credential)
             || (a.service == QLatin1String("eqsl") && account.trimmed().isEmpty())) {
             confirmations::Report failed;
@@ -6727,6 +6741,15 @@ void DecoLogController::setConfirmAutoHours(int hours)
     emit confirmChanged();
 }
 
+void DecoLogController::setConfirmQrzAuto(bool enabled)
+{
+    if (enabled == m_confirmQrzAuto)
+        return;
+    m_confirmQrzAuto = enabled;
+    QSettings().setValue(QStringLiteral("confirmations/qrzAutomatic"), enabled);
+    emit confirmChanged();
+}
+
 QVariantMap DecoLogController::confirmLastSync() const
 {
     QVariantMap out;
@@ -6746,14 +6769,13 @@ void DecoLogController::checkConfirmSchedule()
         return;
     const QDateTime now = QDateTime::currentDateTimeUtc();
     for (const QString& service : {QStringLiteral("eqsl"), QStringLiteral("qrz")}) {
-        // Senza credenziali tace: l'operatore quel servizio non lo usa.
-        if (confirmAccounts(service).isEmpty())
-            continue;
         const QDateTime success =
             QDateTime::fromString(m_db.setting(service + QStringLiteral(".last_sync_at")), Qt::ISODate);
         const QDateTime attempt =
             QDateTime::fromString(m_db.setting(service + QStringLiteral(".last_attempt_at")), Qt::ISODate);
-        if (!confirmations::autoDownloadDue(success, attempt, now, m_confirmAutoHours))
+        const bool enabled = service != QLatin1String("qrz") || m_confirmQrzAuto;
+        if (!confirmations::autoDownloadDue(success, attempt, now, m_confirmAutoHours, enabled)
+            || confirmAccounts(service).isEmpty())
             continue;
         // Uno alla volta: l'altro al giro dopo questo (onConfirmationReport).
         m_confirmAuto = true;
@@ -6770,8 +6792,12 @@ void DecoLogController::onConfirmationReport(const confirmations::Report& report
     const ConfirmAccount a = m_confirmAccount;
     if (!report.ok) {
         m_confirmFailed = true;
-        // Di un account di profilo si dice quale.
-        m_confirmStatus = a.only.isEmpty() ? report.error : a.label + QStringLiteral(" · ") + report.error;
+        if (report.service == QLatin1String("qrz")) {
+            const QString source = a.only.isEmpty() ? tr("General QSL settings") : tr("Station profile: %1").arg(a.label);
+            m_confirmStatus = source + QStringLiteral(" · ") + report.error;
+        } else {
+            m_confirmStatus = a.only.isEmpty() ? report.error : a.label + QStringLiteral(" · ") + report.error;
+        }
         m_db.setSetting(a.key + QStringLiteral(".last_result"), m_confirmStatus);
         addActivity(category, m_confirmStatus, QStringLiteral("error"));
         recordQslImport(a.label, report.service, {}, !m_confirmAuto, report.error);

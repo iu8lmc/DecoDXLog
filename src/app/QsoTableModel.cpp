@@ -1269,6 +1269,46 @@ void QsoTableModel::reloadAfterQslUpdate()
     reloadImpl(true);
 }
 
+void QsoTableModel::refreshQslUpload(const QSet<qint64>& ids)
+{
+    decolog::StartupSpan trace("QSO table: refresh uploaded rows");
+    if (ids.isEmpty() || m_ids.isEmpty() || columns() == 0)
+        return;
+
+    // Uploads only update sent state. Confirmation filters and first-QSO
+    // categories depend on received state and contact data, respectively.
+    const auto* sort = extraColumn(m_sortKey);
+    if (sort && !sort->sql) {
+        reloadAfterQslUpdate();
+        return;
+    }
+
+    QList<int> rows;
+    if (ids.size() == 1) {
+        const int row = rowForId(*ids.cbegin());
+        if (row >= 0) rows.append(row);
+    } else {
+        for (int row = 0; row < rowCount(); ++row) {
+            if (ids.contains(m_ids.at(row)))
+                rows.append(row);
+        }
+    }
+    for (const int row : rows) {
+        const int page = row / kPage;
+        if (m_pages.remove(page))
+            m_pageUse.removeOne(page);
+    }
+    // Invalidate every affected cache page before notifying any observer.
+    const QList<int> roles{Qt::DisplayRole, CategoryRole, QslStateRole};
+    for (qsizetype i = 0; i < rows.size();) {
+        const int first = rows.at(i++);
+        int last = first;
+        while (i < rows.size() && rows.at(i) == last + 1)
+            last = rows.at(i++);
+        emit dataChanged(index(first, 0), index(last, columns() - 1), roles);
+    }
+}
+
 void QsoTableModel::reloadImpl(bool preserveIfUnchanged)
 {
     decolog::StartupSpan trace("QsoTableModel::reload");
