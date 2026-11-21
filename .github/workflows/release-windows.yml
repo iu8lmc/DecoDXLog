@@ -45,24 +45,24 @@ jobs:
       - name: Install MSYS2 MinGW and Qt
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-qt6-base
-            mingw-w64-x86_64-qt6-declarative
-            mingw-w64-x86_64-qt6-tools
-            mingw-w64-x86_64-qt6-translations
-            mingw-w64-x86_64-qt6-multimedia
-            mingw-w64-x86_64-qt6-positioning
-            mingw-w64-x86_64-qt6-location
-            mingw-w64-x86_64-qt6-serialport
-            mingw-w64-x86_64-qt6-websockets
-            mingw-w64-x86_64-qt6-shadertools
-            mingw-w64-x86_64-qtkeychain
-            mingw-w64-x86_64-openssl
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-qt6-translations
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-positioning
+            mingw-w64-ucrt-x86_64-qt6-location
+            mingw-w64-ucrt-x86_64-qt6-serialport
+            mingw-w64-ucrt-x86_64-qt6-websockets
+            mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qtkeychain
+            mingw-w64-ucrt-x86_64-openssl
 
       - name: Install Inno Setup
         shell: pwsh
@@ -85,7 +85,7 @@ jobs:
         run: bash scripts/release-gate.sh build-rel build-rel/DecoDXLog.exe build-rel/decodxlog-capabilities.json
 
       - name: Package with the tested MinGW procedure
-        run: MINGW=/mingw64 BUILD="$PWD/build-rel" bash scripts/installer.sh
+        run: MINGW=/ucrt64 BUILD="$PWD/build-rel" bash scripts/installer.sh
 
       - name: Prepare assets for review
         id: assets
