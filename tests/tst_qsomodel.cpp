@@ -43,6 +43,86 @@ class TestQsoModel : public QObject {
     Q_OBJECT
 
 private slots:
+    void largeFileReloadIsAsyncAndInsertInvalidatesPendingSnapshot()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
+        QByteArray adif;
+        for (int i = 0; i < 10000; ++i) {
+            const QByteArray call = "K" + QByteArray::number(i) + "ABC";
+            adif += "<CALL:" + QByteArray::number(call.size()) + ">" + call
+                    + "<QSO_DATE:8>20261117<TIME_ON:6>120000<BAND:3>20m<MODE:2>CW<EOR>\n";
+        }
+        QCOMPARE(db.importAdif(adif).inserted, 10000);
+        // A second connection can hold an exclusive writer lock to simulate
+        // a slow file without depending on CPU speed or disk hardware.
+        QSqlQuery journal(db.connection()); QVERIFY(journal.exec("PRAGMA journal_mode=DELETE"));
+        QVERIFY(journal.next()); QCOMPARE(journal.value(0).toString().toLower(), QStringLiteral("delete"));
+        journal.finish();
+        QsoTableModel model(&db);
+        QCOMPARE(model.count(), 10000);
+        QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
+        model.reloadAfterQslUpdate();
+        QVERIFY(model.busy());
+        QCOMPARE(model.count(), 10000);
+        const InsertResult inserted = db.insertQso({{"CALL", "K1NEWZZ"}, {"QSO_DATE", "20261118"},
+                                                     {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "CW"}}, "manual");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        model.insertQso(inserted.id);
+        QCOMPARE(model.count(), 10001);
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.count(), 10001);
+        QCOMPARE(model.idAt(0), inserted.id);
+        QCOMPARE(resets.size(), 0);
+        model.setFilterText("K1NEWZZ");
+        QVERIFY(model.busy());
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.count(), 1);
+        QCOMPARE(model.idAt(0), inserted.id);
+        model.clearFilters();
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.count(), 10001);
+        LogDatabase blocker; QVERIFY(blocker.open(dir.filePath("large.sqlite")));
+        QSqlQuery lock(blocker.connection()); QVERIFY(lock.exec("BEGIN EXCLUSIVE"));
+        QElapsedTimer timer; timer.start();
+        model.reloadAfterQslUpdate();
+        QVERIFY2(timer.elapsed() < 1000, "reload blocked on the locked SQLite file");
+        QVERIFY(model.busy());
+        QTest::qWait(200);
+        QVERIFY(model.busy());
+        QVERIFY(lock.exec("ROLLBACK"));
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.count(), 10001);
+        QVERIFY(lock.exec("BEGIN EXCLUSIVE"));
+        const qint64 firstId = model.idAt(0);
+        model.reloadAfterQslUpdate();
+        QVERIFY(model.busy());
+        // Hold the lock past SQLite's 3s busy timeout. A failed reload must
+        // retain the old rows and clear busy rather than adopting an empty log.
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 20000);
+        QCOMPARE(model.count(), 10001);
+        QCOMPARE(model.idAt(0), firstId);
+        QVERIFY(lock.exec("ROLLBACK"));
+        model.reloadAfterQslUpdate();
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.count(), 10001);
+        // Return to the application's normal WAL mode before testing a writer
+        // concurrent with a reader; rollback journals serialize the two.
+        QTRY_VERIFY_WITH_TIMEOUT(journal.exec("PRAGMA journal_mode=WAL"), 10000);
+        QVERIFY(journal.next()); QCOMPARE(journal.value(0).toString().toLower(), QStringLiteral("wal"));
+        journal.finish();
+        model.setFilterText("K1NEWZZ");
+        QVERIFY(model.busy());
+        QVERIFY2(db.softDeleteQso(inserted.id), qPrintable(db.lastError()));
+        model.removeDeletedIds({inserted.id});
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.rowForId(inserted.id), -1);
+        QCOMPARE(model.count(), 0);
+        model.clearFilters();
+        QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
+        QCOMPARE(model.count(), 10000);
+        QCOMPARE(model.rowForId(inserted.id), -1);
+    }
     void deletingRowsPreservesTheTableAndCellAlignment()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); fill(db);

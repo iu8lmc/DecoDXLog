@@ -628,8 +628,8 @@ RoundedWindow {
                        : mode === "export" || mode === "export-fail" ? !decolog.exportBusy
                        : mode === "import" ? decolog.importProgress < 0
                        : mode === "callbookscan" ? (now - startedAt >= 1000 && decolog.callbookQueued === 0)
-                       : decolog.bulkProgress < 0 && ((mode !== "filtered" && mode !== "manual") || !window.panelItem("logbook").item.model.busy)
-            if (sawRunning && done && ++settledTicks >= 5) {
+                       : decolog.bulkProgress < 0
+            if (sawRunning && done && !window.panelItem("logbook").item.model.busy && ++settledTicks >= 5) {
                 if (mode === "manual") console.warn("PROBE manual-model-count=" + window.panelItem("logbook").item.model.count)
                 console.warn("PROBE bulkcheck mode=" + mode + " rows=" + rows + " maxgap=" + maxGap
                              + " elapsed=" + (now - startedAt))

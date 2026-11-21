@@ -8,6 +8,7 @@
 
 #include <QCoreApplication>
 #include <QDateTime>
+#include <QDebug>
 #include <QMetaObject>
 #include <QPointer>
 
@@ -1315,12 +1316,10 @@ void QsoTableModel::reloadImpl(bool preserveIfUnchanged)
     const int generation = ++m_reloadGeneration;
     m_reloadLatest->store(generation);
     const QString path = m_db && m_db->isOpen() ? m_db->path() : QString();
-    // Su un log grande in un file, un ordine o un filtro diversi da quelli di
-    // sempre costano secondi (un milione di QSO per nominativo: due): si
-    // preparano su un altro filo, e intanto la tabella resta com'e'. Il log in
-    // ordine di tempo senza filtri legge solo il suo indice, e resta qui.
-    if (!path.isEmpty() && path != QLatin1String(":memory:") && m_total >= kBackgroundRows
-        && (filtered() || !defaultSort())) {
+    // Anche la lettura dell'indice cronologico puo' richiedere secondi su
+    // macchine lente o dischi esterni. Nei log grandi ogni ricarico successivo
+    // all'apertura si prepara sul worker, lasciando visibile la tabella attuale.
+    if (!path.isEmpty() && path != QLatin1String(":memory:") && m_total >= kBackgroundRows) {
         QVariantList binds;
         const QString sql = idsSql(binds, scanWholeLog());
         if (!m_busy) {
@@ -1334,25 +1333,46 @@ void QsoTableModel::reloadImpl(bool preserveIfUnchanged)
             if (latest->load() != generation)
                 return;
             QVector<qint64> ids;
+            QString error;
             {
                 core::LogDatabase db;
                 if (db.open(path)) {
                     QSqlQuery q(db.connection());
                     q.setForwardOnly(true);
-                    q.prepare(sql);
-                    for (const auto& b : binds)
-                        q.addBindValue(b);
-                    if (q.exec()) {
+                    if (!q.prepare(sql)) {
+                        error = q.lastError().text();
+                        if (error.isEmpty()) error = QStringLiteral("query preparation failed");
+                    } else {
+                        for (const auto& b : binds)
+                            q.addBindValue(b);
+                        if (!q.exec()) {
+                            error = q.lastError().text();
+                            if (error.isEmpty()) error = QStringLiteral("query failed");
+                        }
+                    }
+                    if (error.isEmpty()) {
                         while (q.next())
                             ids.append(q.value(0).toLongLong());
+                        if (q.lastError().isValid()) error = q.lastError().text();
                     }
+                } else {
+                    error = db.lastError();
+                    if (error.isEmpty()) error = QStringLiteral("database open failed");
                 }
             }
             QMetaObject::invokeMethod(
                 self.data(),
-                [self, generation, preserveIfUnchanged, ids = std::move(ids)]() mutable {
+                [self, generation, preserveIfUnchanged, ids = std::move(ids), error]() mutable {
                     if (!self || generation != self->m_reloadGeneration)
                         return;
+                    if (!error.isEmpty()) {
+                        qWarning().noquote() << "QSO table reload failed:" << error;
+                        if (self->m_busy) {
+                            self->m_busy = false;
+                            emit self->busyChanged();
+                        }
+                        return;
+                    }
                     self->adoptIds(std::move(ids), preserveIfUnchanged);
                 },
                 Qt::QueuedConnection);
@@ -1476,6 +1496,11 @@ void QsoTableModel::insertQso(qint64 id)
     if (!q.exec() || !q.next())
         return;
     const QString on = q.value(0).toString();
+    // Una ricerca di ID gia' avviata puo' avere uno snapshot precedente al
+    // nuovo QSO: invalidala prima di inserire la riga nel modello.
+    const bool reloadWasPending = m_busy;
+    if (reloadWasPending)
+        m_reloadLatest->store(++m_reloadGeneration);
     // Una ricerca a meta' sulle righe che la tabella ha gia', in ordine di
     // tempo: una ventina di letture per id invece di contare nel log i QSO piu'
     // recenti — per un QSO del 2015 su un milione erano mezzo milione di righe.
@@ -1520,6 +1545,8 @@ void QsoTableModel::insertQso(qint64 id)
     // Senza filtri il totale e' uno in piu': niente conteggio del log.
     ++m_total;
     emit countChanged();
+    if (reloadWasPending)
+        reloadImpl(true);
 }
 
 void QsoTableModel::clearFilters()

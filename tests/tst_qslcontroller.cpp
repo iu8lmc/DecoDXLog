@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPointer>
 #include <QFile>
 #include <QDir>
 #include <QSettings>
@@ -287,6 +288,7 @@ private slots:
         int requests = 0, ticks = 0;
         QTimer heartbeat; heartbeat.setInterval(5);
         connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        QPointer<QTcpSocket> pendingResponse;
         connect(&server, &QTcpServer::newConnection, this, [&] {
             QTcpSocket* socket = server.nextPendingConnection();
             connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
@@ -294,12 +296,7 @@ private slots:
                 if (socket->property("answered").toBool()) return;
                 socket->setProperty("answered", true);
                 ++requests;
-                QTimer::singleShot(60, socket, [socket] {
-                    const QByteArray body = "Result: 0 out of 1 record. Duplicate";
-                    socket->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(body.size())
-                                  + "\r\nConnection: close\r\n\r\n" + body);
-                    socket->disconnectFromHost();
-                });
+                pendingResponse = socket;
             });
         });
         QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
@@ -308,18 +305,34 @@ private slots:
         controller.setAutoUpload("eqsl", true);
         controller.m_autoDelay.setInterval(1);
         if (legacyTrigger) controller.qsoLogged(a); else controller.qsoEdited(a);
-        QTest::qWait(200);
-        QCOMPARE(requests, legacyTrigger ? 1 : 0);
         if (!legacyTrigger) {
+            QTest::qWait(200);
+            QCOMPARE(requests, 0);
             controller.qsoEdited(b);
-            QTRY_COMPARE_WITH_TIMEOUT(requests, 1, 3000);
         }
+        QTRY_COMPARE_WITH_TIMEOUT(requests, 1, 3000);
+        QVERIFY(pendingResponse);
+        QVERIFY(controller.busy());
+
+        // Keep the HTTP response pending until the UI event loop has actually
+        // processed ten timer events. Counting timers across fixed qWait calls
+        // is platform-dependent and does not establish responsiveness during
+        // the upload itself.
+        const int ticksAtRequest = ticks;
+        QElapsedTimer responsiveness; responsiveness.start();
+        QTRY_VERIFY_WITH_TIMEOUT(ticks >= ticksAtRequest + 10, 3000);
+        QVERIFY2(responsiveness.elapsed() < 3000, "UI stopped responding during the pending eQSL upload");
+        QVERIFY(controller.busy());
+        QCOMPARE(requests, 1);
+        const QByteArray body = "Result: 0 out of 1 record. Duplicate";
+        pendingResponse->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(body.size())
+                               + "\r\nConnection: close\r\n\r\n" + body);
+        pendingResponse->disconnectFromHost();
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 3000);
         QCOMPARE(db.qslStatus(b).first().sent, QStringLiteral("Y"));
         controller.qsoEdited(b);
         QTest::qWait(100);
         QCOMPARE(requests, 1);
-        QVERIFY(ticks >= 10);
     }
 
 

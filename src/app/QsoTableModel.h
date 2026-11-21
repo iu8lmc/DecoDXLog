@@ -299,7 +299,7 @@ private:
 
     // Il ricarico su un altro filo: da quante righe in su, e l'ultimo chiesto
     // (quelli rimasti in coda si saltano, quelli arrivati tardi si scartano).
-    static constexpr int kBackgroundRows = 50000;
+    static constexpr int kBackgroundRows = 10000;
     QThreadPool m_reloadPool;
     int m_reloadGeneration{0};
     std::shared_ptr<std::atomic<int>> m_reloadLatest{std::make_shared<std::atomic<int>>(0)};
