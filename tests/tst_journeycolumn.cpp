@@ -219,21 +219,48 @@ private slots:
         QByteArray output;
         QVERIFY2(launch(dir, QStringLiteral("radionet:save"), output), output.constData());
         QVERIFY2(output.contains("PROBE radioNetInvalid kept=true"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetMismatch kept=true"), output.constData());
         QVERIFY2(output.contains("PROBE radioNetSaved closed=true"), output.constData());
         QVERIFY2(output.contains("PROBE radioNetRepeat closed=true"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetClosed kept=true"), output.constData());
         decolog::core::LogDatabase db;
         QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
         QCOMPARE(db.qsoCount(), 2);
         QSqlQuery q(db.connection());
-        QVERIFY(q.exec("SELECT call,name,band,mode FROM qso WHERE deleted=0 ORDER BY id"));
+        QSqlQuery session(db.connection());
+        QVERIFY(session.exec("SELECT uuid FROM radio_net_session"));
+        QVERIFY(session.next());
+        const QString sessionUuid = session.value(0).toString();
+        QVERIFY(!sessionUuid.isEmpty());
+        QVERIFY(q.exec("SELECT call,name,band,mode,id FROM qso WHERE deleted=0 ORDER BY id"));
         for (int i = 0; i < 2; ++i) {
             QVERIFY(q.next());
             QCOMPARE(q.value(0).toString(), QStringLiteral("K1AAA"));
             QCOMPARE(q.value(1).toString(), QStringLiteral("Alice"));
             QCOMPARE(q.value(2).toString(), QStringLiteral("20m"));
             QCOMPARE(q.value(3).toString(), QStringLiteral("CW"));
+            const auto record = db.record(q.value(4).toLongLong());
+            QVERIFY(record.has_value());
+            QCOMPARE(record->value("APP_DECOLOG_RADIO_NET_SESSION"), sessionUuid);
+            QCOMPARE(record->value("APP_DECOLOG_RADIO_NET_CALL"), QStringLiteral("K1AAA"));
         }
         QVERIFY(!q.next());
+        const auto exported = db.exportAdif();
+        const auto originalRecords = decolog::core::adif::parse(exported).records;
+        QCOMPARE(originalRecords.size(), 2);
+        for (const auto &record : originalRecords) {
+            QCOMPARE(record.value("APP_DECOLOG_RADIO_NET_SESSION"), sessionUuid);
+            QCOMPARE(record.value("APP_DECOLOG_RADIO_NET_CALL"), QStringLiteral("K1AAA"));
+        }
+        decolog::core::LogDatabase imported;
+        QVERIFY(imported.open(":memory:"));
+        QCOMPARE(imported.importAdif(exported).inserted, 1); // identical contacts are deduplicated on import
+        const auto records = decolog::core::adif::parse(imported.exportAdif()).records;
+        QCOMPARE(records.size(), 1);
+        for (const auto &record : records) {
+            QCOMPARE(record.value("APP_DECOLOG_RADIO_NET_SESSION"), sessionUuid);
+            QCOMPARE(record.value("APP_DECOLOG_RADIO_NET_CALL"), QStringLiteral("K1AAA"));
+        }
     }
 
     void radioNetPreparesQsoWithoutSavingOrOverwritingDraft()

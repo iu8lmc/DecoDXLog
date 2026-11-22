@@ -11,6 +11,8 @@ DialogFrame {
     // 0 = profilo attivo, >0 = finestra dedicata a quel profilo.
     property int profileId: 0
     property string profileDialogKey: ""
+    property double radioNetSessionId: 0
+    property double radioNetMemberId: 0
     // Optional explicit handoff; applied only when opening a fresh dialog.
     property string initialCall: ""
     property string initialName: ""
@@ -144,6 +146,9 @@ DialogFrame {
         callField.text = ""
         root.submit(false)
         console.warn("PROBE radioNetInvalid kept=" + (root.visible && errorText.text.length > 0))
+        callField.text = "K1BBB"
+        root.submit(false)
+        console.warn("PROBE radioNetMismatch kept=" + (root.visible && errorText.text === qsTranslate("decolog::app::DecoLogController", "The radio net session or participant no longer matches this QSO.")))
         callField.text = original
         freqField.text = "14.050000"
         modeBox.currentIndex = modeBox.find("CW")
@@ -156,6 +161,13 @@ DialogFrame {
         modeBox.currentIndex = modeBox.find("CW")
         root.submit(false)
         console.warn("PROBE radioNetRepeat closed=" + !root.visible + " error=" + errorText.text)
+    }
+
+    function probeRadioNetClosed() {
+        freqField.text = "14.050000"
+        modeBox.currentIndex = modeBox.find("CW")
+        root.submit(false)
+        console.warn("PROBE radioNetClosed kept=" + (root.visible && errorText.text === qsTranslate("decolog::app::DecoLogController", "The radio net session or participant no longer matches this QSO.")))
     }
 
     function probeSatelliteSplit() {
@@ -215,7 +227,8 @@ DialogFrame {
             country: countryField.text, address: addressField.text, state: stateField.text,
             cnty: cntyField.text, cont: contField.text, cqz: cqzField.text, ituz: ituzField.text,
             dxcc: dxccField.text, qsl_via: qslViaField.text,
-            station_profile_id: root.profileId
+            station_profile_id: root.profileId,
+            radio_net_session_id: root.radioNetSessionId, radio_net_member_id: root.radioNetMemberId
         })
         errorText.text = error
         if (error.length > 0)

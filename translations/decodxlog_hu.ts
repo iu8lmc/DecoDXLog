@@ -12301,6 +12301,14 @@ A további mezők megmaradnak: %8</translation>
         <source>The rover locator is unavailable</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>The radio net session or participant no longer matches this QSO.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The radio net session uses a different station profile.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>

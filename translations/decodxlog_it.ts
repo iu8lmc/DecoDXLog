@@ -12384,6 +12384,14 @@ Campi extra conservati: %8</translation>
         <source>The rover locator is unavailable</source>
         <translation>Il locator rover non è disponibile</translation>
     </message>
+    <message>
+        <source>The radio net session or participant no longer matches this QSO.</source>
+        <translation>La sessione della rete radio o il partecipante non corrispondono più a questo QSO.</translation>
+    </message>
+    <message>
+        <source>The radio net session uses a different station profile.</source>
+        <translation>La sessione della rete radio usa un profilo stazione diverso.</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::LogLibrary</name>

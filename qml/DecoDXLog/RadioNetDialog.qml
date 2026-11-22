@@ -151,6 +151,9 @@ DialogFrame {
                     participantQso.probeRadioNetSave()
                     row.openQso()
                     participantQso.probeRadioNetRepeat()
+                    row.openQso()
+                    root.net.closeSession()
+                    participantQso.probeRadioNetClosed()
                 }
             }
         }
@@ -259,6 +262,8 @@ DialogFrame {
                     }
                     qsoNotice.text = ""
                     participantQso.profileId = Number(root.current.stationProfileId || 0)
+                    participantQso.radioNetSessionId = Number(root.current.id || 0)
+                    participantQso.radioNetMemberId = Number(modelData.id || 0)
                     participantQso.initialCall = modelData.call
                     participantQso.initialName = modelData.name || ""
                     participantQso.open()

@@ -3803,6 +3803,23 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     }
     if (m_activation->active() && m_activation->session().stationProfileId > 0)
         profileId = m_activation->session().stationProfileId;
+    const qint64 radioSessionId = fields.value(QStringLiteral("radio_net_session_id")).toLongLong();
+    const qint64 radioMemberId = fields.value(QStringLiteral("radio_net_member_id")).toLongLong();
+    if (radioSessionId || radioMemberId) {
+        QSqlQuery radio(m_db.connection());
+        radio.prepare(QStringLiteral("SELECT s.uuid,m.call,s.station_profile_id FROM radio_net_session s "
+                                     "JOIN radio_net_member m ON m.session_id=s.id "
+                                     "WHERE s.id=? AND m.id=? AND s.ended_at IS NULL"));
+        radio.addBindValue(radioSessionId);
+        radio.addBindValue(radioMemberId);
+        if (!radio.exec() || !radio.next() || radio.value(1).toString().compare(r.value(QStringLiteral("CALL")), Qt::CaseInsensitive) != 0)
+            return tr("The radio net session or participant no longer matches this QSO.");
+        const qint64 radioProfileId = radio.value(2).toLongLong();
+        if (radioProfileId > 0 && radioProfileId != profileId)
+            return tr("The radio net session uses a different station profile.");
+        r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_SESSION"), radio.value(0).toString());
+        r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_CALL"), radio.value(1).toString());
+    }
     if (m_rover && !m_rover->session().isEmpty() && explicitMyGrid.isEmpty()) {
         if (m_activation->active())
             return tr("Enter the station locator explicitly when rover and activation are both active.");
