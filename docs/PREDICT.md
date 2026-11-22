@@ -1,0 +1,7 @@
+# PREDICT snapshot (desktop)
+
+Open **PREDICT satellite tracker** from the main menu. Run a compatible PREDICT server separately, then enter its numeric IP address, UDP port and the exact satellite name in its database. Choose **Read snapshot**. The window displays the returned position, next AOS/LOS event, Doppler normalized to 100 MHz, receipt time and the TLE epoch. This is a single requested reading, not continuous tracking or pass planning.
+
+PREDICT controls its own orbital data and station coordinates. The window warns when the TLE epoch is in the future or more than 14 days old; that threshold is a caution, not a guarantee that newer data are suitable. Update the tracker data and verify its station configuration. A server response and two tracking-mode checks do not prove that every sample is current. The sample is hidden when a new request fails. A timeout or invalid response is shown as an error.
+
+DecoDXLog's snapshot client sends only PREDICT read commands. It does not command CAT, PTT or a rotor, and it does not apply Doppler or create a QSO. It currently requires a numeric address, has no server discovery or satellite listing, and has no TLS or authentication; use it only on a network where the server and path are trusted. The software was checked against a local PREDICT 2.2.5 instance using old test elements; current predictions, radio hardware and other platforms have not been verified. See `docs/evolution/PROGRESS.md` for evidence.

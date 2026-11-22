@@ -9832,6 +9832,10 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>PREDICT satellite tracker…</source>
+        <translation>PREDICT satellite tracker…</translation>
+    </message>
+    <message>
         <source>Radio net manager…</source>
         <translation>Radio net manager…</translation>
     </message>
@@ -14825,6 +14829,105 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Export cancelled</source>
         <translation>Export cancelled</translation>
+    </message>
+</context>
+<context>
+    <name>PredictDialog</name>
+    <message>
+        <source>PREDICT satellite tracker</source>
+        <translation>PREDICT satellite tracker</translation>
+    </message>
+    <message>
+        <source>Read-only: the tracker controls neither radio nor rotor</source>
+        <translation>Read-only: the tracker controls neither radio nor rotor</translation>
+    </message>
+    <message>
+        <source>PREDICT UDP server</source>
+        <translation>PREDICT UDP server</translation>
+    </message>
+    <message>
+        <source>IP address</source>
+        <translation>IP address</translation>
+    </message>
+    <message>
+        <source>Tracker IP address</source>
+        <translation>Tracker IP address</translation>
+    </message>
+    <message>
+        <source>Tracker port</source>
+        <translation>Tracker port</translation>
+    </message>
+    <message>
+        <source>Exact satellite name</source>
+        <translation>Exact satellite name</translation>
+    </message>
+    <message>
+        <source>Read snapshot</source>
+        <translation>Read snapshot</translation>
+    </message>
+    <message>
+        <source>Snapshot received</source>
+        <translation>Snapshot received</translation>
+    </message>
+    <message>
+        <source>Tracker error: %1</source>
+        <translation>Tracker error: %1</translation>
+    </message>
+    <message>
+        <source>Enter a numeric IP, port and satellite name (up to 25 characters).</source>
+        <translation>Enter a numeric IP, port and satellite name (up to 25 characters).</translation>
+    </message>
+    <message>
+        <source>Reading…</source>
+        <translation>Reading…</translation>
+    </message>
+    <message>
+        <source>Satellite: %1</source>
+        <translation>Satellite: %1</translation>
+    </message>
+    <message>
+        <source>Azimuth: %1° · Elevation: %2°</source>
+        <translation>Azimuth: %1° · Elevation: %2°</translation>
+    </message>
+    <message>
+        <source>Next AOS/LOS (Unix UTC): %1</source>
+        <translation>Next AOS/LOS (Unix UTC): %1</translation>
+    </message>
+    <message>
+        <source>Doppler at 100 MHz: %1 Hz</source>
+        <translation>Doppler at 100 MHz: %1 Hz</translation>
+    </message>
+    <message>
+        <source>Received (UTC): %1</source>
+        <translation>Received (UTC): %1</translation>
+    </message>
+    <message>
+        <source>TLE epoch (UTC): %1</source>
+        <translation>TLE epoch (UTC): %1</translation>
+    </message>
+    <message>
+        <source>TLE age unavailable</source>
+        <translation>TLE age unavailable</translation>
+    </message>
+    <message>
+        <source>TLE epoch is in the future; check clocks.</source>
+        <translation>TLE epoch is in the future; check clocks.</translation>
+    </message>
+    <message>
+        <source>TLE is %1 days old; update orbital data before use.</source>
+        <translation>TLE is %1 days old; update orbital data before use.</translation>
+    </message>
+    <message>
+        <source>TLE age: %1 days (check suitability for this satellite).</source>
+        <translation>TLE age: %1 days (check suitability for this satellite).</translation>
+    </message>
+    <message>
+        <source>A received snapshot does not guarantee current tracking. PREDICT must be running and its orbital data must be maintained.</source>
+        <translation>A received snapshot does not guarantee current tracking. PREDICT must be running and its orbital data must be maintained.</translation>
+    </message>
+    <message>
+        <source>Port</source>
+        <translation>Port</translation>
     </message>
 </context>
 </TS>

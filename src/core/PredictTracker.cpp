@@ -11,11 +11,11 @@ PredictTracker::PredictTracker(QObject *parent) : QObject(parent)
     m_timeout.setInterval(1200);
     connect(&m_timeout, &QTimer::timeout, this, [this] { fail(QStringLiteral("PREDICT request timed out")); });
 }
-bool PredictTracker::request(const QString &host, quint16 port, const QString &satellite)
+bool PredictTracker::request(const QString &host, int port, const QString &satellite)
 {
     static const QRegularExpression valid(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9 ._+/-]{0,24}$"));
     QHostAddress address;
-    if (m_socket || !address.setAddress(host) || !port || !valid.match(satellite).hasMatch())
+    if (m_busy || !address.setAddress(host) || port <= 0 || port > 65535 || !valid.match(satellite).hasMatch())
         return false;
     m_host = address;
     m_port = port;
@@ -23,6 +23,8 @@ bool PredictTracker::request(const QString &host, quint16 port, const QString &s
     m_stage = 0;
     m_pending.clear();
     m_snapshot.clear();
+    m_busy = true;
+    emit changed();
     sendNext();
     return true;
 }
@@ -35,6 +37,8 @@ void PredictTracker::sendNext()
     }
     if (m_stage == 5) {
         m_snapshot = m_pending;
+        m_busy = false;
+        emit changed();
         emit finished(true, {});
         return;
     }
@@ -142,6 +146,8 @@ void PredictTracker::fail(const QString &error)
     }
     m_pending.clear();
     m_snapshot.clear();
+    m_busy = false;
+    emit changed();
     emit finished(false, error);
 }
 } // namespace decolog::core

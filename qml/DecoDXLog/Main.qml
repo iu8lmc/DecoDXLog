@@ -1266,6 +1266,7 @@ RoundedWindow {
             Qt.callLater(function () { newQsoDialog.probeSatelliteSplit() })
         }
         else if (what[0] === "rigsplitprobe") rigSplitProbeTimer.start()
+        else if (what[0] === "predictprobe") { predictDialog.open(); Qt.callLater(() => predictDialog.probe(what[1], what[2], what[3])) }
         else if (what[0] === "radionet") {
             radioNetDialog.open()
             Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso" || what[1] === "save" || what[1] === "reminder", what[1] === "qso" || what[1] === "save", what[1] === "save", what[1] === "history", what[1] === "reminder") })
@@ -1736,6 +1737,7 @@ RoundedWindow {
     }
     ActivationDialog { id: activationDialog }
     RadioNetDialog { id: radioNetDialog }
+    PredictDialog { id: predictDialog }
     ContestSubmitDialog { id: submitDialog }
     Timer {
         id: benchTimer
@@ -2676,6 +2678,7 @@ RoundedWindow {
             onClusterRequested: window.openCluster(0)
             onActivationRequested: activationDialog.openDialog()
             onRadioNetRequested: radioNetDialog.open()
+            onPredictRequested: predictDialog.open()
             contestModeOn: window.contestModeOn
             contestOpenPanels: contestLayout.shownList
             onContestCommand: (what, arg) => window.deskDo(what, arg)

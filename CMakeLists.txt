@@ -476,6 +476,7 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/UpdateDialog.qml
     qml/DecoDXLog/ActivationDialog.qml
     qml/DecoDXLog/RadioNetDialog.qml
+    qml/DecoDXLog/PredictDialog.qml
     qml/DecoDXLog/LogsDialog.qml
     qml/DecoDXLog/ContestLayout.qml
     qml/DecoDXLog/ColumnsDialog.qml
@@ -811,6 +812,9 @@ if(DECODXLOG_BUILD_TESTS)
         add_test(NAME rig_split_manual COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/rig_split_manual_probe.py $<TARGET_FILE:decolog>)
         set_tests_properties(rig_split_manual PROPERTIES TIMEOUT 30)
+        add_test(NAME predict_ui COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/tools/predict_ui_probe.py $<TARGET_FILE:decolog>)
+        set_tests_properties(predict_ui PROPERTIES TIMEOUT 45)
     endif()
 
     qt_add_executable(tst_bulkresponsiveness tests/tst_bulkresponsiveness.cpp)

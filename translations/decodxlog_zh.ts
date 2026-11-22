@@ -9816,6 +9816,10 @@ QSL 状态：%6 · UTC 不完整：%7。
         <translation>ON4KST 聊天…</translation>
     </message>
     <message>
+        <source>PREDICT satellite tracker…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Radio net manager…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -14765,6 +14769,105 @@ QSL 状态：%6 · UTC 不完整：%7。
     </message>
     <message>
         <source>Export cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>PredictDialog</name>
+    <message>
+        <source>PREDICT satellite tracker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Read-only: the tracker controls neither radio nor rotor</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>PREDICT UDP server</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>IP address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tracker IP address</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tracker port</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Exact satellite name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Read snapshot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Snapshot received</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tracker error: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a numeric IP, port and satellite name (up to 25 characters).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reading…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Satellite: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Azimuth: %1° · Elevation: %2°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Next AOS/LOS (Unix UTC): %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Doppler at 100 MHz: %1 Hz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Received (UTC): %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLE epoch (UTC): %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLE age unavailable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLE epoch is in the future; check clocks.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLE is %1 days old; update orbital data before use.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>TLE age: %1 days (check suitability for this satellite).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A received snapshot does not guarantee current tracking. PREDICT must be running and its orbital data must be maintained.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Port</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

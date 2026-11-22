@@ -8,11 +8,15 @@ namespace decolog::core {
 // Read-only PREDICT UDP client. It never sends radio or rotor commands.
 class PredictTracker : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QVariantMap snapshot READ snapshot NOTIFY changed)
+    Q_PROPERTY(bool busy READ busy NOTIFY changed)
   public:
     explicit PredictTracker(QObject *parent = nullptr);
-    bool request(const QString &host, quint16 port, const QString &satellite);
+    Q_INVOKABLE bool request(const QString &host, int port, const QString &satellite);
     QVariantMap snapshot() const { return m_snapshot; }
+    bool busy() const { return m_busy; }
   signals:
+    void changed();
     void finished(bool success, const QString &error);
 
   private:
@@ -27,5 +31,6 @@ class PredictTracker : public QObject {
     int m_stage{0};
     QVariantMap m_pending;
     QVariantMap m_snapshot;
+    bool m_busy{false};
 };
 } // namespace decolog::core

@@ -6,6 +6,13 @@ using namespace decolog::core;
 class TestPredictTracker : public QObject {
     Q_OBJECT
   private slots:
+    void exposesSnapshotAndBusyToDesktop()
+    {
+        PredictTracker tracker;
+        QVERIFY(tracker.metaObject()->indexOfProperty("snapshot") >= 0);
+        QVERIFY(tracker.metaObject()->indexOfProperty("busy") >= 0);
+        QVERIFY(tracker.metaObject()->indexOfMethod("request(QString,int,QString)") >= 0);
+    }
     void actualPredictServerWhenConfigured()
     {
         const QByteArray value = qgetenv("DECOLOG_TEST_PREDICT_PORT");

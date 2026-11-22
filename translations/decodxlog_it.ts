@@ -9871,6 +9871,10 @@ Campi extra conservati: %8</translation>
         <translation>Chat ON4KST…</translation>
     </message>
     <message>
+        <source>PREDICT satellite tracker…</source>
+        <translation>Tracker satellitare PREDICT…</translation>
+    </message>
+    <message>
         <source>Radio net manager…</source>
         <translation>Gestione rete radio…</translation>
     </message>
@@ -14868,6 +14872,105 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Export cancelled</source>
         <translation>Esportazione annullata</translation>
+    </message>
+</context>
+<context>
+    <name>PredictDialog</name>
+    <message>
+        <source>PREDICT satellite tracker</source>
+        <translation>Tracker satellitare PREDICT</translation>
+    </message>
+    <message>
+        <source>Read-only: the tracker controls neither radio nor rotor</source>
+        <translation>Sola lettura: il tracker non comanda radio o rotore</translation>
+    </message>
+    <message>
+        <source>PREDICT UDP server</source>
+        <translation>Server UDP PREDICT</translation>
+    </message>
+    <message>
+        <source>IP address</source>
+        <translation>Indirizzo IP</translation>
+    </message>
+    <message>
+        <source>Tracker IP address</source>
+        <translation>Indirizzo IP del tracker</translation>
+    </message>
+    <message>
+        <source>Tracker port</source>
+        <translation>Porta del tracker</translation>
+    </message>
+    <message>
+        <source>Exact satellite name</source>
+        <translation>Nome esatto del satellite</translation>
+    </message>
+    <message>
+        <source>Read snapshot</source>
+        <translation>Leggi posizione</translation>
+    </message>
+    <message>
+        <source>Snapshot received</source>
+        <translation>Lettura ricevuta</translation>
+    </message>
+    <message>
+        <source>Tracker error: %1</source>
+        <translation>Errore tracker: %1</translation>
+    </message>
+    <message>
+        <source>Enter a numeric IP, port and satellite name (up to 25 characters).</source>
+        <translation>Inserisci IP numerico, porta e nome satellite (massimo 25 caratteri).</translation>
+    </message>
+    <message>
+        <source>Reading…</source>
+        <translation>Lettura…</translation>
+    </message>
+    <message>
+        <source>Satellite: %1</source>
+        <translation>Satellite: %1</translation>
+    </message>
+    <message>
+        <source>Azimuth: %1° · Elevation: %2°</source>
+        <translation>Azimut: %1° · Elevazione: %2°</translation>
+    </message>
+    <message>
+        <source>Next AOS/LOS (Unix UTC): %1</source>
+        <translation>Prossimo AOS/LOS (Unix UTC): %1</translation>
+    </message>
+    <message>
+        <source>Doppler at 100 MHz: %1 Hz</source>
+        <translation>Doppler a 100 MHz: %1 Hz</translation>
+    </message>
+    <message>
+        <source>Received (UTC): %1</source>
+        <translation>Ricevuto (UTC): %1</translation>
+    </message>
+    <message>
+        <source>TLE epoch (UTC): %1</source>
+        <translation>Epoca TLE (UTC): %1</translation>
+    </message>
+    <message>
+        <source>TLE age unavailable</source>
+        <translation>Età del TLE non disponibile</translation>
+    </message>
+    <message>
+        <source>TLE epoch is in the future; check clocks.</source>
+        <translation>L’epoca TLE è nel futuro; controlla gli orologi.</translation>
+    </message>
+    <message>
+        <source>TLE is %1 days old; update orbital data before use.</source>
+        <translation>Il TLE ha %1 giorni; aggiorna i dati orbitali prima dell’uso.</translation>
+    </message>
+    <message>
+        <source>TLE age: %1 days (check suitability for this satellite).</source>
+        <translation>Età TLE: %1 giorni (verifica l’idoneità per questo satellite).</translation>
+    </message>
+    <message>
+        <source>A received snapshot does not guarantee current tracking. PREDICT must be running and its orbital data must be maintained.</source>
+        <translation>Una lettura ricevuta non garantisce il tracciamento attuale. PREDICT deve essere in esecuzione e i dati orbitali aggiornati.</translation>
+    </message>
+    <message>
+        <source>Port</source>
+        <translation>Porta</translation>
     </message>
 </context>
 </TS>
