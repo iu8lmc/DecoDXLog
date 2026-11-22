@@ -815,8 +815,8 @@ if(DECODXLOG_BUILD_TESTS)
             ${CMAKE_SOURCE_DIR}/tests/tools/rig_split_manual_probe.py $<TARGET_FILE:decolog>)
         set_tests_properties(rig_split_manual PROPERTIES TIMEOUT 30)
         add_test(NAME predict_ui COMMAND ${Python3_EXECUTABLE}
-            ${CMAKE_SOURCE_DIR}/tests/tools/predict_ui_probe.py $<TARGET_FILE:decolog>)
-        set_tests_properties(predict_ui PROPERTIES TIMEOUT 60)
+            ${CMAKE_SOURCE_DIR}/tests/tools/predict_ui_probe.py $<TARGET_FILE:decolog> $<TARGET_FILE:tst_journeycolumn>)
+        set_tests_properties(predict_ui PROPERTIES TIMEOUT 120)
     endif()
 
     qt_add_executable(tst_bulkresponsiveness tests/tst_bulkresponsiveness.cpp)

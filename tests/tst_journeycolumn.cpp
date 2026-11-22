@@ -48,6 +48,36 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void exportTrackerQsoFixture()
+    {
+        const QString path = qEnvironmentVariable("DECOLOG_TEST_SATELLITE_DB");
+        if (path.isEmpty())
+            QSKIP("Set DECOLOG_TEST_SATELLITE_DB to verify a saved tracker QSO");
+        decolog::core::LogDatabase source;
+        QVERIFY(source.open(path));
+        const QByteArray exported = source.exportAdif("fixture");
+        const auto document = decolog::core::adif::parse(exported);
+        QCOMPARE(document.records.size(), 1);
+        const auto &qso = document.records.first();
+        QCOMPARE(qso.value("CALL"), QStringLiteral("K1AAA"));
+        QCOMPARE(qso.value("FREQ"), QStringLiteral("145.998596"));
+        QCOMPARE(qso.value("FREQ_RX"), QStringLiteral("435.004184"));
+        QCOMPARE(qso.value("BAND"), QStringLiteral("2m"));
+        QCOMPARE(qso.value("BAND_RX"), QStringLiteral("70cm"));
+        QCOMPARE(qso.value("PROP_MODE"), QStringLiteral("SAT"));
+        QCOMPARE(qso.value("SAT_NAME"), QStringLiteral("OSCAR-7"));
+        QCOMPARE(qso.value("SAT_MODE"), QStringLiteral("V/U"));
+        QCOMPARE(qso.value("MODE"), qEnvironmentVariable("DECOLOG_TEST_SATELLITE_MODE"));
+        decolog::core::LogDatabase imported;
+        QVERIFY(imported.open(":memory:"));
+        QCOMPARE(imported.importAdif(exported).inserted, 1);
+        const auto roundtrip = decolog::core::adif::parse(imported.exportAdif());
+        QCOMPARE(roundtrip.records.size(), 1);
+        QCOMPARE(roundtrip.records.first().value("FREQ_RX"), QStringLiteral("435.004184"));
+        QCOMPARE(roundtrip.records.first().value("SAT_NAME"), QStringLiteral("OSCAR-7"));
+        QCOMPARE(roundtrip.records.first().value("SAT_MODE"), QStringLiteral("V/U"));
+    }
+
     void manualSatelliteSplitPersistsBothFrequencies()
     {
         QTemporaryDir dir;

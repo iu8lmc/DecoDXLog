@@ -149,7 +149,8 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
         server.shutdown()
         print(f'PASS pass: {server.commands}')
 
-for fresh in (False, True):
+for fresh, save_mode in ((False, ''), (True, ''), (True, 'CW'), (True, 'FM')):
+    save = bool(save_mode)
     with tempfile.TemporaryDirectory(prefix='decolog-predict-draft-') as tmp:
         root = pathlib.Path(tmp)
         with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
@@ -162,7 +163,7 @@ for fresh in (False, True):
                        DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='2800')
             command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
                        '--db', str(root/'test.sqlite'), '--port', '0', '--show',
-                       f'predictdraft:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
+                       f'{"predictdraftfm" if save_mode == "FM" else "predictdraftsave" if save else "predictdraft"}:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
             result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
             output = result.stdout + result.stderr
             expected = ('PROBE predictDraft visible=true tx=145.998596 rx=435.004184 sat=OSCAR-7' if fresh
@@ -171,8 +172,22 @@ for fresh in (False, True):
                 raise SystemExit(f'FAIL draft fresh={fresh}: {output}; requests={server.commands}')
             if fresh and 'PROBE predictDraftPreserved=true notice=true' not in output:
                 raise SystemExit(f'FAIL draft overwrite: {output}')
+            if save and any(marker not in output for marker in ('PROBE predictDraftBeforeSave count=0', 'PROBE predictDraftInvalid kept=true', 'PROBE predictDraftSaved=true')):
+                raise SystemExit(f'FAIL explicit save: {output}')
             with sqlite3.connect(root/'test.sqlite') as db:
-                assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
+                rows = db.execute('SELECT call,freq,band,freq_rx,band_rx,prop_mode,sat_name,mode,sat_mode FROM qso WHERE deleted=0').fetchall()
+                if save:
+                    assert rows == [('K1AAA', 145.998596, '2m', 435.004184, '70cm', 'SAT', 'OSCAR-7', save_mode, 'V/U')], rows
+                else:
+                    assert not rows, rows
+            if save:
+                verify_env = env.copy()
+                verify_env.update(DECODXLOG_TEST_FIXTURE='1', DECOLOG_TEST_SATELLITE_DB=str(root/'test.sqlite'),
+                                  DECOLOG_TEST_SATELLITE_MODE=save_mode)
+                verify = subprocess.run([sys.argv[2], 'exportTrackerQsoFixture'], env=verify_env,
+                                        capture_output=True, text=True, timeout=15)
+                if verify.returncode:
+                    raise SystemExit(f'FAIL ADIF roundtrip {save_mode}: {verify.stdout} {verify.stderr}')
             if server.commands != ['GET_MODE', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']:
                 raise SystemExit(f'Unexpected draft commands: {server.commands}')
             server.shutdown()

@@ -183,6 +183,16 @@ DialogFrame {
         root.submit(false)
         console.warn("PROBE rigSplitSaved=" + !root.visible + " error=" + errorText.text)
     }
+    function probeTrackerDraftSave(mode) {
+        callField.text = ""
+        root.submit(false)
+        console.warn("PROBE predictDraftInvalid kept=" + (root.visible && errorText.text.length > 0))
+        callField.text = "K1AAA"
+        modeBox.currentIndex = modeBox.find(mode || "CW")
+        satModeField.text = "V/U"
+        root.submit(false)
+        console.warn("PROBE predictDraftSaved=" + !root.visible + " error=" + errorText.text)
+    }
 
     function submit(keep) {
         const error = decolog.logManualQso({

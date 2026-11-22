@@ -20,6 +20,8 @@ DialogFrame {
     property bool probingLive: false
     property bool probingPass: false
     property bool probingDraft: false
+    property bool probingDraftSave: false
+    property string probingDraftMode: "CW"
     property int probePassCount: 0
     property int probeLiveSuccesses: 0
     property bool listValid: false
@@ -68,8 +70,10 @@ DialogFrame {
         satelliteField.text = name
         firstPassButton.clicked()
     }
-    function probeDraft(host, port, name) {
+    function probeDraft(host, port, name, save, mode) {
         probingDraft = true
+        probingDraftSave = !!save
+        probingDraftMode = mode || "CW"
         hostField.text = host
         portField.text = String(port)
         satelliteField.text = name
@@ -205,6 +209,10 @@ DialogFrame {
                                  + " rx=" + satelliteQso.initialRxForProbe + " sat=" + satelliteQso.initialSatelliteForProbe)
                     prepareDraftButton.clicked()
                     console.warn("PROBE predictDraftPreserved=" + satelliteQso.visible + " notice=" + (correctionStatus.text.length > 0))
+                    if (root.probingDraftSave && satelliteQso.visible) {
+                        console.warn("PROBE predictDraftBeforeSave count=" + decolog.currentLogInfo().qsos)
+                        satelliteQso.probeTrackerDraftSave(root.probingDraftMode)
+                    }
                 } else console.warn("PROBE predictDraft failed=" + error)
                 root.probingDraft = false
             }
