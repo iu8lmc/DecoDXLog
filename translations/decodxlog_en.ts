@@ -14770,6 +14770,26 @@ Extra fields are preserved: %8</source>
         <source>Prepare QSO for %1</source>
         <translation>Prepare QSO for %1</translation>
     </message>
+    <message>
+        <source>Reported session QSO</source>
+        <translation>Reported session QSO</translation>
+    </message>
+    <message>
+        <source>Show history</source>
+        <translation>Show history</translation>
+    </message>
+    <message>
+        <source>Show reported QSO</source>
+        <translation>Show reported QSO</translation>
+    </message>
+    <message>
+        <source>Reported metadata may come from an imported log and does not prove local participation.</source>
+        <translation>Reported metadata may come from an imported log and does not prove local participation.</translation>
+    </message>
+    <message>
+        <source>Reported participant: %1</source>
+        <translation>Reported participant: %1</translation>
+    </message>
 </context>
 
 <context>

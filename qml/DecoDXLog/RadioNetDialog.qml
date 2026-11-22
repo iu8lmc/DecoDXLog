@@ -22,10 +22,26 @@ DialogFrame {
     property bool probeSaveQso: false
     property bool probeHistory: false
     property bool probeReminder: false
+    property bool probeQsoHistory: false
     property var historyAnchors: [0]
     property var historyRows: []
     property bool historyHasOlder: false
     property var historySessionId: 0
+    property bool showReportedQsos: false
+    property var qsoAnchors: [0]
+    property var qsoRows: []
+    property bool qsoHasOlder: false
+    property var qsoSessionId: 0
+    function refreshReportedQsos() {
+        const id = root.current.id || 0
+        if (id !== root.qsoSessionId) {
+            root.qsoSessionId = id
+            root.qsoAnchors = [0]
+        }
+        const rows = root.net.reportedQsoPage(root.qsoAnchors[root.qsoAnchors.length - 1])
+        root.qsoHasOlder = rows.length > 200
+        root.qsoRows = rows.slice(0, 200)
+    }
     function refreshHistory() {
         const id = root.current.id || 0
         if (id !== root.historySessionId) {
@@ -46,7 +62,7 @@ DialogFrame {
         root.historyAnchors = root.historyAnchors.slice(0, -1)
         root.refreshHistory()
     }
-    onOpened: refreshHistory()
+    onOpened: { refreshHistory(); refreshReportedQsos() }
     Timer {
         interval: 250
         repeat: true
@@ -71,10 +87,14 @@ DialogFrame {
     }
     Connections {
         target: root.net
-        function onChanged() { root.refreshHistory() }
+        function onChanged() { root.refreshHistory(); root.refreshReportedQsos() }
         function onExportFinished(success, message) {
             exportMessage.text = success ? qsTr("Session exported.") : qsTr("Export failed: %1").arg(message)
         }
+    }
+    Connections {
+        target: decolog
+        function onLogChanged() { if (root.visible) root.refreshReportedQsos() }
     }
     function historyText(row) {
         switch (row.event) {
@@ -99,11 +119,12 @@ DialogFrame {
         }
     }
     // Exercised only by the explicitly requested isolated --show probe.
-    function probe(seed, openQso, saveQso, history, reminder) {
+    function probe(seed, openQso, saveQso, history, reminder, qsoHistory) {
         root.probeOpenQso = openQso
         root.probeSaveQso = saveQso
         root.probeHistory = history
         root.probeReminder = reminder
+        root.probeQsoHistory = qsoHistory
         if (seed) {
             sessionTitle.text = "Test net"
             startButton.clicked()
@@ -134,6 +155,14 @@ DialogFrame {
                 newerButton.clicked()
                 console.warn("PROBE historyReturn count=" + root.historyRows.length + " newer=" + newerButton.enabled)
             }
+            if (root.probeQsoHistory) {
+                showQsoButton.clicked()
+                console.warn("PROBE qsoHistoryFirst count=" + root.qsoRows.length + " older=" + olderButton.enabled)
+                olderButton.clicked()
+                console.warn("PROBE qsoHistoryOlder count=" + root.qsoRows.length + " newer=" + newerButton.enabled + " older=" + olderButton.enabled)
+                newerButton.clicked()
+                console.warn("PROBE qsoHistoryReturn count=" + root.qsoRows.length + " newer=" + newerButton.enabled)
+            }
             if (root.probeReminder) {
                 reminderSeconds.text = "1"
                 setReminderButton.clicked()
@@ -151,6 +180,7 @@ DialogFrame {
                     participantQso.probeRadioNetSave()
                     row.openQso()
                     participantQso.probeRadioNetRepeat()
+                    console.warn("PROBE radioNetReported count=" + root.qsoRows.length)
                     row.openQso()
                     root.net.closeSession()
                     participantQso.probeRadioNetClosed()
@@ -296,20 +326,30 @@ DialogFrame {
         }
         RowLayout {
             Layout.fillWidth: true
-            Text { text: qsTr("Session history"); color: Theme.secondaryColor; font.bold: true; Layout.fillWidth: true }
-            GlassButton { id: newerButton; text: qsTr("Newer"); enabled: root.historyAnchors.length > 1; onClicked: root.newerHistory() }
-            GlassButton { id: olderButton; text: qsTr("Older"); enabled: root.historyHasOlder; onClicked: root.olderHistory() }
+            Text { text: root.showReportedQsos ? qsTr("Reported session QSO") : qsTr("Session history"); color: Theme.secondaryColor; font.bold: true; Layout.fillWidth: true }
+            GlassButton { id: showQsoButton; text: root.showReportedQsos ? qsTr("Show history") : qsTr("Show reported QSO"); onClicked: root.showReportedQsos = !root.showReportedQsos }
+            GlassButton { id: newerButton; text: qsTr("Newer"); enabled: root.showReportedQsos ? root.qsoAnchors.length > 1 : root.historyAnchors.length > 1; onClicked: { if (root.showReportedQsos) { root.qsoAnchors = root.qsoAnchors.slice(0, -1); root.refreshReportedQsos() } else root.newerHistory() } }
+            GlassButton { id: olderButton; text: qsTr("Older"); enabled: root.showReportedQsos ? root.qsoHasOlder : root.historyHasOlder; onClicked: { if (root.showReportedQsos) { root.qsoAnchors = root.qsoAnchors.concat([root.qsoRows[root.qsoRows.length - 1].id]); root.refreshReportedQsos() } else root.olderHistory() } }
+        }
+        Text {
+            Layout.fillWidth: true
+            visible: root.showReportedQsos
+            text: qsTr("Reported metadata may come from an imported log and does not prove local participation.")
+            color: Theme.textSecondary
+            wrapMode: Text.Wrap
         }
         ListView {
             Layout.fillWidth: true
             Layout.preferredHeight: 110
             clip: true
-            model: root.historyRows
+            model: root.showReportedQsos ? root.qsoRows : root.historyRows
             ScrollBar.vertical: ScrollBar { }
             delegate: Text {
                 required property var modelData
                 width: ListView.view.width
-                text: String(modelData.at) + " · " + (modelData.call || "—") + " · " + root.historyText(modelData)
+                text: root.showReportedQsos
+                      ? String(modelData.at) + " · " + (modelData.call || "—") + " · " + (modelData.band || "—") + " · " + (modelData.mode || "—") + " · " + (modelData.source || "—") + " · " + qsTr("Reported participant: %1").arg(modelData.reportedCall || "—")
+                      : String(modelData.at) + " · " + (modelData.call || "—") + " · " + root.historyText(modelData)
                 color: Theme.textSecondary
                 elide: Text.ElideRight
             }

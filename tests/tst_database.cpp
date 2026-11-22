@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 17;
+constexpr int kSchemaVersion = 18;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -59,6 +59,34 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void radioNetIndexMigratesMalformedExtras()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("old.sqlite");
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            AdifRecord r{{"CALL", "K1AAA"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "120000"},
+                         {"BAND", "20m"}, {"MODE", "CW"}};
+            QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("DROP INDEX idx_qso_reported_radio_net"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=18"));
+            QVERIFY(q.exec("UPDATE qso SET adif_extra='malformed'"));
+        }
+        {
+            LogDatabase db;
+            QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
+            QCOMPARE(db.qsoCount(), 1);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("SELECT call,adif_extra FROM qso"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toString(), QString("K1AAA"));
+            QCOMPARE(q.value(1).toString(), QString("malformed"));
+        }
+    }
     void roverHistorySchemaDoesNotCreateQsos()
     {
         LogDatabase db;

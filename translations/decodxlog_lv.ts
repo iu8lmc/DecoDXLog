@@ -14843,6 +14843,26 @@ Papildu lauki tiek saglabāti: %8</translation>
         <source>Prepare QSO for %1</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Reported session QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Show reported QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reported metadata may come from an imported log and does not prove local participation.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reported participant: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 
 <context>

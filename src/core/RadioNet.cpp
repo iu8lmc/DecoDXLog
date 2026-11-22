@@ -196,6 +196,29 @@ QVariantList RadioNet::historyPage(qint64 beforeId) const
                            {QStringLiteral("call"), q.value(4)}};
     return out;
 }
+QVariantList RadioNet::reportedQsoPage(qint64 beforeId) const
+{
+    QVariantList out;
+    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+        return out;
+    QSqlQuery q(m_db->connection());
+    q.prepare(QStringLiteral("SELECT q.id,q.uuid,q.call,q.qso_datetime_on,q.band,q.mode,q.source,"
+                             "CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.APP_DECOLOG_RADIO_NET_CALL') END "
+                             "FROM qso q WHERE q.deleted=0 AND "
+                             "(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END) IS NOT NULL AND "
+                             "(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END)="
+                             "(SELECT uuid FROM radio_net_session WHERE id=?) AND q.id<? ORDER BY q.id DESC LIMIT 201"));
+    q.addBindValue(m_sessionId);
+    q.addBindValue(beforeId > 0 ? beforeId : std::numeric_limits<qint64>::max());
+    if (!q.exec())
+        return out;
+    while (q.next())
+        out << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("uuid"), q.value(1)},
+                           {QStringLiteral("call"), q.value(2)}, {QStringLiteral("at"), q.value(3)},
+                           {QStringLiteral("band"), q.value(4)}, {QStringLiteral("mode"), q.value(5)},
+                           {QStringLiteral("source"), q.value(6)}, {QStringLiteral("reportedCall"), q.value(7)}};
+    return out;
+}
 bool RadioNet::appendEvent(qint64 memberId, const QString &kind, const QString &detail)
 {
     QSqlQuery q(m_db->connection());
@@ -597,6 +620,14 @@ bool RadioNet::exportSession(const QUrl &file)
                                          QStringLiteral("SELECT e.id,e.member_id,e.event,e.recorded_at,e.detail,m.call "
                                                         "FROM radio_net_event e LEFT JOIN radio_net_member m ON "
                                                         "m.id=e.member_id WHERE e.session_id=? ORDER BY e.id"));
+                            if (ok)
+                                ok = rows(QByteArrayLiteral("reported_qsos"),
+                                          QStringLiteral("SELECT q.id,q.uuid,q.call,q.qso_datetime_on,q.band,q.mode,q.source,"
+                                                         "CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.APP_DECOLOG_RADIO_NET_CALL') END AS reported_member_call "
+                                                         "FROM qso q WHERE q.deleted=0 AND "
+                             "(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END) IS NOT NULL AND "
+                                                         "(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END)="
+                                                         "(SELECT uuid FROM radio_net_session WHERE id=?) ORDER BY q.id"));
                             if (ok && cancel->load()) {
                                 error = tr("Export cancelled");
                                 ok = false;

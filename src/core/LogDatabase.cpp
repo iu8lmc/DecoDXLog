@@ -430,6 +430,7 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_rover_one_active ON rover_session((1)) WHERE ended_at IS NULL"),
               QStringLiteral("CREATE TABLE IF NOT EXISTS rover_position (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES rover_session(id), gridsquare TEXT NOT NULL, effective_at TEXT NOT NULL, recorded_at TEXT NOT NULL)"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_rover_position_time ON rover_position(session_id,effective_at,id)")}, nullptr},
+        {18, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qso_reported_radio_net ON qso((CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END)) WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END) IS NOT NULL")}, "adif_extra"},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -519,6 +520,17 @@ bool LogDatabase::migrate()
             q.prepare(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('qso') WHERE name = ?"));
             q.addBindValue(QLatin1String(step.needsQsoColumn));
             if (!q.exec() || !q.next() || q.value(0).toInt() == 0)
+                statements.clear();
+        }
+        if (step.to == 18 && !statements.isEmpty()) {
+            QSqlQuery columnQuery(db);
+            if (!columnQuery.exec(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('qso') WHERE name='deleted'")) ||
+                !columnQuery.next()) {
+                db.rollback();
+                m_lastError = QStringLiteral("cannot inspect QSO columns during radio net index migration");
+                return false;
+            }
+            if (columnQuery.value(0).toInt() == 0)
                 statements.clear();
         }
         for (const QString& stmt : statements + QStringList{

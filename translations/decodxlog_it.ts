@@ -14813,6 +14813,26 @@ Campi extra conservati: %8</translation>
         <source>Prepare QSO for %1</source>
         <translation>Prepara QSO per %1</translation>
     </message>
+    <message>
+        <source>Reported session QSO</source>
+        <translation>QSO associati dichiarati</translation>
+    </message>
+    <message>
+        <source>Show history</source>
+        <translation>Mostra cronologia</translation>
+    </message>
+    <message>
+        <source>Show reported QSO</source>
+        <translation>Mostra QSO dichiarati</translation>
+    </message>
+    <message>
+        <source>Reported metadata may come from an imported log and does not prove local participation.</source>
+        <translation>I metadati dichiarati possono provenire da un log importato e non dimostrano una partecipazione locale.</translation>
+    </message>
+    <message>
+        <source>Reported participant: %1</source>
+        <translation>Partecipante dichiarato: %1</translation>
+    </message>
 </context>
 
 <context>

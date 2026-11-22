@@ -222,6 +222,7 @@ private slots:
         QVERIFY2(output.contains("PROBE radioNetMismatch kept=true"), output.constData());
         QVERIFY2(output.contains("PROBE radioNetSaved closed=true"), output.constData());
         QVERIFY2(output.contains("PROBE radioNetRepeat closed=true"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetReported count=2"), output.constData());
         QVERIFY2(output.contains("PROBE radioNetClosed kept=true"), output.constData());
         decolog::core::LogDatabase db;
         QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
@@ -261,6 +262,32 @@ private slots:
             QCOMPARE(record.value("APP_DECOLOG_RADIO_NET_SESSION"), sessionUuid);
             QCOMPARE(record.value("APP_DECOLOG_RADIO_NET_CALL"), QStringLiteral("K1AAA"));
         }
+    }
+
+    void radioNetNavigatesReportedQsoHistory()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        {
+            decolog::core::LogDatabase db;
+            QVERIFY(db.open(dir.filePath("test.sqlite")));
+            decolog::core::RadioNet net(&db);
+            QVERIFY(net.start("QSO history"));
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("SELECT uuid FROM radio_net_session"));
+            QVERIFY(q.next());
+            const QString uuid = q.value(0).toString();
+            for (int i = 0; i < 202; ++i) {
+                decolog::core::AdifRecord r{{"CALL", "K1AAA"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "120000"},
+                                             {"BAND", "20m"}, {"MODE", "CW"}, {"APP_DECOLOG_RADIO_NET_SESSION", uuid}};
+                QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, decolog::core::InsertResult::Status::Inserted);
+            }
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, "radionet:qsohistory", output), output.constData());
+        QVERIFY2(output.contains("PROBE qsoHistoryFirst count=200 older=true"), output.constData());
+        QVERIFY2(output.contains("PROBE qsoHistoryOlder count=2 newer=true older=false"), output.constData());
+        QVERIFY2(output.contains("PROBE qsoHistoryReturn count=200 newer=false"), output.constData());
     }
 
     void radioNetPreparesQsoWithoutSavingOrOverwritingDraft()

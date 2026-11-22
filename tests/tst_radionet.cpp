@@ -14,6 +14,53 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void reportedQsoHistoryIsPagedAndSessionScoped()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        RadioNet net(&db);
+        QVERIFY(net.metaObject()->indexOfMethod("reportedQsoPage(qlonglong)") >= 0);
+        QVERIFY(net.start("First"));
+        const qint64 first = net.session().value("id").toLongLong();
+        QSqlQuery session(db.connection());
+        QVERIFY(session.exec("SELECT uuid FROM radio_net_session WHERE id=" + QString::number(first)));
+        QVERIFY(session.next());
+        const QString uuid = session.value(0).toString();
+        QSqlQuery plan(db.connection());
+        QVERIFY(plan.exec("EXPLAIN QUERY PLAN SELECT id FROM qso WHERE deleted=0 AND "
+                          "(CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END) IS NOT NULL AND "
+                          "(CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END)='x' "
+                          "AND id<999 ORDER BY id DESC LIMIT 201"));
+        bool indexed = false;
+        while (plan.next()) indexed |= plan.value(3).toString().contains("idx_qso_reported_radio_net");
+        QVERIFY(indexed);
+        for (int i = 0; i < 205; ++i) {
+            AdifRecord r{{"CALL", "K1AAA"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "120000"},
+                         {"BAND", "20m"}, {"MODE", "CW"}, {"APP_DECOLOG_RADIO_NET_SESSION", uuid},
+                         {"APP_DECOLOG_RADIO_NET_CALL", "K1AAA"}};
+            QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
+        QVariantList firstPage;
+        QVERIFY(QMetaObject::invokeMethod(&net, "reportedQsoPage", Q_RETURN_ARG(QVariantList, firstPage), Q_ARG(qlonglong, 0)));
+        QCOMPARE(firstPage.size(), 201);
+        QVariantList older;
+        QVERIFY(QMetaObject::invokeMethod(&net, "reportedQsoPage", Q_RETURN_ARG(QVariantList, older),
+                                          Q_ARG(qlonglong, firstPage.at(199).toMap().value("id").toLongLong())));
+        QCOMPARE(older.size(), 5);
+        QCOMPARE(firstPage.first().toMap().value("reportedCall").toString(), QString("K1AAA"));
+        QSqlQuery corrupt(db.connection());
+        QVERIFY(corrupt.exec("UPDATE qso SET adif_extra='not json' WHERE id=1"));
+        QVERIFY(corrupt.exec("UPDATE qso SET deleted=1 WHERE id=2"));
+        QVariantList remaining;
+        QVERIFY(QMetaObject::invokeMethod(&net, "reportedQsoPage", Q_RETURN_ARG(QVariantList, remaining),
+                                          Q_ARG(qlonglong, firstPage.at(199).toMap().value("id").toLongLong())));
+        QCOMPARE(remaining.size(), 3);
+        QVERIFY(net.start("Second"));
+        QVariantList empty;
+        QVERIFY(QMetaObject::invokeMethod(&net, "reportedQsoPage", Q_RETURN_ARG(QVariantList, empty), Q_ARG(qlonglong, 0)));
+        QVERIFY(empty.isEmpty());
+        QCOMPARE(db.qsoCount(), 204);
+    }
     void reminderSurvivesRestartAndCanBeCleared()
     {
         QTemporaryDir dir;
@@ -174,6 +221,36 @@ class TestRadioNet : public QObject {
         QVERIFY(db.open(":memory:"));
         RadioNet net(&db);
         QVERIFY(net.metaObject()->indexOfMethod("exportSession(QUrl)") >= 0);
+    }
+
+    void exportIncludesReportedQsoProvenance()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        LogDatabase db;
+        QVERIFY(db.open(dir.filePath("log.sqlite")));
+        RadioNet net(&db);
+        QVERIFY(net.start("Test"));
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT uuid FROM radio_net_session"));
+        QVERIFY(q.next());
+        const QString uuid = q.value(0).toString();
+        AdifRecord record{{"CALL", "K1AAA"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "120000"},
+                          {"BAND", "20m"}, {"MODE", "CW"}, {"APP_DECOLOG_RADIO_NET_SESSION", uuid},
+                          {"APP_DECOLOG_RADIO_NET_CALL", "K1BBB"}};
+        QCOMPARE(db.insertQso(record, "import", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        const QString path = dir.filePath("net.json");
+        QSignalSpy finished(&net, &RadioNet::exportFinished);
+        QVERIFY(net.exportSession(QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 10000);
+        QVERIFY2(finished.first().at(0).toBool(), qPrintable(finished.first().at(1).toString()));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto array = QJsonDocument::fromJson(file.readAll()).object().value("reported_qsos").toArray();
+        QCOMPARE(array.size(), 1);
+        QCOMPARE(array.first().toObject().value("call").toString(), QString("K1AAA"));
+        QCOMPARE(array.first().toObject().value("reported_member_call").toString(), QString("K1BBB"));
+        QCOMPARE(array.first().toObject().value("source").toString(), QString("import"));
     }
 
     void exportsCompleteHistoryAndProtectsOpenLog()
