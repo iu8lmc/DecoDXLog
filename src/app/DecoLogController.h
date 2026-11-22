@@ -178,6 +178,7 @@ class DecoLogController : public QObject {
     // preferenze UI portabili e cambiano subito, senza riavviare.
     Q_PROPERTY(QStringList newQsoVisibleFields READ newQsoVisibleFields NOTIFY newQsoSettingsChanged)
     Q_PROPERTY(QVariantList newQsoCustomFields READ newQsoCustomFields NOTIFY newQsoSettingsChanged)
+    Q_PROPERTY(bool enterToLogQso READ enterToLogQso NOTIFY newQsoSettingsChanged)
 
     // ── Entita' DXCC (cty.csv di AD1C) ─────────────────────────────────────
     Q_PROPERTY(QString countriesVersion READ countriesVersion NOTIFY countriesChanged)
@@ -671,11 +672,14 @@ public:
     Q_INVOKABLE QString logManualQso(const QVariantMap& fields);
     QStringList newQsoVisibleFields() const;
     QVariantList newQsoCustomFields() const;
+    bool enterToLogQso() const;
     Q_INVOKABLE QVariantList newQsoFieldOptions() const;
     // Salva la configurazione dopo aver validato i nomi ADIF. Stringa vuota =
     // successo; in caso contrario la UI mostra il motivo e non cambia nulla.
     Q_INVOKABLE QString saveNewQsoPanelSettings(const QStringList& visibleFields,
                                                 const QVariantList& customFields);
+    Q_INVOKABLE QString saveNewQsoPanelSettings(const QStringList& visibleFields,
+                                                const QVariantList& customFields, bool enterToLog);
     Q_INVOKABLE void resetNewQsoPanelSettings();
     Q_INVOKABLE QVariantMap utcNow() const;
     // Le date davanti all'operatore, nella forma della sua lingua (in

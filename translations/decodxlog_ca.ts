@@ -1820,8 +1820,12 @@ L&apos;indicatiu que Decodium treballa hi surt tot sol.</translation>
         <translation>Regla nova</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>Un spot que compleix una regla s&apos;escriu al registre d&apos;activitat i es ressalta; si la regla ho diu s&apos;envia a Decodium, s&apos;anuncia per veu, surt en una finestra (un clic sintonitza la ràdio) i sona. El mateix DX a la mateixa banda i mode avisa com a molt un cop cada %1 minuts.</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>Registra els avisos dels spots filtrats al registre d'activitat</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>Les regles poden enviar avisos a Decodium, anunciar-los per veu, obrir una finestra emergent o fer sonar un avís. El registre d'activitat només desa un avís si l'spot també compleix els filtres actuals. Per al mateix DX a la mateixa banda i en el mateix mode, s'emet com a màxim un avís cada %1 minuts.</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3640,8 +3644,8 @@ A Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, i &quot;Ac
         <translation>3  Primer QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>Obre Nou QSO, escriu un indicatiu i els camps necessaris i prem Ctrl+Retorn o Registra. El registre local continua sent utilitzable encara que el CAT o un servei en línia no estigui disponible.</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>Obre Nou QSO, escriu un indicatiu i els camps necessaris i fes clic a «Registra el QSO». El registre local continua sent utilitzable encara que el CAT o un servei en línia no estigui disponible.</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5113,6 +5117,10 @@ Camps extra conservats: %8</translation>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>La tecla Retorn registra el QSO als camps d’entrada manual</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>Camps de QSO nou</translation>

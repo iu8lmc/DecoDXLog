@@ -145,7 +145,7 @@ private slots:
         QCOMPARE(spot->value("call").toString(), QString("3Y0J"));
         QVERIFY(spot->value("alert").toBool());
         QVERIFY(spot->value("statusBits").toInt() & StatusNewDxcc);
-        QVERIFY(activity.last().startsWith("CLUSTER:"));
+        QVERIFY(activity.filter(QStringLiteral("CLUSTER:")).isEmpty());
 
         const QVariantList recommendations = cluster.assistantRecommendations();
         QCOMPARE(recommendations.size(), 1);
@@ -402,6 +402,62 @@ private slots:
         cluster.removeSource(talking);
         QTest::qWait(300);
         QVERIFY(sourceOf(talking).isEmpty());
+    }
+
+    void spotActivityFollowsPreferenceAndVisibleFilter()
+    {
+        QSettings().clear();
+        QStringList activity;
+        QString radioBand = QStringLiteral("40m");
+        ClusterController::Context ctx;
+        ctx.decodiumBand = [&] { return radioBand; };
+        ctx.activity = [&](const QString& category, const QString& message, const QString& level) {
+            if (category == "CLUSTER" && level == "highlight")
+                activity << message;
+        };
+        ClusterController cluster(ctx);
+        cluster.saveAlertRule({{"name", "CW rule"}, {"voice", false}, {"popup", true},
+                               {"filter", QVariantMap{{"modes", QStringList{"CW"}}}}});
+        cluster.setFilter({{"bands", QStringList{"20m"}}});
+        QSignalSpy notifications(&cluster, &ClusterController::alertNotify);
+        const auto inject = [&](const QString& khz, const QString& call, const QString& mode = "CW") {
+            cluster.injectLine(QStringLiteral("DX de IK1AAA:  %1  %2  %3  1200Z").arg(khz, call, mode));
+        };
+
+        QVERIFY(!cluster.logSpotAlerts());
+        inject("14025", "DL1AAA");
+        QCOMPARE(notifications.size(), 1);
+        QVERIFY(activity.isEmpty());
+
+        cluster.setLogSpotAlerts(true);
+        ClusterController restored(ctx);
+        QVERIFY(restored.logSpotAlerts());
+        inject("7025", "DL2AAA");   // Rule matches outside the displayed band.
+        QCOMPARE(notifications.size(), 2);
+        QVERIFY(activity.isEmpty());
+        inject("14074", "DL3AAA", "FT8");   // In the displayed band, outside the rule.
+        QVERIFY(activity.isEmpty());
+        inject("14025", "DL4AAA");
+        QCOMPARE(activity.size(), 1);
+        QVERIFY(activity.last().contains("DL4AAA"));
+        inject("14025", "DL4AAA");   // A repeated spot is still on cooldown.
+        QCOMPARE(activity.size(), 1);
+
+        cluster.setFollowDecodiumBand(true);
+        inject("14025", "DL5AAA");   // Explicit filter says 20m; the displayed band is 40m.
+        QCOMPARE(activity.size(), 1);
+        inject("7025", "DL6AAA");
+        QCOMPARE(activity.size(), 2);
+        QVERIFY(activity.last().contains("DL6AAA"));
+        radioBand = QStringLiteral("17m");
+        cluster.decodiumBandChanged();
+        inject("18075", "DL7AAA");
+        QCOMPARE(activity.size(), 3);
+
+        cluster.setLogSpotAlerts(false);
+        inject("18075", "DL8AAA");
+        QCOMPARE(activity.size(), 3);
+        QCOMPARE(notifications.size(), 7);
     }
 };
 

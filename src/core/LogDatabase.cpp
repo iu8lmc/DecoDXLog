@@ -839,7 +839,12 @@ bool LogDatabase::writeQsl(qint64 qsoId, const QList<QslState>& states, bool kee
         ins.addBindValue(st.rcvd);
         ins.addBindValue(nullable(st.rcvdDate));
         ins.addBindValue(nullable(st.remoteId.isEmpty() ? kept.remoteId : st.remoteId));
-        ins.addBindValue(nullable(st.lastError.isEmpty() ? kept.lastError : st.lastError));
+        // An operator marking an upload as sent has resolved the previous
+        // upload failure. Editing unrelated fields or received status must not
+        // silently clear the diagnostic from an unsuccessful upload.
+        const bool manuallyMarkedSent = st.sent == QLatin1String("Y") && kept.sent != QLatin1String("Y");
+        ins.addBindValue(nullable(manuallyMarkedSent ? st.lastError
+                                                   : (st.lastError.isEmpty() ? kept.lastError : st.lastError)));
         ins.addBindValue(nullable(st.via));
         if (!ins.exec())
             return false;

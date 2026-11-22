@@ -1820,8 +1820,12 @@ Det kaldesignal, Decodium kører, dukker op her af sig selv.</translation>
         <translation>Ny regel</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>Et spot der matcher en regel skrives i aktivitetsloggen og fremhæves; hvis reglen siger det, sendes det til Decodium, annonceres med stemme, vises i en popup (klik for at indstille radioen) og afspilles som lyd. Samme DX på samme bånd og mode advarer højst én gang hver %1 minutter.</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>Skriv alarmer for filtrerede spots i aktivitetsloggen</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>Regler kan sende alarmer til Decodium, læse dem op, vise en pop op-meddelelse eller afspille en lyd. En alarm skrives kun i aktivitetsloggen, hvis spottet også passer til de aktuelle spotfiltre. For samme DX på samme bånd og i samme driftsart gives der højst én alarm hvert %1. minut.</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3640,8 +3644,8 @@ I Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, og &quot;A
         <translation>3  Første QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>Åbn Nyt QSO, skriv et kaldesignal og de nødvendige felter, og tryk på Ctrl+Enter eller Registrér. Den lokale log kan bruges, selv om CAT eller en onlinetjeneste ikke er tilgængelig.</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>Åbn Nyt QSO, skriv et kaldesignal og de nødvendige felter, og klik på «Log QSO». Den lokale log kan bruges, selv om CAT eller en onlinetjeneste ikke er tilgængelig.</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5113,6 +5117,10 @@ Ekstra felter bevares: %8</translation>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>Registrer QSO’en med Enter i felterne til manuel indtastning</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>Felter i Ny QSO</translation>

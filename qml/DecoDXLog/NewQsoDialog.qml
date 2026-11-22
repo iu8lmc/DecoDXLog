@@ -118,6 +118,11 @@ DialogFrame {
         callField.forceActiveFocus()
     }
 
+    function submitOnEnter(event) {
+        if (decolog.enterToLogQso && !event.isAutoRepeat && (event.modifiers & ~Qt.KeypadModifier) === 0)
+            root.submit(false)
+    }
+
     // `keep`: resta aperta con banda, modo, potenza e referenze, per il QSO dopo.
     // Per le prove: apre la tendina delle bande.
     function showBandCombo() { bandBox.popup.open() }
@@ -186,7 +191,8 @@ DialogFrame {
 
     Shortcut {
         sequences: ["Ctrl+Return", "Ctrl+Enter"]
-        enabled: root.visible
+        enabled: root.visible && decolog.enterToLogQso
+        autoRepeat: false
         onActivated: root.submit(false)
     }
     Shortcut {
@@ -210,6 +216,7 @@ DialogFrame {
                 label: qsTr("Callsign")
                 StyledTextField {
                     id: callField
+                    objectName: "manualCallsignField"
                     Layout.fillWidth: true
                     fieldHeight: 44
                     uppercase: true
@@ -217,8 +224,8 @@ DialogFrame {
                     font.bold: true
                     font.letterSpacing: 2
                     onTextChanged: decolog.lookupCall = text
-                    Keys.onReturnPressed: root.submit(false)
-                    Keys.onEnterPressed: root.submit(false)
+                    Keys.onReturnPressed: (event) => root.submitOnEnter(event)
+                    Keys.onEnterPressed: (event) => root.submitOnEnter(event)
                 }
             }
             LabeledField {
@@ -606,8 +613,9 @@ DialogFrame {
                 onClicked: root.submit(true)
             }
             GlassButton {
+                objectName: "manualLogButton"
                 text: "✎ " + qsTr("LOG QSO")
-                hint: "Ctrl+Enter"
+                hint: decolog.enterToLogQso ? "Ctrl+Enter" : ""
                 tone: Theme.accentColor
                 filled: true
                 buttonHeight: 34

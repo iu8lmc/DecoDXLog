@@ -1815,8 +1815,12 @@ Az a hívójel, amivel a Decodium dolgozik, magától megjelenik itt.</translati
         <translation>Új szabály</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>A szabálynak megfelelő spot bekerül a tevékenységnaplóba és kiemelve jelenik meg; ha a szabály kéri, megy a Decodiumnak, hangosan bemondja, felugró ablakban mutatja (kattintásra hangol a rádió) és hangot ad. Ugyanaz a DX ugyanazon a sávon és módban legfeljebb %1 percenként jelez.</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>A szűrt spotok riasztásainak rögzítése a tevékenységnaplóban</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>A szabályok riasztást küldhetnek a Decodiumnak, felolvashatják azt, felugró ablakot jeleníthetnek meg vagy hangjelzést adhatnak. A riasztás csak akkor kerül a tevékenységnaplóba, ha a spot az aktuális spotszűrőknek is megfelel. Ugyanarról a DX-állomásról ugyanazon a sávon és ugyanabban az üzemmódban %1 percenként legfeljebb egy riasztás érkezik.</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3630,8 +3634,8 @@ A Decodiumban: Settings → Reporting → UDP Server 127.0.0.1, port: %1, és &q
         <translation>3  Első QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>Nyissa meg az Új QSO-t, adjon meg egy hívójelet és a kötelező mezőket, majd nyomja meg a Ctrl+Entert vagy a Rögzítés gombot. A helyi napló akkor is használható, ha a CAT vagy egy online szolgáltatás nem érhető el.</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>Nyissa meg az Új QSO-t, adjon meg egy hívójelet és a kötelező mezőket, majd kattintson a „QSO naplózása” gombra. A helyi napló akkor is használható, ha a CAT vagy egy online szolgáltatás nem érhető el.</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5101,6 +5105,10 @@ A további mezők megmaradnak: %8</translation>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>QSO naplózása az Enter billentyűvel a kézi adatbeviteli mezőkben</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>Új QSO mezői</translation>

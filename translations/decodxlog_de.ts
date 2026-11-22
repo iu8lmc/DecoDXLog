@@ -1820,8 +1820,12 @@ Das Rufzeichen, an dem Decodium arbeitet, erscheint hier von selbst.</translatio
         <translation>Neue Regel</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>Ein Spot, der zu einer Regel passt, kommt ins Aktivitätsprotokoll und wird hervorgehoben; wenn die Regel es will, geht er an Decodium, wird angesagt, als Popup gezeigt (Klick stimmt das Funkgerät ab) und mit Ton gemeldet. Derselbe DX auf demselben Band und in derselben Betriebsart meldet sich höchstens alle %1 Minuten.</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>Meldungen zu gefilterten Spots ins Aktivitätsprotokoll schreiben</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>Regeln können Meldungen an Decodium senden, sie vorlesen, ein Popup anzeigen oder einen Ton abspielen. Eine Meldung erscheint nur dann im Aktivitätsprotokoll, wenn der Spot auch den aktuellen Spot-Filtern entspricht. Für denselben DX auf demselben Band und in derselben Betriebsart erfolgt höchstens eine Meldung alle %1 Minuten.</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3640,8 +3644,8 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, Port %1, und &quot
         <translation>3  Erstes QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>Öffnen Sie Neues QSO, geben Sie ein Rufzeichen und die nötigen Felder ein und drücken Sie Strg+Eingabe oder Eintragen. Das lokale Log bleibt nutzbar, auch wenn CAT oder ein Onlinedienst nicht verfügbar ist.</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>Öffnen Sie Neues QSO, geben Sie ein Rufzeichen und die nötigen Felder ein und klicken Sie auf „QSO eintragen“. Das lokale Log bleibt nutzbar, auch wenn CAT oder ein Onlinedienst nicht verfügbar ist.</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5113,6 +5117,10 @@ Zusatzfelder bleiben erhalten: %8</translation>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>QSO bei manueller Eingabe mit der Eingabetaste loggen</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>Felder für Neues QSO</translation>

@@ -3570,9 +3570,13 @@ QStringList DecoLogController::newQsoVisibleFields() const
 {
     QSettings settings;
     const QString key = QStringLiteral("ui/newQso/visibleFields");
-    if (!settings.contains(key))
-        return newqso::defaultVisibleFields();
-    return newqso::normalizeVisibleFields(settings.value(key).toStringList());
+    QStringList fields = settings.contains(key) ? settings.value(key).toStringList()
+                                                : newqso::defaultVisibleFields();
+    bool legacyIota = false;
+    newqso::decodeCustomFields(settings.value(QStringLiteral("ui/newQso/customFields")).toString(), &legacyIota);
+    if (legacyIota)
+        fields.append(QStringLiteral("IOTA"));
+    return newqso::normalizeVisibleFields(fields);
 }
 
 QVariantList DecoLogController::newQsoCustomFields() const
@@ -3581,16 +3585,24 @@ QVariantList DecoLogController::newQsoCustomFields() const
         QSettings().value(QStringLiteral("ui/newQso/customFields")).toString());
 }
 
+bool DecoLogController::enterToLogQso() const
+{
+    return QSettings().value(QStringLiteral("ui/newQso/enterToLogQso"), false).toBool();
+}
+
 QVariantList DecoLogController::newQsoFieldOptions() const
 {
-    auto option = [](const QString& key, const QString& label) {
-        return QVariantMap{{QStringLiteral("key"), key}, {QStringLiteral("label"), label}};
+    const QStringList defaults = newqso::defaultVisibleFields();
+    auto option = [&defaults](const QString& key, const QString& label) {
+        return QVariantMap{{QStringLiteral("key"), key}, {QStringLiteral("label"), label},
+                           {QStringLiteral("defaultVisible"), defaults.contains(key)}};
     };
     return {
         option(QStringLiteral("GRIDSQUARE"), tr("Grid locator")),
         option(QStringLiteral("NAME"), tr("Operator name")),
         option(QStringLiteral("QTH"), tr("QTH")),
         option(QStringLiteral("STATE"), tr("State / province")),
+        option(QStringLiteral("IOTA"), QStringLiteral("Islands on the Air")),
         option(QStringLiteral("TX_PWR"), tr("TX power")),
         option(QStringLiteral("PROP_MODE"), tr("Propagation mode")),
         option(QStringLiteral("SAT_NAME"), tr("Satellite")),
@@ -3601,6 +3613,12 @@ QVariantList DecoLogController::newQsoFieldOptions() const
 
 QString DecoLogController::saveNewQsoPanelSettings(const QStringList& visibleFields,
                                                    const QVariantList& customFields)
+{
+    return saveNewQsoPanelSettings(visibleFields, customFields, enterToLogQso());
+}
+
+QString DecoLogController::saveNewQsoPanelSettings(const QStringList& visibleFields,
+                                                   const QVariantList& customFields, bool enterToLog)
 {
     const newqso::CustomFieldsResult checked = newqso::validateCustomFields(customFields);
     if (!checked.ok()) {
@@ -3626,6 +3644,7 @@ QString DecoLogController::saveNewQsoPanelSettings(const QStringList& visibleFie
                       newqso::normalizeVisibleFields(visibleFields));
     settings.setValue(QStringLiteral("ui/newQso/customFields"),
                       newqso::encodeCustomFields(checked.fields));
+    settings.setValue(QStringLiteral("ui/newQso/enterToLogQso"), enterToLog);
     settings.sync();
     if (settings.status() != QSettings::NoError)
         return tr("The New QSO field settings could not be saved.");
@@ -3638,6 +3657,7 @@ void DecoLogController::resetNewQsoPanelSettings()
     QSettings settings;
     settings.remove(QStringLiteral("ui/newQso/visibleFields"));
     settings.remove(QStringLiteral("ui/newQso/customFields"));
+    settings.remove(QStringLiteral("ui/newQso/enterToLogQso"));
     settings.sync();
     emit newQsoSettingsChanged();
 }

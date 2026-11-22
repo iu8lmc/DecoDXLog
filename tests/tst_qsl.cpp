@@ -528,6 +528,52 @@ private slots:
         QVERIFY(r.message.contains("library error"));
     }
 
+    void qrzInsertPreservesFormValues()
+    {
+        FakeCrx server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answer = "RESULT=OK&LOGID=123";
+        WebQslUploader web;
+        web.setEndpoints(server.url(), {});
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        const QString record = adif::writeRecord({
+            {"CALL", "UN0GY"}, {"QSL_VIA", "QSL manager: M0OXO; LoTW, QRZ.com"},
+            {"COMMENT", QStringLiteral("Caffè + portable & literal %20")}
+        });
+        web.uploadQrz("test-key", record);
+        QVERIFY(done.wait(5000));
+        QVERIFY(done.first().first().value<QslUploadResult>().ok);
+        QVERIFY(server.request.toLower().contains("content-type: application/x-www-form-urlencoded"));
+        // Servers that accept ';' as a form separator must still see one complete ADIF value.
+        QMap<QByteArray, QByteArray> fields;
+        for (const auto& part : QByteArray(server.body).replace(';', '&').split('&')) {
+            const auto pos = part.indexOf('=');
+            QVERIFY(pos >= 0);
+            fields.insert(part.left(pos), QByteArray::fromPercentEncoding(part.mid(pos + 1).replace('+', ' ')));
+        }
+        QCOMPARE(fields.size(), 3);
+        QCOMPARE(fields.value("KEY"), QByteArray("test-key"));
+        QCOMPARE(fields.value("ACTION"), QByteArray("INSERT"));
+        QCOMPARE(fields.value("ADIF"), record.toUtf8());
+    }
+
+    void qrzRejectedAdifMarker_data()
+    {
+        QTest::addColumn<QByteArray>("reason");
+        QTest::newRow("literal HTML entities from QRZ") << QByteArray("missing &lt;eor&gt; in record");
+        QTest::newRow("percent-encoded ADIF tag") << QByteArray("missing%20%3Ceor%3E%20in%20record");
+        QTest::newRow("form-encoded HTML entities") << QByteArray("missing+%26lt%3Beor%26gt%3B+in+record");
+    }
+
+    void qrzRejectedAdifMarker()
+    {
+        QFETCH(QByteArray, reason);
+        const auto result = qsl::parseQrzResponse("STATUS=FAIL&RESULT=FAIL&REASON=" + reason + "&EXTENDED=");
+        QVERIFY(!result.ok);
+        QCOMPARE(result.rejected, 1);
+        QCOMPARE(result.message, QStringLiteral("QRZ Logbook: missing <eor> in record"));
+    }
+
     void qrzAnswers()
     {
         auto r = qsl::parseQrzResponse("RESULT=OK&LOGID=123456&COUNT=1");

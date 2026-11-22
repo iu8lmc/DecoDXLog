@@ -109,6 +109,7 @@ ClusterController::ClusterController(Context context, QObject* parent)
     m_savedFilters = QJsonDocument::fromJson(s.value(QStringLiteral("cluster/savedFilters")).toString().toUtf8())
                          .object().toVariantMap();
     m_sendToDecodium = s.value(QStringLiteral("cluster/sendToDecodium"), true).toBool();
+    m_logSpotAlerts = s.value(QStringLiteral("cluster/logSpotAlerts"), false).toBool();
     const QVariantMap assistant = QJsonDocument::fromJson(
         s.value(QStringLiteral("cluster/assistantPreferences")).toString().toUtf8())
                                       .object().toVariantMap();
@@ -749,7 +750,7 @@ void ClusterController::checkRules(const EnrichedSpot& e, bool isNew)
     static const bool trace = qEnvironmentVariableIntValue("DECODXLOG_TRACE_SPOTS") != 0;
     QElapsedTimer clock;
     clock.start();
-    if (m_ctx.activity)
+    if (m_logSpotAlerts && m_ctx.activity && m_model.filter().matches(e, now))
         m_ctx.activity(QStringLiteral("CLUSTER"), QStringLiteral("%1: %2").arg(title, text), QStringLiteral("highlight"));
     const qint64 tActivity = clock.nsecsElapsed();
     emit alertRaised(title, text);
@@ -1223,6 +1224,14 @@ void ClusterController::setSendToDecodium(bool on)
     if (on == m_sendToDecodium) return;
     m_sendToDecodium = on;
     QSettings().setValue(QStringLiteral("cluster/sendToDecodium"), on);
+    emit settingsChanged();
+}
+
+void ClusterController::setLogSpotAlerts(bool on)
+{
+    if (on == m_logSpotAlerts) return;
+    m_logSpotAlerts = on;
+    QSettings().setValue(QStringLiteral("cluster/logSpotAlerts"), on);
     emit settingsChanged();
 }
 

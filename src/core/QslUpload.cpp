@@ -228,9 +228,19 @@ QslUploadResult resultFromTqslExit(int exitCode, const QString& output, int qsoC
 QslUploadResult parseQrzResponse(const QByteArray& body)
 {
     QslUploadResult r;
-    const QUrlQuery q(QString::fromUtf8(body).trimmed());
+    // QRZ sometimes sends literal HTML entities inside REASON. Preserve their
+    // ampersands as data before QUrlQuery splits the response into fields.
+    static const QRegularExpression entityStart(QStringLiteral("&(?=(?:lt|gt|amp|quot|apos);)"));
+    QString form = QString::fromUtf8(body).trimmed();
+    form.replace(QLatin1Char('+'), QStringLiteral("%20")).replace(entityStart, QStringLiteral("%26"));
+    const QUrlQuery q(form);
     const QString result = q.queryItemValue(QStringLiteral("RESULT"));
-    const QString reason = q.queryItemValue(QStringLiteral("REASON"), QUrl::FullyDecoded);
+    QString reason = q.queryItemValue(QStringLiteral("REASON"), QUrl::FullyDecoded);
+    reason.replace(QLatin1String("&lt;"), QLatin1String("<"))
+          .replace(QLatin1String("&gt;"), QLatin1String(">"))
+          .replace(QLatin1String("&quot;"), QLatin1String("\""))
+          .replace(QLatin1String("&apos;"), QLatin1String("'"))
+          .replace(QLatin1String("&amp;"), QLatin1String("&"));
     if (result == QLatin1String("OK")) {
         r.ok = true;
         r.accepted = 1;
@@ -697,11 +707,10 @@ void WebQslUploader::uploadQrz(const QString& apiKey, const QString& adifRecord)
 {
     if (m_busy) return;
     if (apiKey.trimmed().isEmpty()) { QslUploadResult result; result.message = tr("QRZ: API key is required"); emit finished(result); return; }
-    QUrlQuery form;
-    form.addQueryItem(QStringLiteral("KEY"), apiKey);
-    form.addQueryItem(QStringLiteral("ACTION"), QStringLiteral("INSERT"));
-    form.addQueryItem(QStringLiteral("ADIF"), adifRecord);
-    send(Service::QrzLogbook, m_qrzUrl, form.toString(QUrl::FullyEncoded).toUtf8());
+    // Form values may contain literal '+', ';' and percent escapes in free-text ADIF fields.
+    const QByteArray body = "KEY=" + QUrl::toPercentEncoding(apiKey)
+                          + "&ACTION=INSERT&ADIF=" + QUrl::toPercentEncoding(adifRecord);
+    send(Service::QrzLogbook, m_qrzUrl, body);
 }
 
 void WebQslUploader::uploadEqsl(const QString& user, const QString& password, const QString& adifRecord)

@@ -346,7 +346,7 @@ private slots:
         QVERIFY(text.contains(QStringLiteral("Station profile")));
         QVERIFY(text.contains(QStringLiteral("Radio (CAT)")));
         QVERIFY(text.contains(QStringLiteral("First QSO")));
-        QVERIFY(text.contains(QStringLiteral("Ctrl+Enter")));
+        QVERIFY(text.contains(QStringLiteral("click Log QSO")));
         QVERIFY(text.contains(QStringLiteral("signal setupRequested")));
         QVERIFY(text.contains(QStringLiteral("signal newQsoRequested")));
         QVERIFY(text.contains(QStringLiteral("activeFocusOnTab: true")));
@@ -449,7 +449,7 @@ private slots:
         QVERIFY(panel.contains(QStringLiteral("root.fieldVisible(\"STATE\")")));
         QVERIFY(panel.contains(QStringLiteral("root.fieldVisible(\"TX_PWR\")")));
         QVERIFY(settings.contains(QStringLiteral("saveNewQsoPanelSettings")));
-        QVERIFY(settings.contains(QStringLiteral("resetNewQsoPanelSettings")));
+        QVERIFY(settings.contains(QStringLiteral("onClicked: root.reload(true)")));
         QVERIFY(settings.contains(QStringLiteral("CUSTOM ADIF FIELDS")));
         QVERIFY(settings.contains(QStringLiteral("STATE and TX_PWR")));
     }

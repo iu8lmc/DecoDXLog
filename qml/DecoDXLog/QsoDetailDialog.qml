@@ -794,6 +794,7 @@ DialogFrame {
                             anchors.margins: 8
                             wrapMode: Text.Wrap
                             text: modelData.label + " last_error: " + modelData.lastError
+                            textFormat: Text.PlainText
                             color: Theme.errorColor
                             font.family: Theme.monoFamily
                             font.pixelSize: 11

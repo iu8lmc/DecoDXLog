@@ -1815,8 +1815,12 @@ Decodium が交信しているコールサインは、ここにひとりでに�
         <translation>新しい決まり</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>ルールに合ったスポットはアクティビティログに書かれ強調されます。ルールの指定により Decodium に送り、音声で読み上げ、ポップアップ表示（クリックで無線機を同調）し、サウンドを鳴らします。同じ DX・同じバンドとモードの通知は最大 %1 分に1回です。</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>スポットのフィルターに一致する通知をアクティビティ ログに記録する</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>ルールに応じて、Decodium への通知の送信、音声での読み上げ、ポップアップの表示、通知音の再生ができます。スポットが現在のフィルターにも一致した場合にのみ、通知がアクティビティ ログに記録されます。同じ DX 局の同じバンド・モードでの通知は %1 分につき 1 回までです。</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3630,8 +3634,8 @@ Decodium で: Settings → Reporting → UDP Server 127.0.0.1、ポート %1、�
         <translation>3  最初の QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>「新規 QSO」を開き、コールサインと必須項目を入力して、Ctrl+Enter か「登録」を押します。CAT やオンラインサービスが使えなくても、ローカルのログは使えます。</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>「新規 QSO」を開き、コールサインと必須項目を入力して、「QSO を記録」をクリックします。CAT やオンラインサービスが使えなくても、ローカルのログは使えます。</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5101,6 +5105,10 @@ QSL の状態: %6 · UTC が不完全: %7。
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>手動入力欄で Enter キーを押すと QSO を記録する</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>新しい QSO の項目</translation>

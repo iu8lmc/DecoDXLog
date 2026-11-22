@@ -28,7 +28,7 @@ DialogFrame {
                 Text { Layout.fillWidth: true; text: qsTr("2  Radio (optional)"); color: Theme.textPrimary; font.bold: true }
                 Text { Layout.fillWidth: true; text: qsTr("In Setup → Radio (CAT), choose the model and connection, then use Find the radio. For a shared CAT connection, enter its host and port instead of opening a second serial connection."); color: Theme.textSecondary; wrapMode: Text.Wrap; font.pixelSize: 12 }
                 Text { Layout.fillWidth: true; text: qsTr("3  First QSO"); color: Theme.textPrimary; font.bold: true }
-                Text { Layout.fillWidth: true; text: qsTr("Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable."); color: Theme.textSecondary; wrapMode: Text.Wrap; font.pixelSize: 12 }
+                Text { Layout.fillWidth: true; text: qsTr("Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable."); color: Theme.textSecondary; wrapMode: Text.Wrap; font.pixelSize: 12 }
                 Item { Layout.fillHeight: true }
             }
         }

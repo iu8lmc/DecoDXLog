@@ -32,7 +32,7 @@ struct CustomFieldsResult {
 };
 
 // Campi opzionali gia' gestiti dal pannello e quelli visibili per impostazione
-// predefinita. STATE e TX_PWR sono disponibili ma inizialmente spenti, per non
+// predefinita. STATE, IOTA e TX_PWR sono disponibili ma inizialmente spenti, per non
 // cambiare la disposizione degli utenti esistenti.
 QStringList standardFields();
 QStringList defaultVisibleFields();
@@ -48,6 +48,6 @@ bool isProtectedAdifField(const QString& name);
 CustomFieldsResult validateCustomFields(const QVariantList& fields);
 
 QString encodeCustomFields(const QVariantList& fields);
-QVariantList decodeCustomFields(const QString& json);
+QVariantList decodeCustomFields(const QString& json, bool* legacyIota = nullptr);
 
 } // namespace decolog::core::newqso

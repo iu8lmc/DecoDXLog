@@ -21,18 +21,21 @@ DialogFrame {
 
     ListModel { id: customModel }
 
-    function reload() {
+    function reload(useDefaults = false) {
         root.options = decolog.newQsoFieldOptions()
+        enterToLogToggle.checked = !useDefaults && decolog.enterToLogQso
         customModel.clear()
-        for (const field of decolog.newQsoCustomFields)
-            customModel.append({ fieldName: field.name, fieldLabel: field.label })
+        if (!useDefaults) {
+            for (const field of decolog.newQsoCustomFields)
+                customModel.append({ fieldName: field.name, fieldLabel: field.label })
+        }
         settingsError.text = ""
         Qt.callLater(function() {
             const visible = decolog.newQsoVisibleFields
             for (let i = 0; i < standardRepeater.count; ++i) {
                 const item = standardRepeater.itemAt(i)
                 if (item)
-                    item.checked = visible.indexOf(item.fieldKey) >= 0
+                    item.checked = useDefaults ? item.modelData.defaultVisible : visible.indexOf(item.fieldKey) >= 0
             }
         })
     }
@@ -51,7 +54,7 @@ DialogFrame {
             if (item)
                 custom.push({ name: item.fieldNameText, label: item.fieldLabelText })
         }
-        const error = decolog.saveNewQsoPanelSettings(visible, custom)
+        const error = decolog.saveNewQsoPanelSettings(visible, custom, enterToLogToggle.checked)
         settingsError.text = error
         if (error.length === 0)
             root.accept()
@@ -69,6 +72,13 @@ DialogFrame {
             color: Theme.textSecondary
             wrapMode: Text.WordWrap
             font.pixelSize: 12
+        }
+
+        ToggleSwitch {
+            id: enterToLogToggle
+            objectName: "enterToLogToggle"
+            Layout.fillWidth: true
+            text: qsTr("Enter logs the QSO in manual entry fields")
         }
 
         Text {
@@ -168,7 +178,7 @@ DialogFrame {
                                 Layout.fillWidth: true
                                 text: customRow.fieldName
                                 uppercase: true
-                                placeholderText: "RDA"
+                                placeholderText: qsTr("ADIF name")
                                 Accessible.name: qsTr("Custom ADIF field name")
                             }
                         }
@@ -180,7 +190,7 @@ DialogFrame {
                                 id: labelField
                                 Layout.fillWidth: true
                                 text: customRow.fieldLabel
-                                placeholderText: qsTr("Russian district")
+                                placeholderText: qsTr("Label (optional)")
                                 Accessible.name: qsTr("Custom ADIF field label")
                             }
                         }
@@ -210,10 +220,7 @@ DialogFrame {
             Layout.fillWidth: true
             GlassButton {
                 text: qsTr("Restore defaults")
-                onClicked: {
-                    decolog.resetNewQsoPanelSettings()
-                    root.reload()
-                }
+                onClicked: root.reload(true)
             }
             Item { Layout.fillWidth: true }
             GlassButton { text: qsTr("Cancel"); onClicked: root.reject() }

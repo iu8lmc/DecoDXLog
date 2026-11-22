@@ -1825,8 +1825,12 @@ Indicativul pe care îl lucrează Decodium apare aici singur.</translation>
         <translation>Regulă nouă</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>Un spot care respectă o regulă se scrie în jurnalul de activitate și e evidențiat; dacă regula cere, merge la Decodium, e anunțat vocal, apare într-o fereastră (un clic acordă stația) și sună. Același DX pe aceeași bandă și mod avertizează cel mult o dată la %1 minute.</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>Înregistrează alertele pentru spoturile filtrate în jurnalul de activitate</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>Regulile pot trimite alerte către Decodium, le pot anunța vocal, pot afișa o notificare sau pot reda un sunet. Jurnalul de activitate înregistrează o alertă numai dacă spotul corespunde și filtrelor actuale. Pentru același DX pe aceeași bandă și în același mod se emite cel mult o alertă la fiecare %1 minute.</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3650,8 +3654,8 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <translation>3  Primul QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>Deschide QSO nou, introdu un indicativ și câmpurile necesare, apoi apasă Ctrl+Enter sau Înregistrează. Jurnalul local rămâne utilizabil chiar dacă CAT sau un serviciu online nu este disponibil.</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>Deschide QSO nou, introdu un indicativ și câmpurile necesare, apoi fă clic pe „Înregistrează QSO”. Jurnalul local rămâne utilizabil chiar dacă CAT sau un serviciu online nu este disponibil.</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5125,6 +5129,10 @@ Câmpuri suplimentare păstrate: %8</translation>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>Înregistrează QSO-ul la apăsarea tastei Enter în câmpurile de introducere manuală</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>Câmpurile pentru QSO nou</translation>

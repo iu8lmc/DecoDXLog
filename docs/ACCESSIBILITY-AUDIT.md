@@ -11,7 +11,7 @@ The focused check was run on 2026-10-16 with
 
 - The main window exposes keyboard entry points for new QSO, search,
   import/export, cluster, activation, contest and rotor.
-- The New QSO dialog accepts `Ctrl+Enter` and `Ctrl+Return`.
+- The New QSO dialog accepts `Ctrl+Enter` and `Ctrl+Return` when Enter-to-log is enabled in the New QSO field settings.
 - Popup windows containing editable fields are checked for a window-level focus
   declaration by `tst_qmlpopups`.
 - The Panels menu exposes explicit Beginner, DX, Digital, Contest and Portable

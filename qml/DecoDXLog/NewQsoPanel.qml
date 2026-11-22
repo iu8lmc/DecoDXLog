@@ -191,6 +191,7 @@ GlassPanel {
         nameField.text = ""
         qthField.text = ""
         gridField.text = ""
+        iotaField.text = ""
         stateField.text = ""
         txPwrField.text = root.defaultTxPower()
         commentField.text = ""
@@ -221,12 +222,18 @@ GlassPanel {
         transientParent: root.Window.window
     }
 
+    function submitOnEnter(event) {
+        if (decolog.enterToLogQso && !event.isAutoRepeat && (event.modifiers & ~Qt.KeypadModifier) === 0)
+            root.submit()
+    }
+
     function submit() {
         const error = decolog.logManualQso({
             call: callField.text, date: dateField.text, time: timeField.text,
             freq: freqField.text, band: bandBox.currentIndex > 0 ? bandBox.currentText : "",
             mode: modeBox.editText, rst_sent: sentField.text, rst_rcvd: rcvdField.text,
             gridsquare: gridField.text, name: nameField.text, qth: qthField.text, comment: commentField.text,
+            iota: root.fieldVisible("IOTA") ? iotaField.text : "",
             state: stateField.text, tx_pwr: txPwrField.text,
             prop_mode: propModeBox.editText, sat_name: satNameField.text, sat_mode: satModeField.text,
             srx: srxField.text, custom_fields: root.customAdifValues()
@@ -388,6 +395,7 @@ GlassPanel {
                         label: qsTr("Callsign")
                         StyledTextField {
                             id: callField
+                            objectName: "manualCallsignField"
                             Layout.fillWidth: true
                             fieldHeight: 36
                             uppercase: true
@@ -395,8 +403,8 @@ GlassPanel {
                             font.bold: true
                             font.letterSpacing: 1
                             onTextChanged: decolog.lookupCall = text
-                            Keys.onReturnPressed: root.submit()
-                            Keys.onEnterPressed: root.submit()
+                            Keys.onReturnPressed: (event) => root.submitOnEnter(event)
+                            Keys.onEnterPressed: (event) => root.submitOnEnter(event)
                         }
                     }
                 }
@@ -608,8 +616,8 @@ GlassPanel {
                             id: srxField
                             Layout.preferredWidth: 70
                             validator: IntValidator { bottom: 0; top: 99999 }
-                            Keys.onReturnPressed: root.submit()
-                            Keys.onEnterPressed: root.submit()
+                            Keys.onReturnPressed: (event) => root.submitOnEnter(event)
+                            Keys.onEnterPressed: (event) => root.submitOnEnter(event)
                         }
                     }
                     LabeledField {
@@ -631,18 +639,33 @@ GlassPanel {
                             id: commentField
                             Layout.fillWidth: true
                             mono: false
-                            Keys.onReturnPressed: root.submit()
-                            Keys.onEnterPressed: root.submit()
+                            Keys.onReturnPressed: (event) => root.submitOnEnter(event)
+                            Keys.onEnterPressed: (event) => root.submitOnEnter(event)
                         }
                     }
                 }
                 GridLayout {
                     Layout.fillWidth: true
-                    visible: root.customFields.length > 0
+                    visible: root.fieldVisible("IOTA") || root.customFields.length > 0
                     columns: root.width >= 520 ? 2 : 1
                     columnSpacing: 8
                     rowSpacing: 8
 
+                    LabeledField {
+                        Layout.fillWidth: true
+                        visible: root.fieldVisible("IOTA")
+                        label: "IOTA"
+                        StyledTextField {
+                            id: iotaField
+                            objectName: "newQsoIota"
+                            Layout.fillWidth: true
+                            uppercase: true
+                            placeholderText: "SA-056"
+                            Accessible.name: "IOTA"
+                            Keys.onReturnPressed: (event) => root.submitOnEnter(event)
+                            Keys.onEnterPressed: (event) => root.submitOnEnter(event)
+                        }
+                    }
                     Repeater {
                         id: customFieldRepeater
                         model: root.customFields
@@ -685,6 +708,7 @@ GlassPanel {
                         spacing: 8
                         GlassButton {
                             Layout.fillWidth: true
+                            objectName: "manualLogButton"
                             text: "✎ " + qsTr("LOG QSO")
                             tone: Theme.accentColor
                             filled: true

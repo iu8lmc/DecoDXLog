@@ -1825,8 +1825,12 @@ Tas izsaukuma signāls, ar ko strādā Decodium, šeit parādās pats.</translat
         <translation>Jauns noteikums</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>Spots, kas atbilst noteikumam, tiek ierakstīts darbību žurnālā un izcelts; ja noteikums to paredz, tas tiek nosūtīts uz Decodium, paziņots balsī, parādīts uznirstošā logā (klikšķis noskaņo radio) un atskaņots skaņas signāls. Tas pats DX tajā pašā joslā un modā brīdina ne biežāk kā reizi %1 minūtēs.</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>Ierakstīt filtrēto spotu brīdinājumus darbību žurnālā</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>Noteikumi var nosūtīt brīdinājumu uz Decodium, nolasīt to balsī, parādīt uznirstošo logu vai atskaņot skaņu. Brīdinājumu ieraksta darbību žurnālā tikai tad, ja spots atbilst arī pašreizējiem spotu filtriem. Par vienu un to pašu DX staciju tajā pašā joslā un režīmā brīdinājumu sniedz ne biežāk kā reizi %1 minūtēs.</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3650,8 +3654,8 @@ Decodium: Settings → Reporting → UDP Server 127.0.0.1, ports %1, un &quot;Ac
         <translation>3  Pirmais QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>Atveriet Jauns QSO, ievadiet zvanu zīmi un nepieciešamos laukus, tad nospiediet Ctrl+Enter vai Reģistrēt. Lokālais žurnāls paliek lietojams arī tad, ja CAT vai tiešsaistes pakalpojums nav pieejams.</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>Atveriet Jauns QSO, ievadiet zvanu zīmi un nepieciešamos laukus, tad noklikšķiniet uz «Ierakstīt QSO». Lokālais žurnāls paliek lietojams arī tad, ja CAT vai tiešsaistes pakalpojums nav pieejams.</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5125,6 +5129,10 @@ Papildu lauki tiek saglabāti: %8</translation>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>Manuālās ievades laukos reģistrēt QSO ar taustiņu Enter</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>Jaunā QSO lauki</translation>

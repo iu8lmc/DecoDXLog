@@ -1819,7 +1819,11 @@ The call Decodium is working shows up here by itself.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3637,7 +3641,7 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5106,6 +5110,10 @@ Extra fields are preserved: %8</source>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation type="unfinished"></translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation type="unfinished"></translation>

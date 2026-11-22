@@ -2,8 +2,8 @@
 //
 // Tutte le fonti (nodi telnet, RBN, HamAlert, POTA) finiscono in una lista sola.
 // Ogni spot si confronta col log (nuovo DXCC, nuova banda, gia' lavorato...), si
-// filtra, e se una regola d'avviso lo chiede si annuncia a voce, si segnala nel
-// registro attivita' e si manda a Decodium con DecoLink. Un doppio clic sintonizza
+// filtra, e le regole d'avviso possono annunciarlo a voce o mandarlo a
+// Decodium con DecoLink. Un doppio clic sintonizza
 // Decodium sullo spot.
 #pragma once
 
@@ -45,6 +45,7 @@ class ClusterController : public QObject {
     Q_PROPERTY(bool followDecodiumBand READ followDecodiumBand WRITE setFollowDecodiumBand NOTIFY filterChanged)
     Q_PROPERTY(QVariantMap savedFilters READ savedFilters NOTIFY filterChanged)
     Q_PROPERTY(QVariantList alertRules READ alertRules NOTIFY rulesChanged)
+    Q_PROPERTY(bool logSpotAlerts READ logSpotAlerts WRITE setLogSpotAlerts NOTIFY settingsChanged)
     Q_PROPERTY(QStringList console READ console NOTIFY consoleChanged)
     Q_PROPERTY(QVariantList statusNames READ statusNames CONSTANT)
     Q_PROPERTY(bool sendToDecodium READ sendToDecodium WRITE setSendToDecodium NOTIFY settingsChanged)
@@ -134,6 +135,8 @@ public:
     QVariantList statusNames() const;
     bool sendToDecodium() const { return m_sendToDecodium; }
     void setSendToDecodium(bool on);
+    bool logSpotAlerts() const { return m_logSpotAlerts; }
+    void setLogSpotAlerts(bool on);
     QVariantMap assistantPreferences() const;
     void setAssistantPreferences(const QVariantMap& preferences);
 
@@ -291,6 +294,7 @@ private:
     QNetworkAccessManager* m_net{nullptr};
     bool m_started{false};
     bool m_sendToDecodium{true};
+    bool m_logSpotAlerts{false};
     core::dxassistant::Preferences m_assistantPreferences;
     bool m_voiceEnabled{true};
     QString m_voiceName;

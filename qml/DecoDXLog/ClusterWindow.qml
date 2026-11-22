@@ -252,9 +252,14 @@ RoundedWindow {
                             onClicked: ruleEditor.openFor({ id: "", name: "", enabled: true, voice: true, decodium: true, filter: { maxAgeMinutes: 10 } })
                         }
                     }
+                    ToggleSwitch {
+                        text: qsTr("Log filtered spot alerts in Activity log")
+                        checked: root.cluster.logSpotAlerts
+                        onToggled: root.cluster.logSpotAlerts = checked
+                    }
                     Note {
-                        text: qsTr("A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, "
-                                   + "announced by voice, shown in a popup (click it to tune the radio) and played as a sound. "
+                        text: qsTr("Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. "
+                                   + "Activity log records an alert only when the spot also matches the current spot filters. "
                                    + "The same DX on the same band and mode alerts at most once every %1 minutes.")
                               .arg(root.cluster.voiceCooldownMinutes)
                     }

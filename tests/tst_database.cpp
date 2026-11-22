@@ -794,6 +794,53 @@ private slots:
         QCOMPARE(db.qsoCount(), 2);
     }
 
+    void markedSentClearsOnlyThatServiceError()
+    {
+        const QList<QPair<QString, QString>> services{
+            {"qrz", "QRZCOM_QSO_UPLOAD_STATUS"}, {"lotw", "LOTW_QSL_SENT"},
+            {"clublog", "CLUBLOG_QSO_UPLOAD_STATUS"}, {"hrdlog", "HRDLOG_QSO_UPLOAD_STATUS"},
+            {"eqsl", "EQSL_QSL_SENT"}, {"card", "QSL_SENT"}
+        };
+        for (const auto& service : services) {
+            LogDatabase db;
+            QVERIFY(db.open(":memory:"));
+            const auto result = db.insertQso({{"CALL", "UN0GY"}, {"QSO_DATE", "20261121"},
+                                               {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "FT8"}}, "manual");
+            QVERIFY(result.id > 0);
+            QslState rejected;
+            rejected.service = service.first;
+            rejected.sent = "N";
+            rejected.rcvd = "Y";
+            rejected.rcvdDate = "20261120";
+            rejected.remoteId = "12345";
+            rejected.lastError = "example rejected";
+            QVERIFY(db.writeQslState(result.id, rejected, true));
+            auto errorCount = [&] {
+                for (const auto& row : db.qslSummary())
+                    if (row.value("service").toString() == service.first)
+                        return row.value("errors").toInt();
+                return -1;
+            };
+            QCOMPARE(errorCount(), 1);
+            auto record = *db.record(result.id);
+            record.set("COMMENT", "Unrelated edit");
+            QCOMPARE(db.updateQso(result.id, record).status, InsertResult::Status::Inserted);
+            QCOMPARE(errorCount(), 1);
+            record = *db.record(result.id);
+            record.set(service.second, "Y");
+            QCOMPARE(db.updateQso(result.id, record).status, InsertResult::Status::Inserted);
+            QCOMPARE(errorCount(), 0);
+            const auto states = db.qslStatus(result.id);
+            QCOMPARE(states.size(), 1);
+            QCOMPARE(states.first().sent, QString("Y"));
+            QCOMPARE(states.first().remoteId, QString("12345"));
+            if (service.first == "lotw" || service.first == "qrz" || service.first == "eqsl" || service.first == "card") {
+                QCOMPARE(states.first().rcvd, QString("Y"));
+                QCOMPARE(states.first().rcvdDate, QString("20261120"));
+            }
+        }
+    }
+
     void editPreservesNonAdifServiceStates()
     {
         LogDatabase db;

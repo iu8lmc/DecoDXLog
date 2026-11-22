@@ -43,6 +43,21 @@ private slots:
         QVERIFY(newqso::decodeCustomFields(QStringLiteral("not json")).isEmpty());
     }
 
+    void legacyCustomIotaBecomesOptionalStandardField()
+    {
+        QVERIFY(!newqso::defaultVisibleFields().contains(QStringLiteral("IOTA")));
+        QCOMPARE(newqso::normalizeVisibleFields({QStringLiteral("iota")}), QStringList{"IOTA"});
+
+        const QString oldJson = QStringLiteral(R"([{"name":"IOTA","label":"Island"},{"name":"RDA","label":"District"}])");
+        bool migratedIota = false;
+        const auto remaining = newqso::decodeCustomFields(oldJson, &migratedIota);
+        QVERIFY(migratedIota);
+        const QVariantList expected{QVariantMap{{"name", "RDA"}, {"label", "District"}}};
+        QCOMPARE(remaining, expected);
+        QCOMPARE(newqso::decodeCustomFields(newqso::encodeCustomFields(remaining), &migratedIota), expected);
+        QVERIFY(!migratedIota);
+    }
+
     void unsafeAndDuplicateNamesAreRejected()
     {
         auto check = newqso::validateCustomFields(

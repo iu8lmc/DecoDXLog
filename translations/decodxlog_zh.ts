@@ -1815,8 +1815,12 @@ Decodium 正在通联的呼号会自己出现在这里。</translation>
         <translation>新建规则</translation>
     </message>
     <message>
-        <source>A spot that matches a rule is written in the activity log and highlighted; if the rule says so it is sent to Decodium, announced by voice, shown in a popup (click it to tune the radio) and played as a sound. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
-        <translation>符合规则的 spot 会写入活动日志并高亮；按规则设置可发送到 Decodium、语音播报、弹窗显示（点击调谐电台）并播放声音。同一 DX 在同一波段和模式最多每 %1 分钟提醒一次。</translation>
+        <source>Log filtered spot alerts in Activity log</source>
+        <translation>在活动日志中记录符合筛选条件的点报提醒</translation>
+    </message>
+    <message>
+        <source>Rules can send alerts to Decodium, announce them by voice, or trigger a popup or sound. Activity log records an alert only when the spot also matches the current spot filters. The same DX on the same band and mode alerts at most once every %1 minutes.</source>
+        <translation>规则可以向 Decodium 发送提醒、播报语音、显示弹窗或播放提示音。只有点报也符合当前筛选条件时，提醒才会写入活动日志。对于同一 DX 电台，在相同波段和模式下，每 %1 分钟最多提醒一次。</translation>
     </message>
     <message>
         <source>DX in %1</source>
@@ -3630,8 +3634,8 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <translation>3  第一次 QSO</translation>
     </message>
     <message>
-        <source>Open New QSO, enter a callsign and the required fields, then press Ctrl+Enter or Register. The local log remains usable if CAT or an online service is unavailable.</source>
-        <translation>打开“新建 QSO”，输入呼号和必填字段，然后按 Ctrl+Enter 或点击“登记”。即使 CAT 或在线服务不可用，本地日志仍可使用。</translation>
+        <source>Open New QSO, enter a callsign and the required fields, then click Log QSO. The local log remains usable if CAT or an online service is unavailable.</source>
+        <translation>打开“新建 QSO”，输入呼号和必填字段，然后点击“记录 QSO”。即使 CAT 或在线服务不可用，本地日志仍可使用。</translation>
     </message>
     <message>
         <source>This guide appears once when the log is empty; the normal setup and New QSO shortcuts remain available afterwards.</source>
@@ -5101,6 +5105,10 @@ QSL 状态：%6 · UTC 不完整：%7。
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
+    <message>
+        <source>Enter logs the QSO in manual entry fields</source>
+        <translation>在手动输入字段中按回车键记录 QSO</translation>
+    </message>
     <message>
         <source>New QSO fields</source>
         <translation>新建 QSO 字段</translation>

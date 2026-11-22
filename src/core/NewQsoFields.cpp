@@ -14,6 +14,7 @@ QStringList standardFields()
         QStringLiteral("NAME"),
         QStringLiteral("QTH"),
         QStringLiteral("STATE"),
+        QStringLiteral("IOTA"),
         QStringLiteral("TX_PWR"),
         QStringLiteral("PROP_MODE"),
         QStringLiteral("SAT_NAME"),
@@ -132,16 +133,29 @@ QString encodeCustomFields(const QVariantList& fields)
     return QString::fromUtf8(QJsonDocument::fromVariant(checked.fields).toJson(QJsonDocument::Compact));
 }
 
-QVariantList decodeCustomFields(const QString& json)
+QVariantList decodeCustomFields(const QString& json, bool* legacyIota)
 {
+    if (legacyIota)
+        *legacyIota = false;
     if (json.trimmed().isEmpty())
         return {};
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(json.toUtf8(), &error);
     if (error.error != QJsonParseError::NoError || !document.isArray())
         return {};
-    const CustomFieldsResult checked = validateCustomFields(document.toVariant().toList());
-    return checked.ok() ? checked.fields : QVariantList{};
+    // Older versions allowed IOTA as a custom field. Expose it in the
+    // standard section and keep accepting the other saved custom fields.
+    QVariantList fields = document.toVariant().toList();
+    const bool hadIota = fields.removeIf([](const QVariant& field) {
+        return normalizeAdifName(field.toMap().value(QStringLiteral("name")).toString())
+               == QLatin1String("IOTA");
+    }) > 0;
+    const CustomFieldsResult checked = validateCustomFields(fields);
+    if (!checked.ok())
+        return {};
+    if (legacyIota)
+        *legacyIota = hadIota;
+    return checked.fields;
 }
 
 } // namespace decolog::core::newqso
