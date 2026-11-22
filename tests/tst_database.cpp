@@ -59,6 +59,93 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void failedImportCommitDoesNotReportRolledBackQsos()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("import.sqlite"));
+        LogDatabase db;
+        QVERIFY(db.open(path));
+        const auto existing = db.insertQso({{"CALL", "K1OLD"}, {"QSO_DATE", "20260101"},
+                                            {"TIME_ON", "0900"}, {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        QVERIFY(existing.id > 0);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("CREATE TABLE test_parent (id INTEGER PRIMARY KEY)"));
+        QVERIFY(q.exec("CREATE TABLE test_child (parent_id INTEGER REFERENCES test_parent(id) DEFERRABLE INITIALLY DEFERRED)"));
+        QVERIFY(q.exec("CREATE TRIGGER fail_import_commit AFTER INSERT ON qso BEGIN INSERT INTO test_child VALUES (999); END"));
+        const auto result = db.importAdif("<CALL:5>K1NEW<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(result.inserted, 0);
+        QVERIFY(result.insertedIds.isEmpty());
+        QVERIFY(!result.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 1);
+        QVERIFY(db.record(existing.id).has_value());
+        QVERIFY(q.exec("DROP TRIGGER fail_import_commit"));
+        const auto retry = db.importAdif("<CALL:5>K1NEW<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(retry.inserted, 1);
+        QCOMPARE(db.qsoCount(), 2);
+        q = QSqlQuery();
+        db.close();
+        QVERIFY(db.open(path));
+        QCOMPARE(db.qsoCount(), 2);
+        QVERIFY(db.record(existing.id).has_value());
+    }
+
+    void failedLaterImportBatchPreservesOnlyCommittedIds()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("CREATE TABLE test_parent (id INTEGER PRIMARY KEY)"));
+        QVERIFY(q.exec("CREATE TABLE test_child (parent_id INTEGER REFERENCES test_parent(id) DEFERRABLE INITIALLY DEFERRED)"));
+        QVERIFY(q.exec("CREATE TRIGGER fail_later_commit AFTER INSERT ON qso WHEN NEW.call = 'K1BAD' BEGIN INSERT INTO test_child VALUES (999); END"));
+        QList<int> progress;
+        qint64 independentId = 0;
+        const auto result = db.importAdif(
+            "<CALL:6>K1GOOD<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BAD<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>",
+            "test", 0, [&progress, &db, &independentId](int done, int) {
+                progress << done;
+                if (done == 1)
+                    independentId = db.insertQso({{"CALL", "K1LIVE"}, {"QSO_DATE", "20260101"},
+                                                  {"TIME_ON", "0950"}, {"BAND", "20m"}, {"MODE", "CW"}}, "radio").id;
+            }, 1);
+        QCOMPARE(result.inserted, 1);
+        QCOMPARE(result.insertedIds.size(), 1);
+        QVERIFY(independentId > 0);
+        QCOMPARE(db.qsoCount(), 2);
+        QVERIFY(db.record(independentId).has_value());
+        QCOMPARE(db.record(result.insertedIds.first())->value("CALL"), QString("K1GOOD"));
+        QCOMPARE(progress, QList<int>{1});
+        QVERIFY(!result.errors.isEmpty());
+    }
+
+    void importRefusesAnAlreadyActiveTransaction()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlDatabase sql = db.connection();
+        QVERIFY(sql.transaction());
+        const auto result = db.importAdif("<CALL:5>K1NEW<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(result.inserted, 0);
+        QVERIFY(result.insertedIds.isEmpty());
+        QVERIFY(!result.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 0);
+        QVERIFY(sql.rollback());
+    }
+
+    void failedQslWriteDoesNotLeaveUnreportedImportedQso()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("CREATE TRIGGER fail_qsl_import BEFORE INSERT ON qsl_status BEGIN SELECT RAISE(ABORT, 'injected QSL failure'); END"));
+        const auto result = db.importAdif("<CALL:5>K1NEW<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<LOTW_QSL_RCVD:1>Y<EOR>");
+        QCOMPARE(result.inserted, 0);
+        QCOMPARE(result.invalid, 1);
+        QVERIFY(!result.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void batchedTagAndDeletePreserveHistoryAndRemoteQueue()
     {
         LogDatabase db;

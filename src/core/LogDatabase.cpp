@@ -1981,7 +1981,14 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
     int done = 0;
     while (done < total) {
         const int end = total - done > batch ? done + batch : total;
-        const bool ownTransaction = db.transaction();
+        if (!db.transaction()) {
+            m_lastError = db.lastError().text();
+            result.errors << QStringLiteral("Cannot begin import batch: %1").arg(m_lastError);
+            break;
+        }
+        const int insertedBeforeBatch = result.inserted;
+        const int duplicatesBeforeBatch = result.duplicates;
+        const qsizetype idsBeforeBatch = result.insertedIds.size();
         for (; done < end; ++done) {
             AdifRecord record = doc.records.at(done);
             ++result.read;
@@ -2016,7 +2023,36 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
             // Le conferme scritte nei campi di un altro programma (QRZ) diventano
             // quelle ADIF.
             migration::mapProgramFields(record);
+            QSqlQuery savepoint(db);
+            if (!savepoint.exec(QStringLiteral("SAVEPOINT decolog_import_item"))) {
+                m_lastError = savepoint.lastError().text();
+                db.rollback();
+                result.inserted = insertedBeforeBatch;
+                result.duplicates = duplicatesBeforeBatch;
+                result.insertedIds.resize(idsBeforeBatch);
+                result.errors << QStringLiteral("Cannot start import item: %1").arg(m_lastError);
+                return result;
+            }
             const InsertResult r = insertQso(record, source, programId, false, stationProfileId);
+            if (r.status != InsertResult::Status::Inserted
+                && !savepoint.exec(QStringLiteral("ROLLBACK TO decolog_import_item"))) {
+                m_lastError = savepoint.lastError().text();
+                db.rollback();
+                result.inserted = insertedBeforeBatch;
+                result.duplicates = duplicatesBeforeBatch;
+                result.insertedIds.resize(idsBeforeBatch);
+                result.errors << QStringLiteral("Cannot roll back import item: %1").arg(m_lastError);
+                return result;
+            }
+            if (!savepoint.exec(QStringLiteral("RELEASE decolog_import_item"))) {
+                m_lastError = savepoint.lastError().text();
+                db.rollback();
+                result.inserted = insertedBeforeBatch;
+                result.duplicates = duplicatesBeforeBatch;
+                result.insertedIds.resize(idsBeforeBatch);
+                result.errors << QStringLiteral("Cannot finish import item: %1").arg(m_lastError);
+                return result;
+            }
             switch (r.status) {
             case InsertResult::Status::Inserted:
                 ++result.inserted;
@@ -2031,8 +2067,15 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
                 break;
             }
         }
-        if (ownTransaction)
-            db.commit();
+        if (!db.commit()) {
+            m_lastError = db.lastError().text();
+            db.rollback();
+            result.inserted = insertedBeforeBatch;
+            result.duplicates = duplicatesBeforeBatch;
+            result.insertedIds.resize(idsBeforeBatch);
+            result.errors << QStringLiteral("Cannot commit import batch: %1").arg(m_lastError);
+            break;
+        }
         if (progress)
             progress(done, total);
     }

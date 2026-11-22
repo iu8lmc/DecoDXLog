@@ -5196,7 +5196,7 @@ void DecoLogController::finishImport(const QString& path, const ImportResult& r)
     addActivity(QStringLiteral("IMPORT"), tr("%1: %2 read, %3 new, %4 duplicates, %5 rejected, %6 with QSL status")
                                               .arg(QFileInfo(path).fileName()).arg(r.read).arg(r.inserted)
                                               .arg(r.duplicates).arg(r.invalid).arg(r.qslRecords),
-                r.invalid ? QStringLiteral("warning") : QStringLiteral("success"));
+                (r.invalid || !r.errors.isEmpty()) ? QStringLiteral("warning") : QStringLiteral("success"));
     if (r.missingUtc > 0)
         addActivity(QStringLiteral("IMPORT"), tr("%1 record(s) had no complete UTC date/time")
                                                 .arg(r.missingUtc), QStringLiteral("warning"));
