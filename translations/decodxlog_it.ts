@@ -15320,6 +15320,54 @@ Campi extra conservati: %8</translation>
         <source>Use Import scan or image in the QSO detail to attach the original separately.</source>
         <translation>Usa Importa scansione o immagine nella scheda QSO per allegare separatamente l’originale.</translation>
     </message>
+    <message>
+        <source>Unverified suggestions — select a callsign to search the current log.</source>
+        <translation>Suggerimenti non verificati — seleziona un nominativo per cercare nel log aperto.</translation>
+    </message>
+    <message>
+        <source>Suggested callsigns</source>
+        <translation>Nominativi suggeriti</translation>
+    </message>
+    <message>
+        <source>Find exact callsign</source>
+        <translation>Cerca nominativo esatto</translation>
+    </message>
+    <message>
+        <source>Cancel search</source>
+        <translation>Annulla ricerca</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Data</translation>
+    </message>
+    <message>
+        <source>Time</source>
+        <translation>Ora</translation>
+    </message>
+    <message>
+        <source>Band</source>
+        <translation>Banda</translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation>Modo</translation>
+    </message>
+    <message>
+        <source>Showing the first 100 matches; refine the search separately.</source>
+        <translation>Mostrate le prime 100 corrispondenze; affina la ricerca separatamente.</translation>
+    </message>
+    <message>
+        <source>No exact callsign matches in the current log.</source>
+        <translation>Nessuna corrispondenza esatta nel log aperto.</translation>
+    </message>
+    <message>
+        <source>Some suggestions are omitted; review the complete OCR text.</source>
+        <translation>Alcuni suggerimenti sono omessi; controlla tutto il testo OCR.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Annulla</translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15354,6 +15402,29 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Tesseract OCR was not found</source>
         <translation>Tesseract OCR non trovato</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::QslOcrSearch</name>
+    <message>
+        <source>Choose a callsign and an open file-backed log</source>
+        <translation>Scegli un nominativo e un log aperto su file</translation>
+    </message>
+    <message>
+        <source>Cannot open the log for searching</source>
+        <translation>Impossibile aprire il log per la ricerca</translation>
+    </message>
+    <message>
+        <source>Cannot search the log</source>
+        <translation>Impossibile cercare nel log</translation>
+    </message>
+    <message>
+        <source>Search cancelled</source>
+        <translation>Ricerca annullata</translation>
+    </message>
+    <message>
+        <source>The open log changed</source>
+        <translation>Il log aperto è cambiato</translation>
     </message>
 </context>
 </TS>

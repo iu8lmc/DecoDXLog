@@ -1,4 +1,6 @@
 #include "core/TesseractOcr.h"
+#include "core/QslOcrSearch.h"
+#include "core/LogDatabase.h"
 #include <QFile>
 #include <QImage>
 #include <QPainter>
@@ -32,6 +34,31 @@ class TestTesseractOcr : public QObject {
         return path;
     }
   private slots:
+    void suggestionsPreserveAmbiguousDatesAndSimilarCalls()
+    {
+        TesseractOcr ocr;
+        QVERIFY(ocr.metaObject()->indexOfProperty("suggestions") >= 0);
+        QVariantList words;
+        for (const QString &word : {"K1ABC", "K1ABO", "03/04/2026", "2026-09-23", "31/02/2026",
+                                    "2026", "1430", "UTC", "20M", "SSB"})
+            words << QVariantMap{{"text", word}, {"uncertain", word == QLatin1String("K1ABO")}};
+        const auto result = TesseractOcr::suggestionsFromWords(words);
+        const auto calls = result.value("calls").toList();
+        QCOMPARE(calls.size(), 2);
+        QCOMPARE(calls.at(0).toMap().value("value").toString(), QString("K1ABC"));
+        QCOMPARE(calls.at(1).toMap().value("value").toString(), QString("K1ABO"));
+        QVERIFY(calls.at(1).toMap().value("uncertain").toBool());
+        const auto dates = result.value("dates").toList();
+        QCOMPARE(dates.size(), 3);
+        QCOMPARE(dates.at(0).toMap().value("value").toString(), QString("2026-04-03"));
+        QCOMPARE(dates.at(1).toMap().value("value").toString(), QString("2026-03-04"));
+        QVERIFY(dates.at(0).toMap().value("ambiguous").toBool());
+        QCOMPARE(dates.at(2).toMap().value("value").toString(), QString("2026-09-23"));
+        QCOMPARE(result.value("times").toList().size(), 1);
+        QCOMPARE(result.value("times").toList().first().toMap().value("value").toString(), QString("14:30"));
+        QCOMPARE(result.value("bands").toList().first().toMap().value("value").toString(), QString("20m"));
+        QCOMPARE(result.value("modes").toList().first().toMap().value("value").toString(), QString("SSB"));
+    }
     void rejectsMissingEngineAndNonLocalInput()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
@@ -41,6 +68,47 @@ class TestTesseractOcr : public QObject {
         QVERIFY(!missing.start(QUrl::fromLocalFile(image)));
         QVERIFY(!missing.error().isEmpty());
         QVERIFY(missing.text().isEmpty());
+    }
+    void searchesExactCallWithoutChangingLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        for (const QString &call : {"K1ABC", "K1ABO"}) {
+            AdifRecord record{{"CALL", call}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"},
+                              {"BAND", "20m"}, {"MODE", "SSB"}};
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
+        QslOcrSearch search(&db); QSignalSpy done(&search, &QslOcrSearch::finished);
+        QVERIFY(!search.start("not a call"));
+        QVERIFY(search.start("k1abc"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 5000);
+        QVERIFY(done.at(0).first().toBool());
+        QCOMPARE(search.matches().size(), 1);
+        QCOMPARE(search.matches().first().toMap().value("call").toString(), QString("K1ABC"));
+        QVERIFY(search.start("K1ZZZ"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, 5000);
+        QVERIFY(done.at(1).first().toBool());
+        QVERIFY(search.matches().isEmpty());
+        for (int i = 0; i < 103; ++i) {
+            AdifRecord record{{"CALL", "K1BIG"}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"},
+                              {"BAND", "20m"}, {"MODE", "CW"}};
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
+        QVERIFY(search.start("K1BIG"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 3, 5000);
+        QVERIFY(done.at(2).first().toBool());
+        QCOMPARE(search.matches().size(), 100);
+        QVERIFY(search.truncated());
+        QVERIFY(search.start("K1BIG"));
+        search.cancel();
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 4, 5000);
+        QVERIFY(!done.at(3).first().toBool());
+        QVERIFY(search.matches().isEmpty());
+        QVERIFY(search.start("K1ABC"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 5, 5000);
+        QVERIFY(done.at(4).first().toBool());
+        QCOMPARE(search.matches().size(), 1);
+        QCOMPARE(db.qsoCount(), 105);
     }
     void readsTwoLocalLayoutsWithoutModifyingImages()
     {
@@ -61,6 +129,10 @@ class TestTesseractOcr : public QObject {
             QVERIFY2(ocr.text().contains("2026"), qPrintable(ocr.text()));
             QVERIFY(!ocr.words().isEmpty());
             QVERIFY(ocr.words().first().toMap().contains("uncertain"));
+            const auto calls = ocr.suggestions().value("calls").toList();
+            bool found = false;
+            for (const auto &candidate : calls) found |= candidate.toMap().value("value").toString() == QLatin1String("K1ABC");
+            QVERIFY(found);
             QVERIFY(source.open(QIODevice::ReadOnly)); QCOMPARE(source.readAll(), before);
         }
     }

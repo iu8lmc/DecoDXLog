@@ -15277,6 +15277,54 @@ Extra fields are preserved: %8</source>
         <source>Use Import scan or image in the QSO detail to attach the original separately.</source>
         <translation>Use Import scan or image in the QSO detail to attach the original separately.</translation>
     </message>
+    <message>
+        <source>Unverified suggestions — select a callsign to search the current log.</source>
+        <translation>Unverified suggestions — select a callsign to search the current log.</translation>
+    </message>
+    <message>
+        <source>Suggested callsigns</source>
+        <translation>Suggested callsigns</translation>
+    </message>
+    <message>
+        <source>Find exact callsign</source>
+        <translation>Find exact callsign</translation>
+    </message>
+    <message>
+        <source>Cancel search</source>
+        <translation>Cancel search</translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation>Date</translation>
+    </message>
+    <message>
+        <source>Time</source>
+        <translation>Time</translation>
+    </message>
+    <message>
+        <source>Band</source>
+        <translation>Band</translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation>Mode</translation>
+    </message>
+    <message>
+        <source>Showing the first 100 matches; refine the search separately.</source>
+        <translation>Showing the first 100 matches; refine the search separately.</translation>
+    </message>
+    <message>
+        <source>No exact callsign matches in the current log.</source>
+        <translation>No exact callsign matches in the current log.</translation>
+    </message>
+    <message>
+        <source>Some suggestions are omitted; review the complete OCR text.</source>
+        <translation>Some suggestions are omitted; review the complete OCR text.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15311,6 +15359,29 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Tesseract OCR was not found</source>
         <translation>Tesseract OCR was not found</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::QslOcrSearch</name>
+    <message>
+        <source>Choose a callsign and an open file-backed log</source>
+        <translation>Choose a callsign and an open file-backed log</translation>
+    </message>
+    <message>
+        <source>Cannot open the log for searching</source>
+        <translation>Cannot open the log for searching</translation>
+    </message>
+    <message>
+        <source>Cannot search the log</source>
+        <translation>Cannot search the log</translation>
+    </message>
+    <message>
+        <source>Search cancelled</source>
+        <translation>Search cancelled</translation>
+    </message>
+    <message>
+        <source>The open log changed</source>
+        <translation>The open log changed</translation>
     </message>
 </context>
 </TS>

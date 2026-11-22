@@ -15284,6 +15284,54 @@ Zusatzfelder bleiben erhalten: %8</translation>
         <source>Use Import scan or image in the QSO detail to attach the original separately.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Unverified suggestions — select a callsign to search the current log.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Suggested callsigns</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Find exact callsign</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Date</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Band</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Showing the first 100 matches; refine the search separately.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No exact callsign matches in the current log.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Some suggestions are omitted; review the complete OCR text.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15317,6 +15365,29 @@ Zusatzfelder bleiben erhalten: %8</translation>
     </message>
     <message>
         <source>Tesseract OCR was not found</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::QslOcrSearch</name>
+    <message>
+        <source>Choose a callsign and an open file-backed log</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot open the log for searching</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot search the log</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Search cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The open log changed</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

@@ -69,15 +69,35 @@ private slots:
             decolog::core::AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20260923"},
                                              {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "SSB"}};
             QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, decolog::core::InsertResult::Status::Inserted);
+            record.set("CALL", "K1ABO");
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, decolog::core::InsertResult::Status::Inserted);
         }
         QByteArray output;
-        QVERIFY2(launch(dir, QStringLiteral("qslocr:") + path, output), output.constData());
-        QVERIFY2(output.contains("PROBE qslOcr success=true hasCall=true count=1"), output.constData());
+        QVERIFY2(launch(dir, QStringLiteral("qslocrmatches:") + path, output), output.constData());
+        QVERIFY2(output.contains("PROBE qslOcr success=true hasCall=true count=2"), output.constData());
+        QVERIFY2(output.contains("PROBE qslMatches success=true count=1 first=K1ABC"), output.constData());
         decolog::core::LogDatabase db;
         QVERIFY(db.open(dir.filePath("test.sqlite")));
-        QCOMPARE(db.qsoCount(), 1);
+        QCOMPARE(db.qsoCount(), 2);
         QVERIFY(db.qslAttachments(1).isEmpty());
         QCOMPARE(db.record(1)->value("CALL"), QString("K1ABC"));
+    }
+    void qslOcrDialogShowsNoExactMatch()
+    {
+        decolog::core::TesseractOcr engine;
+        if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = dir.filePath("card.png");
+        QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"), path));
+        {
+            decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            decolog::core::AdifRecord record{{"CALL", "K1ABO"}, {"QSO_DATE", "20260923"},
+                                             {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "SSB"}};
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, decolog::core::InsertResult::Status::Inserted);
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("qslocrmatches:") + path, output), output.constData());
+        QVERIFY2(output.contains("PROBE qslMatches success=true count=0 first= noMatchNotice=true"), output.constData());
     }
     void roverManualQsoRespectsHistoryAndExplicitOverride()
     {

@@ -12,6 +12,7 @@ class TesseractOcr : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
     Q_PROPERTY(QString text READ text NOTIFY changed)
     Q_PROPERTY(QVariantList words READ words NOTIFY changed)
+    Q_PROPERTY(QVariantMap suggestions READ suggestions NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(QString executable READ executable NOTIFY changed)
   public:
@@ -20,6 +21,8 @@ class TesseractOcr : public QObject {
     bool busy() const { return m_busy; }
     QString text() const { return m_text; }
     QVariantList words() const { return m_words; }
+    QVariantMap suggestions() const { return m_suggestions; }
+    static QVariantMap suggestionsFromWords(const QVariantList &words);
     QString error() const { return m_error; }
     QString executable() const { return m_executable; }
     Q_INVOKABLE bool start(const QUrl &image);
@@ -37,6 +40,7 @@ class TesseractOcr : public QObject {
     QByteArray m_output;
     QString m_text;
     QVariantList m_words;
+    QVariantMap m_suggestions;
     QString m_error;
     bool m_busy{false};
     bool m_cancelled{false};

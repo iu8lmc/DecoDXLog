@@ -2,6 +2,9 @@
 #include <QFileInfo>
 #include <QImageReader>
 #include <QStandardPaths>
+#include <QDate>
+#include <QRegularExpression>
+#include <QSet>
 
 namespace decolog::core {
 namespace {
@@ -54,7 +57,7 @@ TesseractOcr::~TesseractOcr()
 bool TesseractOcr::start(const QUrl &image)
 {
     if (m_busy) return false;
-    m_text.clear(); m_words.clear(); m_output.clear(); m_error.clear(); m_cancelled = false; m_tooLarge = false;
+    m_text.clear(); m_words.clear(); m_suggestions.clear(); m_output.clear(); m_error.clear(); m_cancelled = false; m_tooLarge = false;
     const QFileInfo info(image.toLocalFile());
     if (!image.isLocalFile() || !info.isFile() || !info.isReadable() || info.size() <= 0 || info.size() > kMaxImageBytes) {
         m_error = tr("Choose a readable local image up to 32 MB"); emit changed(); return false;
@@ -109,13 +112,75 @@ void TesseractOcr::parse()
         m_words << QVariantMap{{QStringLiteral("text"), word}, {QStringLiteral("confidence"), ok ? confidence : -1.0},
                                {QStringLiteral("uncertain"), !ok || confidence < 75.0}};
     }
+    m_suggestions = suggestionsFromWords(m_words);
+}
+QVariantMap TesseractOcr::suggestionsFromWords(const QVariantList &words)
+{
+    QVariantList calls, dates, times, bands, modes;
+    QSet<QString> seen;
+    bool truncated = false;
+    const QSet<QString> validBands{QStringLiteral("160M"), QStringLiteral("80M"), QStringLiteral("60M"),
+        QStringLiteral("40M"), QStringLiteral("30M"), QStringLiteral("20M"), QStringLiteral("17M"),
+        QStringLiteral("15M"), QStringLiteral("12M"), QStringLiteral("10M"), QStringLiteral("6M"),
+        QStringLiteral("4M"), QStringLiteral("2M"), QStringLiteral("70CM"), QStringLiteral("23CM")};
+    const QSet<QString> validModes{QStringLiteral("CW"), QStringLiteral("SSB"), QStringLiteral("USB"),
+        QStringLiteral("LSB"), QStringLiteral("AM"), QStringLiteral("FM"), QStringLiteral("FT8"),
+        QStringLiteral("FT4"), QStringLiteral("RTTY")};
+    static const QRegularExpression callRe(QStringLiteral("^(?=.{3,15}$)(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
+    static const QRegularExpression isoRe(QStringLiteral("^(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})$"));
+    static const QRegularExpression localRe(QStringLiteral("^(\\d{1,2})[-/.](\\d{1,2})[-/.](\\d{4})$"));
+    static const QRegularExpression timeRe(QStringLiteral("^([01]\\d|2[0-3]):([0-5]\\d)$"));
+    static const QRegularExpression compactTimeRe(QStringLiteral("^([01]\\d|2[0-3])([0-5]\\d)$"));
+    const auto append = [&](QVariantList &list, const QString &kind, const QString &value,
+                            const QString &raw, bool uncertain, bool ambiguous = false) {
+        const QString key = kind + QLatin1Char('|') + value + QLatin1Char('|') + raw;
+        if (seen.contains(key)) return;
+        seen.insert(key);
+        if (list.size() >= 100) { truncated = true; return; }
+        list << QVariantMap{{QStringLiteral("value"), value}, {QStringLiteral("raw"), raw},
+                            {QStringLiteral("uncertain"), uncertain}, {QStringLiteral("ambiguous"), ambiguous}};
+    };
+    for (qsizetype i = 0; i < words.size(); ++i) {
+        const auto item = words.at(i).toMap();
+        const QString raw = item.value(QStringLiteral("text")).toString();
+        const QString token = raw.trimmed().toUpper();
+        const bool uncertain = item.value(QStringLiteral("uncertain"), true).toBool();
+        if (validBands.contains(token)) { append(bands, "band", token.toLower(), raw, uncertain); continue; }
+        if (validModes.contains(token)) { append(modes, "mode", token, raw, uncertain); continue; }
+        auto date = isoRe.match(token);
+        if (date.hasMatch()) {
+            const QDate d(date.captured(1).toInt(), date.captured(2).toInt(), date.captured(3).toInt());
+            if (d.isValid()) append(dates, "date", d.toString(Qt::ISODate), raw, uncertain);
+            continue;
+        }
+        date = localRe.match(token);
+        if (date.hasMatch()) {
+            const int a = date.captured(1).toInt(), b = date.captured(2).toInt(), y = date.captured(3).toInt();
+            const QDate dayFirst(y, b, a), monthFirst(y, a, b);
+            const bool ambiguous = dayFirst.isValid() && monthFirst.isValid() && dayFirst != monthFirst;
+            if (dayFirst.isValid()) append(dates, "date", dayFirst.toString(Qt::ISODate), raw, uncertain, ambiguous);
+            if (monthFirst.isValid() && monthFirst != dayFirst) append(dates, "date", monthFirst.toString(Qt::ISODate), raw, uncertain, ambiguous);
+            continue;
+        }
+        auto time = timeRe.match(token);
+        if (!time.hasMatch()) {
+            const QString previous = i > 0 ? words.at(i - 1).toMap().value("text").toString().toUpper() : QString();
+            const QString next = i + 1 < words.size() ? words.at(i + 1).toMap().value("text").toString().toUpper() : QString();
+            if (previous == QLatin1String("TIME") || previous == QLatin1String("UTC") || next == QLatin1String("UTC"))
+                time = compactTimeRe.match(token);
+        }
+        if (time.hasMatch()) { append(times, "time", time.captured(1) + ':' + time.captured(2), raw, uncertain); continue; }
+        if (callRe.match(token).hasMatch()) append(calls, "call", token, raw, uncertain);
+    }
+    return {{QStringLiteral("calls"), calls}, {QStringLiteral("dates"), dates}, {QStringLiteral("times"), times},
+            {QStringLiteral("bands"), bands}, {QStringLiteral("modes"), modes}, {QStringLiteral("truncated"), truncated}};
 }
 void TesseractOcr::finish(bool success, const QString &message)
 {
     m_timeout.stop();
     m_busy = false;
     m_error = message;
-    if (!success) { m_text.clear(); m_words.clear(); }
+    if (!success) { m_text.clear(); m_words.clear(); m_suggestions.clear(); }
     emit changed();
     emit finished(success);
 }
