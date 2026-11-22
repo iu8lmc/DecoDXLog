@@ -24,8 +24,8 @@ DialogFrame {
     property var enrichments: []
     property var attachments: []
     property var managerSuggestion: ({})
-    QslOcrDialog { id: qslOcrDialog }
-    function probeOcr(url, match) { qslOcrDialog.open(); qslOcrDialog.probe(url, match) }
+    QslOcrDialog { id: qslOcrDialog; onAcquired: root.attachments = decolog.qsoDetail(root.qsoId).attachments || [] }
+    function probeOcr(url, match, acquire) { qslOcrDialog.open(); qslOcrDialog.probe(url, match, acquire) }
 
     title: qsTr("QSO detail")
     dotColor: Theme.primaryColor

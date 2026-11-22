@@ -14,17 +14,28 @@ DialogFrame {
     info: qsTr("Review every result")
     readonly property var ocr: decolog.qslOcr
     readonly property var search: decolog.qslOcrSearch
+    readonly property var acquisition: decolog.qslOcrAcquisition
+    signal acquired()
     property url selectedImage: ""
     property url processedImage: ""
     property bool probing: false
     property bool probeMatches: false
+    property bool probeAcquire: false
     property string searchedCall: ""
     property bool searchDone: false
+    property var selectedQsos: []
+    property bool saved: false
     readonly property bool showingResult: String(processedImage).length > 0 && String(selectedImage) === String(processedImage)
-    onClosed: { if (root.ocr.busy) root.ocr.cancel(); if (root.search.busy) root.search.cancel() }
-    function probe(url, match) {
+    onClosed: { if (root.ocr.busy) root.ocr.cancel(); if (root.search.busy) root.search.cancel(); if (root.acquisition.busy) root.acquisition.cancel() }
+    function toggleQso(row, enabled) {
+        const remaining = root.selectedQsos.filter(x => x.uuid !== row.uuid)
+        root.selectedQsos = enabled ? remaining.concat([row]) : remaining
+        root.saved = false
+    }
+    function probe(url, match, acquire) {
         probing = true
         probeMatches = !!match
+        probeAcquire = !!acquire
         selectedImage = url
         scan.clicked()
     }
@@ -49,6 +60,20 @@ DialogFrame {
                 console.warn("PROBE qslMatches success=" + success + " count=" + root.search.matches.length
                              + " first=" + (root.search.matches.length ? root.search.matches[0].call : "")
                              + " noMatchNotice=" + noMatchNotice.visible)
+            if (root.probing && root.probeAcquire && success) {
+                for (const row of root.search.matches) root.toggleQso(row, true)
+                approveButton.clicked()
+            }
+        }
+    }
+    Connections {
+        target: root.acquisition
+        function onFinished(success) {
+            root.saved = success
+            if (success) root.acquired()
+            if (root.probing && root.probeAcquire)
+                console.warn("PROBE qslAcquire success=" + success + " selected=" + root.acquisition.result.selected
+                             + " newLinks=" + root.acquisition.result.newLinks + " error=" + root.acquisition.error)
         }
     }
     FileDialog {
@@ -56,10 +81,15 @@ DialogFrame {
         title: qsTr("Select a local QSL image")
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTr("Images (*.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp)"), qsTr("All files (*)")]
-        onAccepted: { root.selectedImage = selectedFile; root.processedImage = ""; root.searchedCall = ""; root.searchDone = false }
+        onAccepted: { root.selectedImage = selectedFile; root.processedImage = ""; root.searchedCall = ""; root.searchDone = false; root.selectedQsos = []; root.saved = false }
     }
-    body: ColumnLayout {
+    body: ScrollView {
+        id: dialogScroll
         anchors.margins: 14
+        clip: true
+        contentWidth: availableWidth
+        ColumnLayout {
+        width: dialogScroll.availableWidth
         spacing: 8
         Text {
             Layout.fillWidth: true
@@ -69,9 +99,9 @@ DialogFrame {
         }
         RowLayout {
             Layout.fillWidth: true
-            GlassButton { text: qsTr("Choose image…"); enabled: !root.ocr.busy; onClicked: picker.open() }
+            GlassButton { text: qsTr("Choose image…"); enabled: !root.ocr.busy && !root.acquisition.busy; onClicked: picker.open() }
             Text { Layout.fillWidth: true; text: String(root.selectedImage) || qsTr("No image selected"); textFormat: Text.PlainText; color: Theme.textPrimary; elide: Text.ElideMiddle }
-            GlassButton { id: scan; text: qsTr("Read image"); enabled: !root.ocr.busy && !root.search.busy && String(root.selectedImage).length > 0; onClicked: { root.searchedCall = ""; root.searchDone = false; root.processedImage = root.selectedImage; root.ocr.start(root.selectedImage) } }
+            GlassButton { id: scan; text: qsTr("Read image"); enabled: !root.ocr.busy && !root.search.busy && !root.acquisition.busy && String(root.selectedImage).length > 0; onClicked: { root.selectedQsos = []; root.saved = false; root.searchedCall = ""; root.searchDone = false; root.processedImage = root.selectedImage; root.ocr.start(root.selectedImage) } }
             GlassButton { text: qsTr("Cancel"); enabled: root.ocr.busy; onClicked: root.ocr.cancel() }
         }
         Text {
@@ -92,7 +122,7 @@ DialogFrame {
         Text { text: qsTr("Recognized text"); color: Theme.textPrimary; font.bold: true }
         ScrollView {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: 120
             clip: true
             TextArea {
                 readOnly: true
@@ -112,14 +142,14 @@ DialogFrame {
                 id: callChoice
                 Layout.fillWidth: true
                 Accessible.name: qsTr("Suggested callsigns")
-                enabled: !root.search.busy
+                enabled: !root.search.busy && !root.acquisition.busy
                 readonly property var rows: root.showingResult ? (root.ocr.suggestions.calls || []) : []
                 model: rows.map(x => x.value + (x.uncertain ? " ?" : ""))
             }
             GlassButton {
                 id: searchButton
                 text: qsTr("Find exact callsign")
-                enabled: !root.ocr.busy && !root.search.busy && callChoice.currentIndex >= 0 && callChoice.rows.length > 0
+                enabled: !root.ocr.busy && !root.search.busy && !root.acquisition.busy && callChoice.currentIndex >= 0 && callChoice.rows.length > 0
                 onClicked: { root.searchDone = false; root.searchedCall = callChoice.rows[callChoice.currentIndex].value; root.search.start(root.searchedCall) }
             }
             GlassButton { text: qsTr("Cancel search"); enabled: root.search.busy; onClicked: root.search.cancel() }
@@ -154,15 +184,44 @@ DialogFrame {
             clip: true
             model: root.showingResult && callChoice.currentIndex >= 0 && callChoice.rows[callChoice.currentIndex].value === root.searchedCall ? root.search.matches : []
             ScrollBar.vertical: ScrollBar { }
-            delegate: Text {
+            delegate: RowLayout {
                 required property var modelData
                 width: ListView.view.width
-                text: "#" + modelData.id + " · " + modelData.call + " · " + modelData.at + " · " + modelData.band + " · " + modelData.mode
-                textFormat: Text.PlainText
-                color: Theme.textSecondary
-                elide: Text.ElideRight
+                CheckBox {
+                    Accessible.name: qsTr("Select QSO %1 for attachment").arg(modelData.call)
+                    checked: root.selectedQsos.some(x => x.uuid === modelData.uuid)
+                    enabled: !root.acquisition.busy
+                    onClicked: root.toggleQso(modelData, checked)
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: "#" + modelData.id + " · " + modelData.call + " · " + modelData.at + " · " + modelData.band + " · " + modelData.mode
+                    textFormat: Text.PlainText
+                    color: Theme.textPrimary
+                    elide: Text.ElideRight
+                }
             }
         }
+        Text {
+            Layout.fillWidth: true
+            text: qsTr("Selected for attachment: %1").arg(root.selectedQsos.map(x => x.call + " #" + x.id).join(", ") || "—")
+            textFormat: Text.PlainText
+            color: Theme.textSecondary
+            elide: Text.ElideRight
+        }
+        Text { Layout.fillWidth: true; text: qsTr("Approval stores the OCR image copy and recognized text with the selected QSO; it does not mark them confirmed."); color: Theme.warningColor; wrapMode: Text.Wrap }
+        RowLayout {
+            Layout.fillWidth: true
+            GlassButton {
+                id: approveButton
+                text: qsTr("Approve and attach copy")
+                enabled: root.showingResult && root.ocr.snapshotSha256.length > 0 && !root.ocr.busy && !root.search.busy && !root.acquisition.busy && root.selectedQsos.length > 0 && root.selectedQsos.length <= 100 && !root.saved
+                onClicked: root.acquisition.start(root.selectedQsos, root.selectedImage)
+            }
+            GlassButton { text: qsTr("Cancel save"); enabled: root.acquisition.busy; onClicked: root.acquisition.cancel() }
+            Text { Layout.fillWidth: true; visible: root.saved; text: qsTr("Saved: %1 QSO, %2 new links").arg(root.acquisition.result.selected).arg(root.acquisition.result.newLinks); color: Theme.textSecondary; wrapMode: Text.Wrap }
+        }
+        Text { Layout.fillWidth: true; visible: root.acquisition.error.length > 0; text: root.acquisition.error; color: Theme.warningColor; wrapMode: Text.Wrap }
         Text {
             Layout.fillWidth: true
             text: qsTr("Low-confidence words (below 75/100; not a probability)")
@@ -186,9 +245,10 @@ DialogFrame {
         }
         Text {
             Layout.fillWidth: true
-            text: qsTr("Use Import scan or image in the QSO detail to attach the original separately.")
+            text: qsTr("Use Import scan or image in the QSO detail to attach a different file separately.")
             color: Theme.textSecondary
             wrapMode: Text.Wrap
         }
+    }
     }
 }

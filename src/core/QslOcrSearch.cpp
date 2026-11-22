@@ -37,7 +37,7 @@ bool QslOcrSearch::start(const QString &rawCall)
                 error = tr("Cannot open the log for searching");
             } else if (!cancelled->load()) {
                 QSqlQuery q(sql);
-                q.prepare(QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source FROM qso "
+                q.prepare(QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso "
                                          "WHERE call=? AND deleted=0 ORDER BY id DESC LIMIT 101"));
                 q.addBindValue(call);
                 if (!q.exec()) {
@@ -47,7 +47,8 @@ bool QslOcrSearch::start(const QString &rawCall)
                         if (matches.size() == 100) { truncated = true; break; }
                         matches << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("call"), q.value(1)},
                                                {QStringLiteral("at"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
-                                               {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)}};
+                                               {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)},
+                                               {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)}};
                     }
                     if (q.lastError().isValid()) error = tr("Cannot search the log");
                 }

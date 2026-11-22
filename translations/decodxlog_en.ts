@@ -15329,6 +15329,34 @@ Extra fields are preserved: %8</source>
         <source>Temporary image copy · SHA-256 %1…</source>
         <translation>Temporary image copy · SHA-256 %1…</translation>
     </message>
+    <message>
+        <source>Selected for attachment: %1</source>
+        <translation>Selected for attachment: %1</translation>
+    </message>
+    <message>
+        <source>Approval stores the OCR image copy and recognized text with the selected QSO; it does not mark them confirmed.</source>
+        <translation>Approval stores the OCR image copy and recognized text with the selected QSO; it does not mark them confirmed.</translation>
+    </message>
+    <message>
+        <source>Approve and attach copy</source>
+        <translation>Approve and attach copy</translation>
+    </message>
+    <message>
+        <source>Cancel save</source>
+        <translation>Cancel save</translation>
+    </message>
+    <message>
+        <source>Saved: %1 QSO, %2 new links</source>
+        <translation>Saved: %1 QSO, %2 new links</translation>
+    </message>
+    <message>
+        <source>Use Import scan or image in the QSO detail to attach a different file separately.</source>
+        <translation>Use Import scan or image in the QSO detail to attach a different file separately.</translation>
+    </message>
+    <message>
+        <source>Select QSO %1 for attachment</source>
+        <translation>Select QSO %1 for attachment</translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15394,6 +15422,45 @@ Extra fields are preserved: %8</source>
     <message>
         <source>The open log changed</source>
         <translation>The open log changed</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::QslOcrAcquisition</name>
+    <message>
+        <source>Choose a completed OCR image and one to 100 QSO</source>
+        <translation>Choose a completed OCR image and one to 100 QSO</translation>
+    </message>
+    <message>
+        <source>Invalid OCR acquisition</source>
+        <translation>Invalid OCR acquisition</translation>
+    </message>
+    <message>
+        <source>The selected log is unavailable</source>
+        <translation>The selected log is unavailable</translation>
+    </message>
+    <message>
+        <source>Invalid or duplicate QSO selection</source>
+        <translation>Invalid or duplicate QSO selection</translation>
+    </message>
+    <message>
+        <source>The OCR image copy is unavailable</source>
+        <translation>The OCR image copy is unavailable</translation>
+    </message>
+    <message>
+        <source>Acquisition cancelled</source>
+        <translation>Acquisition cancelled</translation>
+    </message>
+    <message>
+        <source>The OCR image copy changed; read the image again</source>
+        <translation>The OCR image copy changed; read the image again</translation>
+    </message>
+    <message>
+        <source>A selected QSO changed or is no longer available; search again</source>
+        <translation>A selected QSO changed or is no longer available; search again</translation>
+    </message>
+    <message>
+        <source>Cannot save the OCR acquisition</source>
+        <translation>Cannot save the OCR acquisition</translation>
     </message>
 </context>
 </TS>

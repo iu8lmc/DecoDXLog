@@ -32,6 +32,7 @@ class TesseractOcr : public QObject {
     QString executable() const { return m_executable; }
     QString snapshotSha256() const { return m_snapshotSha256; }
     QString snapshotPath() const { return m_snapshotPath; }
+    QString sourcePath() const { return m_sourcePath; }
     Q_INVOKABLE bool start(const QUrl &image);
     Q_INVOKABLE void cancel();
   signals:
@@ -54,6 +55,7 @@ class TesseractOcr : public QObject {
     QString m_error;
     QString m_snapshotPath;
     QString m_snapshotSha256;
+    QString m_sourcePath;
     bool m_busy{false};
     bool m_cancelled{false};
     bool m_tooLarge{false};

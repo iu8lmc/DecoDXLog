@@ -431,6 +431,9 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TABLE IF NOT EXISTS rover_position (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES rover_session(id), gridsquare TEXT NOT NULL, effective_at TEXT NOT NULL, recorded_at TEXT NOT NULL)"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_rover_position_time ON rover_position(session_id,effective_at,id)")}, nullptr},
         {18, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qso_reported_radio_net ON qso((CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END)) WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_RADIO_NET_SESSION') END) IS NOT NULL")}, "adif_extra"},
+        {19, {QStringLiteral("CREATE TABLE IF NOT EXISTS qsl_ocr_acquisition (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL UNIQUE, attachment_id INTEGER NOT NULL REFERENCES qsl_attachment(id), sha256 TEXT NOT NULL, source_name TEXT NOT NULL, ocr_text TEXT NOT NULL, created_at TEXT NOT NULL)"),
+              QStringLiteral("CREATE TABLE IF NOT EXISTS qsl_ocr_acquisition_qso (acquisition_id INTEGER NOT NULL REFERENCES qsl_ocr_acquisition(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, qso_revision INTEGER NOT NULL, newly_linked INTEGER NOT NULL CHECK(newly_linked IN (0,1)), PRIMARY KEY(acquisition_id,qso_uuid))"),
+              QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qsl_ocr_acquisition_qso ON qsl_ocr_acquisition_qso(qso_uuid,acquisition_id)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)

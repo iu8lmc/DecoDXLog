@@ -34,6 +34,7 @@
 #include "core/RoverSession.h"
 #include "core/TesseractOcr.h"
 #include "core/QslOcrSearch.h"
+#include "core/QslOcrAcquisition.h"
 #include "core/PredictTracker.h"
 #include "core/PredictPassPlanner.h"
 #include "core/Callbook.h"
@@ -110,6 +111,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* rover READ rover CONSTANT)
     Q_PROPERTY(QObject* qslOcr READ qslOcr CONSTANT)
     Q_PROPERTY(QObject* qslOcrSearch READ qslOcrSearch CONSTANT)
+    Q_PROPERTY(QObject* qslOcrAcquisition READ qslOcrAcquisition CONSTANT)
     Q_PROPERTY(QObject* predictTracker READ predictTracker CONSTANT)
     Q_PROPERTY(QObject* predictPassPlanner READ predictPassPlanner CONSTANT)
     // I log della stazione: quello aperto e gli altri, per i contest.
@@ -330,6 +332,7 @@ public:
     QObject* rover() const { return m_rover; }
     QObject* qslOcr() const { return m_qslOcr; }
     QObject* qslOcrSearch() const { return m_qslOcrSearch; }
+    QObject* qslOcrAcquisition() const { return m_qslOcrAcquisition; }
     QObject* predictTracker() const { return m_predictTracker; }
     QObject* predictPassPlanner() const { return m_predictPassPlanner; }
     QObject* credentials() const { return m_credentials; }
@@ -1126,6 +1129,7 @@ private:
     core::RoverSession* m_rover{nullptr};
     core::TesseractOcr* m_qslOcr{nullptr};
     core::QslOcrSearch* m_qslOcrSearch{nullptr};
+    core::QslOcrAcquisition* m_qslOcrAcquisition{nullptr};
     core::PredictTracker* m_predictTracker{nullptr};
     core::PredictPassPlanner* m_predictPassPlanner{nullptr};
     LogLibrary* m_logs{nullptr};

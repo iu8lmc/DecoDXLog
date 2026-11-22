@@ -99,6 +99,36 @@ private slots:
         QVERIFY2(launch(dir, QStringLiteral("qslocrmatches:") + path, output), output.constData());
         QVERIFY2(output.contains("PROBE qslMatches success=true count=0 first= noMatchNotice=true"), output.constData());
     }
+    void qslOcrExplicitlyAttachesSnapshotToTwoQsos()
+    {
+        decolog::core::TesseractOcr engine;
+        if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = dir.filePath("card.png");
+        QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"), path));
+        QFile original(path); QVERIFY(original.open(QIODevice::ReadOnly)); const QByteArray bytes = original.readAll(); original.close();
+        {
+            decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            for (const QString &time : {"143000", "153000"}) {
+                decolog::core::AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20260923"},
+                                                 {"TIME_ON", time}, {"BAND", "20m"}, {"MODE", "SSB"}};
+                QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, decolog::core::InsertResult::Status::Inserted);
+            }
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("qslocrattach:") + path, output), output.constData());
+        QVERIFY2(output.contains("PROBE qslMatches success=true count=2 first=K1ABC"), output.constData());
+        QVERIFY2(output.contains("PROBE qslAcquire success=true selected=2 newLinks=2"), output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+        QCOMPARE(db.qsoCount(), 2);
+        const auto first = db.qslAttachments(1), second = db.qslAttachments(2);
+        QCOMPARE(first.size(), 1); QCOMPARE(second.size(), 1);
+        QCOMPARE(first.first().id, second.first().id);
+        QCOMPARE(db.qslAttachmentData(first.first().id), bytes);
+        QSqlQuery journal(db.connection()); QVERIFY(journal.exec("SELECT ocr_text FROM qsl_ocr_acquisition"));
+        QVERIFY(journal.next()); QVERIFY(journal.value(0).toString().contains("K1ABC")); QVERIFY(!journal.next());
+        QVERIFY(db.record(1)->value("QSL_RCVD").isEmpty());
+    }
     void roverManualQsoRespectsHistoryAndExplicitOverride()
     {
         QTemporaryDir dir;

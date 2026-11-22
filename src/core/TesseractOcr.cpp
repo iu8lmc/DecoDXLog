@@ -65,7 +65,7 @@ bool TesseractOcr::start(const QUrl &image)
 {
     if (m_busy) return false;
     if (!m_snapshotPath.isEmpty()) QFile::remove(m_snapshotPath);
-    m_snapshotPath.clear(); m_snapshotSha256.clear();
+    m_snapshotPath.clear(); m_snapshotSha256.clear(); m_sourcePath.clear();
     m_text.clear(); m_words.clear(); m_suggestions.clear(); m_output.clear(); m_error.clear(); m_cancelled = false; m_tooLarge = false;
     const QFileInfo info(image.toLocalFile());
     if (!image.isLocalFile() || !info.isFile() || !info.isReadable() || info.size() <= 0 || info.size() > kMaxImageBytes) {
@@ -81,6 +81,7 @@ bool TesseractOcr::start(const QUrl &image)
     m_copyCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_copyCancel;
     const QString original = info.absoluteFilePath();
+    m_sourcePath = original;
     const QString snapshot = m_tempDir.filePath(QUuid::createUuid().toString(QUuid::WithoutBraces));
     emit changed();
     QPointer<TesseractOcr> self(this);
@@ -241,6 +242,7 @@ void TesseractOcr::finish(bool success, const QString &message)
         m_text.clear(); m_words.clear(); m_suggestions.clear(); m_snapshotSha256.clear();
         if (!m_snapshotPath.isEmpty()) QFile::remove(m_snapshotPath);
         m_snapshotPath.clear();
+        m_sourcePath.clear();
     }
     emit changed();
     emit finished(success);

@@ -102,6 +102,8 @@ add_library(decolog_core STATIC
     src/core/TesseractOcr.h
     src/core/QslOcrSearch.cpp
     src/core/QslOcrSearch.h
+    src/core/QslOcrAcquisition.cpp
+    src/core/QslOcrAcquisition.h
     src/core/RadioNet.cpp
     src/core/RadioNet.h
     src/core/Adif.cpp

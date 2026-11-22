@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 18;
+constexpr int kSchemaVersion = 19;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -59,6 +59,40 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void ocrAcquisitionJournalExistsWithoutCreatingQsos()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY2(q.exec("SELECT COUNT(*) FROM qsl_ocr_acquisition"), qPrintable(q.lastError().text()));
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+        QCOMPARE(db.qsoCount(), 0);
+    }
+    void schema18UpgradePreservesQslAttachments()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = dir.filePath("legacy.sqlite");
+        qint64 id = 0, attachment = 0;
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            AdifRecord r{{"CALL", "K1ABC"}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            const auto inserted = db.insertQso(r, "manual", {}, true, 0, false);
+            QCOMPARE(inserted.status, InsertResult::Status::Inserted); id = inserted.id;
+            attachment = db.addQslAttachment("image bytes", "card.png", "image/png", {id}); QVERIFY(attachment > 0);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("DROP TABLE qsl_ocr_acquisition_qso"));
+            QVERIFY(q.exec("DROP TABLE qsl_ocr_acquisition"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=19"));
+        }
+        {
+            LogDatabase db; QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
+            QCOMPARE(db.qsoCount(), 1);
+            QCOMPARE(db.qslAttachments(id).size(), 1);
+            QCOMPARE(db.qslAttachmentData(attachment), QByteArray("image bytes"));
+        }
+    }
     void radioNetIndexMigratesMalformedExtras()
     {
         QTemporaryDir dir;

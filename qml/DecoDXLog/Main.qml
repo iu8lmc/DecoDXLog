@@ -1277,6 +1277,7 @@ RoundedWindow {
         else if (what[0] === "vuccboundary") Qt.callLater(() => console.warn("PROBE vuccBoundary " + JSON.stringify(decolog.vuccPreview("6m", "", "", 100))))
         else if (what[0] === "qslocr") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1])) }
         else if (what[0] === "qslocrmatches") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true)) }
+        else if (what[0] === "qslocrattach") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true, true)) }
         else if (what[0] === "radionet") {
             radioNetDialog.open()
             Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso" || what[1] === "save" || what[1] === "reminder", what[1] === "qso" || what[1] === "save", what[1] === "save", what[1] === "history", what[1] === "reminder", what[1] === "qsohistory") })
