@@ -5282,6 +5282,24 @@ bool DecoLogController::undoLastImport()
                 self->m_decoLink.resendSnapshot();
                 self->refreshCallInfo();
             }
+            QVariantList issues;
+            for (const auto& issue : result.issues) {
+                QString reason;
+                if (issue.reason == QLatin1String("no_baseline")) reason = tr("No verified import baseline");
+                else if (issue.reason == QLatin1String("revision")) reason = tr("QSO edited after import");
+                else if (issue.reason == QLatin1String("changed")) reason = tr("QSO, QSL or attachment changed");
+                else if (issue.reason == QLatin1String("unavailable")) reason = tr("QSO unavailable or identity changed");
+                else reason = tr("Could not move QSO to recycle history");
+                issues << QVariantMap{{QStringLiteral("qsoId"), issue.qsoId},
+                                      {QStringLiteral("call"), issue.call},
+                                      {QStringLiteral("reason"), reason}};
+            }
+            emit self->importUndoFinished(QVariantMap{
+                {QStringLiteral("batchId"), result.batchId}, {QStringLiteral("deleted"), result.deleted},
+                {QStringLiteral("alreadyDeleted"), result.alreadyDeleted}, {QStringLiteral("changed"), result.changed},
+                {QStringLiteral("unavailable"), result.unavailable}, {QStringLiteral("failed"), result.failed},
+                {QStringLiteral("cancelled"), result.cancelled}, {QStringLiteral("issues"), issues},
+                {QStringLiteral("issuesOmitted"), result.issuesOmitted}, {QStringLiteral("errors"), result.errors}});
         }, Qt::QueuedConnection);
     });
     return true;

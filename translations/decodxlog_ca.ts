@@ -4799,6 +4799,26 @@ Obre&apos;l una vegada a DecoDXLog per actualitzar-lo.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Import undo result</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Moved to recycle: %1 · already there: %2 · changed: %3 · unavailable: %4 · failed: %5</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Stopped before all QSO were processed. You can retry.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Showing the first 200 issues; %1 more are not shown.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QSO %1 · %2 · %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Import preview</source>
         <translation>Previsualització de la importació</translation>
     </message>
@@ -11841,6 +11861,26 @@ Camps extra conservats: %8</translation>
     </message>
     <message>
         <source>No recorded import is available to undo.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No verified import baseline</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QSO edited after import</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QSO, QSL or attachment changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>QSO unavailable or identity changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Could not move QSO to recycle history</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

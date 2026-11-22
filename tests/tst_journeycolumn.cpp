@@ -50,22 +50,39 @@ private slots:
     {
         for (const bool accept : {false, true}) {
             QTemporaryDir dir; QVERIFY(dir.isValid());
-            qint64 importedId = 0, independentId = 0;
+            qint64 importedId = 0, changedId = 0, independentId = 0;
             {
                 decolog::core::LogDatabase db;
                 QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
-                const auto imported = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
-                QCOMPARE(imported.inserted, 1);
+                const auto imported = db.importAdif(
+                    "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+                    "<CALL:5>K1CCC<QSO_DATE:8>20260101<TIME_ON:4>0930<BAND:3>20m<MODE:2>CW<EOR>");
+                QCOMPARE(imported.inserted, 2);
                 importedId = imported.insertedIds.first();
+                changedId = imported.insertedIds.last();
+                auto changed = db.record(changedId);
+                QVERIFY(changed.has_value());
+                changed->set(QStringLiteral("COMMENT"), QStringLiteral("review me"));
+                QCOMPARE(db.updateQso(changedId, *changed).status, decolog::core::InsertResult::Status::Inserted);
                 independentId = db.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20260101"},
                     {"TIME_ON", "1000"}, {"BAND", "20m"}, {"MODE", "CW"}}, "radio").id;
                 QVERIFY(independentId > 0);
             }
             QByteArray output;
             QVERIFY2(launch(dir, accept ? QStringLiteral("undoimport") : QStringLiteral("undoimport:cancel"), output), output.constData());
+            if (accept) {
+                QVERIFY2(output.contains("PROBE importUndo"), output.constData());
+                QVERIFY2(output.contains("\"changed\":1"), output.constData());
+                QVERIFY2(output.contains("\"qsoId\":" + QByteArray::number(changedId)), output.constData());
+                QVERIFY2(output.contains("PROBE importUndoView visible=true row=QSO "), output.constData());
+                QVERIFY2(output.contains("K1CCC"), output.constData());
+            } else {
+                QVERIFY(!output.contains("PROBE importUndo"));
+            }
             decolog::core::LogDatabase reopened;
             QVERIFY(reopened.open(dir.filePath(QStringLiteral("test.sqlite"))));
             QCOMPARE(reopened.meta(importedId)->deleted, accept);
+            QVERIFY(!reopened.meta(changedId)->deleted);
             QVERIFY(!reopened.meta(independentId)->deleted);
         }
     }

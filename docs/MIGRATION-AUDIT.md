@@ -12,7 +12,9 @@ performed in batches and a per-log journal records the identity and baseline of
 each new QSO. The File menu offers undo of the latest recorded import, after
 confirmation. The operation runs in the background and moves unchanged QSO to
 recycle/history; modified, missing and older entries without a baseline are
-left for review. Cancellation stops between QSO and a retry can continue.
+left for review. The result window identifies up to 200 affected QSO and explains
+why they were skipped or failed; it states how many further entries are omitted.
+Cancellation stops between QSO and a retry can continue.
 Imports made before this journal cannot be recovered through this action.
 
 Verified locally:

@@ -42,6 +42,12 @@ struct ImportResult {
     QStringList errors;     // i primi problemi, per mostrarli all'operatore
 };
 
+struct ImportUndoIssue {
+    qint64 qsoId{0};
+    QString call;
+    QString reason; // unavailable, no_baseline, revision, changed, failed
+};
+
 struct ImportUndoResult {
     qint64 batchId{0};
     int deleted{0};
@@ -51,6 +57,8 @@ struct ImportUndoResult {
     int failed{0};
     bool cancelled{false};
     QStringList errors;
+    QList<ImportUndoIssue> issues;
+    int issuesOmitted{0};
 };
 
 struct EnrichmentEntry {

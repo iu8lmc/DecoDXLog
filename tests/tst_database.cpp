@@ -163,6 +163,12 @@ private slots:
             QCOMPARE(result.deleted, 1);
             QCOMPARE(result.changed, 2);
             QCOMPARE(result.failed, 0);
+            QCOMPARE(result.issues.size(), 2);
+            QCOMPARE(result.issues.at(0).qsoId, ids.at(1));
+            QCOMPARE(result.issues.at(0).call, QStringLiteral("K1BBB"));
+            QCOMPARE(result.issues.at(0).reason, QStringLiteral("revision"));
+            QCOMPARE(result.issues.at(1).qsoId, ids.at(2));
+            QCOMPARE(result.issues.at(1).reason, QStringLiteral("changed"));
             QVERIFY(db.meta(ids.at(0))->deleted);
             QVERIFY(!db.meta(ids.at(1))->deleted);
             QVERIFY(!db.meta(ids.at(2))->deleted);
@@ -189,6 +195,9 @@ private slots:
         const auto partial = db.undoLatestImport();
         QCOMPARE(partial.deleted, 1);
         QCOMPARE(partial.failed, 1);
+        QCOMPARE(partial.issues.size(), 1);
+        QCOMPARE(partial.issues.first().qsoId, second);
+        QCOMPARE(partial.issues.first().reason, QStringLiteral("failed"));
         QVERIFY(db.meta(first)->deleted);
         QVERIFY(!db.meta(second)->deleted);
         QVERIFY(db.history(second).isEmpty());
@@ -210,7 +219,31 @@ private slots:
         const auto result = db.undoLatestImport();
         QCOMPARE(result.deleted, 0);
         QCOMPARE(result.changed, 1);
+        QCOMPARE(result.issues.size(), 1);
+        QCOMPARE(result.issues.first().reason, QStringLiteral("no_baseline"));
         QVERIFY(!db.meta(imported.insertedIds.first())->deleted);
+    }
+
+    void undoImportBoundsReviewRowsWithoutHidingTotals()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QByteArray adif;
+        for (int i = 0; i < 205; ++i) {
+            const QByteArray call = QByteArray("K") + QByteArray::number(i) + "ZZ";
+            adif += "<CALL:" + QByteArray::number(call.size()) + ">" + call
+                  + "<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>";
+        }
+        const auto imported = db.importAdif(adif);
+        QCOMPARE(imported.inserted, 205);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("UPDATE import_qso SET baseline_hash = NULL"));
+        const auto result = db.undoLatestImport();
+        QCOMPARE(result.changed, 205);
+        QCOMPARE(result.issues.size(), 200);
+        QCOMPARE(result.issuesOmitted, 5);
+        QCOMPARE(result.deleted, 0);
+        QCOMPARE(db.qsoCount(), 205);
     }
 
     void upgradeSchema12PreservesLegacyJournalForReview()

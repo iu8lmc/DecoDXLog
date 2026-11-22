@@ -1878,6 +1878,92 @@ RoundedWindow {
     }
     property url pendingImport
     property var importPreview: ({})
+    property var importUndoSummary: ({})
+    Connections {
+        target: decolog
+        function onImportUndoFinished(result) {
+            if (typeof startupShow !== "undefined" && startupShow === "undoimport")
+                console.warn("PROBE importUndo " + JSON.stringify(result))
+            window.importUndoSummary = result
+            undoImportResultDialog.open()
+            if (typeof startupShow !== "undefined" && startupShow === "undoimport")
+                undoImportResultProbe.start()
+        }
+    }
+    Timer {
+        id: undoImportResultProbe
+        interval: 300
+        onTriggered: {
+            const row = undoImportIssueList.itemAtIndex(0)
+            console.warn("PROBE importUndoView visible=" + undoImportResultDialog.visible
+                         + " row=" + (row ? row.text : "missing"))
+        }
+    }
+    DialogFrame {
+        id: undoImportResultDialog
+        title: qsTr("Import undo result")
+        dialogKey: "undo-import-result"
+        dotColor: Theme.warningColor
+        width: 640
+        height: 440
+        body: ColumnLayout {
+            anchors.margins: 16
+            spacing: 8
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                color: Theme.textPrimary
+                text: qsTr("Moved to recycle: %1 · already there: %2 · changed: %3 · unavailable: %4 · failed: %5")
+                    .arg(window.importUndoSummary.deleted || 0).arg(window.importUndoSummary.alreadyDeleted || 0)
+                    .arg(window.importUndoSummary.changed || 0).arg(window.importUndoSummary.unavailable || 0)
+                    .arg(window.importUndoSummary.failed || 0)
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: !!window.importUndoSummary.cancelled
+                text: qsTr("Stopped before all QSO were processed. You can retry.")
+                color: Theme.warningColor
+                wrapMode: Text.Wrap
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: (window.importUndoSummary.issuesOmitted || 0) > 0
+                text: qsTr("Showing the first 200 issues; %1 more are not shown.").arg(window.importUndoSummary.issuesOmitted || 0)
+                color: Theme.warningColor
+                wrapMode: Text.Wrap
+            }
+            ListView {
+                id: undoImportIssueList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 4
+                model: window.importUndoSummary.issues || []
+                delegate: Text {
+                    required property var modelData
+                    width: ListView.view.width
+                    text: qsTr("QSO %1 · %2 · %3").arg(modelData.qsoId).arg(modelData.call || "—").arg(modelData.reason)
+                    color: Theme.textPrimary
+                    wrapMode: Text.Wrap
+                }
+                ScrollBar.vertical: ScrollBar { }
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: (window.importUndoSummary.errors || []).length > 0
+                text: (window.importUndoSummary.errors || []).join("\n")
+                color: Theme.warningColor
+                wrapMode: Text.Wrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                GlassButton { text: qsTr("Close"); onClicked: undoImportResultDialog.reject() }
+            }
+        }
+    }
     DialogFrame {
         id: undoImportDialog
         title: qsTr("Undo last import")

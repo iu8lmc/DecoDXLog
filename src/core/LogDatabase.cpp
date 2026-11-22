@@ -2196,6 +2196,18 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
     while (items.next()) rows << Item{items.value(0).toLongLong(), items.value(1).toString(),
                                        items.value(2).toInt(), items.value(3).toString()};
     items.finish();
+    const auto addIssue = [&out, &db](qint64 id, const QString& reason, bool showCall) {
+        // Keep diagnostics bounded for large imports; total counts remain exact.
+        if (out.issues.size() >= 200) { ++out.issuesOmitted; return; }
+        QString call;
+        if (showCall) {
+            QSqlQuery q(db);
+            q.prepare(QStringLiteral("SELECT call FROM qso WHERE id=?"));
+            q.addBindValue(id);
+            if (q.exec() && q.next()) call = q.value(0).toString();
+        }
+        out.issues << ImportUndoIssue{id, call, reason};
+    };
     int done = 0;
     for (const Item& item : std::as_const(rows)) {
         if (progress && !progress(done, int(rows.size()))) {
@@ -2205,12 +2217,14 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
         ++done;
         if (!db.transaction()) {
             ++out.failed;
-            out.errors << db.lastError().text();
+            addIssue(item.id, QStringLiteral("failed"), false);
+            if (out.errors.size() < 20) out.errors << db.lastError().text();
             continue;
         }
         const auto current = meta(item.id);
         if (!current || current->uuid != item.uuid) {
             ++out.unavailable;
+            addIssue(item.id, QStringLiteral("unavailable"), false);
             db.rollback();
             continue;
         }
@@ -2222,18 +2236,24 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
         if (item.fingerprint.isEmpty() || current->revision != item.revision
             || fingerprintReader.read(item.id) != item.fingerprint) {
             ++out.changed;
+            const QString reason = item.fingerprint.isEmpty() ? QStringLiteral("no_baseline")
+                : current->revision != item.revision ? QStringLiteral("revision") : QStringLiteral("changed");
+            addIssue(item.id, reason, true);
             db.rollback();
             continue;
         }
         if (!softDeleteQso(item.id)) {
             ++out.failed;
-            out.errors << QStringLiteral("QSO %1: cannot move to recycle history").arg(item.id);
+            addIssue(item.id, QStringLiteral("failed"), true);
+            if (out.errors.size() < 20)
+                out.errors << QStringLiteral("QSO %1: cannot move to recycle history").arg(item.id);
             db.rollback();
             continue;
         }
         if (!db.commit()) {
             ++out.failed;
-            out.errors << db.lastError().text();
+            addIssue(item.id, QStringLiteral("failed"), true);
+            if (out.errors.size() < 20) out.errors << db.lastError().text();
             db.rollback();
             continue;
         }

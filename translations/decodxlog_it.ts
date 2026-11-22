@@ -4815,6 +4815,26 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
         <translation>Spostare nel cestino i QSO non modificati dell’ultima importazione registrata? I QSO modificati, non disponibili e le vecchie voci non verificate restano nel log per la revisione.</translation>
     </message>
     <message>
+        <source>Import undo result</source>
+        <translation>Risultato annullamento importazione</translation>
+    </message>
+    <message>
+        <source>Moved to recycle: %1 · already there: %2 · changed: %3 · unavailable: %4 · failed: %5</source>
+        <translation>Spostati nel cestino: %1 · già presenti: %2 · modificati: %3 · non disponibili: %4 · non riusciti: %5</translation>
+    </message>
+    <message>
+        <source>Stopped before all QSO were processed. You can retry.</source>
+        <translation>Operazione interrotta prima di elaborare tutti i QSO. Puoi riprovare.</translation>
+    </message>
+    <message>
+        <source>Showing the first 200 issues; %1 more are not shown.</source>
+        <translation>Sono mostrati i primi 200 problemi; altri %1 non sono mostrati.</translation>
+    </message>
+    <message>
+        <source>QSO %1 · %2 · %3</source>
+        <translation>QSO %1 · %2 · %3</translation>
+    </message>
+    <message>
         <source>Import preview</source>
         <translation>Anteprima dell&apos;importazione</translation>
     </message>
@@ -11930,6 +11950,26 @@ Campi extra conservati: %8</translation>
     <message>
         <source>No recorded import is available to undo.</source>
         <translation>Non ci sono importazioni registrate da annullare.</translation>
+    </message>
+    <message>
+        <source>No verified import baseline</source>
+        <translation>Nessuna base di importazione verificata</translation>
+    </message>
+    <message>
+        <source>QSO edited after import</source>
+        <translation>QSO modificato dopo l’importazione</translation>
+    </message>
+    <message>
+        <source>QSO, QSL or attachment changed</source>
+        <translation>QSO, QSL o allegato modificato</translation>
+    </message>
+    <message>
+        <source>QSO unavailable or identity changed</source>
+        <translation>QSO non disponibile o identità cambiata</translation>
+    </message>
+    <message>
+        <source>Could not move QSO to recycle history</source>
+        <translation>Impossibile spostare il QSO nel cestino</translation>
     </message>
     <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>

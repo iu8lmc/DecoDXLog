@@ -4795,6 +4795,26 @@ Open it once in DecoDXLog to bring it up to date.</source>
         <translation>Move unchanged QSO from the latest recorded import to the recycle history? Changed, unavailable and older unverified entries remain in the log for review.</translation>
     </message>
     <message>
+        <source>Import undo result</source>
+        <translation>Import undo result</translation>
+    </message>
+    <message>
+        <source>Moved to recycle: %1 · already there: %2 · changed: %3 · unavailable: %4 · failed: %5</source>
+        <translation>Moved to recycle: %1 · already there: %2 · changed: %3 · unavailable: %4 · failed: %5</translation>
+    </message>
+    <message>
+        <source>Stopped before all QSO were processed. You can retry.</source>
+        <translation>Stopped before all QSO were processed. You can retry.</translation>
+    </message>
+    <message>
+        <source>Showing the first 200 issues; %1 more are not shown.</source>
+        <translation>Showing the first 200 issues; %1 more are not shown.</translation>
+    </message>
+    <message>
+        <source>QSO %1 · %2 · %3</source>
+        <translation>QSO %1 · %2 · %3</translation>
+    </message>
+    <message>
         <source>Import preview</source>
         <translation type="unfinished"></translation>
     </message>
@@ -11835,6 +11855,26 @@ Extra fields are preserved: %8</source>
     <message>
         <source>No recorded import is available to undo.</source>
         <translation>No recorded import is available to undo.</translation>
+    </message>
+    <message>
+        <source>No verified import baseline</source>
+        <translation>No verified import baseline</translation>
+    </message>
+    <message>
+        <source>QSO edited after import</source>
+        <translation>QSO edited after import</translation>
+    </message>
+    <message>
+        <source>QSO, QSL or attachment changed</source>
+        <translation>QSO, QSL or attachment changed</translation>
+    </message>
+    <message>
+        <source>QSO unavailable or identity changed</source>
+        <translation>QSO unavailable or identity changed</translation>
+    </message>
+    <message>
+        <source>Could not move QSO to recycle history</source>
+        <translation>Could not move QSO to recycle history</translation>
     </message>
     <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>

@@ -821,6 +821,7 @@ signals:
     void stationChanged();
     void backupChanged();
     void importChanged();
+    void importUndoFinished(const QVariantMap& result);
     void importPreviewReady(const QUrl& file, const QVariantMap& result);
     void bulkChanged();
     void exportBusyChanged();

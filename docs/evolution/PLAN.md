@@ -9,7 +9,7 @@ Scope: desktop Windows, macOS and Linux, and the existing cloud; no mobile clien
 | G02 Awards | G00, G01 | Partial: VUCC and Marathon previews and claims exist; verify official rules, multi-grid and independent entity/zone selection. |
 | G03 QSL planner | G02 | Partial foundations: QSL status and routing exist; marginal award benefit and alternatives need verification/implementation. |
 | G04 DX campaigns | G02 | Partial foundations: calendar and DX Assistant; persistent campaign workflow to verify. |
-| G05 Migration and sync history | G01 | Partial: import preview, extras, memory-only undo and reconciliation exist; schema-13 journal and guarded undo core added. Background undo and confirmation UI are present; add per-QSO review, test UI cancellation/crash, resolve measured fingerprint cost, source-specific migration and per-QSO history. |
+| G05 Migration and sync history | G01 | Partial: import preview, extras, memory-only undo and reconciliation exist; schema-13 journal and guarded undo core added. Background undo, confirmation and bounded per-QSO outcome list are present; add pre-operation preview and exhaustive review, test UI cancellation/crash, resolve measured fingerprint cost, source-specific migration and per-QSO history. |
 | G06 Multi-program activation | G02, G05 | Partial: activation sessions exist; independent program references and exports remain. |
 | G07 Typed fields and reports | G01, G02 | Partial: text custom fields exist; typed fields and saved reports to verify. |
 | G08 Radio net manager | G01 | Not established: computer contest network is distinct; inspect radio roster workflow. |
