@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 13;
+constexpr int kSchemaVersion = 14;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -269,7 +269,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 13);
+            QCOMPARE(db.schemaVersion(), 14);
             const auto result = db.undoLatestImport();
             QCOMPARE(result.changed, 1);
             QCOMPARE(result.deleted, 0);
@@ -302,8 +302,8 @@ private slots:
             "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
         QCOMPARE(imported.inserted, 2);
         QList<int> observed;
-        const auto interrupted = db.undoLatestImport([&observed](int done, int) {
-            observed << done;
+        const auto interrupted = db.undoLatestImport([&observed](int done, int total) {
+            if (total >= 0) observed << done;
             return done < 1;
         });
         QVERIFY(interrupted.cancelled);
@@ -314,6 +314,82 @@ private slots:
         const auto retry = db.undoLatestImport();
         QCOMPARE(retry.alreadyDeleted, 1);
         QCOMPARE(retry.deleted, 1);
+    }
+
+    void undoCanCancelBeforeLoadingJournalRows()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QCOMPARE(db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>").inserted, 1);
+        int observedTotal = -99;
+        const auto result = db.undoLatestImport([&observedTotal](int, int total) {
+            observedTotal = total;
+            return false;
+        }, true);
+        QCOMPARE(observedTotal, -1);
+        QVERIFY(result.cancelled);
+        QCOMPARE(result.deleted, 0);
+        QCOMPARE(db.qsoCount(), 1);
+    }
+
+    void pagedUndoCanStopAndResumeAcrossPageBoundary()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QByteArray adif;
+        for (int i = 0; i < 260; ++i) {
+            const QByteArray call = QByteArray("K") + QByteArray::number(i) + "ZZ";
+            adif += "<CALL:" + QByteArray::number(call.size()) + ">" + call
+                  + "<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>";
+        }
+        const auto imported = db.importAdif(adif);
+        QCOMPARE(imported.inserted, 260);
+        const auto preview = db.undoLatestImport({}, true);
+        QCOMPARE(preview.eligible, 260);
+        QCOMPARE(db.qsoCount(), 260);
+        const auto stopped = db.undoLatestImport([](int done, int) { return done < 129; }, false,
+                                                  preview.batchId, preview.batchUuid);
+        QVERIFY(stopped.cancelled);
+        QCOMPARE(stopped.deleted, 129);
+        QCOMPARE(db.qsoCount(), 131);
+        const auto resumed = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid);
+        QCOMPARE(resumed.alreadyDeleted, 129);
+        QCOMPARE(resumed.deleted, 131);
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
+    void schema13UpgradeAddsJournalPagingIndex()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("v13.sqlite"));
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            QCOMPARE(db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>").inserted, 1);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("DROP INDEX idx_import_qso_page"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version >= 14"));
+            QVERIFY(q.exec("INSERT INTO schema_version(version) VALUES (13)"));
+        }
+        {
+            LogDatabase db;
+            QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), 14);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_import_qso_page'"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 1);
+            QVERIFY(q.exec("EXPLAIN QUERY PLAN SELECT qso_id,qso_uuid,imported_revision,baseline_hash FROM import_qso "
+                           "WHERE batch_id=1 AND (qso_id>0 OR (qso_id=0 AND qso_uuid>'')) AND qso_id<=999 "
+                           "ORDER BY qso_id,qso_uuid LIMIT 128"));
+            QString plan;
+            while (q.next()) plan += q.value(3).toString();
+            QVERIFY2(plan.contains(QStringLiteral("idx_import_qso_page")), qPrintable(plan));
+            const auto undo = db.undoLatestImport();
+            QCOMPARE(undo.deleted, 1);
+            QCOMPARE(undo.changed, 0);
+        }
     }
 
     void undoPreviewDoesNotChangeDataAndRechecksAfterConfirmation()
@@ -400,7 +476,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 13);
+            QCOMPARE(db.schemaVersion(), 14);
             QCOMPARE(db.qsoCount(), 1);
             QCOMPARE(db.meta(id)->uuid, uuid);
             QSqlQuery q(db.connection());

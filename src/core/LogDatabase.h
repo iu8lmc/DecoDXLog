@@ -349,7 +349,7 @@ public:
     using ImportProgress = std::function<void(int done, int total)>;
     ImportResult importAdif(const QByteArray& data, const QString& source, qint64 stationProfileId,
                             const ImportProgress& progress, int batchSize);
-    // Called before each item and once at completion. False requests cancellation.
+    // Called initially with total=-1, before each item and at completion. False cancels.
     ImportUndoResult undoLatestImport(const std::function<bool(int done, int total)>& progress = {},
                                       bool preview = false, qint64 expectedBatchId = 0,
                                       const QString& expectedBatchUuid = {});

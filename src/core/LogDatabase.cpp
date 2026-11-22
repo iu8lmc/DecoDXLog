@@ -410,6 +410,7 @@ bool LogDatabase::migrate()
         {12, {QStringLiteral("CREATE TABLE IF NOT EXISTS import_batch (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)"),
               QStringLiteral("CREATE TABLE IF NOT EXISTS import_qso (batch_id INTEGER NOT NULL REFERENCES import_batch(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, imported_revision INTEGER NOT NULL, PRIMARY KEY (batch_id, qso_uuid))")}, nullptr},
         {13, {QStringLiteral("ALTER TABLE import_qso ADD COLUMN baseline_hash TEXT")}, nullptr},
+        {14, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_import_qso_page ON import_qso(batch_id, qso_id, qso_uuid)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -2178,6 +2179,11 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
 {
     ImportUndoResult out;
     QSqlDatabase db = connection();
+    // Allow cancellation before counting or fetching a potentially large journal.
+    if (progress && !progress(0, -1)) {
+        out.cancelled = true;
+        return out;
+    }
     ImportFingerprintReader fingerprintReader(db);
     QSqlQuery batch(db);
     if (!batch.exec(QStringLiteral("SELECT id,uuid FROM import_batch ORDER BY id DESC LIMIT 1"))) {
@@ -2192,18 +2198,26 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
         out.errors << QStringLiteral("The latest import changed after preview; preview again");
         return out;
     }
-    QSqlQuery items(db);
-    items.prepare(QStringLiteral("SELECT qso_id,qso_uuid,imported_revision,baseline_hash FROM import_qso WHERE batch_id=? ORDER BY qso_id"));
-    items.addBindValue(out.batchId);
-    if (!items.exec()) {
-        out.errors << items.lastError().text();
+    QSqlQuery bounds(db);
+    bounds.prepare(QStringLiteral("SELECT COUNT(*),COALESCE(MAX(qso_id),0) FROM import_qso WHERE batch_id=?"));
+    bounds.addBindValue(out.batchId);
+    if (!bounds.exec() || !bounds.next()) {
+        out.errors << bounds.lastError().text();
         return out;
     }
+    const qint64 count = bounds.value(0).toLongLong();
+    const qint64 maxId = bounds.value(1).toLongLong();
+    if (count > std::numeric_limits<int>::max()) {
+        out.errors << QStringLiteral("Import journal is too large to scan safely");
+        return out;
+    }
+    const int total = int(count);
+    bounds.finish();
+    QSqlQuery items(db);
+    items.prepare(QStringLiteral("SELECT qso_id,qso_uuid,imported_revision,baseline_hash FROM import_qso "
+        "WHERE batch_id=? AND (qso_id>? OR (qso_id=? AND qso_uuid>?)) AND qso_id<=? "
+        "ORDER BY qso_id,qso_uuid LIMIT 128"));
     struct Item { qint64 id; QString uuid; int revision; QString fingerprint; };
-    QList<Item> rows;
-    while (items.next()) rows << Item{items.value(0).toLongLong(), items.value(1).toString(),
-                                       items.value(2).toInt(), items.value(3).toString()};
-    items.finish();
     const auto addIssue = [&out, &db](qint64 id, const QString& reason, bool showCall) {
         // Keep diagnostics bounded for large imports; total counts remain exact.
         if (out.issues.size() >= 200) { ++out.issuesOmitted; return; }
@@ -2217,62 +2231,87 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
         out.issues << ImportUndoIssue{id, call, reason};
     };
     int done = 0;
-    for (const Item& item : std::as_const(rows)) {
-        if (progress && !progress(done, int(rows.size()))) {
-            out.cancelled = true;
+    qint64 lastId = -1;
+    QString lastUuid;
+    while (done < total) {
+        items.bindValue(0, out.batchId);
+        items.bindValue(1, lastId);
+        items.bindValue(2, lastId);
+        items.bindValue(3, lastUuid);
+        items.bindValue(4, maxId);
+        if (!items.exec()) {
+            out.errors << items.lastError().text();
             break;
         }
-        ++done;
-        if (!db.transaction()) {
-            ++out.failed;
-            addIssue(item.id, QStringLiteral("failed"), false);
-            if (out.errors.size() < 20) out.errors << db.lastError().text();
-            continue;
+        QList<Item> rows;
+        while (items.next()) rows << Item{items.value(0).toLongLong(), items.value(1).toString(),
+                                           items.value(2).toInt(), items.value(3).toString()};
+        items.finish();
+        if (rows.isEmpty()) {
+            out.errors << QStringLiteral("Import journal changed during scan; preview again");
+            break;
         }
-        const auto current = meta(item.id);
-        if (!current || current->uuid != item.uuid) {
-            ++out.unavailable;
-            addIssue(item.id, QStringLiteral("unavailable"), false);
-            db.rollback();
-            continue;
+        for (const Item& item : std::as_const(rows)) {
+            if (done >= total) break;
+            if (progress && !progress(done, total)) {
+                out.cancelled = true;
+                break;
+            }
+            ++done;
+            lastId = item.id;
+            lastUuid = item.uuid;
+            if (!db.transaction()) {
+                ++out.failed;
+                addIssue(item.id, QStringLiteral("failed"), false);
+                if (out.errors.size() < 20) out.errors << db.lastError().text();
+                continue;
+            }
+            const auto current = meta(item.id);
+            if (!current || current->uuid != item.uuid) {
+                ++out.unavailable;
+                addIssue(item.id, QStringLiteral("unavailable"), false);
+                db.rollback();
+                continue;
+            }
+            if (current->deleted) {
+                ++out.alreadyDeleted;
+                db.rollback();
+                continue;
+            }
+            if (item.fingerprint.isEmpty() || current->revision != item.revision
+                || fingerprintReader.read(item.id) != item.fingerprint) {
+                ++out.changed;
+                const QString reason = item.fingerprint.isEmpty() ? QStringLiteral("no_baseline")
+                    : current->revision != item.revision ? QStringLiteral("revision") : QStringLiteral("changed");
+                addIssue(item.id, reason, true);
+                db.rollback();
+                continue;
+            }
+            if (preview) {
+                ++out.eligible;
+                db.rollback();
+                continue;
+            }
+            if (!softDeleteQso(item.id)) {
+                ++out.failed;
+                addIssue(item.id, QStringLiteral("failed"), true);
+                if (out.errors.size() < 20)
+                    out.errors << QStringLiteral("QSO %1: cannot move to recycle history").arg(item.id);
+                db.rollback();
+                continue;
+            }
+            if (!db.commit()) {
+                ++out.failed;
+                addIssue(item.id, QStringLiteral("failed"), true);
+                if (out.errors.size() < 20) out.errors << db.lastError().text();
+                db.rollback();
+                continue;
+            }
+            ++out.deleted;
         }
-        if (current->deleted) {
-            ++out.alreadyDeleted;
-            db.rollback();
-            continue;
-        }
-        if (item.fingerprint.isEmpty() || current->revision != item.revision
-            || fingerprintReader.read(item.id) != item.fingerprint) {
-            ++out.changed;
-            const QString reason = item.fingerprint.isEmpty() ? QStringLiteral("no_baseline")
-                : current->revision != item.revision ? QStringLiteral("revision") : QStringLiteral("changed");
-            addIssue(item.id, reason, true);
-            db.rollback();
-            continue;
-        }
-        if (preview) {
-            ++out.eligible;
-            db.rollback();
-            continue;
-        }
-        if (!softDeleteQso(item.id)) {
-            ++out.failed;
-            addIssue(item.id, QStringLiteral("failed"), true);
-            if (out.errors.size() < 20)
-                out.errors << QStringLiteral("QSO %1: cannot move to recycle history").arg(item.id);
-            db.rollback();
-            continue;
-        }
-        if (!db.commit()) {
-            ++out.failed;
-            addIssue(item.id, QStringLiteral("failed"), true);
-            if (out.errors.size() < 20) out.errors << db.lastError().text();
-            db.rollback();
-            continue;
-        }
-        ++out.deleted;
+        if (out.cancelled) break;
     }
-    if (!out.cancelled && progress) progress(done, int(rows.size()));
+    if (!out.cancelled && out.errors.isEmpty() && progress) progress(done, total);
     return out;
 }
 

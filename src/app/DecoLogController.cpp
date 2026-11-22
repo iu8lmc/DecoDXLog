@@ -5260,7 +5260,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
         } else {
             int lastPercent = -1;
             result = db.undoLatestImport([self, cancel, &lastPercent](int done, int total) {
-                const int percent = total ? done * 100 / total : 100;
+                const int percent = total > 0 ? int(qint64(done) * 100 / total) : 0;
                 if (percent != lastPercent) {
                     lastPercent = percent;
                     QMetaObject::invokeMethod(self.data(), [self, percent] {
@@ -5297,7 +5297,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
                 self->addActivity(QStringLiteral("IMPORT"), error, QStringLiteral("warning"));
             if (result.cancelled && !preview)
                 self->addActivity(QStringLiteral("IMPORT"), tr("Import undo cancelled; unprocessed QSO remain available for retry."), QStringLiteral("warning"));
-            if (!preview && !result.batchId && result.errors.isEmpty())
+            if (!preview && !result.cancelled && !result.batchId && result.errors.isEmpty())
                 self->addActivity(QStringLiteral("IMPORT"), tr("No recorded import is available to undo."), QStringLiteral("warning"));
             if (result.deleted > 0) {
                 self->addActivity(QStringLiteral("IMPORT"), tr("Undid the last import: %1 QSO(s) moved to the recycle history.")
