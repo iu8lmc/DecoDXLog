@@ -14870,5 +14870,21 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Port</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Load satellites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Available tracked satellites</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Satellite list received</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a numeric IP and a valid port.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 </TS>

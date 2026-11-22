@@ -6,6 +6,70 @@ using namespace decolog::core;
 class TestPredictTracker : public QObject {
     Q_OBJECT
   private slots:
+    void listsSatellitesAndRejectsStoppedTracking()
+    {
+        PredictTracker tracker;
+        QVERIFY(tracker.metaObject()->indexOfMethod("requestSatellites(QString,int)") >= 0);
+        QVERIFY(tracker.metaObject()->indexOfProperty("satellites") >= 0);
+        QUdpSocket server;
+        QVERIFY(server.bind(QHostAddress::LocalHost, 0));
+        QByteArray mode = "MULTI\n";
+        QByteArray list = "OSCAR-7\nFO-29 (JAS-2)\n\n";
+        bool changeMode = false;
+        QStringList commands;
+        connect(&server, &QUdpSocket::readyRead, &server, [&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()), Qt::Uninitialized);
+                QHostAddress from;
+                quint16 port;
+                server.readDatagram(request.data(), request.size(), &from, &port);
+                commands << QString::fromLatin1(request).trimmed();
+                server.writeDatagram(request.startsWith("GET_LIST") ? list : mode, from, port);
+                if (changeMode && request.startsWith("GET_LIST"))
+                    mode = "NONE\n";
+            }
+        });
+        QSignalSpy done(&tracker, &PredictTracker::satellitesFinished);
+        QVERIFY(tracker.requestSatellites("127.0.0.1", server.localPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(done.takeFirst().at(0).toBool());
+        QCOMPARE(tracker.satellites(), QStringList({"OSCAR-7", "FO-29 (JAS-2)"}));
+        QCOMPARE(commands, QStringList({"GET_MODE", "GET_LIST", "GET_MODE"}));
+        mode = "FO-29 (JAS-2)\n";
+        QVERIFY(tracker.requestSatellites("127.0.0.1", server.localPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(done.takeFirst().at(0).toBool());
+        QCOMPARE(tracker.satellites(), QStringList({"FO-29 (JAS-2)"}));
+        mode = "MULTI\n";
+        changeMode = true;
+        QVERIFY(tracker.requestSatellites("127.0.0.1", server.localPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(!done.takeFirst().at(0).toBool());
+        QVERIFY(tracker.satellites().isEmpty());
+        changeMode = false;
+        mode = "NONE\n";
+        QVERIFY(tracker.requestSatellites("127.0.0.1", server.localPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(!done.takeFirst().at(0).toBool());
+        QVERIFY(tracker.satellites().isEmpty());
+        mode = "MULTI\n";
+        list = "Huh?\n";
+        QVERIFY(tracker.requestSatellites("127.0.0.1", server.localPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(!done.takeFirst().at(0).toBool());
+        QVERIFY(tracker.satellites().isEmpty());
+        list = "\n\n";
+        QVERIFY(tracker.requestSatellites("127.0.0.1", server.localPort()));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(!done.takeFirst().at(0).toBool());
+        QVERIFY(tracker.satellites().isEmpty());
+        const quint16 port = server.localPort();
+        server.close();
+        QVERIFY(tracker.requestSatellites("127.0.0.1", port));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(!done.takeFirst().at(0).toBool());
+        QVERIFY(tracker.satellites().isEmpty());
+    }
     void exposesSnapshotAndBusyToDesktop()
     {
         PredictTracker tracker;

@@ -13,7 +13,7 @@ PredictTracker::PredictTracker(QObject *parent) : QObject(parent)
 }
 bool PredictTracker::request(const QString &host, int port, const QString &satellite)
 {
-    static const QRegularExpression valid(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9 ._+/-]{0,24}$"));
+    static const QRegularExpression valid(QStringLiteral("^[\\x21-\\x7e][\\x20-\\x7e]{0,24}$"));
     QHostAddress address;
     if (m_busy || !address.setAddress(host) || port <= 0 || port > 65535 || !valid.match(satellite).hasMatch())
         return false;
@@ -21,8 +21,26 @@ bool PredictTracker::request(const QString &host, int port, const QString &satel
     m_port = port;
     m_satellite = satellite;
     m_stage = 0;
+    m_listing = false;
     m_pending.clear();
     m_snapshot.clear();
+    m_busy = true;
+    emit changed();
+    sendNext();
+    return true;
+}
+bool PredictTracker::requestSatellites(const QString &host, int port)
+{
+    QHostAddress address;
+    if (m_busy || !address.setAddress(host) || port <= 0 || port > 65535)
+        return false;
+    m_host = address;
+    m_port = port;
+    m_stage = 0;
+    m_listing = true;
+    m_satellites.clear();
+    m_pendingSatellites.clear();
+    m_listMode.clear();
     m_busy = true;
     emit changed();
     sendNext();
@@ -35,7 +53,14 @@ void PredictTracker::sendNext()
         m_socket->deleteLater();
         m_socket = nullptr;
     }
-    if (m_stage == 5) {
+    if (m_listing && m_stage == 3) {
+        m_satellites = m_pendingSatellites;
+        m_busy = false;
+        emit changed();
+        emit satellitesFinished(true, {});
+        return;
+    }
+    if (!m_listing && m_stage == 5) {
         m_snapshot = m_pending;
         m_busy = false;
         emit changed();
@@ -43,8 +68,9 @@ void PredictTracker::sendNext()
         return;
     }
     static const char *commands[] = {"GET_MODE", "GET_SAT ", "GET_DOPPLER ", "GET_TLE ", "GET_MODE"};
-    QByteArray command(commands[m_stage]);
-    if (m_stage > 0 && m_stage < 4)
+    QByteArray command = m_listing ? (m_stage == 1 ? QByteArrayLiteral("GET_LIST") : QByteArrayLiteral("GET_MODE"))
+                                   : QByteArray(commands[m_stage]);
+    if (!m_listing && m_stage > 0 && m_stage < 4)
         command += m_satellite.toLatin1();
     command += '\n';
     m_socket = new QUdpSocket(this);
@@ -78,7 +104,36 @@ void PredictTracker::receive()
             continue;
         m_timeout.stop();
         const auto lines = raw.trimmed().split('\n');
-        if (m_stage == 0 || m_stage == 4) {
+        if (m_listing) {
+            if (m_stage == 0 || m_stage == 2) {
+                const QString mode = QString::fromLatin1(raw).trimmed();
+                static const QRegularExpression valid(QStringLiteral("^[\\x21-\\x7e][\\x20-\\x7e]{0,24}$"));
+                if (!valid.match(mode).hasMatch() || mode == QLatin1String("NONE") || mode == QLatin1String("Huh?") ||
+                    (m_stage == 2 && mode != m_listMode)) {
+                    fail(QStringLiteral("PREDICT tracking mode unavailable or changed"));
+                    return;
+                }
+                m_listMode = mode;
+            } else {
+                static const QRegularExpression valid(QStringLiteral("^[\\x21-\\x7e][\\x20-\\x7e]{0,24}$"));
+                for (const QByteArray &line : lines) {
+                    const QString name = QString::fromLatin1(line).trimmed();
+                    if (name.isEmpty())
+                        continue;
+                    if (!valid.match(name).hasMatch() || name == QLatin1String("Huh?")) {
+                        fail(QStringLiteral("Invalid PREDICT satellite list"));
+                        return;
+                    }
+                    if (!m_pendingSatellites.contains(name, Qt::CaseInsensitive) &&
+                        (m_listMode == QLatin1String("MULTI") || m_listMode.compare(name, Qt::CaseInsensitive) == 0))
+                        m_pendingSatellites.append(name);
+                }
+                if (m_pendingSatellites.isEmpty()) {
+                    fail(QStringLiteral("PREDICT returned no tracked satellites"));
+                    return;
+                }
+            }
+        } else if (m_stage == 0 || m_stage == 4) {
             const QString mode = QString::fromLatin1(raw).trimmed();
             if (mode != QLatin1String("MULTI") && mode.compare(m_satellite, Qt::CaseInsensitive) != 0) {
                 fail(QStringLiteral("PREDICT is not tracking the selected satellite"));
@@ -145,9 +200,17 @@ void PredictTracker::fail(const QString &error)
         m_socket = nullptr;
     }
     m_pending.clear();
-    m_snapshot.clear();
+    if (m_listing) {
+        m_pendingSatellites.clear();
+        m_satellites.clear();
+    } else {
+        m_snapshot.clear();
+    }
     m_busy = false;
     emit changed();
-    emit finished(false, error);
+    if (m_listing)
+        emit satellitesFinished(false, error);
+    else
+        emit finished(false, error);
 }
 } // namespace decolog::core

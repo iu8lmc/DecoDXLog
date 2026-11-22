@@ -14972,5 +14972,21 @@ Campi extra conservati: %8</translation>
         <source>Port</source>
         <translation>Porta</translation>
     </message>
+    <message>
+        <source>Load satellites</source>
+        <translation>Carica satelliti</translation>
+    </message>
+    <message>
+        <source>Available tracked satellites</source>
+        <translation>Satelliti tracciati disponibili</translation>
+    </message>
+    <message>
+        <source>Satellite list received</source>
+        <translation>Elenco satelliti ricevuto</translation>
+    </message>
+    <message>
+        <source>Enter a numeric IP and a valid port.</source>
+        <translation>Inserisci un IP numerico e una porta valida.</translation>
+    </message>
 </context>
 </TS>

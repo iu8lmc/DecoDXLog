@@ -18,6 +18,8 @@ class Fixture(socketserver.BaseRequestHandler):
             reply = 'NONE\n'
         elif command == 'GET_MODE':
             reply = 'MULTI\n'
+        elif command == 'GET_LIST':
+            reply = 'OSCAR-7\nFO-29 (JAS-2)\n'
         elif command == 'GET_SAT OSCAR-7':
             reply = 'OSCAR-7\n151.79\n-70.04\n203.75\n-60.01\n1800000000\n5988\n11881\n773\n7.47\n6292\nD\n279\n-32\n360\n'
         elif command == 'GET_DOPPLER OSCAR-7':
@@ -54,3 +56,29 @@ for stopped in (False, True):
                 assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
             server.shutdown()
             print(f'PASS stopped={stopped}, commands={server.commands}')
+
+for stopped in (False, True):
+    with tempfile.TemporaryDirectory(prefix='decolog-predict-list-') as tmp:
+        root = pathlib.Path(tmp)
+        with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
+            server.commands = []
+            server.stopped = stopped
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            env = os.environ.copy()
+            env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
+                       DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='2800')
+            command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
+                       '--db', str(root/'test.sqlite'), '--port', '0', '--show',
+                       f'predictlist:127.0.0.1:{server.server_address[1]}', '--grab', str(root/'screen.png')]
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
+            output = result.stdout + result.stderr
+            expected = 'PROBE predictList success=false count=0 selected=' if stopped else 'PROBE predictList success=true count=2 selected=OSCAR-7'
+            if result.returncode or expected not in output:
+                raise SystemExit(f'FAIL list stopped={stopped}: {output}; requests={server.commands}')
+            expected_commands = ['GET_MODE'] if stopped else ['GET_MODE', 'GET_LIST', 'GET_MODE']
+            if server.commands != expected_commands:
+                raise SystemExit(f'Unexpected commands: {server.commands}')
+            with sqlite3.connect(root/'test.sqlite') as db:
+                assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
+            server.shutdown()
+            print(f'PASS list stopped={stopped}, commands={server.commands}')

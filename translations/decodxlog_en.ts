@@ -14929,5 +14929,21 @@ Extra fields are preserved: %8</source>
         <source>Port</source>
         <translation>Port</translation>
     </message>
+    <message>
+        <source>Load satellites</source>
+        <translation>Load satellites</translation>
+    </message>
+    <message>
+        <source>Available tracked satellites</source>
+        <translation>Available tracked satellites</translation>
+    </message>
+    <message>
+        <source>Satellite list received</source>
+        <translation>Satellite list received</translation>
+    </message>
+    <message>
+        <source>Enter a numeric IP and a valid port.</source>
+        <translation>Enter a numeric IP and a valid port.</translation>
+    </message>
 </context>
 </TS>

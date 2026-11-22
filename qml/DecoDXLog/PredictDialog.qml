@@ -14,6 +14,10 @@ DialogFrame {
     readonly property var tracker: decolog.predictTracker
     readonly property var sample: tracker.snapshot
     property bool probing: false
+    property bool probingList: false
+    property bool listValid: false
+    property string listHost: ""
+    property string listPort: ""
     property bool resultValid: false
     readonly property double epochMs: sample.tleEpoch ? new Date(sample.tleEpoch).getTime() : NaN
     readonly property double ageDays: isFinite(epochMs) ? (Date.now() - epochMs) / 86400000 : NaN
@@ -24,8 +28,27 @@ DialogFrame {
         satelliteField.text = name
         requestButton.clicked()
     }
+    function probeList(host, port) {
+        probingList = true
+        hostField.text = host
+        portField.text = String(port)
+        listButton.clicked()
+    }
     Connections {
         target: root.tracker
+        function onSatellitesFinished(success, error) {
+            root.listValid = success && root.listHost === hostField.text.trim() && root.listPort === portField.text.trim()
+            status.text = root.listValid ? qsTr("Satellite list received") : qsTr("Tracker error: %1").arg(error)
+            if (root.probingList) {
+                if (success && satelliteChoices.count > 0) {
+                    satelliteChoices.currentIndex = 0
+                    satelliteChoices.activated(0)
+                }
+                console.warn("PROBE predictList success=" + success + " count=" + satelliteChoices.count
+                             + " selected=" + satelliteField.text + " error=" + error)
+                root.probingList = false
+            }
+        }
         function onFinished(success, error) {
             root.resultValid = success
             status.text = success ? qsTr("Snapshot received") : qsTr("Tracker error: %1").arg(error)
@@ -43,9 +66,9 @@ DialogFrame {
         Text { text: qsTr("PREDICT UDP server"); color: Theme.textPrimary; font.bold: true }
         RowLayout {
             Layout.fillWidth: true
-            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true }
-            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90 }
-            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true }
+            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy; onTextChanged: { root.listValid = false; root.resultValid = false } }
+            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy; onTextChanged: { root.listValid = false; root.resultValid = false } }
+            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy; onTextChanged: root.resultValid = false }
             GlassButton {
                 id: requestButton
                 text: qsTr("Read snapshot")
@@ -58,6 +81,33 @@ DialogFrame {
                         if (root.probing) { console.warn("PROBE predict success=false invalid=true"); root.probing = false }
                     }
                 }
+            }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            GlassButton {
+                id: listButton
+                text: qsTr("Load satellites")
+                enabled: !root.tracker.busy && portField.acceptableInput
+                onClicked: {
+                    root.listValid = false
+                    satelliteField.text = ""
+                    root.listHost = hostField.text.trim()
+                    root.listPort = portField.text.trim()
+                    status.text = qsTr("Reading…")
+                    if (!root.tracker.requestSatellites(hostField.text.trim(), Number(portField.text))) {
+                        status.text = qsTr("Enter a numeric IP and a valid port.")
+                        if (root.probingList) { console.warn("PROBE predictList success=false invalid=true"); root.probingList = false }
+                    }
+                }
+            }
+            StyledComboBox {
+                id: satelliteChoices
+                Layout.fillWidth: true
+                Accessible.name: qsTr("Available tracked satellites")
+                enabled: !root.tracker.busy
+                model: root.listValid ? root.tracker.satellites : []
+                onActivated: if (currentIndex >= 0) satelliteField.text = currentText
             }
         }
         Text { id: status; Layout.fillWidth: true; text: root.tracker.busy ? qsTr("Reading…") : ""; color: Theme.textSecondary; wrapMode: Text.Wrap }
