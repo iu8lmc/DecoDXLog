@@ -8,3 +8,4 @@
 | G00 full desktop | Clean Release build passed | macOS arm64 | Apple M4, macOS arm64, Qt 6.11.2; Windows/Linux, clean install and hardware remain open. |
 
 No A/B test can be inferred from static inspection. Record fixture, before/after result, commands and platform for every subsequent increment.
+| G02 independent CQ zone candidates | A: same-entity zone fixture failed, 0 instead of 2. B: focused unit fixture and SQLite loading test pass, four CTest targets pass. | macOS arm64, Qt 6.11.2; synthetic QSOs | Official program lists, operating location, category, UI runtime, organiser submission and other platforms remain open. |

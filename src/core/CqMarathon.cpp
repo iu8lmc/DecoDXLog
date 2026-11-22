@@ -2,6 +2,7 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QSet>
 #include <algorithm>
 #include <QSqlQuery>
 #include <QSqlError>
@@ -61,6 +62,7 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         return a.qsoId < b.qsoId;
     });
     QHash<int, int> entityCount;
+    QSet<int> zones;
     for (const Entry& entry : sorted) {
         if (!entry.timestamp.isValid() || entry.timestamp.toUTC().date().year() != rules.year) {
             result.exclusions << QStringLiteral("QSO %1: outside edition year").arg(entry.qsoId);
@@ -78,8 +80,14 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             result.exclusions << QStringLiteral("QSO %1: category mismatch").arg(entry.qsoId);
             continue;
         }
+        const bool newZone = entry.cqZone >= 1 && entry.cqZone <= 40 && !zones.contains(entry.cqZone);
+        if (newZone) {
+            result.zoneCandidates << entry;
+            zones.insert(entry.cqZone);
+        }
         if (entityCount.value(entry.dxcc) >= rules.maxPerEntity) {
-            result.exclusions << QStringLiteral("QSO %1: entity limit reached").arg(entry.qsoId);
+            if (!newZone)
+                result.exclusions << QStringLiteral("QSO %1: entity limit reached and no new valid zone").arg(entry.qsoId);
             continue;
         }
         result.selected << entry;
@@ -117,15 +125,18 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
 QJsonDocument Result::toJson() const
 {
     QJsonArray qsos;
-    for (const Entry& entry : selected) {
-        qsos.append(QJsonObject{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
+    const auto row = [](const Entry& entry) {
+        return QJsonObject{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
                                 {QStringLiteral("call"), entry.call},
                                 {QStringLiteral("dxcc"), entry.dxcc},
                                 {QStringLiteral("cqZone"), entry.cqZone},
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("mode"), entry.mode},
-                                {QStringLiteral("timestamp"), entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}});
-    }
+                                {QStringLiteral("timestamp"), entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
+    };
+    for (const Entry& entry : selected) qsos.append(row(entry));
+    QJsonArray zones;
+    for (const Entry& entry : zoneCandidates) zones.append(row(entry));
     QJsonArray exclusions;
     for (const QString& value : this->exclusions) exclusions.append(value);
     return QJsonDocument(QJsonObject{{QStringLiteral("format"), QStringLiteral("decodxlog-cq-marathon-1")},
@@ -134,6 +145,8 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("maxPerEntity"), rules.maxPerEntity},
                                      {QStringLiteral("stationProfileId"), static_cast<double>(rules.stationProfileId)},
                                      {QStringLiteral("selected"), qsos},
+                                     {QStringLiteral("zoneCandidates"), zones},
+                                     {QStringLiteral("officialRulesVerified"), false},
                                      {QStringLiteral("exclusions"), exclusions}});
 }
 

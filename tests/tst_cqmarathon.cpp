@@ -1,6 +1,7 @@
 #include "core/CqMarathon.h"
 
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QTest>
 
 using namespace decolog::core::cqmarathon;
@@ -8,6 +9,26 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void selectsZonesIndependentlyOfEntity()
+    {
+        const QDateTime when(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::UTC);
+        const QList<Entry> entries{
+            {1, QStringLiteral("K1AAA"), 291, 5, QStringLiteral("20m"), QStringLiteral("CW"), when},
+            {2, QStringLiteral("K6BBB"), 291, 3, QStringLiteral("20m"), QStringLiteral("CW"), when},
+            {3, QStringLiteral("K7CCC"), 291, 3, QStringLiteral("20m"), QStringLiteral("CW"), when},
+            {4, QStringLiteral("DL1ABC"), 230, 0, QStringLiteral("20m"), QStringLiteral("CW"), when},
+            {5, QStringLiteral("JA1ABC"), 339, 41, QStringLiteral("20m"), QStringLiteral("CW"), when}
+        };
+        const auto json = select(entries, {2026, QStringLiteral("mixed"), 1}).toJson().object();
+        const auto zones = json.value(QStringLiteral("zoneCandidates")).toArray();
+        QCOMPARE(zones.size(), 2);
+        QCOMPARE(zones.at(0).toObject().value(QStringLiteral("qsoId")).toInt(), 1);
+        QCOMPARE(zones.at(1).toObject().value(QStringLiteral("qsoId")).toInt(), 2);
+        QCOMPARE(zones.at(1).toObject().value(QStringLiteral("cqZone")).toInt(), 3);
+        QCOMPARE(json.value(QStringLiteral("selected")).toArray().size(), 3);
+        QVERIFY(!json.value(QStringLiteral("officialRulesVerified")).toBool(true));
+    }
+
     void editionUsesUtcAcrossYearBoundary()
     {
         const auto local = QDateTime::fromString(QStringLiteral("2027-01-01T00:30:00+01:00"), Qt::ISODate);

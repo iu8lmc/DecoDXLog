@@ -29,6 +29,7 @@ struct Rules {
 struct Result {
     Rules rules;
     QList<Entry> selected;
+    QList<Entry> zoneCandidates; // preliminary, independent of entity selection
     QStringList exclusions;
     bool isValid(QString* error = nullptr) const;
     QJsonDocument toJson() const;

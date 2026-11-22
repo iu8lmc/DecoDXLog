@@ -465,8 +465,9 @@ DialogFrame {
                         Layout.fillWidth: true
                         text: root.marathonPreview.valid === undefined
                               ? qsTr("Configure edition, category and entity limit, then preview.")
-                              : qsTr("Selected: %1 · excluded: %2")
+                              : qsTr("Entity candidates: %1 · zone candidates: %2 · excluded: %3")
                                 .arg(root.marathonPreview.selected.length || 0)
+                                .arg(root.marathonPreview.zoneCandidateCount || 0)
                                 .arg(root.marathonPreview.exclusions.length || 0)
                         color: root.marathonPreview.valid === false ? Theme.warningColor : Theme.textSecondary
                         font.pixelSize: 11

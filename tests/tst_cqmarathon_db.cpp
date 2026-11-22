@@ -2,12 +2,31 @@
 #include "core/LogDatabase.h"
 
 #include <QTest>
+#include <QJsonArray>
+#include <QJsonObject>
 
 using namespace decolog::core;
 
 class TestCqMarathonDb : public QObject {
     Q_OBJECT
 private slots:
+    void zoneCandidatesUsePersistedCqZones()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(QStringLiteral(":memory:")));
+        for (const auto& values : {qMakePair("K1AAA", "5"), qMakePair("K6BBB", "3")}) {
+            AdifRecord record{{"CALL", values.first}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                              {"BAND", "20m"}, {"MODE", "CW"}, {"DXCC", "291"}, {"CQZ", values.second}};
+            QCOMPARE(db.insertQso(record, "test").status, InsertResult::Status::Inserted);
+        }
+        QString error;
+        const auto entries = cqmarathon::loadEntries(db, &error);
+        QVERIFY2(error.isEmpty(), qPrintable(error));
+        const auto json = cqmarathon::select(entries, {2026, QStringLiteral("mixed"), 1}).toJson().object();
+        QCOMPARE(json.value(QStringLiteral("selected")).toArray().size(), 1);
+        QCOMPARE(json.value(QStringLiteral("zoneCandidates")).toArray().size(), 2);
+    }
+
     void loadsOnlyLiveQsosAndFeedsSelector()
     {
         LogDatabase db;

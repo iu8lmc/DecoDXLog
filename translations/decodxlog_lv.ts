@@ -728,6 +728,10 @@
         <translation>Atlasīti: %1 · izslēgti: %2</translation>
     </message>
     <message>
+        <source>Entity candidates: %1 · zone candidates: %2 · excluded: %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>VUCC preview</source>
         <translation>VUCC priekšskatījums</translation>
     </message>

@@ -724,6 +724,10 @@
         <translation>已选择：%1 · 已排除：%2</translation>
     </message>
     <message>
+        <source>Entity candidates: %1 · zone candidates: %2 · excluded: %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>VUCC preview</source>
         <translation>VUCC 预览</translation>
     </message>
