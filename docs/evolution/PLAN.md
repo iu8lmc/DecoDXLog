@@ -12,7 +12,7 @@ Scope: desktop Windows, macOS and Linux, and the existing cloud; no mobile clien
 | G05 Migration and sync history | G01 | Partial: import preview, extras, memory-only undo and reconciliation exist; schema-13 journal and guarded undo core added. Background undo, cancellable advisory preview and bounded per-QSO outcome list are present; add exhaustive review, test cross-process membership guards and UI cancellation/crash on large logs, resolve measured fingerprint/index/trigger cost, source-specific migration and per-QSO history. |
 | G06 Multi-program activation | G02, G05 | Partial: activation sessions exist; independent program references and exports remain. |
 | G07 Typed fields and reports | G01, G02 | Partial: text custom fields exist; typed fields and saved reports to verify. |
-| G08 Radio net manager | G01 | Local roster, session persistence, statuses, order, turns, partial history UI, explicit QSO draft and complete JSON export implemented. Complete persisted QSO association, timers, full history UI and operational verification. |
+| G08 Radio net manager | G01 | Local roster, session persistence, statuses, order, turns, partial history UI, status/check-in summary, explicit QSO draft and complete JSON export implemented. Complete persisted QSO association, timers, full history UI and operational verification. |
 | G09 Satellite and rover | G02, G06, G11 contracts | Partial: QSO satellite fields and rotor gateway exist; tracker workflow remains unverified. |
 | G10 Contest | G01, G05 | Partial: scoring rules, SO2R and ContestNet exist; convergence, serial partitions and advanced workflow remain. |
 | G11 SDK | G01 | Partial: authenticated local API exists; versioned permissions, isolation and adapters remain to verify. |

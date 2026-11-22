@@ -75,6 +75,23 @@ QVariantMap RadioNet::session() const
             {QStringLiteral("active"), q.value(3).isNull()}};
 }
 bool RadioNet::active() const { return session().value(QStringLiteral("active")).toBool(); }
+QVariantMap RadioNet::summary() const
+{
+    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+        return {};
+    QSqlQuery q(m_db->connection());
+    q.prepare(QStringLiteral("SELECT COUNT(*),COALESCE(SUM(status='present'),0),COALESCE(SUM(status='waiting'),0),"
+                             "COALESCE(SUM(status='absent'),0),COALESCE(SUM(status='departed'),0),"
+                             "(SELECT COUNT(*) FROM radio_net_event WHERE session_id=? AND event='check_in') "
+                             "FROM radio_net_member WHERE session_id=?"));
+    q.addBindValue(m_sessionId);
+    q.addBindValue(m_sessionId);
+    if (!q.exec() || !q.next())
+        return {};
+    return {{QStringLiteral("participants"), q.value(0)}, {QStringLiteral("present"), q.value(1)},
+            {QStringLiteral("waiting"), q.value(2)},      {QStringLiteral("absent"), q.value(3)},
+            {QStringLiteral("departed"), q.value(4)},     {QStringLiteral("checkIns"), q.value(5)}};
+}
 QVariantList RadioNet::members() const
 {
     QVariantList out;

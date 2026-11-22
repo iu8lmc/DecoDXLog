@@ -9,6 +9,7 @@ DialogFrame {
     id: root
     readonly property var net: decolog.radioNet
     readonly property var current: net.session
+    readonly property var summary: net.summary
     title: qsTr("Radio net manager")
     dialogKey: "radio-net"
     width: 1000
@@ -16,6 +17,7 @@ DialogFrame {
     dotColor: Theme.secondaryColor
     info: qsTr("Roster entries do not create QSO")
     property bool probeOpenQso: false
+    property bool probeSaveQso: false
     NewQsoDialog {
         id: participantQso
         profileDialogKey: "radio-net-qso"
@@ -59,8 +61,9 @@ DialogFrame {
         }
     }
     // Exercised only by the explicitly requested isolated --show probe.
-    function probe(seed, openQso) {
+    function probe(seed, openQso, saveQso) {
         root.probeOpenQso = openQso
+        root.probeSaveQso = saveQso
         if (seed) {
             sessionTitle.text = "Test net"
             startButton.clicked()
@@ -82,6 +85,8 @@ DialogFrame {
             const row = memberList.itemAtIndex(0)
             console.warn("PROBE radioNet visible=" + root.visible + " members=" + root.net.members.length
                          + " first=" + (row ? row.modelData.call : "missing"))
+            if (root.current.id)
+                console.warn("PROBE radioNetSummary participants=" + root.summary.participants + " present=" + root.summary.present + " checkIns=" + root.summary.checkIns)
             if (root.probeOpenQso && row) {
                 row.openQso()
                 console.warn("PROBE radioNetQso visible=" + participantQso.visible + " call=" + participantQso.enteredCallForProbe)
@@ -89,6 +94,11 @@ DialogFrame {
                 if (other) other.openQso()
                 console.warn("PROBE radioNetDraft preserved=" + (participantQso.enteredCallForProbe === "K1AAA")
                              + " notice=" + (qsoNotice.text.length > 0))
+                if (root.probeSaveQso) {
+                    participantQso.probeRadioNetSave()
+                    row.openQso()
+                    participantQso.probeRadioNetRepeat()
+                }
             }
         }
     }
@@ -120,6 +130,15 @@ DialogFrame {
         Text {
             Layout.fillWidth: true
             text: root.current.id ? qsTr("Started: %1 UTC").arg(String(root.current.startedAt || "")) : qsTr("Start or select a session.")
+            color: Theme.textSecondary
+            wrapMode: Text.Wrap
+        }
+        Text {
+            Layout.fillWidth: true
+            visible: !!root.current.id
+            text: qsTr("Participants: %1 · Present: %2 · Waiting: %3 · Absent: %4 · Departed: %5 · Check-ins: %6")
+                  .arg(root.summary.participants || 0).arg(root.summary.present || 0).arg(root.summary.waiting || 0)
+                  .arg(root.summary.absent || 0).arg(root.summary.departed || 0).arg(root.summary.checkIns || 0)
             color: Theme.textSecondary
             wrapMode: Text.Wrap
         }

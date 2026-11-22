@@ -131,6 +131,26 @@ DialogFrame {
     // Per le prove: apre la tendina delle bande.
     function showBandCombo() { bandBox.popup.open() }
 
+    // Isolated --show probe only: exercise the actual manual submission path.
+    function probeRadioNetSave() {
+        const original = callField.text
+        callField.text = ""
+        root.submit(false)
+        console.warn("PROBE radioNetInvalid kept=" + (root.visible && errorText.text.length > 0))
+        callField.text = original
+        freqField.text = "14.050000"
+        modeBox.currentIndex = modeBox.find("CW")
+        root.submit(false)
+        console.warn("PROBE radioNetSaved closed=" + !root.visible + " error=" + errorText.text)
+    }
+
+    function probeRadioNetRepeat() {
+        freqField.text = "14.050000"
+        modeBox.currentIndex = modeBox.find("CW")
+        root.submit(false)
+        console.warn("PROBE radioNetRepeat closed=" + !root.visible + " error=" + errorText.text)
+    }
+
     function submit(keep) {
         const error = decolog.logManualQso({
             call: callField.text, date: dateField.text, time: timeField.text,

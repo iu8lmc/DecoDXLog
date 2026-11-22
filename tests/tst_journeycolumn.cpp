@@ -47,6 +47,30 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetExplicitSaveAndRepeatQso()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionet:save"), output), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetInvalid kept=true"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetSaved closed=true"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetRepeat closed=true"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), 2);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT call,name,band,mode FROM qso WHERE deleted=0 ORDER BY id"));
+        for (int i = 0; i < 2; ++i) {
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toString(), QStringLiteral("K1AAA"));
+            QCOMPARE(q.value(1).toString(), QStringLiteral("Alice"));
+            QCOMPARE(q.value(2).toString(), QStringLiteral("20m"));
+            QCOMPARE(q.value(3).toString(), QStringLiteral("CW"));
+        }
+        QVERIFY(!q.next());
+    }
+
     void radioNetPreparesQsoWithoutSavingOrOverwritingDraft()
     {
         QTemporaryDir dir;
@@ -55,6 +79,7 @@ private slots:
         QVERIFY2(launch(dir, QStringLiteral("radionet:qso"), output), output.constData());
         QVERIFY2(output.contains("PROBE radioNetQso visible=true call=K1AAA"), output.constData());
         QVERIFY2(output.contains("PROBE radioNetDraft preserved=true notice=true"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetSummary participants=2 present=2 checkIns=2"), output.constData());
         decolog::core::LogDatabase db;
         QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
         QCOMPARE(db.qsoCount(), 0);

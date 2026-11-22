@@ -14602,6 +14602,10 @@ Extra velden blijven behouden: %8</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Participants: %1 · Present: %2 · Waiting: %3 · Absent: %4 · Departed: %5 · Check-ins: %6</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation type="unfinished"></translation>
     </message>

@@ -14,6 +14,35 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void summaryCountsCurrentStatusesAndReturns()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        RadioNet net(&db);
+        QVERIFY(net.metaObject()->indexOfProperty("summary") >= 0);
+        QVERIFY(net.start("Round table"));
+        QVERIFY(net.checkIn("K1AAA", "Alice", ""));
+        QVERIFY(net.checkIn("K1BBB", "Bob", ""));
+        const qint64 bob = net.members().at(1).toMap().value("id").toLongLong();
+        QVERIFY(net.setStatus(bob, "departed"));
+        QVERIFY(net.checkIn("K1BBB", "", ""));
+        const auto summary = net.property("summary").toMap();
+        QCOMPARE(summary.value("participants").toInt(), 2);
+        QCOMPARE(summary.value("present").toInt(), 2);
+        QCOMPARE(summary.value("departed").toInt(), 0);
+        QCOMPARE(summary.value("checkIns").toInt(), 3);
+        QVERIFY(net.setStatus(bob, "waiting"));
+        QCOMPARE(net.property("summary").toMap().value("waiting").toInt(), 1);
+        QVERIFY(net.setStatus(bob, "absent"));
+        QCOMPARE(net.property("summary").toMap().value("absent").toInt(), 1);
+        QVERIFY(net.setStatus(bob, "departed"));
+        QCOMPARE(net.property("summary").toMap().value("departed").toInt(), 1);
+        QVERIFY(net.start("Another net"));
+        QCOMPARE(net.property("summary").toMap().value("participants").toInt(), 0);
+        QCOMPARE(net.property("summary").toMap().value("checkIns").toInt(), 0);
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void sessionHasAnExportAction()
     {
         LogDatabase db;
