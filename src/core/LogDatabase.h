@@ -50,6 +50,8 @@ struct ImportUndoIssue {
 
 struct ImportUndoResult {
     qint64 batchId{0};
+    QString batchUuid;
+    int eligible{0};
     int deleted{0};
     int alreadyDeleted{0};
     int changed{0};
@@ -348,7 +350,9 @@ public:
     ImportResult importAdif(const QByteArray& data, const QString& source, qint64 stationProfileId,
                             const ImportProgress& progress, int batchSize);
     // Called before each item and once at completion. False requests cancellation.
-    ImportUndoResult undoLatestImport(const std::function<bool(int done, int total)>& progress = {});
+    ImportUndoResult undoLatestImport(const std::function<bool(int done, int total)>& progress = {},
+                                      bool preview = false, qint64 expectedBatchId = 0,
+                                      const QString& expectedBatchUuid = {});
     QByteArray   exportAdif(const QString& programVersion = {}) const;
     QByteArray   exportAdif(const QList<qint64>& ids, const QString& programVersion = {}) const;
 

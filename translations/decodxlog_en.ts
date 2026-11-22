@@ -4009,6 +4009,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, and &quot
         <translation>Undoing import %1%</translation>
     </message>
     <message>
+        <source>Checking import %1%</source>
+        <translation>Checking import %1%</translation>
+    </message>
+    <message>
         <source>Importing %1%</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4813,6 +4817,22 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>QSO %1 · %2 · %3</source>
         <translation>QSO %1 · %2 · %3</translation>
+    </message>
+    <message>
+        <source>Candidates: %1 · already in recycle: %2 · changed: %3 · unavailable: %4 · failed: %5</source>
+        <translation>Candidates: %1 · already in recycle: %2 · changed: %3 · unavailable: %4 · failed: %5</translation>
+    </message>
+    <message>
+        <source>Preview stopped; run it again before undoing.</source>
+        <translation>Preview stopped; run it again before undoing.</translation>
+    </message>
+    <message>
+        <source>No recorded import is available to undo.</source>
+        <translation>No recorded import is available to undo.</translation>
+    </message>
+    <message>
+        <source>The preview can change while the log is active; each QSO is checked again before it is moved.</source>
+        <translation>The preview can change while the log is active; each QSO is checked again before it is moved.</translation>
     </message>
     <message>
         <source>Import preview</source>
@@ -11875,6 +11895,10 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Could not move QSO to recycle history</source>
         <translation>Could not move QSO to recycle history</translation>
+    </message>
+    <message>
+        <source>The log or import changed; preview the undo again</source>
+        <translation>The log or import changed; preview the undo again</translation>
     </message>
     <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>

@@ -70,14 +70,17 @@ private slots:
             }
             QByteArray output;
             QVERIFY2(launch(dir, accept ? QStringLiteral("undoimport") : QStringLiteral("undoimport:cancel"), output), output.constData());
+            QVERIFY2(output.contains("PROBE importUndoPreview"), output.constData());
+            QVERIFY2(output.contains("\"eligible\":1"), output.constData());
+            QVERIFY2(output.contains("\"changed\":1"), output.constData());
             if (accept) {
-                QVERIFY2(output.contains("PROBE importUndo"), output.constData());
+                QVERIFY2(output.contains("PROBE importUndo "), output.constData());
                 QVERIFY2(output.contains("\"changed\":1"), output.constData());
                 QVERIFY2(output.contains("\"qsoId\":" + QByteArray::number(changedId)), output.constData());
                 QVERIFY2(output.contains("PROBE importUndoView visible=true row=QSO "), output.constData());
                 QVERIFY2(output.contains("K1CCC"), output.constData());
             } else {
-                QVERIFY(!output.contains("PROBE importUndo"));
+                QVERIFY(!output.contains("PROBE importUndo "));
             }
             decolog::core::LogDatabase reopened;
             QVERIFY(reopened.open(dir.filePath(QStringLiteral("test.sqlite"))));

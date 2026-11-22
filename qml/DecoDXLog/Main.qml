@@ -1249,11 +1249,7 @@ RoundedWindow {
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
         else if (what[0] === "undoimport") {
-            undoImportDialog.open()
-            Qt.callLater(function () {
-                if (what[1] === "cancel") undoImportDialog.reject()
-                else undoImportDialog.accept()
-            })
+            decolog.previewImportUndo()
         }
         else if (what[0] === "qso") { openQso(parseInt(what[1])); if (what[2]) qsoDialog.currentTab = parseInt(what[2]) }
         else if (what[0] === "profiles") profilesDialog.open()
@@ -1879,8 +1875,21 @@ RoundedWindow {
     property url pendingImport
     property var importPreview: ({})
     property var importUndoSummary: ({})
+    property var importUndoPreview: ({})
     Connections {
         target: decolog
+        function onImportUndoPreviewReady(result) {
+            if (typeof startupShow !== "undefined" && startupShow.indexOf("undoimport") === 0)
+                console.warn("PROBE importUndoPreview " + JSON.stringify(result))
+            window.importUndoPreview = result
+            undoImportDialog.open()
+            if (typeof startupShow !== "undefined" && startupShow.indexOf("undoimport") === 0) {
+                Qt.callLater(function () {
+                    if (startupShow === "undoimport:cancel") undoImportDialog.reject()
+                    else undoImportDialog.accept()
+                })
+            }
+        }
         function onImportUndoFinished(result) {
             if (typeof startupShow !== "undefined" && startupShow === "undoimport")
                 console.warn("PROBE importUndo " + JSON.stringify(result))
@@ -1970,8 +1979,12 @@ RoundedWindow {
         dialogKey: "undo-import"
         dotColor: Theme.warningColor
         width: 560
-        height: 220
-        onAccepted: decolog.undoLastImport()
+        height: 440
+        onAccepted: {
+            if (window.importUndoPreview.batchId > 0 && !window.importUndoPreview.cancelled
+                    && (window.importUndoPreview.errors || []).length === 0)
+                decolog.undoLastImport(window.importUndoPreview.batchId, window.importUndoPreview.batchUuid)
+        }
         body: ColumnLayout {
             anchors.margins: 16
             spacing: 10
@@ -1981,12 +1994,69 @@ RoundedWindow {
                 text: qsTr("Move unchanged QSO from the latest recorded import to the recycle history? Changed, unavailable and older unverified entries remain in the log for review.")
                 color: Theme.textPrimary
             }
-            Item { Layout.fillHeight: true }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                color: Theme.textPrimary
+                text: qsTr("Candidates: %1 · already in recycle: %2 · changed: %3 · unavailable: %4 · failed: %5")
+                    .arg(window.importUndoPreview.eligible || 0).arg(window.importUndoPreview.alreadyDeleted || 0)
+                    .arg(window.importUndoPreview.changed || 0).arg(window.importUndoPreview.unavailable || 0)
+                    .arg(window.importUndoPreview.failed || 0)
+            }
+            Text {
+                Layout.fillWidth: true
+                text: qsTr("The preview can change while the log is active; each QSO is checked again before it is moved.")
+                color: Theme.textSecondary
+                wrapMode: Text.Wrap
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: !!window.importUndoPreview.cancelled || !window.importUndoPreview.batchId
+                text: window.importUndoPreview.cancelled ? qsTr("Preview stopped; run it again before undoing.")
+                                                         : qsTr("No recorded import is available to undo.")
+                color: Theme.warningColor
+                wrapMode: Text.Wrap
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: (window.importUndoPreview.issuesOmitted || 0) > 0
+                text: qsTr("Showing the first 200 issues; %1 more are not shown.").arg(window.importUndoPreview.issuesOmitted || 0)
+                color: Theme.warningColor
+                wrapMode: Text.Wrap
+            }
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: window.importUndoPreview.issues || []
+                delegate: Text {
+                    required property var modelData
+                    width: ListView.view.width
+                    text: qsTr("QSO %1 · %2 · %3").arg(modelData.qsoId).arg(modelData.call || "—").arg(modelData.reason)
+                    color: Theme.textPrimary
+                    wrapMode: Text.Wrap
+                }
+                ScrollBar.vertical: ScrollBar { }
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: (window.importUndoPreview.errors || []).length > 0
+                text: (window.importUndoPreview.errors || []).join("\n")
+                color: Theme.warningColor
+                wrapMode: Text.Wrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
+            }
             RowLayout {
                 Layout.fillWidth: true
                 Item { Layout.fillWidth: true }
                 GlassButton { text: qsTr("Cancel"); onClicked: undoImportDialog.reject() }
-                GlassButton { text: qsTr("Undo last import"); onClicked: undoImportDialog.accept() }
+                GlassButton {
+                    text: qsTr("Undo last import")
+                    enabled: window.importUndoPreview.batchId > 0 && !window.importUndoPreview.cancelled
+                             && (window.importUndoPreview.errors || []).length === 0
+                    onClicked: undoImportDialog.accept()
+                }
             }
         }
     }
@@ -2574,7 +2644,7 @@ RoundedWindow {
             onSetupRequested: setupDialog.open()
             onLogsRequested: logsDialog.openDialog()
             onImportRequested: importDialog.open()
-            onUndoImportRequested: undoImportDialog.open()
+            onUndoImportRequested: decolog.previewImportUndo()
             onExportRequested: exportDialog.open()
             onExportPeriodRequested: exportPeriodDialog.openDialog()
             onSpotRequested: spotDialog.openCurrent()

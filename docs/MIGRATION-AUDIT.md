@@ -9,8 +9,10 @@ a private in-memory copy of the current log; the real database is not touched.
 The committed import report also records inserted IDs, duplicates, invalid
 records, incomplete UTC, QSL-bearing records and unmapped fields. Imports are
 performed in batches and a per-log journal records the identity and baseline of
-each new QSO. The File menu offers undo of the latest recorded import, after
-confirmation. The operation runs in the background and moves unchanged QSO to
+each new QSO. The File menu offers a cancellable preview and undo of the latest recorded
+import, after confirmation. Preview counts and issue rows can change while the
+log is active; each QSO is checked again before it is moved. The operation runs
+in the background and moves unchanged QSO to
 recycle/history; modified, missing and older entries without a baseline are
 left for review. The result window identifies up to 200 affected QSO and explains
 why they were skipped or failed; it states how many further entries are omitted.

@@ -2172,18 +2172,26 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
     return result;
 }
 
-ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int)>& progress)
+ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int)>& progress,
+                                              bool preview, qint64 expectedBatchId,
+                                              const QString& expectedBatchUuid)
 {
     ImportUndoResult out;
     QSqlDatabase db = connection();
     ImportFingerprintReader fingerprintReader(db);
     QSqlQuery batch(db);
-    if (!batch.exec(QStringLiteral("SELECT id FROM import_batch ORDER BY id DESC LIMIT 1"))) {
+    if (!batch.exec(QStringLiteral("SELECT id,uuid FROM import_batch ORDER BY id DESC LIMIT 1"))) {
         out.errors << batch.lastError().text();
         return out;
     }
     if (!batch.next()) return out;
     out.batchId = batch.value(0).toLongLong();
+    out.batchUuid = batch.value(1).toString();
+    if ((expectedBatchId > 0 && out.batchId != expectedBatchId)
+        || (!expectedBatchUuid.isEmpty() && out.batchUuid != expectedBatchUuid)) {
+        out.errors << QStringLiteral("The latest import changed after preview; preview again");
+        return out;
+    }
     QSqlQuery items(db);
     items.prepare(QStringLiteral("SELECT qso_id,qso_uuid,imported_revision,baseline_hash FROM import_qso WHERE batch_id=? ORDER BY qso_id"));
     items.addBindValue(out.batchId);
@@ -2239,6 +2247,11 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
             const QString reason = item.fingerprint.isEmpty() ? QStringLiteral("no_baseline")
                 : current->revision != item.revision ? QStringLiteral("revision") : QStringLiteral("changed");
             addIssue(item.id, reason, true);
+            db.rollback();
+            continue;
+        }
+        if (preview) {
+            ++out.eligible;
             db.rollback();
             continue;
         }

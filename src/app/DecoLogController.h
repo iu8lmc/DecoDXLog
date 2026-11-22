@@ -270,6 +270,7 @@ class DecoLogController : public QObject {
     // L'importazione ADIF gira su un altro filo: da 0 a 1 mentre va, -1 ferma.
     Q_PROPERTY(double importProgress READ importProgress NOTIFY importChanged)
     Q_PROPERTY(bool importUndoRunning READ importUndoRunning NOTIFY importChanged)
+    Q_PROPERTY(bool importUndoPreviewing READ importUndoPreviewing NOTIFY importChanged)
     // Anche una modifica in blocco: da 0 a 1 mentre va, -1 ferma.
     Q_PROPERTY(double bulkProgress READ bulkProgress NOTIFY bulkChanged)
     Q_PROPERTY(bool exportBusy READ exportBusy NOTIFY exportBusyChanged)
@@ -646,6 +647,7 @@ public:
 
     double importProgress() const { return m_importProgress; }
     bool importUndoRunning() const { return m_importUndoRunning; }
+    bool importUndoPreviewing() const { return m_importUndoPreviewing; }
     double bulkProgress() const { return m_bulkProgress; }
     bool exportBusy() const { return m_exportsPending > 0; }
     QVariantMap duplicates() const { return m_duplicates; }
@@ -742,7 +744,8 @@ public:
 
     Q_INVOKABLE void importAdif(const QUrl& file);
     Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false, const QString& stationCall = {});
-    Q_INVOKABLE bool undoLastImport();
+    Q_INVOKABLE bool undoLastImport(qint64 expectedBatchId = 0, const QString& expectedBatchUuid = {});
+    Q_INVOKABLE bool previewImportUndo();
     Q_INVOKABLE void cancelImportUndo();
     Q_INVOKABLE QVariantList qsoEnrichments(qint64 qsoId) const;
     Q_INVOKABLE bool undoQsoEnrichment(qint64 qsoId, const QString& field);
@@ -822,6 +825,7 @@ signals:
     void backupChanged();
     void importChanged();
     void importUndoFinished(const QVariantMap& result);
+    void importUndoPreviewReady(const QVariantMap& result);
     void importPreviewReady(const QUrl& file, const QVariantMap& result);
     void bulkChanged();
     void exportBusyChanged();
@@ -1151,7 +1155,12 @@ private:
     std::shared_ptr<std::atomic<int>> m_statsLatest{std::make_shared<std::atomic<int>>(0)};
     double m_importProgress{-1};
     bool m_importUndoRunning{false};
+    bool m_importUndoPreviewing{false};
+    QString m_importUndoPreviewPath;
+    QString m_importUndoPreviewUuid;
+    qint64 m_importUndoPreviewBatchId{0};
     std::shared_ptr<std::atomic_bool> m_importUndoCancel;
+    bool startImportUndo(bool preview, qint64 expectedBatchId, const QString& expectedBatchUuid);
     void finishImport(const QString& path, const core::ImportResult& result);
     double m_bulkProgress{-1};
     bool m_udpResendActive{false};

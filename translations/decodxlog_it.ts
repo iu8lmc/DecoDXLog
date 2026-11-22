@@ -4024,6 +4024,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
         <translation>Annullamento importazione %1%</translation>
     </message>
     <message>
+        <source>Checking import %1%</source>
+        <translation>Verifica importazione %1%</translation>
+    </message>
+    <message>
         <source>Importing %1%</source>
         <translation>Importo %1%</translation>
     </message>
@@ -4833,6 +4837,22 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
     <message>
         <source>QSO %1 · %2 · %3</source>
         <translation>QSO %1 · %2 · %3</translation>
+    </message>
+    <message>
+        <source>Candidates: %1 · already in recycle: %2 · changed: %3 · unavailable: %4 · failed: %5</source>
+        <translation>Candidati: %1 · già nel cestino: %2 · modificati: %3 · non disponibili: %4 · non riusciti: %5</translation>
+    </message>
+    <message>
+        <source>Preview stopped; run it again before undoing.</source>
+        <translation>Anteprima interrotta; ripetila prima di annullare.</translation>
+    </message>
+    <message>
+        <source>No recorded import is available to undo.</source>
+        <translation>Non ci sono importazioni registrate da annullare.</translation>
+    </message>
+    <message>
+        <source>The preview can change while the log is active; each QSO is checked again before it is moved.</source>
+        <translation>L’anteprima può cambiare mentre il log è attivo; ogni QSO viene ricontrollato prima di essere spostato.</translation>
     </message>
     <message>
         <source>Import preview</source>
@@ -11970,6 +11990,10 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Could not move QSO to recycle history</source>
         <translation>Impossibile spostare il QSO nel cestino</translation>
+    </message>
+    <message>
+        <source>The log or import changed; preview the undo again</source>
+        <translation>Il log o l’importazione è cambiata; ripeti l’anteprima dell’annullamento</translation>
     </message>
     <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>

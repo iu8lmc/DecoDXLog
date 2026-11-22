@@ -316,6 +316,67 @@ private slots:
         QCOMPARE(retry.deleted, 1);
     }
 
+    void undoPreviewDoesNotChangeDataAndRechecksAfterConfirmation()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif(
+            "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 2);
+        const auto preview = db.undoLatestImport({}, true);
+        QVERIFY(preview.batchId > 0);
+        QVERIFY(!preview.batchUuid.isEmpty());
+        QCOMPARE(preview.eligible, 2);
+        QCOMPARE(preview.deleted, 0);
+        QCOMPARE(db.qsoCount(), 2);
+        const auto cancelledPreview = db.undoLatestImport([](int done, int) { return done < 1; }, true);
+        QVERIFY(cancelledPreview.cancelled);
+        QCOMPARE(cancelledPreview.eligible, 1);
+        QCOMPARE(cancelledPreview.deleted, 0);
+        QCOMPARE(db.qsoCount(), 2);
+        auto edited = db.record(imported.insertedIds.last());
+        QVERIFY(edited.has_value());
+        edited->set(QStringLiteral("COMMENT"), QStringLiteral("changed after preview"));
+        QCOMPARE(db.updateQso(imported.insertedIds.last(), *edited).status, InsertResult::Status::Inserted);
+        const auto result = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid);
+        QCOMPARE(result.deleted, 1);
+        QCOMPARE(result.changed, 1);
+        QVERIFY(!db.meta(imported.insertedIds.last())->deleted);
+    }
+
+    void undoRejectsDifferentLatestBatchAfterPreview()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto first = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(first.inserted, 1);
+        const auto preview = db.undoLatestImport({}, true);
+        const auto second = db.importAdif("<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(second.inserted, 1);
+        const auto result = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid);
+        QCOMPARE(result.deleted, 0);
+        QVERIFY(!result.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 2);
+    }
+
+    void undoRejectsDifferentBatchUuidEvenWhenLocalIdsMatch()
+    {
+        LogDatabase first, second;
+        QVERIFY(first.open(":memory:"));
+        QVERIFY(second.open(":memory:"));
+        QCOMPARE(first.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>").inserted, 1);
+        QCOMPARE(second.importAdif("<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>").inserted, 1);
+        const auto firstPreview = first.undoLatestImport({}, true);
+        const auto secondPreview = second.undoLatestImport({}, true);
+        QCOMPARE(firstPreview.batchId, secondPreview.batchId);
+        QVERIFY(firstPreview.batchUuid != secondPreview.batchUuid);
+        const auto wrong = second.undoLatestImport({}, false, firstPreview.batchId, firstPreview.batchUuid);
+        QCOMPARE(wrong.deleted, 0);
+        QVERIFY(!wrong.errors.isEmpty());
+        QCOMPARE(second.qsoCount(), 1);
+    }
+
     void upgradeFromSchema11PreservesExistingQso()
     {
         QTemporaryDir dir;

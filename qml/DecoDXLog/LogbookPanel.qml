@@ -395,7 +395,8 @@ GlassPanel {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: decolog.importUndoRunning
-                      ? qsTr("Undoing import %1%").arg(Math.round(decolog.importProgress * 100))
+                      ? (decolog.importUndoPreviewing ? qsTr("Checking import %1%") : qsTr("Undoing import %1%"))
+                          .arg(Math.round(decolog.importProgress * 100))
                       : qsTr("Importing %1%").arg(Math.round(decolog.importProgress * 100))
                 color: Theme.accentColor
                 font.family: Theme.monoFamily

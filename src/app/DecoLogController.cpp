@@ -5220,7 +5220,26 @@ void DecoLogController::finishImport(const QString& path, const ImportResult& r)
     refreshCallInfo();
 }
 
-bool DecoLogController::undoLastImport()
+bool DecoLogController::undoLastImport(qint64 expectedBatchId, const QString& expectedBatchUuid)
+{
+    if (expectedBatchId > 0 && (expectedBatchUuid.isEmpty()
+        || m_importUndoPreviewPath != m_db.path() || m_importUndoPreviewBatchId != expectedBatchId
+        || m_importUndoPreviewUuid != expectedBatchUuid)) {
+        addActivity(QStringLiteral("IMPORT"), tr("The log or import changed; preview the undo again"), QStringLiteral("warning"));
+        return false;
+    }
+    return startImportUndo(false, expectedBatchId, expectedBatchUuid);
+}
+
+bool DecoLogController::previewImportUndo()
+{
+    m_importUndoPreviewPath.clear();
+    m_importUndoPreviewUuid.clear();
+    m_importUndoPreviewBatchId = 0;
+    return startImportUndo(true, 0, {});
+}
+
+bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, const QString& expectedBatchUuid)
 {
     const QString dbPath = m_db.path();
     if (m_importProgress >= 0 || !m_db.isOpen() || dbPath.isEmpty() || dbPath == QLatin1String(":memory:"))
@@ -5228,10 +5247,11 @@ bool DecoLogController::undoLastImport()
     m_importUndoCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancel = m_importUndoCancel;
     m_importUndoRunning = true;
+    m_importUndoPreviewing = preview;
     m_importProgress = 0;
     emit importChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, cancel] {
+    m_importPool.start([self, dbPath, cancel, preview, expectedBatchId, expectedBatchUuid] {
         core::ImportUndoResult result;
         core::LogDatabase db;
         if (!db.open(dbPath)) {
@@ -5251,27 +5271,33 @@ bool DecoLogController::undoLastImport()
                     }, Qt::QueuedConnection);
                 }
                 return !cancel->load();
-            });
+            }, preview, expectedBatchId, expectedBatchUuid);
         }
-        QMetaObject::invokeMethod(self.data(), [self, dbPath, result] {
+        QMetaObject::invokeMethod(self.data(), [self, dbPath, result, preview] {
             if (!self) return;
             self->m_importProgress = -1;
             self->m_importUndoRunning = false;
+            self->m_importUndoPreviewing = false;
             self->m_importUndoCancel.reset();
             emit self->importChanged();
             if (!self->m_db.isOpen() || self->m_db.path() != dbPath) {
                 self->addActivity(QStringLiteral("IMPORT"), tr("Import undo finished on a log that is no longer open"), QStringLiteral("warning"));
                 return;
             }
-            if (result.changed || result.unavailable || result.failed || !result.errors.isEmpty())
+            if (preview && result.batchId > 0 && !result.cancelled && result.errors.isEmpty()) {
+                self->m_importUndoPreviewPath = dbPath;
+                self->m_importUndoPreviewUuid = result.batchUuid;
+                self->m_importUndoPreviewBatchId = result.batchId;
+            }
+            if (!preview && (result.changed || result.unavailable || result.failed || !result.errors.isEmpty()))
                 self->addActivity(QStringLiteral("IMPORT"),
                     tr("Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.")
                         .arg(result.changed).arg(result.unavailable).arg(result.failed), QStringLiteral("warning"));
             for (const QString& error : result.errors)
                 self->addActivity(QStringLiteral("IMPORT"), error, QStringLiteral("warning"));
-            if (result.cancelled)
+            if (result.cancelled && !preview)
                 self->addActivity(QStringLiteral("IMPORT"), tr("Import undo cancelled; unprocessed QSO remain available for retry."), QStringLiteral("warning"));
-            if (!result.batchId && result.errors.isEmpty())
+            if (!preview && !result.batchId && result.errors.isEmpty())
                 self->addActivity(QStringLiteral("IMPORT"), tr("No recorded import is available to undo."), QStringLiteral("warning"));
             if (result.deleted > 0) {
                 self->addActivity(QStringLiteral("IMPORT"), tr("Undid the last import: %1 QSO(s) moved to the recycle history.")
@@ -5294,12 +5320,16 @@ bool DecoLogController::undoLastImport()
                                       {QStringLiteral("call"), issue.call},
                                       {QStringLiteral("reason"), reason}};
             }
-            emit self->importUndoFinished(QVariantMap{
-                {QStringLiteral("batchId"), result.batchId}, {QStringLiteral("deleted"), result.deleted},
+            const QVariantMap summary{
+                {QStringLiteral("batchId"), result.batchId}, {QStringLiteral("batchUuid"), result.batchUuid},
+                {QStringLiteral("deleted"), result.deleted},
+                {QStringLiteral("eligible"), result.eligible},
                 {QStringLiteral("alreadyDeleted"), result.alreadyDeleted}, {QStringLiteral("changed"), result.changed},
                 {QStringLiteral("unavailable"), result.unavailable}, {QStringLiteral("failed"), result.failed},
                 {QStringLiteral("cancelled"), result.cancelled}, {QStringLiteral("issues"), issues},
-                {QStringLiteral("issuesOmitted"), result.issuesOmitted}, {QStringLiteral("errors"), result.errors}});
+                {QStringLiteral("issuesOmitted"), result.issuesOmitted}, {QStringLiteral("errors"), result.errors}};
+            if (preview) emit self->importUndoPreviewReady(summary);
+            else emit self->importUndoFinished(summary);
         }, Qt::QueuedConnection);
     });
     return true;

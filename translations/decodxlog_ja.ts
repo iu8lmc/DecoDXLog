@@ -4002,6 +4002,10 @@ Decodium で: Settings → Reporting → UDP Server 127.0.0.1、ポート %1、�
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Checking import %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Importing %1%</source>
         <translation>インポート中 %1%</translation>
     </message>
@@ -4804,6 +4808,22 @@ DecoDXLog で一度開いて更新してください。</translation>
     </message>
     <message>
         <source>QSO %1 · %2 · %3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Candidates: %1 · already in recycle: %2 · changed: %3 · unavailable: %4 · failed: %5</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Preview stopped; run it again before undoing.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No recorded import is available to undo.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The preview can change while the log is active; each QSO is checked again before it is moved.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -11841,6 +11861,10 @@ QSL の状態: %6 · UTC が不完全: %7。
     </message>
     <message>
         <source>Could not move QSO to recycle history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The log or import changed; preview the undo again</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
