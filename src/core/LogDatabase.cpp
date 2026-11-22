@@ -408,6 +408,7 @@ bool LogDatabase::migrate()
               QStringLiteral("UPDATE station_profile SET operator_profile_id = (SELECT id FROM operator_profile WHERE callsign = station_profile.operator), operating_location_id = (SELECT id FROM operating_location WHERE location_key = station_profile.operating_location), dxcc_entity_id = my_dxcc WHERE operator_profile_id IS NULL OR operating_location_id IS NULL OR dxcc_entity_id IS NULL")}, nullptr},
         {12, {QStringLiteral("CREATE TABLE IF NOT EXISTS import_batch (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)"),
               QStringLiteral("CREATE TABLE IF NOT EXISTS import_qso (batch_id INTEGER NOT NULL REFERENCES import_batch(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, imported_revision INTEGER NOT NULL, PRIMARY KEY (batch_id, qso_uuid))")}, nullptr},
+        {13, {QStringLiteral("ALTER TABLE import_qso ADD COLUMN baseline_hash TEXT")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -969,6 +970,35 @@ QString LogDatabase::snapshotJson(qint64 id) const
         {QStringLiteral("updated_at"), m->updatedAt},
     };
     return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+}
+
+QString LogDatabase::importFingerprint(qint64 id) const
+{
+    QJsonArray parts;
+    const QStringList queries{
+        QStringLiteral("SELECT * FROM qso WHERE id=?"),
+        QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,last_error,via FROM qsl_status WHERE qso_id=? ORDER BY service"),
+        QStringLiteral("SELECT a.id,a.sha256,a.filename,a.mime,a.size,a.created_at FROM qsl_attachment_qso x "
+                       "JOIN qsl_attachment a ON a.id=x.attachment_id WHERE x.qso_id=? ORDER BY a.id"),
+        QStringLiteral("SELECT id,field,previous_value,value,source,kind,acquired_at,valid_from,valid_to FROM qso_enrichment WHERE qso_id=? ORDER BY id")
+    };
+    for (const QString& sql : queries) {
+        QSqlQuery q(connection());
+        q.prepare(sql);
+        q.addBindValue(id);
+        if (!q.exec()) return {};
+        QJsonArray rows;
+        const int columns = q.record().count();
+        while (q.next()) {
+            QJsonArray row;
+            for (int i = 0; i < columns; ++i) row.append(QJsonValue::fromVariant(q.value(i)));
+            rows.append(row);
+        }
+        if (sql == queries.first() && rows.size() != 1) return {};
+        parts.append(rows);
+    }
+    return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(parts).toJson(QJsonDocument::Compact),
+                                                        QCryptographicHash::Sha256).toHex());
 }
 
 InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 stationProfileId,
@@ -2045,11 +2075,14 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
                 journal.addBindValue(nowIso());
                 bool journalOk = journal.exec();
                 if (journalOk) {
-                    journal.prepare(QStringLiteral("INSERT INTO import_qso(batch_id, qso_id, qso_uuid, imported_revision) "
-                        "SELECT b.id, q.id, q.uuid, q.revision FROM import_batch b, qso q WHERE b.uuid = ? AND q.id = ?"));
+                    const QString fingerprint = importFingerprint(r.id);
+                    journalOk = !fingerprint.isEmpty();
+                    journal.prepare(QStringLiteral("INSERT INTO import_qso(batch_id, qso_id, qso_uuid, imported_revision, baseline_hash) "
+                        "SELECT b.id, q.id, q.uuid, q.revision, ? FROM import_batch b, qso q WHERE b.uuid = ? AND q.id = ?"));
+                    journal.addBindValue(fingerprint);
                     journal.addBindValue(importUuid);
                     journal.addBindValue(r.id);
-                    journalOk = journal.exec() && journal.numRowsAffected() == 1;
+                    journalOk = journalOk && journal.exec() && journal.numRowsAffected() == 1;
                 }
                 if (!journalOk) {
                     r.status = InsertResult::Status::Error;
@@ -2102,6 +2135,69 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
             progress(done, total);
     }
     return result;
+}
+
+ImportUndoResult LogDatabase::undoLatestImport()
+{
+    ImportUndoResult out;
+    QSqlDatabase db = connection();
+    QSqlQuery batch(db);
+    if (!batch.exec(QStringLiteral("SELECT id FROM import_batch ORDER BY id DESC LIMIT 1"))) {
+        out.errors << batch.lastError().text();
+        return out;
+    }
+    if (!batch.next()) return out;
+    out.batchId = batch.value(0).toLongLong();
+    QSqlQuery items(db);
+    items.prepare(QStringLiteral("SELECT qso_id,qso_uuid,imported_revision,baseline_hash FROM import_qso WHERE batch_id=? ORDER BY qso_id"));
+    items.addBindValue(out.batchId);
+    if (!items.exec()) {
+        out.errors << items.lastError().text();
+        return out;
+    }
+    struct Item { qint64 id; QString uuid; int revision; QString fingerprint; };
+    QList<Item> rows;
+    while (items.next()) rows << Item{items.value(0).toLongLong(), items.value(1).toString(),
+                                       items.value(2).toInt(), items.value(3).toString()};
+    items.finish();
+    for (const Item& item : std::as_const(rows)) {
+        if (!db.transaction()) {
+            ++out.failed;
+            out.errors << db.lastError().text();
+            continue;
+        }
+        const auto current = meta(item.id);
+        if (!current || current->uuid != item.uuid) {
+            ++out.unavailable;
+            db.rollback();
+            continue;
+        }
+        if (current->deleted) {
+            ++out.alreadyDeleted;
+            db.rollback();
+            continue;
+        }
+        if (item.fingerprint.isEmpty() || current->revision != item.revision
+            || importFingerprint(item.id) != item.fingerprint) {
+            ++out.changed;
+            db.rollback();
+            continue;
+        }
+        if (!softDeleteQso(item.id)) {
+            ++out.failed;
+            out.errors << QStringLiteral("QSO %1: cannot move to recycle history").arg(item.id);
+            db.rollback();
+            continue;
+        }
+        if (!db.commit()) {
+            ++out.failed;
+            out.errors << db.lastError().text();
+            db.rollback();
+            continue;
+        }
+        ++out.deleted;
+    }
+    return out;
 }
 
 namespace {

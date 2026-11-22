@@ -11848,6 +11848,14 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Câmpuri ADIF nemapate păstrate: %1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>Ultimul import a fost anulat: %1 QSO-uri mutate în istoricul coșului.</translation>
     </message>

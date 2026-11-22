@@ -11848,6 +11848,14 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Nesaistītie ADIF lauki tiek saglabāti: %1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>Pēdējais imports atsaukts: %1 QSO pārvietoti uz atkritnes vēsturi.</translation>
     </message>

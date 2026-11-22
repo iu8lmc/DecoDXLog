@@ -11768,6 +11768,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>已保留未對應的 ADIF 欄位：%1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>已復原上次匯入：%1 筆 QSO 已移入資源回收歷史。</translation>
     </message>

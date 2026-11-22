@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 12;
+constexpr int kSchemaVersion = 13;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -80,11 +80,12 @@ private slots:
             LogDatabase db;
             QVERIFY(db.open(path));
             QSqlQuery q(db.connection());
-            QVERIFY2(q.exec("SELECT qso_id, qso_uuid, imported_revision FROM import_qso"), qPrintable(q.lastError().text()));
+            QVERIFY2(q.exec("SELECT qso_id, qso_uuid, imported_revision, baseline_hash FROM import_qso"), qPrintable(q.lastError().text()));
             QVERIFY(q.next());
             QCOMPARE(q.value(0).toLongLong(), importedId);
             QCOMPARE(q.value(1).toString(), db.meta(importedId)->uuid);
             QCOMPARE(q.value(2).toInt(), db.meta(importedId)->revision);
+            QVERIFY(!q.value(3).toString().isEmpty());
             QVERIFY(!q.next());
             QVERIFY(db.record(independentId).has_value());
         }
@@ -105,6 +106,136 @@ private slots:
         QVERIFY(q.exec("SELECT COUNT(*) FROM import_batch"));
         QVERIFY(q.next());
         QCOMPARE(q.value(0).toInt(), 0);
+    }
+
+    void undoImportAfterRestartProtectsChangedAndIndependentQsos()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("undo.sqlite"));
+        QList<qint64> ids;
+        qint64 independent = 0;
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            const auto result = db.importAdif(
+                "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+                "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>"
+                "<CALL:5>K1CCC<QSO_DATE:8>20260101<TIME_ON:4>1100<BAND:3>20m<MODE:2>CW<EOR>");
+            QCOMPARE(result.inserted, 3);
+            ids = result.insertedIds;
+            auto edited = db.record(ids.at(1));
+            QVERIFY(edited.has_value());
+            edited->set(QStringLiteral("COMMENT"), QStringLiteral("edited after import"));
+            QCOMPARE(db.updateQso(ids.at(1), *edited).status, InsertResult::Status::Inserted);
+            QslState qsl; qsl.service = QStringLiteral("lotw"); qsl.sent = QStringLiteral("Y");
+            QVERIFY(db.setQslState(ids.at(2), qsl));
+            independent = db.insertQso({{"CALL", "K1NEW"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                                        {"BAND", "20m"}, {"MODE", "CW"}}, "radio").id;
+            QVERIFY(independent > 0);
+        }
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            const auto result = db.undoLatestImport();
+            QCOMPARE(result.deleted, 1);
+            QCOMPARE(result.changed, 2);
+            QCOMPARE(result.failed, 0);
+            QVERIFY(db.meta(ids.at(0))->deleted);
+            QVERIFY(!db.meta(ids.at(1))->deleted);
+            QVERIFY(!db.meta(ids.at(2))->deleted);
+            QVERIFY(!db.meta(independent)->deleted);
+            QVERIFY(!db.history(ids.at(0)).isEmpty());
+            const auto repeated = db.undoLatestImport();
+            QCOMPARE(repeated.deleted, 0);
+            QCOMPARE(repeated.alreadyDeleted, 1);
+            QCOMPARE(repeated.changed, 2);
+        }
+    }
+
+    void undoImportKeepsFailedItemsAvailableForRetry()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif(
+            "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 2);
+        const qint64 first = imported.insertedIds.at(0), second = imported.insertedIds.at(1);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER fail_undo BEFORE UPDATE OF deleted ON qso WHEN OLD.id=%1 BEGIN SELECT RAISE(ABORT,'blocked'); END").arg(second)));
+        const auto partial = db.undoLatestImport();
+        QCOMPARE(partial.deleted, 1);
+        QCOMPARE(partial.failed, 1);
+        QVERIFY(db.meta(first)->deleted);
+        QVERIFY(!db.meta(second)->deleted);
+        QVERIFY(db.history(second).isEmpty());
+        QVERIFY(q.exec("DROP TRIGGER fail_undo"));
+        const auto retry = db.undoLatestImport();
+        QCOMPARE(retry.deleted, 1);
+        QCOMPARE(retry.alreadyDeleted, 1);
+        QVERIFY(db.meta(second)->deleted);
+    }
+
+    void undoImportDoesNotDeleteLegacyEntriesWithoutBaseline()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 1);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("UPDATE import_qso SET baseline_hash = NULL"));
+        const auto result = db.undoLatestImport();
+        QCOMPARE(result.deleted, 0);
+        QCOMPARE(result.changed, 1);
+        QVERIFY(!db.meta(imported.insertedIds.first())->deleted);
+    }
+
+    void upgradeSchema12PreservesLegacyJournalForReview()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("v12.sqlite"));
+        qint64 importedId = 0;
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            const auto imported = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+            QCOMPARE(imported.inserted, 1);
+            importedId = imported.insertedIds.first();
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("CREATE TABLE old_import_qso (batch_id INTEGER NOT NULL REFERENCES import_batch(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, imported_revision INTEGER NOT NULL, PRIMARY KEY (batch_id, qso_uuid))"));
+            QVERIFY(q.exec("INSERT INTO old_import_qso SELECT batch_id,qso_id,qso_uuid,imported_revision FROM import_qso"));
+            QVERIFY(q.exec("DROP TABLE import_qso"));
+            QVERIFY(q.exec("ALTER TABLE old_import_qso RENAME TO import_qso"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version >= 13"));
+            QVERIFY(q.exec("INSERT INTO schema_version(version) VALUES (12)"));
+        }
+        {
+            LogDatabase db;
+            QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), 13);
+            const auto result = db.undoLatestImport();
+            QCOMPARE(result.changed, 1);
+            QCOMPARE(result.deleted, 0);
+            QVERIFY(!db.meta(importedId)->deleted);
+        }
+    }
+
+    void undoImportCannotUseJournalFromAnotherLog()
+    {
+        LogDatabase first, second;
+        QVERIFY(first.open(":memory:"));
+        QVERIFY(second.open(":memory:"));
+        const auto imported = first.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 1);
+        const auto independent = second.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20260101"},
+            {"TIME_ON", "1000"}, {"BAND", "20m"}, {"MODE", "CW"}}, "radio");
+        QCOMPARE(independent.id, imported.insertedIds.first());
+        const auto result = second.undoLatestImport();
+        QCOMPARE(result.deleted, 0);
+        QCOMPARE(result.batchId, qint64(0));
+        QVERIFY(!second.meta(independent.id)->deleted);
     }
 
     void upgradeFromSchema11PreservesExistingQso()
@@ -130,7 +261,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 12);
+            QCOMPARE(db.schemaVersion(), 13);
             QCOMPARE(db.qsoCount(), 1);
             QCOMPARE(db.meta(id)->uuid, uuid);
             QSqlQuery q(db.connection());

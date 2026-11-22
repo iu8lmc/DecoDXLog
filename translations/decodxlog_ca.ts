@@ -11808,6 +11808,14 @@ Camps extra conservats: %8</translation>
         <translation>Camps ADIF sense assignar conservats: %1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>Última importació desfeta: %1 QSO moguts a l&apos;historial de la paperera.</translation>
     </message>

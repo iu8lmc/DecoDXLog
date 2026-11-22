@@ -11768,6 +11768,14 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>対応付けできなかった ADIF フィールドを保持しました: %1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>直前のインポートを取り消しました。%1 件の QSO をごみ箱の履歴へ移動しました。</translation>
     </message>

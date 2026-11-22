@@ -11801,6 +11801,14 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation>An import finished on a log that is no longer open</translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation type="unfinished"></translation>
     </message>

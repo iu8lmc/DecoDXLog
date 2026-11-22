@@ -11896,6 +11896,14 @@ Campi extra conservati: %8</translation>
         <translation>Campi ADIF non mappati conservati: %1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation>Un’importazione è terminata su un log non più aperto</translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation>Annullamento importazione: %1 modificati, %2 non disponibili, %3 non riusciti. Esamina questi QSO prima di procedere.</translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>Ultima importazione annullata: %1 QSO spostati nella cronologia del cestino.</translation>
     </message>

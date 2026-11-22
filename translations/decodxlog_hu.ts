@@ -11768,6 +11768,14 @@ A további mezők megmaradnak: %8</translation>
         <translation>Meg nem feleltetett ADIF-mezők megőrizve: %1</translation>
     </message>
     <message>
+        <source>An import finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>
         <translation>Az utolsó importálás visszavonva: %1 QSO átkerült a kuka előzményeibe.</translation>
     </message>

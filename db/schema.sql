@@ -1,4 +1,4 @@
--- DecoLog Desktop — schema SQLite v4
+-- DecoLog Desktop — schema SQLite v13
 -- Principi: nomi ADIF, lossless (adif_extra), campi di sync su ogni QSO, UTC.
 
 PRAGMA journal_mode = WAL;
@@ -8,7 +8,7 @@ CREATE TABLE schema_version (
     version     INTEGER NOT NULL,
     applied_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
-INSERT INTO schema_version (version) VALUES (12);
+INSERT INTO schema_version (version) VALUES (13);
 
 CREATE TABLE operator_profile (
     id INTEGER PRIMARY KEY,
@@ -214,6 +214,7 @@ CREATE TABLE import_qso (
     qso_id INTEGER NOT NULL,
     qso_uuid TEXT NOT NULL,
     imported_revision INTEGER NOT NULL,
+    baseline_hash TEXT,
     PRIMARY KEY (batch_id, qso_uuid)
 );
 

@@ -1146,7 +1146,6 @@ private:
     // L'ultima richiesta di statistiche: le altre, ancora in coda, si saltano.
     std::shared_ptr<std::atomic<int>> m_statsLatest{std::make_shared<std::atomic<int>>(0)};
     double m_importProgress{-1};
-    QList<qint64> m_lastImportIds;
     void finishImport(const QString& path, const core::ImportResult& result);
     double m_bulkProgress{-1};
     bool m_udpResendActive{false};

@@ -5053,10 +5053,18 @@ void DecoLogController::importAdif(const QUrl& url)
                                    1000);
         }
         QMetaObject::invokeMethod(
-            self.data(), [self, path, result, startedAt] {
+            self.data(), [self, path, dbPath, result, startedAt] {
                 if (self) {
                     self->recordUiLatency(QStringLiteral("import.adif"),
                                           QDateTime::currentMSecsSinceEpoch() - startedAt);
+                    if (!self->m_db.isOpen() || self->m_db.path() != dbPath) {
+                        self->m_importProgress = -1;
+                        emit self->importChanged();
+                        self->addActivity(QStringLiteral("IMPORT"),
+                                          tr("An import finished on a log that is no longer open"),
+                                          QStringLiteral("warning"));
+                        return;
+                    }
                     self->finishImport(path, result);
                 }
             },
@@ -5190,7 +5198,6 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
 
 void DecoLogController::finishImport(const QString& path, const ImportResult& r)
 {
-    m_lastImportIds = r.insertedIds;
     m_importProgress = -1;
     emit importChanged();
     addActivity(QStringLiteral("IMPORT"), tr("%1: %2 read, %3 new, %4 duplicates, %5 rejected, %6 with QSL status")
@@ -5215,17 +5222,17 @@ void DecoLogController::finishImport(const QString& path, const ImportResult& r)
 
 bool DecoLogController::undoLastImport()
 {
-    if (m_importProgress >= 0 || m_lastImportIds.isEmpty())
+    if (m_importProgress >= 0)
         return false;
-    int deleted = 0;
-    for (const qint64 id : std::as_const(m_lastImportIds))
-        if (m_db.softDeleteQso(id))
-            ++deleted;
-    if (deleted == 0)
+    const auto result = m_db.undoLatestImport();
+    if (result.changed || result.unavailable || result.failed || !result.errors.isEmpty())
+        addActivity(QStringLiteral("IMPORT"),
+                    tr("Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.")
+                        .arg(result.changed).arg(result.unavailable).arg(result.failed), QStringLiteral("warning"));
+    if (result.deleted == 0)
         return false;
     addActivity(QStringLiteral("IMPORT"), tr("Undid the last import: %1 QSO(s) moved to the recycle history.")
-                                              .arg(deleted), QStringLiteral("warning"));
-    m_lastImportIds.clear();
+                                              .arg(result.deleted), QStringLiteral("warning"));
     m_model->reload();
     m_profiles->reload();
     emit logChanged();

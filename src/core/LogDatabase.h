@@ -42,6 +42,16 @@ struct ImportResult {
     QStringList errors;     // i primi problemi, per mostrarli all'operatore
 };
 
+struct ImportUndoResult {
+    qint64 batchId{0};
+    int deleted{0};
+    int alreadyDeleted{0};
+    int changed{0};
+    int unavailable{0};
+    int failed{0};
+    QStringList errors;
+};
+
 struct EnrichmentEntry {
     qint64 qsoId{0};
     QString field;
@@ -328,6 +338,7 @@ public:
     using ImportProgress = std::function<void(int done, int total)>;
     ImportResult importAdif(const QByteArray& data, const QString& source, qint64 stationProfileId,
                             const ImportProgress& progress, int batchSize);
+    ImportUndoResult undoLatestImport();
     QByteArray   exportAdif(const QString& programVersion = {}) const;
     QByteArray   exportAdif(const QList<qint64>& ids, const QString& programVersion = {}) const;
 
@@ -551,6 +562,7 @@ private:
     std::optional<Prepared> prepare(const AdifRecord& input, InsertResult& error) const;
     bool writeQsl(qint64 qsoId, const QList<QslState>& states, bool keepRemote);
     QString snapshotJson(qint64 id) const;
+    QString importFingerprint(qint64 id) const;
     bool applySchema();
     bool migrate();
     std::optional<qint64> findDuplicate(const QString& call, const QString& band,
