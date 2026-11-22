@@ -26,6 +26,14 @@ class Fixture(socketserver.BaseRequestHandler):
             reply = '961.742249\n'
         elif command == 'GET_TLE OSCAR-7':
             reply = 'OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n'
+        elif command.startswith('PREDICT "OSCAR-7" '):
+            start = int(command.rsplit(' ', 1)[1])
+            base = 1800000180 if start >= 1800000180 else 1800000000
+            for part in (f'{base} Fri 15Jan27 08:00:00 0 183 240 22 75 2135 38914 *\n'.encode(),
+                         f'{base + 60} Fri 15Jan27 08:01:00 30 174 243 25 72'.encode(),
+                         b' 1794 38914 *\n', f'{base + 120} Fri 15Jan27 08:02:00 0 160 246 28 69 1517 38914 *\n'.encode(), b'\x1a\n'):
+                sock.sendto(part, self.client_address)
+            return
         else:
             reply = 'Huh?\n'
         sock.sendto(reply.encode('ascii'), self.client_address)
@@ -114,3 +122,26 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-live-') as tmp:
         server.shutdown()
         Fixture.handle = original_handle
         print(f'PASS live: {server.commands}')
+
+with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
+    root = pathlib.Path(tmp)
+    with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
+        server.commands = []
+        server.stopped = False
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        env = os.environ.copy()
+        env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
+                   DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='2800')
+        command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
+                   '--db', str(root/'test.sqlite'), '--port', '0', '--show',
+                   f'predictpass:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
+        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
+        output = result.stdout + result.stderr
+        if result.returncode or 'PROBE predictPass success=true rendered=true max=30 old=true' not in output or 'PROBE predictPassNext success=true rendered=true' not in output:
+            raise SystemExit(f'FAIL pass: {output}; requests={server.commands}')
+        if len(server.commands) != 6 or server.commands[0] != 'GET_TLE OSCAR-7' or not server.commands[1].startswith('PREDICT "OSCAR-7" ') or server.commands[2:4] != ['GET_TLE OSCAR-7', 'GET_TLE OSCAR-7'] or server.commands[4] != 'PREDICT "OSCAR-7" 1800000180' or server.commands[5] != 'GET_TLE OSCAR-7':
+            raise SystemExit(f'Unexpected pass commands: {server.commands}')
+        with sqlite3.connect(root/'test.sqlite') as db:
+            assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
+        server.shutdown()
+        print(f'PASS pass: {server.commands}')

@@ -92,6 +92,8 @@ set_target_properties(monocypher PROPERTIES POSITION_INDEPENDENT_CODE ON C_STAND
 add_library(decolog_core STATIC
     src/core/Activation.cpp
     src/core/Activation.h
+    src/core/PredictPassPlanner.cpp
+    src/core/PredictPassPlanner.h
     src/core/PredictTracker.cpp
     src/core/PredictTracker.h
     src/core/RadioNet.cpp
@@ -702,7 +704,7 @@ if(DECODXLOG_BUILD_TESTS)
             $<TARGET_FILE:clublog_live50> $<TARGET_FILE:clublog_stage_existing>)
         set_tests_properties(clublog_live50_simulation PROPERTIES TIMEOUT 60)
     endif()
-    foreach(name adif protocol database countries credentials callbook callbookprofile awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc radionet predicttracker)
+    foreach(name adif protocol database countries credentials callbook callbookprofile awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc radionet predicttracker predictpass)
         qt_add_executable(tst_${name} tests/tst_${name}.cpp)
         target_link_libraries(tst_${name} PRIVATE decolog_core Qt6::Test)
         set_target_properties(tst_${name} PROPERTIES WIN32_EXECUTABLE OFF)
@@ -814,7 +816,7 @@ if(DECODXLOG_BUILD_TESTS)
         set_tests_properties(rig_split_manual PROPERTIES TIMEOUT 30)
         add_test(NAME predict_ui COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/predict_ui_probe.py $<TARGET_FILE:decolog>)
-        set_tests_properties(predict_ui PROPERTIES TIMEOUT 45)
+        set_tests_properties(predict_ui PROPERTIES TIMEOUT 60)
     endif()
 
     qt_add_executable(tst_bulkresponsiveness tests/tst_bulkresponsiveness.cpp)

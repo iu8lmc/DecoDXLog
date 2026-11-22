@@ -14949,5 +14949,41 @@ Extra fields are preserved: %8</source>
         <source>Refresh automatically (2.5 s after each reading)</source>
         <translation>Refresh automatically (2.5 s after each reading)</translation>
     </message>
+    <message>
+        <source>Predict next pass</source>
+        <translation>Predict next pass</translation>
+    </message>
+    <message>
+        <source>Following pass</source>
+        <translation>Following pass</translation>
+    </message>
+    <message>
+        <source>Cancel prediction</source>
+        <translation>Cancel prediction</translation>
+    </message>
+    <message>
+        <source>Predicting pass…</source>
+        <translation>Predicting pass…</translation>
+    </message>
+    <message>
+        <source>Pass received</source>
+        <translation>Pass received</translation>
+    </message>
+    <message>
+        <source>Enter a valid server and satellite name for pass prediction.</source>
+        <translation>Enter a valid server and satellite name for pass prediction.</translation>
+    </message>
+    <message>
+        <source>Pass UTC: %1 – %2 · maximum sampled elevation %3°</source>
+        <translation>Pass UTC: %1 – %2 · maximum sampled elevation %3°</translation>
+    </message>
+    <message>
+        <source>Prediction TLE epoch: %1</source>
+        <translation>Prediction TLE epoch: %1</translation>
+    </message>
+    <message>
+        <source>Orbital data may be stale; verify before use.</source>
+        <translation>Orbital data may be stale; verify before use.</translation>
+    </message>
 </context>
 </TS>

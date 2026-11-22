@@ -1207,6 +1207,7 @@ bool DecoLogController::openDatabase(const QString& path)
     m_activation = new ActivationController(std::move(actCtx), this);
     m_radioNet = new core::RadioNet(&m_db, this);
     m_predictTracker = new core::PredictTracker(this);
+    m_predictPassPlanner = new core::PredictPassPlanner(this);
     m_radioNet->load();
     // Un QSO corretto, cancellato o importato cambia il punteggio della gara:
     // quello in memoria non vale piu'. Collegato qui, prima delle finestre,

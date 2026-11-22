@@ -26,3 +26,5 @@
 - G09 manual QSO entry exposes distinct RX frequency alongside the satellite fields and validates positive finite RX MHz. When explicitly supplied, the regular frequency is the TX frequency; existing automatic split handling remains for a blank RX. This is data entry, not an orbital tracker or CAT ownership mechanism.
 
 - G09 PREDICT UDP snapshot client is read-only, requires a numeric IP address, and verifies tracking mode both before and after the sample. A TLE epoch is exposed separately; the snapshot does not itself prove accurate orbital data or a continuously updating server. The core is not yet wired into desktop workflows.
+
+- G09 PREDICT pass requests accept a strict ASCII satellite-name allowlist because upstream PREDICT 2.2.x invokes a shell. Pass streams are bounded and require ordered points, plausible horizon endpoints and unchanged TLE; these checks cannot guarantee UDP completeness and may reject slow passes.

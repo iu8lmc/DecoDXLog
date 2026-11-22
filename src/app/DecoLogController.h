@@ -32,6 +32,7 @@
 #include "core/Vucc.h"
 #include "core/RadioNet.h"
 #include "core/PredictTracker.h"
+#include "core/PredictPassPlanner.h"
 #include "core/Callbook.h"
 #include "core/CallbookProfileVerifier.h"
 #include "core/Countries.h"
@@ -104,6 +105,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* activation READ activation CONSTANT)
     Q_PROPERTY(QObject* radioNet READ radioNet CONSTANT)
     Q_PROPERTY(QObject* predictTracker READ predictTracker CONSTANT)
+    Q_PROPERTY(QObject* predictPassPlanner READ predictPassPlanner CONSTANT)
     // I log della stazione: quello aperto e gli altri, per i contest.
     Q_PROPERTY(QObject* logs READ logs CONSTANT)
 
@@ -320,6 +322,7 @@ public:
     QObject* stationProfiles() const { return m_profiles; }
     QObject* radioNet() const { return m_radioNet; }
     QObject* predictTracker() const { return m_predictTracker; }
+    QObject* predictPassPlanner() const { return m_predictPassPlanner; }
     QObject* credentials() const { return m_credentials; }
     QObject* cluster() const { return m_cluster; }
     QObject* qsl() const { return m_qsl; }
@@ -1112,6 +1115,7 @@ private:
     ActivationController* m_activation{nullptr};
     core::RadioNet* m_radioNet{nullptr};
     core::PredictTracker* m_predictTracker{nullptr};
+    core::PredictPassPlanner* m_predictPassPlanner{nullptr};
     LogLibrary* m_logs{nullptr};
 
     int       m_udpPort{2237};

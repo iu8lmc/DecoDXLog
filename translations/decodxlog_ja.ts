@@ -14890,5 +14890,41 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Refresh automatically (2.5 s after each reading)</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Predict next pass</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Following pass</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel prediction</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Predicting pass…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pass received</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a valid server and satellite name for pass prediction.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pass UTC: %1 – %2 · maximum sampled elevation %3°</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Prediction TLE epoch: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Orbital data may be stale; verify before use.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 </TS>

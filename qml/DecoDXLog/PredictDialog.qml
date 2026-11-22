@@ -8,20 +8,27 @@ DialogFrame {
     title: qsTr("PREDICT satellite tracker")
     dialogKey: "predict-tracker"
     width: 720
-    height: 480
+    height: 600
     dotColor: Theme.secondaryColor
     info: qsTr("Read-only: the tracker controls neither radio nor rotor")
     readonly property var tracker: decolog.predictTracker
+    readonly property var planner: decolog.predictPassPlanner
     readonly property var sample: tracker.snapshot
     property bool probing: false
     property bool probingList: false
     property bool probingLive: false
+    property bool probingPass: false
+    property int probePassCount: 0
     property int probeLiveSuccesses: 0
     property bool listValid: false
     property string listHost: ""
     property string listPort: ""
     property bool resultValid: false
     property bool discardPending: false
+    property bool passValid: false
+    readonly property var plannedPass: planner.pass
+    readonly property double passEpochMs: plannedPass.tleEpoch ? new Date(plannedPass.tleEpoch).getTime() : NaN
+    readonly property double passAgeDays: isFinite(passEpochMs) ? (Date.now() - passEpochMs) / 86400000 : NaN
     readonly property double epochMs: sample.tleEpoch ? new Date(sample.tleEpoch).getTime() : NaN
     readonly property double ageDays: isFinite(epochMs) ? (Date.now() - epochMs) / 86400000 : NaN
     function probe(host, port, name) {
@@ -46,6 +53,24 @@ DialogFrame {
         autoRefresh.checked = true
         autoRefresh.toggled()
     }
+    function probePass(host, port, name) {
+        probingPass = true
+        probePassCount = 0
+        hostField.text = host
+        portField.text = String(port)
+        satelliteField.text = name
+        firstPassButton.clicked()
+    }
+    function requestPass(start) {
+        autoRefresh.checked = false
+        refreshTimer.stop()
+        root.passValid = false
+        status.text = qsTr("Predicting pass…")
+        if (!root.planner.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim(), start)) {
+            status.text = qsTr("Enter a valid server and satellite name for pass prediction.")
+            if (root.probingPass) { console.warn("PROBE predictPass success=false invalid=true"); root.probingPass = false }
+        }
+    }
     function refreshSnapshot() {
         root.discardPending = false
         root.resultValid = false
@@ -61,12 +86,32 @@ DialogFrame {
         refreshTimer.stop()
         root.resultValid = false
         root.discardPending = true
+        root.planner.cancel()
+        root.passValid = false
     }
     Timer {
         id: refreshTimer
         interval: 2500
         repeat: false
         onTriggered: if (root.visible && autoRefresh.checked && !root.tracker.busy) root.refreshSnapshot()
+    }
+    Connections {
+        target: root.planner
+        function onFinished(success, error) {
+            root.passValid = success && root.visible
+            status.text = success ? qsTr("Pass received") : qsTr("Tracker error: %1").arg(error)
+            if (root.probingPass) {
+                ++root.probePassCount
+                if (root.probePassCount === 1 && success) {
+                    console.warn("PROBE predictPass success=" + success + " rendered=" + passSummary.visible
+                                 + " max=" + (root.plannedPass.maxElevation || 0) + " old=" + (root.passAgeDays > 14))
+                    Qt.callLater(() => nextPassButton.clicked())
+                } else {
+                    console.warn("PROBE predictPassNext success=" + success + " rendered=" + passSummary.visible)
+                    root.probingPass = false
+                }
+            }
+        }
     }
     Connections {
         target: root.tracker
@@ -110,13 +155,13 @@ DialogFrame {
         Text { text: qsTr("PREDICT UDP server"); color: Theme.textPrimary; font.bold: true }
         RowLayout {
             Layout.fillWidth: true
-            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.resultValid = false } }
-            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.resultValid = false } }
-            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy && !autoRefresh.checked; onTextChanged: root.resultValid = false }
+            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.resultValid = false; root.passValid = false } }
+            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.resultValid = false; root.passValid = false } }
+            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked; onTextChanged: { root.resultValid = false; root.passValid = false } }
             GlassButton {
                 id: requestButton
                 text: qsTr("Read snapshot")
-                enabled: !root.tracker.busy && !autoRefresh.checked && portField.acceptableInput
+                enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked && portField.acceptableInput
                 onClicked: root.refreshSnapshot()
             }
         }
@@ -125,7 +170,7 @@ DialogFrame {
             GlassButton {
                 id: listButton
                 text: qsTr("Load satellites")
-                enabled: !root.tracker.busy && !autoRefresh.checked && portField.acceptableInput
+                enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked && portField.acceptableInput
                 onClicked: {
                     root.listValid = false
                     satelliteField.text = ""
@@ -142,7 +187,7 @@ DialogFrame {
                 id: satelliteChoices
                 Layout.fillWidth: true
                 Accessible.name: qsTr("Available tracked satellites")
-                enabled: !root.tracker.busy && !autoRefresh.checked
+                enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked
                 model: root.listValid ? root.tracker.satellites : []
                 onActivated: if (currentIndex >= 0) satelliteField.text = currentText
             }
@@ -150,11 +195,36 @@ DialogFrame {
         CheckBox {
             id: autoRefresh
             text: qsTr("Refresh automatically (2.5 s after each reading)")
-            enabled: root.visible && (!root.tracker.busy || checked) && portField.acceptableInput
+            enabled: root.visible && !root.planner.busy && (!root.tracker.busy || checked) && portField.acceptableInput
             onToggled: {
                 if (checked) root.refreshSnapshot()
                 else refreshTimer.stop()
             }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            GlassButton { id: firstPassButton; text: qsTr("Predict next pass"); enabled: !root.tracker.busy && !root.planner.busy && portField.acceptableInput; onClicked: root.requestPass(Math.floor(Date.now() / 1000)) }
+            GlassButton { id: nextPassButton; text: qsTr("Following pass"); enabled: root.passValid && !root.tracker.busy && !root.planner.busy; onClicked: root.requestPass(Number(root.plannedPass.los) + 60) }
+            GlassButton { text: qsTr("Cancel prediction"); visible: root.planner.busy; onClicked: root.planner.cancel() }
+        }
+        Text {
+            id: passSummary
+            Layout.fillWidth: true
+            visible: root.passValid
+            text: root.passValid ? qsTr("Pass UTC: %1 – %2 · maximum sampled elevation %3°")
+                  .arg(new Date(Number(root.plannedPass.aos) * 1000).toISOString())
+                  .arg(new Date(Number(root.plannedPass.los) * 1000).toISOString())
+                  .arg(root.plannedPass.maxElevation) : ""
+            color: Theme.textPrimary
+            wrapMode: Text.Wrap
+        }
+        Text {
+            Layout.fillWidth: true
+            visible: root.passValid
+            text: qsTr("Prediction TLE epoch: %1").arg(isFinite(root.passEpochMs) ? new Date(root.passEpochMs).toISOString() : "—")
+                  + (root.passAgeDays < 0 || root.passAgeDays > 14 ? " · " + qsTr("Orbital data may be stale; verify before use.") : "")
+            color: root.passAgeDays < 0 || root.passAgeDays > 14 ? Theme.warningColor : Theme.textSecondary
+            wrapMode: Text.Wrap
         }
         Text { id: status; Layout.fillWidth: true; text: root.tracker.busy ? qsTr("Reading…") : ""; color: Theme.textSecondary; wrapMode: Text.Wrap }
         Text { id: satelliteStatus; visible: root.resultValid && !!root.sample.satellite; text: qsTr("Satellite: %1").arg(root.sample.satellite || ""); color: Theme.textPrimary; font.bold: true }

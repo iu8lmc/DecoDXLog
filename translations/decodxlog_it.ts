@@ -14992,5 +14992,41 @@ Campi extra conservati: %8</translation>
         <source>Refresh automatically (2.5 s after each reading)</source>
         <translation>Aggiorna automaticamente (2,5 s dopo ogni lettura)</translation>
     </message>
+    <message>
+        <source>Predict next pass</source>
+        <translation>Prevedi prossimo passaggio</translation>
+    </message>
+    <message>
+        <source>Following pass</source>
+        <translation>Passaggio successivo</translation>
+    </message>
+    <message>
+        <source>Cancel prediction</source>
+        <translation>Annulla previsione</translation>
+    </message>
+    <message>
+        <source>Predicting pass…</source>
+        <translation>Previsione del passaggio…</translation>
+    </message>
+    <message>
+        <source>Pass received</source>
+        <translation>Passaggio ricevuto</translation>
+    </message>
+    <message>
+        <source>Enter a valid server and satellite name for pass prediction.</source>
+        <translation>Inserisci un server e un nome satellite validi per la previsione.</translation>
+    </message>
+    <message>
+        <source>Pass UTC: %1 – %2 · maximum sampled elevation %3°</source>
+        <translation>Passaggio UTC: %1 – %2 · elevazione massima campionata %3°</translation>
+    </message>
+    <message>
+        <source>Prediction TLE epoch: %1</source>
+        <translation>Epoca TLE della previsione: %1</translation>
+    </message>
+    <message>
+        <source>Orbital data may be stale; verify before use.</source>
+        <translation>I dati orbitali potrebbero essere obsoleti; verifica prima dell’uso.</translation>
+    </message>
 </context>
 </TS>
