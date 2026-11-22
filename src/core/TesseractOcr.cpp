@@ -5,6 +5,11 @@
 #include <QDate>
 #include <QRegularExpression>
 #include <QSet>
+#include <QFile>
+#include <QSaveFile>
+#include <QCryptographicHash>
+#include <QPointer>
+#include <QUuid>
 
 namespace decolog::core {
 namespace {
@@ -52,38 +57,90 @@ TesseractOcr::TesseractOcr(const QString &executableOverride, QObject *parent)
 }
 TesseractOcr::~TesseractOcr()
 {
+    if (m_copyCancel) m_copyCancel->store(true);
+    m_pool.waitForDone();
     if (m_process.state() != QProcess::NotRunning) { m_process.kill(); m_process.waitForFinished(1000); }
 }
 bool TesseractOcr::start(const QUrl &image)
 {
     if (m_busy) return false;
+    if (!m_snapshotPath.isEmpty()) QFile::remove(m_snapshotPath);
+    m_snapshotPath.clear(); m_snapshotSha256.clear();
     m_text.clear(); m_words.clear(); m_suggestions.clear(); m_output.clear(); m_error.clear(); m_cancelled = false; m_tooLarge = false;
     const QFileInfo info(image.toLocalFile());
     if (!image.isLocalFile() || !info.isFile() || !info.isReadable() || info.size() <= 0 || info.size() > kMaxImageBytes) {
         m_error = tr("Choose a readable local image up to 32 MB"); emit changed(); return false;
     }
-    QImageReader reader(info.absoluteFilePath());
-    const QSize size = reader.size();
-    if (!size.isValid() || size.width() > 12000 || size.height() > 12000 || qint64(size.width()) * size.height() > 40000000) {
-        m_error = tr("Unsupported image or image dimensions too large"); emit changed(); return false;
-    }
     if (m_executable.isEmpty() || !QFileInfo(m_executable).isExecutable()) {
         m_error = tr("Tesseract OCR was not found"); emit changed(); return false;
     }
+    if (!m_tempDir.isValid()) {
+        m_error = tr("Cannot create a temporary image copy"); emit changed(); return false;
+    }
     m_busy = true;
+    m_copyCancel = std::make_shared<std::atomic_bool>(false);
+    const auto cancelled = m_copyCancel;
+    const QString original = info.absoluteFilePath();
+    const QString snapshot = m_tempDir.filePath(QUuid::createUuid().toString(QUuid::WithoutBraces));
     emit changed();
-    m_process.setProgram(m_executable);
-    m_process.setArguments({info.absoluteFilePath(), QStringLiteral("stdout"), QStringLiteral("-l"), QStringLiteral("eng"),
-                            QStringLiteral("--psm"), QStringLiteral("3"), QStringLiteral("tsv")});
-    m_timeout.start(90000);
-    m_process.start();
+    QPointer<TesseractOcr> self(this);
+    m_pool.start([self, original, snapshot, cancelled] {
+        QString error;
+        QString digest;
+        QFile input(original);
+        QSaveFile output(snapshot);
+        QCryptographicHash hash(QCryptographicHash::Sha256);
+        if (!input.open(QIODevice::ReadOnly) || !output.open(QIODevice::WriteOnly)) {
+            error = tr("Cannot create a temporary image copy");
+        } else {
+            qint64 total = 0;
+            while (!cancelled->load()) {
+                const QByteArray block = input.read(256 * 1024);
+                if (block.isEmpty()) {
+                    if (input.error() != QFile::NoError) error = tr("Cannot read the image");
+                    break;
+                }
+                total += block.size();
+                if (total > kMaxImageBytes || output.write(block) != block.size()) {
+                    error = tr("Cannot create a temporary image copy"); break;
+                }
+                hash.addData(block);
+            }
+            if (!cancelled->load() && error.isEmpty() && total > 0 && output.commit()) {
+                QImageReader reader(snapshot);
+                const QSize size = reader.size();
+                if (!size.isValid() || size.width() > 12000 || size.height() > 12000 ||
+                    qint64(size.width()) * size.height() > 40000000)
+                    error = tr("Unsupported image or image dimensions too large");
+                else
+                    digest = QString::fromLatin1(hash.result().toHex());
+            } else if (!cancelled->load() && error.isEmpty()) {
+                error = tr("Cannot create a temporary image copy");
+            }
+        }
+        if (!error.isEmpty() || cancelled->load()) QFile::remove(snapshot);
+        QMetaObject::invokeMethod(self.data(), [self, snapshot, digest, error, cancelled] {
+            if (!self) return;
+            self->m_copyCancel.reset();
+            if (cancelled->load()) { QFile::remove(snapshot); self->finish(false, tr("OCR cancelled")); return; }
+            if (!error.isEmpty()) { self->finish(false, error); return; }
+            self->m_snapshotPath = snapshot;
+            self->m_snapshotSha256 = digest;
+            self->m_process.setProgram(self->m_executable);
+            self->m_process.setArguments({snapshot, QStringLiteral("stdout"), QStringLiteral("-l"), QStringLiteral("eng"),
+                                          QStringLiteral("--psm"), QStringLiteral("3"), QStringLiteral("tsv")});
+            self->m_timeout.start(90000);
+            self->m_process.start();
+        }, Qt::QueuedConnection);
+    });
     return true;
 }
 void TesseractOcr::cancel()
 {
     if (!m_busy) return;
     m_cancelled = true;
-    m_process.kill();
+    if (m_copyCancel) m_copyCancel->store(true);
+    if (m_process.state() != QProcess::NotRunning) m_process.kill();
 }
 void TesseractOcr::collect()
 {
@@ -180,7 +237,11 @@ void TesseractOcr::finish(bool success, const QString &message)
     m_timeout.stop();
     m_busy = false;
     m_error = message;
-    if (!success) { m_text.clear(); m_words.clear(); m_suggestions.clear(); }
+    if (!success) {
+        m_text.clear(); m_words.clear(); m_suggestions.clear(); m_snapshotSha256.clear();
+        if (!m_snapshotPath.isEmpty()) QFile::remove(m_snapshotPath);
+        m_snapshotPath.clear();
+    }
     emit changed();
     emit finished(success);
 }

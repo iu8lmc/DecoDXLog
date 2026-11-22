@@ -15266,6 +15266,10 @@ A további mezők megmaradnak: %8</translation>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Temporary image copy · SHA-256 %1…</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15299,6 +15303,14 @@ A további mezők megmaradnak: %8</translation>
     </message>
     <message>
         <source>Tesseract OCR was not found</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary image copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot read the image</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

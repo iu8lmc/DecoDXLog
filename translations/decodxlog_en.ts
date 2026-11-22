@@ -15325,6 +15325,10 @@ Extra fields are preserved: %8</source>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
+    <message>
+        <source>Temporary image copy · SHA-256 %1…</source>
+        <translation>Temporary image copy · SHA-256 %1…</translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15359,6 +15363,14 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Tesseract OCR was not found</source>
         <translation>Tesseract OCR was not found</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary image copy</source>
+        <translation>Cannot create a temporary image copy</translation>
+    </message>
+    <message>
+        <source>Cannot read the image</source>
+        <translation>Cannot read the image</translation>
     </message>
 </context>
 <context>

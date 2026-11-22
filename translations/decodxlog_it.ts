@@ -15368,6 +15368,10 @@ Campi extra conservati: %8</translation>
         <source>Cancel</source>
         <translation>Annulla</translation>
     </message>
+    <message>
+        <source>Temporary image copy · SHA-256 %1…</source>
+        <translation>Copia temporanea dell’immagine · SHA-256 %1…</translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15402,6 +15406,14 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Tesseract OCR was not found</source>
         <translation>Tesseract OCR non trovato</translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary image copy</source>
+        <translation>Impossibile creare una copia temporanea dell’immagine</translation>
+    </message>
+    <message>
+        <source>Cannot read the image</source>
+        <translation>Impossibile leggere l’immagine</translation>
     </message>
 </context>
 <context>

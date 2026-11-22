@@ -6,6 +6,7 @@
 #include <QPainter>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QCryptographicHash>
 #include <QTest>
 using namespace decolog::core;
 class TestTesseractOcr : public QObject {
@@ -34,6 +35,25 @@ class TestTesseractOcr : public QObject {
         return path;
     }
   private slots:
+    void ocrUsesImmutableImageSnapshot()
+    {
+        TesseractOcr ocr;
+        QVERIFY(ocr.metaObject()->indexOfProperty("snapshotSha256") >= 0);
+        if (ocr.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = makeImage(dir, "card.png", false); QVERIFY(!path.isEmpty());
+        QFile source(path); QVERIFY(source.open(QIODevice::ReadOnly));
+        const QByteArray original = source.readAll(); source.close();
+        QSignalSpy done(&ocr, &TesseractOcr::finished);
+        QVERIFY(ocr.start(QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 30000);
+        QVERIFY2(done.first().first().toBool(), qPrintable(ocr.error()));
+        QCOMPARE(ocr.snapshotSha256(), QString::fromLatin1(QCryptographicHash::hash(original, QCryptographicHash::Sha256).toHex()));
+        QVERIFY(source.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(source.write("changed"), 7); source.close();
+        QFile snapshot(ocr.snapshotPath()); QVERIFY(snapshot.open(QIODevice::ReadOnly));
+        QCOMPARE(snapshot.readAll(), original);
+    }
     void suggestionsPreserveAmbiguousDatesAndSimilarCalls()
     {
         TesseractOcr ocr;
@@ -137,6 +157,20 @@ class TestTesseractOcr : public QObject {
         }
     }
 #ifndef Q_OS_WIN
+    void engineReceivesSnapshotPath()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
+        QFile script(dir.filePath("path-ocr")); QVERIFY(script.open(QIODevice::WriteOnly));
+        script.write("#!/bin/sh\nprintf '5\\t1\\t1\\t1\\t1\\t1\\t0\\t0\\t10\\t10\\t91\\t%s\\n' \"$1\"\n");
+        script.close(); QVERIFY(script.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+        TesseractOcr ocr(script.fileName()); QSignalSpy done(&ocr, &TesseractOcr::finished);
+        QVERIFY(ocr.start(QUrl::fromLocalFile(image)));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 5000);
+        QVERIFY(done.first().first().toBool());
+        QCOMPARE(ocr.text(), ocr.snapshotPath());
+        QVERIFY(ocr.snapshotPath() != image);
+    }
     void marksLowConfidenceWordsAndPreservesLines()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
@@ -159,11 +193,13 @@ class TestTesseractOcr : public QObject {
         QTemporaryDir dir; QVERIFY(dir.isValid());
         const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
         QFile script(dir.filePath("slow-ocr")); QVERIFY(script.open(QIODevice::WriteOnly));
-        script.write("#!/bin/sh\nexec sleep 30\n"); script.close();
+        const QString marker = dir.filePath("engine-started");
+        script.write("#!/bin/sh\ntouch \"" + marker.toUtf8() + "\"\nexec sleep 30\n"); script.close();
         QVERIFY(script.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
         TesseractOcr ocr(script.fileName()); QSignalSpy done(&ocr, &TesseractOcr::finished);
         QVERIFY(ocr.start(QUrl::fromLocalFile(image)));
         QVERIFY(!ocr.start(QUrl::fromLocalFile(image)));
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(marker), 5000);
         ocr.cancel();
         QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 5000);
         QVERIFY(!done.first().first().toBool());

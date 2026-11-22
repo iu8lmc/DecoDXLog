@@ -15266,6 +15266,10 @@ QSL の状態: %6 · UTC が不完全: %7。
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Temporary image copy · SHA-256 %1…</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>decolog::core::TesseractOcr</name>
@@ -15299,6 +15303,14 @@ QSL の状態: %6 · UTC が不完全: %7。
     </message>
     <message>
         <source>Tesseract OCR was not found</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot create a temporary image copy</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot read the image</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

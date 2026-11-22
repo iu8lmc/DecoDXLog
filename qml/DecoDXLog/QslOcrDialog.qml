@@ -81,6 +81,13 @@ DialogFrame {
             wrapMode: Text.Wrap
         }
         Text { Layout.fillWidth: true; visible: root.ocr.busy; text: qsTr("Reading locally…"); color: Theme.secondaryColor }
+        Text {
+            Layout.fillWidth: true
+            visible: root.showingResult && root.ocr.snapshotSha256.length > 0
+            text: qsTr("Temporary image copy · SHA-256 %1…").arg(root.ocr.snapshotSha256.substring(0, 12))
+            color: Theme.textSecondary
+            wrapMode: Text.Wrap
+        }
         Text { Layout.fillWidth: true; visible: root.showingResult && root.ocr.error.length > 0; text: root.ocr.error; color: Theme.warningColor; wrapMode: Text.Wrap }
         Text { text: qsTr("Recognized text"); color: Theme.textPrimary; font.bold: true }
         ScrollView {

@@ -42,3 +42,5 @@
 - G12 local OCR uses an optional separately installed Tesseract executable and English model; it is started without a shell for an operator-selected local image. Results and heuristic word scores are temporary suggestions and never alter QSO or confirmation state. Image attachment remains a separate explicit existing action, so the operator must ensure the attached file is the intended original.
 
 - G12 OCR field suggestions are heuristics, never auto-applied. Ambiguous numeric dates retain both valid interpretations and each suggestion keeps its raw word; exact-call candidate lookup is opt-in, bounded to 100, read-only, asynchronous and cancellable. It does not automatically filter by time, date, band or mode, and a candidate is not a confirmed correspondence.
+
+- G12 OCR processes a bounded, SHA-256-labelled temporary copy made asynchronously; later changes to the original cannot alter the bytes fed to Tesseract. The existing separate attachment action does not consume that snapshot and therefore does not yet establish provenance between OCR and attachment. Normal cleanup removes the copy, but crash cleanup is not guaranteed.
