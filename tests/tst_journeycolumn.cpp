@@ -7,6 +7,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include "core/LogDatabase.h"
+#include "core/RadioNet.h"
 
 class TestJourneyColumn : public QObject {
     Q_OBJECT
@@ -47,6 +48,30 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetNavigatesCompleteHistory()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        {
+            decolog::core::LogDatabase db;
+            QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+            decolog::core::RadioNet net(&db);
+            QVERIFY(net.start("History"));
+            QVERIFY(net.checkIn("K1AAA", "Alice", ""));
+            const qint64 id = net.members().first().toMap().value("id").toLongLong();
+            for (int i = 0; i < 200; ++i)
+                QVERIFY(net.setStatus(id, i % 2 ? "present" : "waiting"));
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionet:history"), output), output.constData());
+        QVERIFY2(output.contains("PROBE historyFirst count=200 older=true"), output.constData());
+        QVERIFY2(output.contains("PROBE historyOlder count=2 newer=true older=false"), output.constData());
+        QVERIFY2(output.contains("PROBE historyReturn count=200 newer=false"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void radioNetExplicitSaveAndRepeatQso()
     {
         QTemporaryDir dir;

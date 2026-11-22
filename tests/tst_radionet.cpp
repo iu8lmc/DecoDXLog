@@ -14,6 +14,59 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void pagesCompleteHistoryWithoutChangingRoster()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        RadioNet net(&db);
+        QVERIFY(net.metaObject()->indexOfMethod("historyPage(qlonglong)") >= 0);
+        QVERIFY(net.start("Paging"));
+        QVERIFY(net.checkIn("K1AAA", "Alice", ""));
+        const qint64 memberId = net.members().first().toMap().value("id").toLongLong();
+        QSqlQuery plan(db.connection());
+        QVERIFY(plan.exec("EXPLAIN QUERY PLAN SELECT e.id,e.event,e.recorded_at,e.detail,IFNULL(m.call,'') "
+                          "FROM radio_net_event e LEFT JOIN radio_net_member m ON m.id=e.member_id "
+                          "WHERE e.session_id=1 AND e.id<100000 ORDER BY e.id DESC LIMIT 201"));
+        bool indexed = false;
+        while (plan.next())
+            indexed |= plan.value(3).toString().contains("idx_radio_net_event_session");
+        QVERIFY(indexed);
+        for (int i = 0; i < 405; ++i)
+            QVERIFY(net.setStatus(memberId, (i % 2) ? "present" : "waiting"));
+        QSet<qint64> ids;
+        qint64 before = 0;
+        qint64 originalNewest = 0;
+        int pages = 0;
+        for (;;) {
+            QVariantList page;
+            QVERIFY(QMetaObject::invokeMethod(&net, "historyPage", Q_RETURN_ARG(QVariantList, page),
+                                              Q_ARG(qlonglong, before)));
+            QVERIFY(page.size() <= 201);
+            const int visible = qMin(200, int(page.size()));
+            if (pages == 0) {
+                originalNewest = page.first().toMap().value("id").toLongLong();
+                QVERIFY(net.setStatus(memberId, "present"));
+            }
+            for (int i = 0; i < visible; ++i) {
+                const qint64 id = page.at(i).toMap().value("id").toLongLong();
+                QVERIFY(id > 0);
+                QVERIFY(!ids.contains(id));
+                if (before > 0)
+                    QVERIFY(id < before);
+                ids.insert(id);
+            }
+            ++pages;
+            if (page.size() <= 200)
+                break;
+            before = page.at(199).toMap().value("id").toLongLong();
+        }
+        QCOMPARE(pages, 3);
+        QCOMPARE(ids.size(), 407);
+        QVERIFY(net.events().first().toMap().value("id").toLongLong() > originalNewest);
+        QCOMPARE(net.members().size(), 1);
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void summaryCountsCurrentStatusesAndReturns()
     {
         LogDatabase db;

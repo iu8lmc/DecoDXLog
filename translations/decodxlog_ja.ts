@@ -14540,6 +14540,18 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Session history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Newer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Older</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation type="unfinished"></translation>
     </message>

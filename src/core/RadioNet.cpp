@@ -13,6 +13,7 @@
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QUuid>
+#include <limits>
 
 namespace decolog::core {
 namespace {
@@ -112,14 +113,22 @@ QVariantList RadioNet::members() const
 }
 QVariantList RadioNet::events() const
 {
+    QVariantList result = historyPage(0);
+    if (result.size() > 200)
+        result.removeLast();
+    return result;
+}
+QVariantList RadioNet::historyPage(qint64 beforeId) const
+{
     QVariantList out;
     if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
         return out;
     QSqlQuery q(m_db->connection());
-    q.prepare(
-        QStringLiteral("SELECT e.id,e.event,e.recorded_at,e.detail,IFNULL(m.call,'') FROM radio_net_event e LEFT JOIN "
-                       "radio_net_member m ON m.id=e.member_id WHERE e.session_id=? ORDER BY e.id DESC LIMIT 200"));
+    q.prepare(QStringLiteral(
+        "SELECT e.id,e.event,e.recorded_at,e.detail,IFNULL(m.call,'') FROM radio_net_event e LEFT JOIN "
+        "radio_net_member m ON m.id=e.member_id WHERE e.session_id=? AND e.id<? ORDER BY e.id DESC LIMIT 201"));
     q.addBindValue(m_sessionId);
+    q.addBindValue(beforeId > 0 ? beforeId : std::numeric_limits<qint64>::max());
     if (!q.exec())
         return out;
     while (q.next())

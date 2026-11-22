@@ -14642,6 +14642,18 @@ Campi extra conservati: %8</translation>
         <translation>Partecipanti: %1 · Presenti: %2 · In attesa: %3 · Assenti: %4 · Usciti: %5 · Check-in: %6</translation>
     </message>
     <message>
+        <source>Session history</source>
+        <translation>Storico della sessione</translation>
+    </message>
+    <message>
+        <source>Newer</source>
+        <translation>Più recenti</translation>
+    </message>
+    <message>
+        <source>Older</source>
+        <translation>Più vecchi</translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation>Storico recente della sessione (ultimi 200)</translation>
     </message>

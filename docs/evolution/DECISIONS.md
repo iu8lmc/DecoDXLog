@@ -18,3 +18,5 @@
 - G08 uses a radio-net session and roster stored in the current log (schema 16), independent of ContestNet. Check-ins append history but never create QSO or issue radio commands. This initial local workflow does not claim Cloud synchronisation, session export or full operational acceptance.
 
 - G08 export streams the complete selected session from a worker-owned SQLite read transaction to an atomically replaced local JSON file. A participant may explicitly open a prefilled QSO draft; roster actions never save a QSO and an existing radio-net draft is not overwritten. The export format is application-specific and saved QSO association is not yet implemented.
+
+- G08 history uses indexed descending event IDs as page boundaries, fetching at most 201 rows to show 200 and determine whether older events exist. New events appear when the newest page is revisited; browsing is not a frozen snapshot.

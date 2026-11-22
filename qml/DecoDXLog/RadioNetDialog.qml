@@ -18,6 +18,32 @@ DialogFrame {
     info: qsTr("Roster entries do not create QSO")
     property bool probeOpenQso: false
     property bool probeSaveQso: false
+    property bool probeHistory: false
+    property var historyAnchors: [0]
+    property var historyRows: []
+    property bool historyHasOlder: false
+    property var historySessionId: 0
+    function refreshHistory() {
+        const id = root.current.id || 0
+        if (id !== root.historySessionId) {
+            root.historySessionId = id
+            root.historyAnchors = [0]
+        }
+        const rows = root.net.historyPage(root.historyAnchors[root.historyAnchors.length - 1])
+        root.historyHasOlder = rows.length > 200
+        root.historyRows = rows.slice(0, 200)
+    }
+    function olderHistory() {
+        if (!root.historyHasOlder || root.historyRows.length === 0) return
+        root.historyAnchors = root.historyAnchors.concat([root.historyRows[root.historyRows.length - 1].id])
+        root.refreshHistory()
+    }
+    function newerHistory() {
+        if (root.historyAnchors.length <= 1) return
+        root.historyAnchors = root.historyAnchors.slice(0, -1)
+        root.refreshHistory()
+    }
+    onOpened: refreshHistory()
     NewQsoDialog {
         id: participantQso
         profileDialogKey: "radio-net-qso"
@@ -36,6 +62,7 @@ DialogFrame {
     }
     Connections {
         target: root.net
+        function onChanged() { root.refreshHistory() }
         function onExportFinished(success, message) {
             exportMessage.text = success ? qsTr("Session exported.") : qsTr("Export failed: %1").arg(message)
         }
@@ -61,9 +88,10 @@ DialogFrame {
         }
     }
     // Exercised only by the explicitly requested isolated --show probe.
-    function probe(seed, openQso, saveQso) {
+    function probe(seed, openQso, saveQso, history) {
         root.probeOpenQso = openQso
         root.probeSaveQso = saveQso
+        root.probeHistory = history
         if (seed) {
             sessionTitle.text = "Test net"
             startButton.clicked()
@@ -87,6 +115,13 @@ DialogFrame {
                          + " first=" + (row ? row.modelData.call : "missing"))
             if (root.current.id)
                 console.warn("PROBE radioNetSummary participants=" + root.summary.participants + " present=" + root.summary.present + " checkIns=" + root.summary.checkIns)
+            if (root.probeHistory) {
+                console.warn("PROBE historyFirst count=" + root.historyRows.length + " older=" + olderButton.enabled)
+                olderButton.clicked()
+                console.warn("PROBE historyOlder count=" + root.historyRows.length + " newer=" + newerButton.enabled + " older=" + olderButton.enabled)
+                newerButton.clicked()
+                console.warn("PROBE historyReturn count=" + root.historyRows.length + " newer=" + newerButton.enabled)
+            }
             if (root.probeOpenQso && row) {
                 row.openQso()
                 console.warn("PROBE radioNetQso visible=" + participantQso.visible + " call=" + participantQso.enteredCallForProbe)
@@ -208,12 +243,17 @@ DialogFrame {
                 }
             }
         }
-        Text { text: qsTr("Recent session history (latest 200)"); color: Theme.secondaryColor; font.bold: true }
+        RowLayout {
+            Layout.fillWidth: true
+            Text { text: qsTr("Session history"); color: Theme.secondaryColor; font.bold: true; Layout.fillWidth: true }
+            GlassButton { id: newerButton; text: qsTr("Newer"); enabled: root.historyAnchors.length > 1; onClicked: root.newerHistory() }
+            GlassButton { id: olderButton; text: qsTr("Older"); enabled: root.historyHasOlder; onClicked: root.olderHistory() }
+        }
         ListView {
             Layout.fillWidth: true
             Layout.preferredHeight: 110
             clip: true
-            model: root.net.events
+            model: root.historyRows
             ScrollBar.vertical: ScrollBar { }
             delegate: Text {
                 required property var modelData

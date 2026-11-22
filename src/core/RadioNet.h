@@ -28,6 +28,7 @@ class RadioNet : public QObject {
     QVariantList sessions() const;
     QVariantList members() const;
     QVariantList events() const;
+    Q_INVOKABLE QVariantList historyPage(qint64 beforeId) const;
     QVariantMap session() const;
     QVariantMap summary() const;
     QString error() const { return m_error; }

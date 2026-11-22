@@ -4,8 +4,8 @@ Open **Radio net manager** from the main menu. Enter a session name and choose *
 
 A roster entry does not create or transmit a QSO. Choose **New QSO…** beside a participant to open the normal QSO entry window with the callsign and name prefilled. Saving remains an explicit operator action. An already open radio-net QSO draft is preserved instead of being replaced. The saved QSO is not yet linked to the session.
 
-**Export JSON…** writes the selected session, participants and complete event history as a local `decodxlog-radio-net-1` JSON file. Export runs on a separate database connection using a read transaction and atomic file replacement; it can be cancelled. The open log and its SQLite sidecars cannot be selected as the destination. The window itself displays only the latest 200 events. This format is specific to DecoDXLog; interoperability with other tools has not been established.
+**Export JSON…** writes the selected session, participants and complete event history as a local `decodxlog-radio-net-1` JSON file. Export runs on a separate database connection using a read transaction and atomic file replacement; it can be cancelled. The open log and its SQLite sidecars cannot be selected as the destination. The history window displays up to 200 events per page; use **Older** and **Newer** to navigate the full history. New events are shown when returning to the newest page. This format is specific to DecoDXLog; interoperability with other tools has not been established.
 
-Sessions and roster are local to the log: cloud synchronisation, reminders/timers and complete paginated history are not implemented. Concurrent live refresh between different application instances is not established.
+Sessions and roster are local to the log: cloud synchronisation, reminders and timers are not implemented. Concurrent live refresh between different application instances is not established.
 
 Schema 16 adds the local session, member and event tables in a transaction. Keep a verified backup before upgrading; downgrade to an older application has not been tested. See `docs/evolution/PROGRESS.md` for test evidence and remaining work.

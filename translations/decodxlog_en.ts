@@ -14599,6 +14599,18 @@ Extra fields are preserved: %8</source>
         <translation>Participants: %1 · Present: %2 · Waiting: %3 · Absent: %4 · Departed: %5 · Check-ins: %6</translation>
     </message>
     <message>
+        <source>Session history</source>
+        <translation>Session history</translation>
+    </message>
+    <message>
+        <source>Newer</source>
+        <translation>Newer</translation>
+    </message>
+    <message>
+        <source>Older</source>
+        <translation>Older</translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation>Recent session history (latest 200)</translation>
     </message>
