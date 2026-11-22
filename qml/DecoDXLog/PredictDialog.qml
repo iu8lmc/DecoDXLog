@@ -15,10 +15,13 @@ DialogFrame {
     readonly property var sample: tracker.snapshot
     property bool probing: false
     property bool probingList: false
+    property bool probingLive: false
+    property int probeLiveSuccesses: 0
     property bool listValid: false
     property string listHost: ""
     property string listPort: ""
     property bool resultValid: false
+    property bool discardPending: false
     readonly property double epochMs: sample.tleEpoch ? new Date(sample.tleEpoch).getTime() : NaN
     readonly property double ageDays: isFinite(epochMs) ? (Date.now() - epochMs) / 86400000 : NaN
     function probe(host, port, name) {
@@ -33,6 +36,37 @@ DialogFrame {
         hostField.text = host
         portField.text = String(port)
         listButton.clicked()
+    }
+    function probeLive(host, port, name) {
+        probingLive = true
+        probeLiveSuccesses = 0
+        hostField.text = host
+        portField.text = String(port)
+        satelliteField.text = name
+        autoRefresh.checked = true
+        autoRefresh.toggled()
+    }
+    function refreshSnapshot() {
+        root.discardPending = false
+        root.resultValid = false
+        status.text = qsTr("Reading…")
+        if (!root.tracker.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim())) {
+            autoRefresh.checked = false
+            status.text = qsTr("Enter a numeric IP, port and satellite name (up to 25 characters).")
+            if (root.probing) { console.warn("PROBE predict success=false invalid=true"); root.probing = false }
+        }
+    }
+    onClosed: {
+        autoRefresh.checked = false
+        refreshTimer.stop()
+        root.resultValid = false
+        root.discardPending = true
+    }
+    Timer {
+        id: refreshTimer
+        interval: 2500
+        repeat: false
+        onTriggered: if (root.visible && autoRefresh.checked && !root.tracker.busy) root.refreshSnapshot()
     }
     Connections {
         target: root.tracker
@@ -50,8 +84,18 @@ DialogFrame {
             }
         }
         function onFinished(success, error) {
-            root.resultValid = success
+            root.resultValid = success && root.visible && !root.discardPending
             status.text = success ? qsTr("Snapshot received") : qsTr("Tracker error: %1").arg(error)
+            if (root.resultValid && autoRefresh.checked) refreshTimer.start()
+            if (!success) { autoRefresh.checked = false; refreshTimer.stop() }
+            if (root.probingLive) {
+                if (success) ++root.probeLiveSuccesses
+                else {
+                    console.warn("PROBE predictLive stopped=" + !autoRefresh.checked + " rendered=" + satelliteStatus.visible
+                                 + " successes=" + root.probeLiveSuccesses)
+                    root.probingLive = false
+                }
+            }
             if (root.probing) {
                 console.warn("PROBE predict success=" + success + " satellite=" + (root.sample.satellite || "")
                              + " old=" + (root.ageDays > 14) + " rendered=" + satelliteStatus.visible
@@ -66,21 +110,14 @@ DialogFrame {
         Text { text: qsTr("PREDICT UDP server"); color: Theme.textPrimary; font.bold: true }
         RowLayout {
             Layout.fillWidth: true
-            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy; onTextChanged: { root.listValid = false; root.resultValid = false } }
-            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy; onTextChanged: { root.listValid = false; root.resultValid = false } }
-            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy; onTextChanged: root.resultValid = false }
+            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.resultValid = false } }
+            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.resultValid = false } }
+            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy && !autoRefresh.checked; onTextChanged: root.resultValid = false }
             GlassButton {
                 id: requestButton
                 text: qsTr("Read snapshot")
-                enabled: !root.tracker.busy && portField.acceptableInput
-                onClicked: {
-                    root.resultValid = false
-                    status.text = qsTr("Reading…")
-                    if (!root.tracker.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim())) {
-                        status.text = qsTr("Enter a numeric IP, port and satellite name (up to 25 characters).")
-                        if (root.probing) { console.warn("PROBE predict success=false invalid=true"); root.probing = false }
-                    }
-                }
+                enabled: !root.tracker.busy && !autoRefresh.checked && portField.acceptableInput
+                onClicked: root.refreshSnapshot()
             }
         }
         RowLayout {
@@ -88,7 +125,7 @@ DialogFrame {
             GlassButton {
                 id: listButton
                 text: qsTr("Load satellites")
-                enabled: !root.tracker.busy && portField.acceptableInput
+                enabled: !root.tracker.busy && !autoRefresh.checked && portField.acceptableInput
                 onClicked: {
                     root.listValid = false
                     satelliteField.text = ""
@@ -105,9 +142,18 @@ DialogFrame {
                 id: satelliteChoices
                 Layout.fillWidth: true
                 Accessible.name: qsTr("Available tracked satellites")
-                enabled: !root.tracker.busy
+                enabled: !root.tracker.busy && !autoRefresh.checked
                 model: root.listValid ? root.tracker.satellites : []
                 onActivated: if (currentIndex >= 0) satelliteField.text = currentText
+            }
+        }
+        CheckBox {
+            id: autoRefresh
+            text: qsTr("Refresh automatically (2.5 s after each reading)")
+            enabled: root.visible && (!root.tracker.busy || checked) && portField.acceptableInput
+            onToggled: {
+                if (checked) root.refreshSnapshot()
+                else refreshTimer.stop()
             }
         }
         Text { id: status; Layout.fillWidth: true; text: root.tracker.busy ? qsTr("Reading…") : ""; color: Theme.textSecondary; wrapMode: Text.Wrap }

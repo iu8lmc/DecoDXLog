@@ -82,3 +82,35 @@ for stopped in (False, True):
                 assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
             server.shutdown()
             print(f'PASS list stopped={stopped}, commands={server.commands}')
+
+with tempfile.TemporaryDirectory(prefix='decolog-predict-live-') as tmp:
+    root = pathlib.Path(tmp)
+    with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
+        server.commands = []
+        server.stopped = False
+        original_handle = Fixture.handle
+        def live_handle(handler):
+            if handler.server.commands.count('GET_MODE') >= 4:
+                handler.server.stopped = True
+            original_handle(handler)
+        Fixture.handle = live_handle
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        env = os.environ.copy()
+        env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
+                   DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='9000')
+        command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
+                   '--db', str(root/'test.sqlite'), '--port', '0', '--show',
+                   f'predictlive:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
+        result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
+        output = result.stdout + result.stderr
+        expected = 'PROBE predictLive stopped=true rendered=false successes=2'
+        if result.returncode or expected not in output:
+            raise SystemExit(f'FAIL live: {output}; requests={server.commands}')
+        allowed = {'GET_MODE', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7'}
+        if set(server.commands) - allowed or server.commands.count('GET_SAT OSCAR-7') != 2:
+            raise SystemExit(f'Unexpected live commands: {server.commands}')
+        with sqlite3.connect(root/'test.sqlite') as db:
+            assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
+        server.shutdown()
+        Fixture.handle = original_handle
+        print(f'PASS live: {server.commands}')

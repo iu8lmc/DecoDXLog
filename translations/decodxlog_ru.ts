@@ -15018,5 +15018,9 @@ Extra fields are preserved: %8</source>
         <source>Enter a numeric IP and a valid port.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Refresh automatically (2.5 s after each reading)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 </TS>

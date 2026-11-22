@@ -14886,5 +14886,9 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>Enter a numeric IP and a valid port.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Refresh automatically (2.5 s after each reading)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 </TS>

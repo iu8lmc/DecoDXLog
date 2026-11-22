@@ -14988,5 +14988,9 @@ Campi extra conservati: %8</translation>
         <source>Enter a numeric IP and a valid port.</source>
         <translation>Inserisci un IP numerico e una porta valida.</translation>
     </message>
+    <message>
+        <source>Refresh automatically (2.5 s after each reading)</source>
+        <translation>Aggiorna automaticamente (2,5 s dopo ogni lettura)</translation>
+    </message>
 </context>
 </TS>

@@ -14945,5 +14945,9 @@ Extra fields are preserved: %8</source>
         <source>Enter a numeric IP and a valid port.</source>
         <translation>Enter a numeric IP and a valid port.</translation>
     </message>
+    <message>
+        <source>Refresh automatically (2.5 s after each reading)</source>
+        <translation>Refresh automatically (2.5 s after each reading)</translation>
+    </message>
 </context>
 </TS>
