@@ -1983,7 +1983,8 @@ RoundedWindow {
         onAccepted: {
             if (window.importUndoPreview.batchId > 0 && !window.importUndoPreview.cancelled
                     && (window.importUndoPreview.errors || []).length === 0)
-                decolog.undoLastImport(window.importUndoPreview.batchId, window.importUndoPreview.batchUuid)
+                decolog.undoLastImport(window.importUndoPreview.batchId, window.importUndoPreview.batchUuid,
+                                        window.importUndoPreview.journalRevision)
         }
         body: ColumnLayout {
             anchors.margins: 16

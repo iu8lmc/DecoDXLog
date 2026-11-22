@@ -341,7 +341,13 @@ bool LogDatabase::applySchema()
             return false;
         }
     }
-    return db.commit();
+    if (!db.commit()) {
+        m_lastError = db.lastError().text();
+        return false;
+    }
+    // New databases start from the resource schema and receive the same
+    // transactional migrations as existing databases (including triggers).
+    return migrate();
 }
 
 // Un log creato da una versione precedente si porta avanti un passo alla volta,
@@ -411,6 +417,10 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TABLE IF NOT EXISTS import_qso (batch_id INTEGER NOT NULL REFERENCES import_batch(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, imported_revision INTEGER NOT NULL, PRIMARY KEY (batch_id, qso_uuid))")}, nullptr},
         {13, {QStringLiteral("ALTER TABLE import_qso ADD COLUMN baseline_hash TEXT")}, nullptr},
         {14, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_import_qso_page ON import_qso(batch_id, qso_id, qso_uuid)")}, nullptr},
+        {15, {QStringLiteral("ALTER TABLE import_batch ADD COLUMN journal_revision INTEGER NOT NULL DEFAULT 0"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS import_qso_revision_insert AFTER INSERT ON import_qso BEGIN UPDATE import_batch SET journal_revision=journal_revision+1 WHERE id=NEW.batch_id; END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS import_qso_revision_update AFTER UPDATE ON import_qso BEGIN UPDATE import_batch SET journal_revision=journal_revision+1 WHERE id=OLD.batch_id OR id=NEW.batch_id; END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS import_qso_revision_delete AFTER DELETE ON import_qso BEGIN UPDATE import_batch SET journal_revision=journal_revision+1 WHERE id=OLD.batch_id; END")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -485,6 +495,16 @@ bool LogDatabase::migrate()
                     filtered << statement;
             }
             statements = filtered;
+        }
+        if (step.to == 15) {
+            QSqlQuery columnQuery(db);
+            if (!columnQuery.exec(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('import_batch') WHERE name='journal_revision'"))
+                || !columnQuery.next()) {
+                db.rollback();
+                m_lastError = QStringLiteral("cannot inspect import journal revision column");
+                return false;
+            }
+            if (columnQuery.value(0).toInt() != 0) statements.removeFirst();
         }
         if (step.needsQsoColumn) {
             q.prepare(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('qso') WHERE name = ?"));
@@ -2175,7 +2195,7 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
 
 ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int)>& progress,
                                               bool preview, qint64 expectedBatchId,
-                                              const QString& expectedBatchUuid)
+                                              const QString& expectedBatchUuid, qint64 expectedJournalRevision)
 {
     ImportUndoResult out;
     QSqlDatabase db = connection();
@@ -2186,15 +2206,18 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
     }
     ImportFingerprintReader fingerprintReader(db);
     QSqlQuery batch(db);
-    if (!batch.exec(QStringLiteral("SELECT id,uuid FROM import_batch ORDER BY id DESC LIMIT 1"))) {
+    if (!batch.exec(QStringLiteral("SELECT id,uuid,journal_revision FROM import_batch ORDER BY id DESC LIMIT 1"))) {
         out.errors << batch.lastError().text();
         return out;
     }
     if (!batch.next()) return out;
     out.batchId = batch.value(0).toLongLong();
     out.batchUuid = batch.value(1).toString();
+    out.journalRevision = batch.value(2).toLongLong();
+    batch.finish();
     if ((expectedBatchId > 0 && out.batchId != expectedBatchId)
-        || (!expectedBatchUuid.isEmpty() && out.batchUuid != expectedBatchUuid)) {
+        || (!expectedBatchUuid.isEmpty() && out.batchUuid != expectedBatchUuid)
+        || (expectedJournalRevision >= 0 && out.journalRevision != expectedJournalRevision)) {
         out.errors << QStringLiteral("The latest import changed after preview; preview again");
         return out;
     }
@@ -2218,6 +2241,15 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
         "WHERE batch_id=? AND (qso_id>? OR (qso_id=? AND qso_uuid>?)) AND qso_id<=? "
         "ORDER BY qso_id,qso_uuid LIMIT 128"));
     struct Item { qint64 id; QString uuid; int revision; QString fingerprint; };
+    QSqlQuery revision(db);
+    revision.prepare(QStringLiteral("SELECT journal_revision FROM import_batch WHERE id=?"));
+    const auto membershipUnchanged = [&revision, &out] {
+        revision.bindValue(0, out.batchId);
+        const bool ok = revision.exec() && revision.next()
+            && revision.value(0).toLongLong() == out.journalRevision;
+        revision.finish();
+        return ok;
+    };
     const auto addIssue = [&out, &db](qint64 id, const QString& reason, bool showCall) {
         // Keep diagnostics bounded for large imports; total counts remain exact.
         if (out.issues.size() >= 200) { ++out.issuesOmitted; return; }
@@ -2233,6 +2265,7 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
     int done = 0;
     qint64 lastId = -1;
     QString lastUuid;
+    bool membershipChanged = false;
     while (done < total) {
         items.bindValue(0, out.batchId);
         items.bindValue(1, lastId);
@@ -2265,6 +2298,12 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
                 addIssue(item.id, QStringLiteral("failed"), false);
                 if (out.errors.size() < 20) out.errors << db.lastError().text();
                 continue;
+            }
+            if (!membershipUnchanged()) {
+                db.rollback();
+                out.errors << QStringLiteral("Import journal changed during scan; preview again");
+                membershipChanged = true;
+                break;
             }
             const auto current = meta(item.id);
             if (!current || current->uuid != item.uuid) {
@@ -2309,8 +2348,10 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
             }
             ++out.deleted;
         }
-        if (out.cancelled) break;
+        if (out.cancelled || membershipChanged) break;
     }
+    if (!out.cancelled && !membershipChanged && !membershipUnchanged())
+        out.errors << QStringLiteral("Import journal changed during scan; preview again");
     if (!out.cancelled && out.errors.isEmpty() && progress) progress(done, total);
     return out;
 }

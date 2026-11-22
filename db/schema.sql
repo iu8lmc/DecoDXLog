@@ -1,4 +1,4 @@
--- DecoLog Desktop — schema SQLite v14
+-- DecoLog Desktop — base schema SQLite v14, followed by migrations on open.
 -- Principi: nomi ADIF, lossless (adif_extra), campi di sync su ogni QSO, UTC.
 
 PRAGMA journal_mode = WAL;

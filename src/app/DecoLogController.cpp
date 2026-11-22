@@ -5220,15 +5220,17 @@ void DecoLogController::finishImport(const QString& path, const ImportResult& r)
     refreshCallInfo();
 }
 
-bool DecoLogController::undoLastImport(qint64 expectedBatchId, const QString& expectedBatchUuid)
+bool DecoLogController::undoLastImport(qint64 expectedBatchId, const QString& expectedBatchUuid,
+                                      qint64 expectedJournalRevision)
 {
     if (expectedBatchId > 0 && (expectedBatchUuid.isEmpty()
         || m_importUndoPreviewPath != m_db.path() || m_importUndoPreviewBatchId != expectedBatchId
-        || m_importUndoPreviewUuid != expectedBatchUuid)) {
+        || m_importUndoPreviewUuid != expectedBatchUuid || expectedJournalRevision < 0
+        || m_importUndoPreviewJournalRevision != expectedJournalRevision)) {
         addActivity(QStringLiteral("IMPORT"), tr("The log or import changed; preview the undo again"), QStringLiteral("warning"));
         return false;
     }
-    return startImportUndo(false, expectedBatchId, expectedBatchUuid);
+    return startImportUndo(false, expectedBatchId, expectedBatchUuid, expectedJournalRevision);
 }
 
 bool DecoLogController::previewImportUndo()
@@ -5236,10 +5238,12 @@ bool DecoLogController::previewImportUndo()
     m_importUndoPreviewPath.clear();
     m_importUndoPreviewUuid.clear();
     m_importUndoPreviewBatchId = 0;
-    return startImportUndo(true, 0, {});
+    m_importUndoPreviewJournalRevision = -1;
+    return startImportUndo(true, 0, {}, -1);
 }
 
-bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, const QString& expectedBatchUuid)
+bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, const QString& expectedBatchUuid,
+                                       qint64 expectedJournalRevision)
 {
     const QString dbPath = m_db.path();
     if (m_importProgress >= 0 || !m_db.isOpen() || dbPath.isEmpty() || dbPath == QLatin1String(":memory:"))
@@ -5251,7 +5255,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
     m_importProgress = 0;
     emit importChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, cancel, preview, expectedBatchId, expectedBatchUuid] {
+    m_importPool.start([self, dbPath, cancel, preview, expectedBatchId, expectedBatchUuid, expectedJournalRevision] {
         core::ImportUndoResult result;
         core::LogDatabase db;
         if (!db.open(dbPath)) {
@@ -5271,7 +5275,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
                     }, Qt::QueuedConnection);
                 }
                 return !cancel->load();
-            }, preview, expectedBatchId, expectedBatchUuid);
+            }, preview, expectedBatchId, expectedBatchUuid, expectedJournalRevision);
         }
         QMetaObject::invokeMethod(self.data(), [self, dbPath, result, preview] {
             if (!self) return;
@@ -5288,6 +5292,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
                 self->m_importUndoPreviewPath = dbPath;
                 self->m_importUndoPreviewUuid = result.batchUuid;
                 self->m_importUndoPreviewBatchId = result.batchId;
+                self->m_importUndoPreviewJournalRevision = result.journalRevision;
             }
             if (!preview && (result.changed || result.unavailable || result.failed || !result.errors.isEmpty()))
                 self->addActivity(QStringLiteral("IMPORT"),
@@ -5322,6 +5327,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
             }
             const QVariantMap summary{
                 {QStringLiteral("batchId"), result.batchId}, {QStringLiteral("batchUuid"), result.batchUuid},
+                {QStringLiteral("journalRevision"), result.journalRevision},
                 {QStringLiteral("deleted"), result.deleted},
                 {QStringLiteral("eligible"), result.eligible},
                 {QStringLiteral("alreadyDeleted"), result.alreadyDeleted}, {QStringLiteral("changed"), result.changed},

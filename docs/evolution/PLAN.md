@@ -9,10 +9,10 @@ Scope: desktop Windows, macOS and Linux, and the existing cloud; no mobile clien
 | G02 Awards | G00, G01 | Partial: VUCC and Marathon previews and claims exist; verify official rules, multi-grid and independent entity/zone selection. |
 | G03 QSL planner | G02 | Partial foundations: QSL status and routing exist; marginal award benefit and alternatives need verification/implementation. |
 | G04 DX campaigns | G02 | Partial foundations: calendar and DX Assistant; persistent campaign workflow to verify. |
-| G05 Migration and sync history | G01 | Partial: import preview, extras, memory-only undo and reconciliation exist; schema-13 journal and guarded undo core added. Background undo, cancellable advisory preview and bounded per-QSO outcome list are present; add exhaustive review and stable cross-page membership, test UI cancellation/crash and large-log memory, resolve measured fingerprint/index cost, source-specific migration and per-QSO history. |
+| G05 Migration and sync history | G01 | Partial: import preview, extras, memory-only undo and reconciliation exist; schema-13 journal and guarded undo core added. Background undo, cancellable advisory preview and bounded per-QSO outcome list are present; add exhaustive review, test cross-process membership guards and UI cancellation/crash on large logs, resolve measured fingerprint/index/trigger cost, source-specific migration and per-QSO history. |
 | G06 Multi-program activation | G02, G05 | Partial: activation sessions exist; independent program references and exports remain. |
 | G07 Typed fields and reports | G01, G02 | Partial: text custom fields exist; typed fields and saved reports to verify. |
-| G08 Radio net manager | G01 | Not established: computer contest network is distinct; inspect radio roster workflow. |
+| G08 Radio net manager | G01 | Not established: computer contest network is distinct; inspect radio roster, persistence and UI paths; develop an independent radio-net workflow. |
 | G09 Satellite and rover | G02, G06, G11 contracts | Partial: QSO satellite fields and rotor gateway exist; tracker workflow remains unverified. |
 | G10 Contest | G01, G05 | Partial: scoring rules, SO2R and ContestNet exist; convergence, serial partitions and advanced workflow remain. |
 | G11 SDK | G01 | Partial: authenticated local API exists; versioned permissions, isolation and adapters remain to verify. |

@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 14;
+constexpr int kSchemaVersion = 15;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -269,7 +269,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 14);
+            QCOMPARE(db.schemaVersion(), 15);
             const auto result = db.undoLatestImport();
             QCOMPARE(result.changed, 1);
             QCOMPARE(result.deleted, 0);
@@ -348,14 +348,127 @@ private slots:
         QCOMPARE(preview.eligible, 260);
         QCOMPARE(db.qsoCount(), 260);
         const auto stopped = db.undoLatestImport([](int done, int) { return done < 129; }, false,
-                                                  preview.batchId, preview.batchUuid);
+                                                  preview.batchId, preview.batchUuid, preview.journalRevision);
         QVERIFY(stopped.cancelled);
         QCOMPARE(stopped.deleted, 129);
         QCOMPARE(db.qsoCount(), 131);
-        const auto resumed = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid);
+        const auto resumed = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid, preview.journalRevision);
         QCOMPARE(resumed.alreadyDeleted, 129);
         QCOMPARE(resumed.deleted, 131);
         QCOMPARE(db.qsoCount(), 0);
+    }
+
+    void previewRejectsJournalMembershipChangeDuringScan()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif(
+            "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 2);
+        const auto independent = db.insertQso({{"CALL", "K1CCC"}, {"QSO_DATE", "20260101"},
+            {"TIME_ON", "1100"}, {"BAND", "20m"}, {"MODE", "CW"}}, "radio");
+        QVERIFY(independent.id > 0);
+        bool changed = false;
+        const auto preview = db.undoLatestImport([&](int done, int total) {
+            if (!changed && total >= 0 && done == 1) {
+                QSqlQuery q(db.connection());
+                q.prepare("INSERT INTO import_qso(batch_id,qso_id,qso_uuid,imported_revision,baseline_hash) "
+                          "SELECT MAX(id),?,?,1,'injected' FROM import_batch");
+                q.addBindValue(independent.id);
+                q.addBindValue(db.meta(independent.id)->uuid);
+                changed = q.exec();
+            }
+            return true;
+        }, true);
+        QVERIFY(changed);
+        QVERIFY(!preview.errors.isEmpty());
+        QCOMPARE(preview.deleted, 0);
+        QCOMPARE(db.qsoCount(), 3);
+    }
+
+    void undoRejectsJournalChangeAfterPreviewAndDuringProcessing()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif(
+            "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 2);
+        const auto preview = db.undoLatestImport({}, true);
+        QVERIFY(preview.journalRevision >= 0);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("UPDATE import_qso SET baseline_hash=baseline_hash WHERE qso_id=(SELECT MIN(qso_id) FROM import_qso)"));
+        const auto stale = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid, preview.journalRevision);
+        QCOMPARE(stale.deleted, 0);
+        QVERIFY(!stale.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 2);
+
+        const auto fresh = db.undoLatestImport({}, true);
+        bool changed = false;
+        const auto partial = db.undoLatestImport([&](int done, int total) {
+            if (!changed && total >= 0 && done == 1) {
+                QSqlQuery update(db.connection());
+                changed = update.exec("UPDATE import_qso SET baseline_hash=baseline_hash WHERE qso_id=(SELECT MAX(qso_id) FROM import_qso)");
+            }
+            return true;
+        }, false, fresh.batchId, fresh.batchUuid, fresh.journalRevision);
+        QVERIFY(changed);
+        QCOMPARE(partial.deleted, 1);
+        QVERIFY(!partial.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 1);
+    }
+
+    void previewDetectsJournalChangeFromSecondConnection()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("two-connections.sqlite"));
+        LogDatabase first, second;
+        QVERIFY(first.open(path));
+        QVERIFY(second.open(path));
+        QCOMPARE(first.importAdif(
+            "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>").inserted, 2);
+        bool updated = false;
+        const auto preview = first.undoLatestImport([&](int done, int total) {
+            if (!updated && total >= 0 && done == 1) {
+                QSqlQuery q(second.connection());
+                updated = q.exec("UPDATE import_qso SET baseline_hash=baseline_hash WHERE qso_id=(SELECT MAX(qso_id) FROM import_qso)");
+            }
+            return true;
+        }, true);
+        QVERIFY(updated);
+        QVERIFY(!preview.errors.isEmpty());
+        QCOMPARE(preview.deleted, 0);
+        QCOMPARE(first.qsoCount(), 2);
+    }
+
+    void journalRevisionTracksAndRollsBackMembershipChanges()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 1);
+        QSqlQuery q(db.connection());
+        const auto revision = [&q]() -> qint64 {
+            if (!q.exec("SELECT journal_revision FROM import_batch ORDER BY id DESC LIMIT 1") || !q.next()) return -1;
+            const qint64 value = q.value(0).toLongLong();
+            q.finish();
+            return value;
+        };
+        const qint64 initial = revision();
+        QVERIFY(initial >= 1);
+        QSqlDatabase sql = db.connection();
+        QVERIFY(sql.transaction());
+        QVERIFY(q.exec("UPDATE import_qso SET baseline_hash=baseline_hash"));
+        QCOMPARE(revision(), initial + 1);
+        QVERIFY(sql.rollback());
+        QCOMPARE(revision(), initial);
+        QVERIFY(q.exec("UPDATE import_qso SET baseline_hash=baseline_hash"));
+        QCOMPARE(revision(), initial + 1);
+        QVERIFY(q.exec("DELETE FROM import_qso"));
+        QCOMPARE(revision(), initial + 2);
     }
 
     void schema13UpgradeAddsJournalPagingIndex()
@@ -375,7 +488,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 14);
+            QCOMPARE(db.schemaVersion(), 15);
             QSqlQuery q(db.connection());
             QVERIFY(q.exec("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_import_qso_page'"));
             QVERIFY(q.next());
@@ -415,7 +528,7 @@ private slots:
         QVERIFY(edited.has_value());
         edited->set(QStringLiteral("COMMENT"), QStringLiteral("changed after preview"));
         QCOMPARE(db.updateQso(imported.insertedIds.last(), *edited).status, InsertResult::Status::Inserted);
-        const auto result = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid);
+        const auto result = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid, preview.journalRevision);
         QCOMPARE(result.deleted, 1);
         QCOMPARE(result.changed, 1);
         QVERIFY(!db.meta(imported.insertedIds.last())->deleted);
@@ -430,7 +543,7 @@ private slots:
         const auto preview = db.undoLatestImport({}, true);
         const auto second = db.importAdif("<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
         QCOMPARE(second.inserted, 1);
-        const auto result = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid);
+        const auto result = db.undoLatestImport({}, false, preview.batchId, preview.batchUuid, preview.journalRevision);
         QCOMPARE(result.deleted, 0);
         QVERIFY(!result.errors.isEmpty());
         QCOMPARE(db.qsoCount(), 2);
@@ -447,7 +560,8 @@ private slots:
         const auto secondPreview = second.undoLatestImport({}, true);
         QCOMPARE(firstPreview.batchId, secondPreview.batchId);
         QVERIFY(firstPreview.batchUuid != secondPreview.batchUuid);
-        const auto wrong = second.undoLatestImport({}, false, firstPreview.batchId, firstPreview.batchUuid);
+        const auto wrong = second.undoLatestImport({}, false, firstPreview.batchId, firstPreview.batchUuid,
+                                                    firstPreview.journalRevision);
         QCOMPARE(wrong.deleted, 0);
         QVERIFY(!wrong.errors.isEmpty());
         QCOMPARE(second.qsoCount(), 1);
@@ -476,7 +590,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 14);
+            QCOMPARE(db.schemaVersion(), 15);
             QCOMPARE(db.qsoCount(), 1);
             QCOMPARE(db.meta(id)->uuid, uuid);
             QSqlQuery q(db.connection());

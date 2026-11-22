@@ -744,7 +744,8 @@ public:
 
     Q_INVOKABLE void importAdif(const QUrl& file);
     Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false, const QString& stationCall = {});
-    Q_INVOKABLE bool undoLastImport(qint64 expectedBatchId = 0, const QString& expectedBatchUuid = {});
+    Q_INVOKABLE bool undoLastImport(qint64 expectedBatchId = 0, const QString& expectedBatchUuid = {},
+                                     qint64 expectedJournalRevision = -1);
     Q_INVOKABLE bool previewImportUndo();
     Q_INVOKABLE void cancelImportUndo();
     Q_INVOKABLE QVariantList qsoEnrichments(qint64 qsoId) const;
@@ -1159,8 +1160,10 @@ private:
     QString m_importUndoPreviewPath;
     QString m_importUndoPreviewUuid;
     qint64 m_importUndoPreviewBatchId{0};
+    qint64 m_importUndoPreviewJournalRevision{-1};
     std::shared_ptr<std::atomic_bool> m_importUndoCancel;
-    bool startImportUndo(bool preview, qint64 expectedBatchId, const QString& expectedBatchUuid);
+    bool startImportUndo(bool preview, qint64 expectedBatchId, const QString& expectedBatchUuid,
+                         qint64 expectedJournalRevision);
     void finishImport(const QString& path, const core::ImportResult& result);
     double m_bulkProgress{-1};
     bool m_udpResendActive{false};
