@@ -47,6 +47,23 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetPreparesQsoWithoutSavingOrOverwritingDraft()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionet:qso"), output), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetQso visible=true call=K1AAA"), output.constData());
+        QVERIFY2(output.contains("PROBE radioNetDraft preserved=true notice=true"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), 0);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM radio_net_member"));
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(), 2);
+    }
+
     void radioNetRosterUiAndRestartDoNotCreateQsos()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

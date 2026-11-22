@@ -1250,7 +1250,7 @@ RoundedWindow {
         else if (what[0] === "new") newQsoDialog.open()
         else if (what[0] === "radionet") {
             radioNetDialog.open()
-            Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed") })
+            Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso", what[1] === "qso") })
         }
         else if (what[0] === "undoimport") {
             decolog.previewImportUndo()

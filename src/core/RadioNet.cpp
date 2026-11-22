@@ -2,11 +2,16 @@
 #include "core/LogDatabase.h"
 
 #include <QDateTime>
+#include <QDir>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPointer>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QSqlRecord>
 #include <QUuid>
 
 namespace decolog::core {
@@ -14,6 +19,7 @@ namespace {
 QString nowUtc() { return QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs); }
 } // namespace
 RadioNet::RadioNet(LogDatabase *db, QObject *parent) : QObject(parent), m_db(db) {}
+RadioNet::~RadioNet() { m_exportPool.waitForDone(); }
 
 bool RadioNet::fail(const QString &message)
 {
@@ -392,5 +398,162 @@ bool RadioNet::reopenSession()
     m_error.clear();
     emit changed();
     return true;
+}
+
+bool RadioNet::exportSession(const QUrl &file)
+{
+    if (m_exportBusy || !m_db || !m_db->isOpen() || m_sessionId <= 0 || !file.isLocalFile())
+        return fail(tr("Select a session and a local export file"));
+    const QString source = m_db->path();
+    if (source.isEmpty() || source == QLatin1String(":memory:"))
+        return fail(tr("A file-backed log is required for export"));
+    const auto resolved = [](const QString &path) {
+        const QFileInfo info(path);
+        if (info.exists())
+            return info.canonicalFilePath();
+        const QString parent = QFileInfo(info.absolutePath()).canonicalFilePath();
+        return QDir(parent.isEmpty() ? info.absolutePath() : parent).filePath(info.fileName());
+    };
+    const QString destination = file.toLocalFile();
+    const QString target = resolved(destination);
+    for (const QString &suffix :
+         {QString(), QStringLiteral("-wal"), QStringLiteral("-shm"), QStringLiteral("-journal")}) {
+        if (target == resolved(source + suffix))
+            return fail(tr("Choose a file outside the open log database"));
+    }
+    const qint64 sessionId = m_sessionId;
+    m_exportCancel = std::make_shared<std::atomic_bool>(false);
+    const auto cancel = m_exportCancel;
+    m_exportBusy = true;
+    m_error.clear();
+    emit changed();
+    emit exportChanged();
+    QPointer<RadioNet> self(this);
+    m_exportPool.start([self, source, destination, sessionId, cancel] {
+        QString error;
+        bool success = false;
+        {
+            LogDatabase db;
+            if (cancel->load()) {
+                error = tr("Export cancelled");
+            } else if (!db.open(source)) {
+                error = db.lastError();
+            } else {
+                QSqlDatabase sql = db.connection();
+                if (!sql.transaction()) {
+                    error = sql.lastError().text();
+                } else {
+                    QSaveFile output(destination);
+                    if (!output.open(QIODevice::WriteOnly)) {
+                        error = output.errorString();
+                    } else {
+                        const auto write = [&output, &error](const QByteArray &bytes) {
+                            if (output.write(bytes) == bytes.size())
+                                return true;
+                            error = output.errorString();
+                            return false;
+                        };
+                        const auto object = [](const QSqlQuery &query) {
+                            QJsonObject row;
+                            const QSqlRecord record = query.record();
+                            for (int i = 0; i < record.count(); ++i)
+                                row.insert(record.fieldName(i), QJsonValue::fromVariant(query.value(i)));
+                            return QJsonDocument(row).toJson(QJsonDocument::Compact);
+                        };
+                        QSqlQuery q(sql);
+                        q.prepare(QStringLiteral(
+                            "SELECT id,uuid,title,station_profile_id,started_at,ended_at,current_member_id FROM "
+                            "radio_net_session WHERE id=?"));
+                        q.addBindValue(sessionId);
+                        if (!q.exec() || !q.next()) {
+                            error = q.lastError().text();
+                            if (error.isEmpty())
+                                error = tr("Radio net session not found");
+                        } else {
+                            const QByteArray sessionJson = object(q);
+                            q.finish();
+                            bool ok = write(QByteArrayLiteral("{\"format\":\"decodxlog-radio-net-1\",\"session\":")) &&
+                                      write(sessionJson);
+                            const auto rows = [&](const QByteArray &key, const QString &statement) {
+                                if (!write(QByteArrayLiteral(",\"") + key + QByteArrayLiteral("\":[")))
+                                    return false;
+                                QSqlQuery rowsQuery(sql);
+                                rowsQuery.setForwardOnly(true);
+                                rowsQuery.prepare(statement);
+                                rowsQuery.addBindValue(sessionId);
+                                if (!rowsQuery.exec()) {
+                                    error = rowsQuery.lastError().text();
+                                    return false;
+                                }
+                                bool first = true;
+                                while (rowsQuery.next()) {
+                                    if (cancel->load()) {
+                                        error = tr("Export cancelled");
+                                        return false;
+                                    }
+                                    if (!first && !write(QByteArrayLiteral(",")))
+                                        return false;
+                                    if (!write(object(rowsQuery)))
+                                        return false;
+                                    first = false;
+                                }
+                                if (rowsQuery.lastError().isValid()) {
+                                    error = rowsQuery.lastError().text();
+                                    return false;
+                                }
+                                return write(QByteArrayLiteral("]"));
+                            };
+                            if (ok)
+                                ok = rows(
+                                    QByteArrayLiteral("participants"),
+                                    QStringLiteral("SELECT id,call,name,notes,status,sort_order,first_seen,last_seen "
+                                                   "FROM radio_net_member WHERE session_id=? ORDER BY sort_order,id"));
+                            if (ok)
+                                ok =
+                                    rows(QByteArrayLiteral("history"),
+                                         QStringLiteral("SELECT e.id,e.member_id,e.event,e.recorded_at,e.detail,m.call "
+                                                        "FROM radio_net_event e LEFT JOIN radio_net_member m ON "
+                                                        "m.id=e.member_id WHERE e.session_id=? ORDER BY e.id"));
+                            if (ok && cancel->load()) {
+                                error = tr("Export cancelled");
+                                ok = false;
+                            }
+                            if (ok)
+                                ok = write(QByteArrayLiteral("}\n"));
+                            if (ok && !sql.commit()) {
+                                error = sql.lastError().text();
+                                ok = false;
+                            }
+                            if (ok && !output.commit()) {
+                                error = output.errorString();
+                                ok = false;
+                            }
+                            success = ok;
+                        }
+                    }
+                    if (!success)
+                        sql.rollback();
+                }
+            }
+        }
+        QMetaObject::invokeMethod(
+            self.data(),
+            [self, success, error] {
+                if (!self)
+                    return;
+                self->m_exportBusy = false;
+                self->m_exportCancel.reset();
+                emit self->exportChanged();
+                emit self->exportFinished(success, error);
+            },
+            Qt::QueuedConnection);
+    });
+    return true;
+}
+
+void RadioNet::cancelExport()
+{
+    if (m_exportCancel)
+        m_exportCancel->store(true);
 }
 } // namespace decolog::core

@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import Decodium.UI
 
 DialogFrame {
@@ -14,6 +15,29 @@ DialogFrame {
     height: 720
     dotColor: Theme.secondaryColor
     info: qsTr("Roster entries do not create QSO")
+    property bool probeOpenQso: false
+    NewQsoDialog {
+        id: participantQso
+        profileDialogKey: "radio-net-qso"
+    }
+    FileDialog {
+        id: exportDialog
+        title: qsTr("Export radio net session")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
+        currentFile: "radio-net.json"
+        nameFilters: [qsTr("JSON files (*.json)")]
+        onAccepted: {
+            if (!root.net.exportSession(selectedFile))
+                exportMessage.text = qsTr("Export failed: %1").arg(root.net.error)
+        }
+    }
+    Connections {
+        target: root.net
+        function onExportFinished(success, message) {
+            exportMessage.text = success ? qsTr("Session exported.") : qsTr("Export failed: %1").arg(message)
+        }
+    }
     function historyText(row) {
         switch (row.event) {
         case "start": return qsTr("Session started")
@@ -35,13 +59,19 @@ DialogFrame {
         }
     }
     // Exercised only by the explicitly requested isolated --show probe.
-    function probe(seed) {
+    function probe(seed, openQso) {
+        root.probeOpenQso = openQso
         if (seed) {
             sessionTitle.text = "Test net"
             startButton.clicked()
             callInput.text = "K1AAA"
             nameInput.text = "Alice"
             checkInButton.clicked()
+            if (openQso) {
+                callInput.text = "K1BBB"
+                nameInput.text = "Bob"
+                checkInButton.clicked()
+            }
         }
         probeTimer.start()
     }
@@ -52,6 +82,14 @@ DialogFrame {
             const row = memberList.itemAtIndex(0)
             console.warn("PROBE radioNet visible=" + root.visible + " members=" + root.net.members.length
                          + " first=" + (row ? row.modelData.call : "missing"))
+            if (root.probeOpenQso && row) {
+                row.openQso()
+                console.warn("PROBE radioNetQso visible=" + participantQso.visible + " call=" + participantQso.enteredCallForProbe)
+                const other = memberList.itemAtIndex(1)
+                if (other) other.openQso()
+                console.warn("PROBE radioNetDraft preserved=" + (participantQso.enteredCallForProbe === "K1AAA")
+                             + " notice=" + (qsoNotice.text.length > 0))
+            }
         }
     }
 
@@ -76,6 +114,8 @@ DialogFrame {
             }
             GlassButton { text: qsTr("Close session"); enabled: !!root.current.active; onClicked: root.net.closeSession() }
             GlassButton { text: qsTr("Reopen"); enabled: !!root.current.id && !root.current.active; onClicked: root.net.reopenSession() }
+            GlassButton { text: qsTr("Export JSON…"); enabled: !!root.current.id && !root.net.exportBusy; onClicked: exportDialog.open() }
+            GlassButton { text: qsTr("Cancel export"); visible: root.net.exportBusy; onClicked: root.net.cancelExport() }
         }
         Text {
             Layout.fillWidth: true
@@ -97,6 +137,8 @@ DialogFrame {
             GlassButton { text: qsTr("Next turn"); enabled: !!root.current.active; onClicked: root.net.nextTurn() }
         }
         Text { Layout.fillWidth: true; visible: root.net.error.length > 0; text: root.net.error; color: Theme.warningColor; wrapMode: Text.Wrap }
+        Text { id: exportMessage; Layout.fillWidth: true; visible: text.length > 0; color: Theme.textSecondary; wrapMode: Text.Wrap }
+        Text { id: qsoNotice; Layout.fillWidth: true; visible: text.length > 0; color: Theme.warningColor; wrapMode: Text.Wrap }
         Text { text: qsTr("Participants"); color: Theme.secondaryColor; font.bold: true }
         ListView {
             id: memberList
@@ -107,7 +149,20 @@ DialogFrame {
             model: root.net.members
             ScrollBar.vertical: ScrollBar { }
             delegate: Rectangle {
+                id: memberDelegate
                 required property var modelData
+                function openQso() {
+                    if (participantQso.visible) {
+                        qsoNotice.text = qsTr("Finish or close the existing radio-net QSO draft first.")
+                        participantQso.raise()
+                        return
+                    }
+                    qsoNotice.text = ""
+                    participantQso.profileId = Number(root.current.stationProfileId || 0)
+                    participantQso.initialCall = modelData.call
+                    participantQso.initialName = modelData.name || ""
+                    participantQso.open()
+                }
                 width: ListView.view.width
                 height: memberRow.implicitHeight + 8
                 radius: 4
@@ -130,6 +185,7 @@ DialogFrame {
                     }
                     GlassButton { text: "↑"; Accessible.name: qsTr("Move %1 up").arg(modelData.call); enabled: !!root.current.active; onClicked: root.net.moveMember(modelData.id, -1) }
                     GlassButton { text: "↓"; Accessible.name: qsTr("Move %1 down").arg(modelData.call); enabled: !!root.current.active; onClicked: root.net.moveMember(modelData.id, 1) }
+                    GlassButton { text: qsTr("New QSO…"); Accessible.name: qsTr("Prepare QSO for %1").arg(modelData.call); onClicked: memberDelegate.openQso() }
                 }
             }
         }

@@ -1,6 +1,11 @@
 #include "core/LogDatabase.h"
 #include "core/RadioNet.h"
 
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSignalSpy>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
@@ -9,6 +14,104 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void sessionHasAnExportAction()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        RadioNet net(&db);
+        QVERIFY(net.metaObject()->indexOfMethod("exportSession(QUrl)") >= 0);
+    }
+
+    void exportsCompleteHistoryAndProtectsOpenLog()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString logPath = dir.filePath(QStringLiteral("log.sqlite"));
+        LogDatabase db;
+        QVERIFY(db.open(logPath));
+        RadioNet net(&db);
+        QVERIFY(net.start(QStringLiteral("Test net")));
+        QVERIFY(net.checkIn(QStringLiteral("K1AAA"), QStringLiteral("Alè"), QStringLiteral("note, \"quoted\"")));
+        const qint64 id = net.members().first().toMap().value(QStringLiteral("id")).toLongLong();
+        for (int i = 0; i < 205; ++i)
+            QVERIFY(net.setStatus(id, (i % 2) ? QStringLiteral("waiting") : QStringLiteral("present")));
+        QVERIFY(!net.exportSession(QUrl::fromLocalFile(logPath)));
+        QVERIFY(!net.exportSession(QUrl::fromLocalFile(logPath + QStringLiteral("-wal"))));
+        QCOMPARE(db.qsoCount(), 0);
+        const QString outputPath = dir.filePath(QStringLiteral("session.json"));
+        QSignalSpy finished(&net, &RadioNet::exportFinished);
+        QVERIFY(net.exportSession(QUrl::fromLocalFile(outputPath)));
+        QVERIFY(net.exportBusy());
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 10000);
+        QVERIFY2(finished.first().at(0).toBool(), qPrintable(finished.first().at(1).toString()));
+        QVERIFY(!net.exportBusy());
+        QFile output(outputPath);
+        QVERIFY(output.open(QIODevice::ReadOnly));
+        QJsonParseError parseError;
+        const auto document = QJsonDocument::fromJson(output.readAll(), &parseError);
+        QCOMPARE(parseError.error, QJsonParseError::NoError);
+        const auto json = document.object();
+        QCOMPARE(json.value(QStringLiteral("format")).toString(), QStringLiteral("decodxlog-radio-net-1"));
+        QCOMPARE(json.value(QStringLiteral("participants")).toArray().size(), 1);
+        const auto member = json.value(QStringLiteral("participants")).toArray().first().toObject();
+        QCOMPARE(member.value(QStringLiteral("name")).toString(), QStringLiteral("Alè"));
+        QCOMPARE(member.value(QStringLiteral("notes")).toString(), QStringLiteral("note, \"quoted\""));
+        QCOMPARE(json.value(QStringLiteral("history")).toArray().size(), 207);
+        QCOMPARE(net.events().size(), 200);
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
+    void exportReportsUnwritableDestination()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("log.sqlite"))));
+        RadioNet net(&db);
+        QVERIFY(net.start(QStringLiteral("Test")));
+        QSignalSpy finished(&net, &RadioNet::exportFinished);
+        QVERIFY(net.exportSession(QUrl::fromLocalFile(dir.filePath(QStringLiteral("missing/out.json")))));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 10000);
+        QVERIFY(!finished.first().at(0).toBool());
+        QVERIFY(!finished.first().at(1).toString().isEmpty());
+        QVERIFY(!net.exportBusy());
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
+    void cancelledExportPreservesExistingDestination()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("log.sqlite"))));
+        RadioNet net(&db);
+        QVERIFY(net.start(QStringLiteral("Test")));
+        const QVariant sessionId = net.session().value(QStringLiteral("id"));
+        QSqlDatabase sql = db.connection();
+        QVERIFY(sql.transaction());
+        QSqlQuery q(sql);
+        QVERIFY(q.prepare("INSERT INTO radio_net_event(session_id,event,recorded_at,detail) VALUES(?, 'turn', "
+                          "'2026-01-01T00:00:00Z', '')"));
+        for (int i = 0; i < 10000; ++i) {
+            q.bindValue(0, sessionId);
+            QVERIFY(q.exec());
+        }
+        QVERIFY(sql.commit());
+        const QString path = dir.filePath(QStringLiteral("existing.json"));
+        QFile original(path);
+        QVERIFY(original.open(QIODevice::WriteOnly));
+        QCOMPARE(original.write("original"), qint64(8));
+        original.close();
+        QSignalSpy finished(&net, &RadioNet::exportFinished);
+        QVERIFY(net.exportSession(QUrl::fromLocalFile(path)));
+        net.cancelExport();
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 10000);
+        QVERIFY(!finished.first().at(0).toBool());
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        QCOMPARE(original.readAll(), QByteArray("original"));
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void twoConnectionsShareRosterWithoutDuplicateOrQso()
     {
         QTemporaryDir dir;

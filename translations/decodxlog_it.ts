@@ -14673,6 +14673,42 @@ Campi extra conservati: %8</translation>
         <source>Status: %1</source>
         <translation>Stato: %1</translation>
     </message>
+    <message>
+        <source>Export radio net session</source>
+        <translation>Esporta sessione rete radio</translation>
+    </message>
+    <message>
+        <source>JSON files (*.json)</source>
+        <translation>File JSON (*.json)</translation>
+    </message>
+    <message>
+        <source>Session exported.</source>
+        <translation>Sessione esportata.</translation>
+    </message>
+    <message>
+        <source>Export failed: %1</source>
+        <translation>Esportazione non riuscita: %1</translation>
+    </message>
+    <message>
+        <source>Export JSON…</source>
+        <translation>Esporta JSON…</translation>
+    </message>
+    <message>
+        <source>Cancel export</source>
+        <translation>Annulla esportazione</translation>
+    </message>
+    <message>
+        <source>Finish or close the existing radio-net QSO draft first.</source>
+        <translation>Completa o chiudi prima la bozza QSO della rete radio già aperta.</translation>
+    </message>
+    <message>
+        <source>New QSO…</source>
+        <translation>Nuovo QSO…</translation>
+    </message>
+    <message>
+        <source>Prepare QSO for %1</source>
+        <translation>Prepara QSO per %1</translation>
+    </message>
 </context>
 
 <context>
@@ -14752,6 +14788,22 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Cannot reopen session</source>
         <translation>Impossibile riaprire la sessione</translation>
+    </message>
+    <message>
+        <source>Select a session and a local export file</source>
+        <translation>Seleziona una sessione e un file di esportazione locale</translation>
+    </message>
+    <message>
+        <source>A file-backed log is required for export</source>
+        <translation>Per esportare è necessario un log su file</translation>
+    </message>
+    <message>
+        <source>Choose a file outside the open log database</source>
+        <translation>Scegli un file diverso dal database del log aperto</translation>
+    </message>
+    <message>
+        <source>Export cancelled</source>
+        <translation>Esportazione annullata</translation>
     </message>
 </context>
 </TS>

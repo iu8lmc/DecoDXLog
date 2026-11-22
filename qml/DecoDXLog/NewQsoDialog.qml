@@ -11,6 +11,10 @@ DialogFrame {
     // 0 = profilo attivo, >0 = finestra dedicata a quel profilo.
     property int profileId: 0
     property string profileDialogKey: ""
+    // Optional explicit handoff; applied only when opening a fresh dialog.
+    property string initialCall: ""
+    property string initialName: ""
+    readonly property string enteredCallForProbe: callField.text
     readonly property var stationProfile: profileId > 0
                                            ? decolog.stationProfiles.byId(profileId)
                                            : decolog.stationProfiles.activeProfile
@@ -160,6 +164,10 @@ DialogFrame {
 
     onOpened: {
         clearAll()
+        if (root.initialCall.length > 0) callField.text = root.initialCall
+        if (root.initialName.length > 0) nameField.text = root.initialName
+        root.initialCall = ""
+        root.initialName = ""
         if (decolog.shownFrequency.length)
             freqField.text = decolog.shownFrequency
         const pwr = root.stationProfile.defaultTxPwr
