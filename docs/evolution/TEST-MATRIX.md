@@ -9,3 +9,5 @@
 
 No A/B test can be inferred from static inspection. Record fixture, before/after result, commands and platform for every subsequent increment.
 | G02 independent CQ zone candidates | A: same-entity zone fixture failed, 0 instead of 2. B: focused unit fixture and SQLite loading test pass, four CTest targets pass. | macOS arm64, Qt 6.11.2; synthetic QSOs | Official program lists, operating location, category, UI runtime, organiser submission and other platforms remain open. |
+| G02 mode category grouping | A: AM and USB phone fixture returned 0; B: phone, CW-R and FT8 cases pass. | macOS arm64, Qt 6.11.2 | Unknown modes, edition-specific eligibility, UI runtime and other platforms remain open. |
+| G02 station scope | Synthetic two-profile SQLite comparison: all=2, chosen=1; exported JSON has profile ID. | macOS arm64, Qt 6.11.2 | Controller/QML A/B runtime, file error paths and physical location confirmation remain open. |

@@ -77,7 +77,7 @@ DialogFrame {
 
     function refreshMarathon() {
         marathonPreview = decolog.cqMarathonPreview(marathonYear, marathonCategory,
-                                                     marathonMaxPerEntity)
+                                                     marathonMaxPerEntity, decolog.awardProfile)
     }
 
     function refreshVucc() {
@@ -88,10 +88,11 @@ DialogFrame {
         id: marathonFileDialog
         title: qsTr("Export CQ DX Marathon JSON")
         fileMode: FileDialog.SaveFile
-        currentFile: "decodxlog-cq-marathon-" + root.marathonYear + ".json"
+        currentFile: "decodxlog-cq-marathon-" + root.marathonPreview.edition + ".json"
         nameFilters: [qsTr("JSON files (*.json)"), qsTr("All files (*)")]
-        onAccepted: decolog.saveCqMarathonExport(selectedFile, root.marathonYear,
-                                                   root.marathonCategory, root.marathonMaxPerEntity)
+        onAccepted: decolog.saveCqMarathonExport(selectedFile, root.marathonPreview.edition,
+                                                   root.marathonPreview.category, root.marathonPreview.maxPerEntity,
+                                                   root.marathonPreview.stationProfileId)
     }
 
     title: qsTr("Awards")
@@ -452,14 +453,26 @@ DialogFrame {
                         GlassButton {
                             Accessible.name: qsTr("Preview CQ DX Marathon selection")
                             text: qsTr("Preview")
+                            enabled: decolog.awardProfile > 0
                             onClicked: root.refreshMarathon()
                         }
                         GlassButton {
                             Accessible.name: qsTr("Export CQ DX Marathon JSON")
-                            enabled: (root.marathonPreview.json || "").length > 0
+                            enabled: root.marathonPreview.valid === true
+                                     && root.marathonPreview.stationProfileId === decolog.awardProfile
+                                     && root.marathonPreview.edition === root.marathonYear
+                                     && root.marathonPreview.category === root.marathonCategory
+                                     && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity
                             text: qsTr("Export JSON")
                             onClicked: marathonFileDialog.open()
                         }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: qsTr("Select a station profile above. Confirm that its QSOs are from one operating location; the profile alone does not verify this.")
+                        color: Theme.textSecondary
+                        font.pixelSize: 11
+                        wrapMode: Text.WordWrap
                     }
                     Text {
                         Layout.fillWidth: true

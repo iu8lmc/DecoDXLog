@@ -1,4 +1,5 @@
 #include "core/CqMarathon.h"
+#include "core/Modes.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -19,12 +20,13 @@ bool categoryMatches(const Entry& entry, const QString& category)
 {
     const QString c = normalizedCategory(category);
     if (c.isEmpty() || c == QLatin1String("mixed")) return true;
-    if (c == QLatin1String("cw")) return entry.mode.compare(QStringLiteral("CW"), Qt::CaseInsensitive) == 0;
-    if (c == QLatin1String("phone")) return entry.mode.compare(QStringLiteral("SSB"), Qt::CaseInsensitive) == 0
-                                      || entry.mode.compare(QStringLiteral("FM"), Qt::CaseInsensitive) == 0;
-    if (c == QLatin1String("digital")) return entry.mode.compare(QStringLiteral("CW"), Qt::CaseInsensitive) != 0
-                                           && entry.mode.compare(QStringLiteral("SSB"), Qt::CaseInsensitive) != 0
-                                           && entry.mode.compare(QStringLiteral("FM"), Qt::CaseInsensitive) != 0;
+    const QString mode = entry.mode.trimmed();
+    if (mode.isEmpty()) return false;
+    const QString group = mode.compare(QStringLiteral("DSB"), Qt::CaseInsensitive) == 0
+        ? QStringLiteral("PHONE") : modes::groupFor(mode);
+    if (c == QLatin1String("cw")) return group == QLatin1String("CW");
+    if (c == QLatin1String("phone")) return group == QLatin1String("PHONE");
+    if (c == QLatin1String("digital")) return group == QLatin1String("DATA");
     return false;
 }
 }

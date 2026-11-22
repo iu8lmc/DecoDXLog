@@ -730,6 +730,10 @@
         <translation>Entità candidate: %1 · zone candidate: %2 · esclusi: %3</translation>
     </message>
     <message>
+        <source>Select a station profile above. Confirm that its QSOs are from one operating location; the profile alone does not verify this.</source>
+        <translation>Seleziona un profilo stazione sopra. Verifica che i suoi QSO provengano da una sola località operativa: il profilo da solo non lo garantisce.</translation>
+    </message>
+    <message>
         <source>VUCC preview</source>
         <translation>Anteprima VUCC</translation>
     </message>

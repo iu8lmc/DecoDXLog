@@ -2749,12 +2749,13 @@ QVariantList DecoLogController::awardBandTotals(const QString& awardId) const
 }
 
 QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& category,
-                                                  int maxPerEntity) const
+                                                  int maxPerEntity, qint64 stationProfileId) const
 {
     core::cqmarathon::Rules rules;
     rules.year = year;
     rules.category = category;
     rules.maxPerEntity = maxPerEntity;
+    rules.stationProfileId = stationProfileId;
 
     QString error;
     const QList<core::cqmarathon::Entry> entries = core::cqmarathon::loadEntries(m_db, &error);
@@ -2784,15 +2785,16 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))},
                        {QStringLiteral("edition"), rules.year},
                        {QStringLiteral("category"), rules.category.trimmed().toLower()},
-                       {QStringLiteral("maxPerEntity"), rules.maxPerEntity}};
+                       {QStringLiteral("maxPerEntity"), rules.maxPerEntity},
+                       {QStringLiteral("stationProfileId"), rules.stationProfileId}};
 }
 
 bool DecoLogController::saveCqMarathonExport(const QUrl& file, int year, const QString& category,
-                                              int maxPerEntity) const
+                                              int maxPerEntity, qint64 stationProfileId) const
 {
     if (!file.isLocalFile())
         return false;
-    core::cqmarathon::Rules rules{year, category, maxPerEntity};
+    core::cqmarathon::Rules rules{year, category, maxPerEntity, stationProfileId};
     QString error;
     const auto entries = core::cqmarathon::loadEntries(m_db, &error);
     if (!error.isEmpty())
@@ -2800,10 +2802,11 @@ bool DecoLogController::saveCqMarathonExport(const QUrl& file, int year, const Q
     const auto result = core::cqmarathon::select(entries, rules);
     if (!result.isValid(&error))
         return false;
-    QFile output(file.toLocalFile());
+    QSaveFile output(file.toLocalFile());
     if (!output.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return false;
-    return output.write(result.toJson().toJson(QJsonDocument::Indented)) >= 0;
+    const QByteArray data = result.toJson().toJson(QJsonDocument::Indented);
+    return output.write(data) == data.size() && output.commit();
 }
 
 QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& account,

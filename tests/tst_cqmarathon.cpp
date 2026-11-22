@@ -9,6 +9,28 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void modeCategoriesDistinguishPhoneCwAndDigital()
+    {
+        const QDateTime when(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::UTC);
+        const QList<Entry> entries{
+            {1, QStringLiteral("K1AAA"), 291, 5, QStringLiteral("20m"), QStringLiteral("AM"), when},
+            {2, QStringLiteral("DL1AAA"), 230, 14, QStringLiteral("20m"), QStringLiteral("USB"), when},
+            {3, QStringLiteral("JA1AAA"), 339, 25, QStringLiteral("20m"), QStringLiteral("FT8"), when},
+            {4, QStringLiteral("F1AAA"), 227, 14, QStringLiteral("20m"), QStringLiteral("CW-R"), when},
+            {5, QStringLiteral("I1AAA"), 248, 15, QStringLiteral("20m"), QString(), when}
+        };
+        const auto phone = select(entries, {2026, QStringLiteral("phone"), 1});
+        const auto digital = select(entries, {2026, QStringLiteral("digital"), 1});
+        const auto cw = select(entries, {2026, QStringLiteral("cw"), 1});
+        QCOMPARE(phone.selected.size(), 2);
+        QCOMPARE(phone.selected.at(0).qsoId, qint64(1));
+        QCOMPARE(phone.selected.at(1).qsoId, qint64(2));
+        QCOMPARE(digital.selected.size(), 1);
+        QCOMPARE(digital.selected.first().qsoId, qint64(3));
+        QCOMPARE(cw.selected.size(), 1);
+        QCOMPARE(cw.selected.first().qsoId, qint64(4));
+    }
+
     void selectsZonesIndependentlyOfEntity()
     {
         const QDateTime when(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::UTC);

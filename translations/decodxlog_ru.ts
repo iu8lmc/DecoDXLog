@@ -732,6 +732,10 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Select a station profile above. Confirm that its QSOs are from one operating location; the profile alone does not verify this.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>VUCC preview</source>
         <translation>Предпросмотр VUCC</translation>
     </message>
