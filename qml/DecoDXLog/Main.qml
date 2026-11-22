@@ -13,6 +13,19 @@ import Decodium.UI
 RoundedWindow {
     id: window
 
+    Timer {
+        id: rigSplitProbeTimer
+        interval: 100
+        repeat: true
+        onTriggered: {
+            if (decolog.rig.connected && decolog.rig.split && decolog.rig.txFrequencyHz > 0) {
+                stop()
+                newQsoDialog.open()
+                newQsoDialog.probeRigSplit()
+            }
+        }
+    }
+
     width: 1440
     height: 900
     // Su uno schermo piccolo la finestra non puo' chiedere piu' di quello che c'e':
@@ -1252,6 +1265,7 @@ RoundedWindow {
             newQsoDialog.open()
             Qt.callLater(function () { newQsoDialog.probeSatelliteSplit() })
         }
+        else if (what[0] === "rigsplitprobe") rigSplitProbeTimer.start()
         else if (what[0] === "radionet") {
             radioNetDialog.open()
             Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso" || what[1] === "save" || what[1] === "reminder", what[1] === "qso" || what[1] === "save", what[1] === "save", what[1] === "history", what[1] === "reminder") })

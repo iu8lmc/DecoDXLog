@@ -805,6 +805,11 @@ if(DECODXLOG_BUILD_TESTS)
     set_target_properties(tst_journeycolumn PROPERTIES WIN32_EXECUTABLE OFF)
     add_dependencies(tst_journeycolumn decolog)
     add_test(NAME journeycolumn COMMAND tst_journeycolumn)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME rig_split_manual COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/tools/rig_split_manual_probe.py $<TARGET_FILE:decolog>)
+        set_tests_properties(rig_split_manual PROPERTIES TIMEOUT 30)
+    endif()
 
     qt_add_executable(tst_bulkresponsiveness tests/tst_bulkresponsiveness.cpp)
     target_include_directories(tst_bulkresponsiveness PRIVATE src)

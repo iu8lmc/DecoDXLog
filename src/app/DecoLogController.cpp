@@ -3694,6 +3694,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     // ascoltando, la trasmissione la sa la radio.
     QString freqRx = text("freq_rx");
     freqRx.replace(QLatin1Char(','), QLatin1Char('.'));
+    bool inferredSplitTx = false;
     if (!freqRx.isEmpty()) {
         bool valid = false;
         const double mhz = freqRx.toDouble(&valid);
@@ -3707,6 +3708,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         if (freq.isEmpty() || qAbs(typed - rx) < 0.001) {
             freqRx = QString::number(rx, 'f', 6);
             freq = QString::number(rig->txFrequencyHz() / 1e6, 'f', 6);
+            inferredSplitTx = true;
         }
     }
     r.set(QStringLiteral("FREQ"), freq);
@@ -3714,7 +3716,9 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         r.set(QStringLiteral("FREQ_RX"), freqRx);
         r.set(QStringLiteral("BAND_RX"), bandForFrequency(freqRx));
     }
-    r.set(QStringLiteral("BAND"), text("band").isEmpty() ? bandForFrequency(freq) : text("band"));
+    const QString derivedBand = bandForFrequency(freq);
+    r.set(QStringLiteral("BAND"), (text("band").isEmpty() || (inferredSplitTx && !derivedBand.isEmpty()))
+                                      ? derivedBand : text("band"));
     r.set(QStringLiteral("MODE"), text("mode").toUpper());
     r.set(QStringLiteral("SUBMODE"), text("submode").toUpper());
     r.set(QStringLiteral("RST_SENT"), text("rst_sent"));

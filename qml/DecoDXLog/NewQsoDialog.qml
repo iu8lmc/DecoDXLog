@@ -166,6 +166,17 @@ DialogFrame {
         console.warn("PROBE satelliteSaved closed=" + !root.visible + " error=" + errorText.text)
     }
 
+    function probeRigSplit() {
+        callField.text = "K1AAA"
+        freqField.text = "435.250000"
+        rxFreqField.text = ""
+        modeBox.currentIndex = modeBox.find("CW")
+        propModeBox.currentIndex = propModeBox.find("SAT")
+        satNameField.text = "FO-29"
+        root.submit(false)
+        console.warn("PROBE rigSplitSaved=" + !root.visible + " error=" + errorText.text)
+    }
+
     function submit(keep) {
         const error = decolog.logManualQso({
             call: callField.text, date: dateField.text, time: timeField.text,
