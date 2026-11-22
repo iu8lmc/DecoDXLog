@@ -30,6 +30,7 @@
 #include "core/Awards.h"
 #include "core/CqMarathon.h"
 #include "core/Vucc.h"
+#include "core/RadioNet.h"
 #include "core/Callbook.h"
 #include "core/CallbookProfileVerifier.h"
 #include "core/Countries.h"
@@ -100,6 +101,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* rig READ rig CONSTANT)
     Q_PROPERTY(QObject* cloud READ cloud CONSTANT)
     Q_PROPERTY(QObject* activation READ activation CONSTANT)
+    Q_PROPERTY(QObject* radioNet READ radioNet CONSTANT)
     // I log della stazione: quello aperto e gli altri, per i contest.
     Q_PROPERTY(QObject* logs READ logs CONSTANT)
 
@@ -314,6 +316,7 @@ public:
     bool databaseOpen() const { return m_db.isOpen(); }
     QObject* qsoModel() const { return m_model; }
     QObject* stationProfiles() const { return m_profiles; }
+    QObject* radioNet() const { return m_radioNet; }
     QObject* credentials() const { return m_credentials; }
     QObject* cluster() const { return m_cluster; }
     QObject* qsl() const { return m_qsl; }
@@ -1104,6 +1107,7 @@ private:
     RigController*       m_rig{nullptr};
     CloudController*     m_cloud{nullptr};
     ActivationController* m_activation{nullptr};
+    core::RadioNet* m_radioNet{nullptr};
     LogLibrary* m_logs{nullptr};
 
     int       m_udpPort{2237};

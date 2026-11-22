@@ -20,6 +20,7 @@ Rectangle {
     signal chatRequested()
     signal trafficRequested()
     signal activationRequested()
+    signal radioNetRequested()
     signal profilesRequested()
     // Il menu Pannelli e' un Popup nell'overlay della finestra principale:
     // passiamo chi l'ha aperto per posizionarlo accanto al comando, non sul
@@ -170,6 +171,7 @@ Rectangle {
                     onTriggered: root.chatRequested()
                 }
                 StyledMenuItem { text: qsTr("Decodium traffic monitor…"); onTriggered: root.trafficRequested() }
+                StyledMenuItem { text: qsTr("Radio net manager…"); onTriggered: root.radioNetRequested() }
                 MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSoft } }
                 StyledMenuItem { text: qsTr("Import a log (ADIF, CSV, N1MM)…"); onTriggered: root.importRequested() }
                 StyledMenuItem { text: qsTr("Undo last import…"); enabled: decolog.importProgress < 0; onTriggered: root.undoImportRequested() }

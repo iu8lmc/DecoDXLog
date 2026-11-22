@@ -9824,6 +9824,10 @@ Extra fields are preserved: %8</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Radio net manager…</source>
+        <translation>Radio net manager…</translation>
+    </message>
+    <message>
         <source>Decodium traffic monitor…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -14481,6 +14485,230 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Club Log REST: HTTP %1: %2</source>
         <translation type="unfinished"></translation>
+    </message>
+</context>
+
+<context>
+    <name>RadioNetDialog</name>
+    <message>
+        <source>Radio net manager</source>
+        <translation>Radio net manager</translation>
+    </message>
+    <message>
+        <source>Roster entries do not create QSO</source>
+        <translation>Roster entries do not create QSO</translation>
+    </message>
+    <message>
+        <source>Radio net session</source>
+        <translation>Radio net session</translation>
+    </message>
+    <message>
+        <source>New session name</source>
+        <translation>New session name</translation>
+    </message>
+    <message>
+        <source>New radio net session name</source>
+        <translation>New radio net session name</translation>
+    </message>
+    <message>
+        <source>Start session</source>
+        <translation>Start session</translation>
+    </message>
+    <message>
+        <source>Close session</source>
+        <translation>Close session</translation>
+    </message>
+    <message>
+        <source>Reopen</source>
+        <translation>Reopen</translation>
+    </message>
+    <message>
+        <source>Started: %1 UTC</source>
+        <translation>Started: %1 UTC</translation>
+    </message>
+    <message>
+        <source>Start or select a session.</source>
+        <translation>Start or select a session.</translation>
+    </message>
+    <message>
+        <source>Callsign</source>
+        <translation>Callsign</translation>
+    </message>
+    <message>
+        <source>Participant callsign</source>
+        <translation>Participant callsign</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Name</translation>
+    </message>
+    <message>
+        <source>Participant name</source>
+        <translation>Participant name</translation>
+    </message>
+    <message>
+        <source>Notes</source>
+        <translation>Notes</translation>
+    </message>
+    <message>
+        <source>Participant notes</source>
+        <translation>Participant notes</translation>
+    </message>
+    <message>
+        <source>Check in</source>
+        <translation>Check in</translation>
+    </message>
+    <message>
+        <source>Next turn</source>
+        <translation>Next turn</translation>
+    </message>
+    <message>
+        <source>Participants</source>
+        <translation>Participants</translation>
+    </message>
+    <message>
+        <source>Participant status for %1</source>
+        <translation>Participant status for %1</translation>
+    </message>
+    <message>
+        <source>Present</source>
+        <translation>Present</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>Waiting</translation>
+    </message>
+    <message>
+        <source>Absent</source>
+        <translation>Absent</translation>
+    </message>
+    <message>
+        <source>Departed</source>
+        <translation>Departed</translation>
+    </message>
+    <message>
+        <source>Move %1 up</source>
+        <translation>Move %1 up</translation>
+    </message>
+    <message>
+        <source>Move %1 down</source>
+        <translation>Move %1 down</translation>
+    </message>
+    <message>
+        <source>Recent session history (latest 200)</source>
+        <translation>Recent session history (latest 200)</translation>
+    </message>
+    <message>
+        <source>Session started</source>
+        <translation>Session started</translation>
+    </message>
+    <message>
+        <source>Session closed</source>
+        <translation>Session closed</translation>
+    </message>
+    <message>
+        <source>Session reopened</source>
+        <translation>Session reopened</translation>
+    </message>
+    <message>
+        <source>Checked in · %1 · %2</source>
+        <translation>Checked in · %1 · %2</translation>
+    </message>
+    <message>
+        <source>Checked in</source>
+        <translation>Checked in</translation>
+    </message>
+    <message>
+        <source>Turn</source>
+        <translation>Turn</translation>
+    </message>
+    <message>
+        <source>Order changed</source>
+        <translation>Order changed</translation>
+    </message>
+    <message>
+        <source>Status: %1</source>
+        <translation>Status: %1</translation>
+    </message>
+</context>
+
+<context>
+    <name>decolog::core::RadioNet</name>
+    <message>
+        <source>Log is not open</source>
+        <translation>Log is not open</translation>
+    </message>
+    <message>
+        <source>Radio net session not found</source>
+        <translation>Radio net session not found</translation>
+    </message>
+    <message>
+        <source>Enter a session name (up to 160 characters)</source>
+        <translation>Enter a session name (up to 160 characters)</translation>
+    </message>
+    <message>
+        <source>Cannot save session</source>
+        <translation>Cannot save session</translation>
+    </message>
+    <message>
+        <source>Open an active radio net first</source>
+        <translation>Open an active radio net first</translation>
+    </message>
+    <message>
+        <source>Use 2–32 letters, digits or slashes for the callsign</source>
+        <translation>Use 2–32 letters, digits or slashes for the callsign</translation>
+    </message>
+    <message>
+        <source>Name or notes are too long</source>
+        <translation>Name or notes are too long</translation>
+    </message>
+    <message>
+        <source>Cannot save check-in</source>
+        <translation>Cannot save check-in</translation>
+    </message>
+    <message>
+        <source>Invalid participant status</source>
+        <translation>Invalid participant status</translation>
+    </message>
+    <message>
+        <source>Participant not found</source>
+        <translation>Participant not found</translation>
+    </message>
+    <message>
+        <source>Cannot save status</source>
+        <translation>Cannot save status</translation>
+    </message>
+    <message>
+        <source>No available participants</source>
+        <translation>No available participants</translation>
+    </message>
+    <message>
+        <source>Cannot save turn</source>
+        <translation>Cannot save turn</translation>
+    </message>
+    <message>
+        <source>Invalid movement</source>
+        <translation>Invalid movement</translation>
+    </message>
+    <message>
+        <source>Participant is already at the edge</source>
+        <translation>Participant is already at the edge</translation>
+    </message>
+    <message>
+        <source>Cannot reorder participant</source>
+        <translation>Cannot reorder participant</translation>
+    </message>
+    <message>
+        <source>Cannot close session</source>
+        <translation>Cannot close session</translation>
+    </message>
+    <message>
+        <source>Select a closed session</source>
+        <translation>Select a closed session</translation>
+    </message>
+    <message>
+        <source>Cannot reopen session</source>
+        <translation>Cannot reopen session</translation>
     </message>
 </context>
 </TS>

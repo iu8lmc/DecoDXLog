@@ -421,6 +421,11 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TRIGGER IF NOT EXISTS import_qso_revision_insert AFTER INSERT ON import_qso BEGIN UPDATE import_batch SET journal_revision=journal_revision+1 WHERE id=NEW.batch_id; END"),
               QStringLiteral("CREATE TRIGGER IF NOT EXISTS import_qso_revision_update AFTER UPDATE ON import_qso BEGIN UPDATE import_batch SET journal_revision=journal_revision+1 WHERE id=OLD.batch_id OR id=NEW.batch_id; END"),
               QStringLiteral("CREATE TRIGGER IF NOT EXISTS import_qso_revision_delete AFTER DELETE ON import_qso BEGIN UPDATE import_batch SET journal_revision=journal_revision+1 WHERE id=OLD.batch_id; END")}, nullptr},
+        {16, {QStringLiteral("CREATE TABLE IF NOT EXISTS radio_net_session (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL UNIQUE, title TEXT NOT NULL, station_profile_id INTEGER REFERENCES station_profile(id), started_at TEXT NOT NULL, ended_at TEXT, current_member_id INTEGER)"),
+              QStringLiteral("CREATE TABLE IF NOT EXISTS radio_net_member (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES radio_net_session(id), call TEXT NOT NULL COLLATE NOCASE, name TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', status TEXT NOT NULL CHECK(status IN ('present','waiting','absent','departed')), sort_order INTEGER NOT NULL, first_seen TEXT NOT NULL, last_seen TEXT NOT NULL, UNIQUE(session_id,call))"),
+              QStringLiteral("CREATE TABLE IF NOT EXISTS radio_net_event (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES radio_net_session(id), member_id INTEGER REFERENCES radio_net_member(id), event TEXT NOT NULL, recorded_at TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '')"),
+              QStringLiteral("CREATE INDEX IF NOT EXISTS idx_radio_net_member_order ON radio_net_member(session_id,sort_order,id)"),
+              QStringLiteral("CREATE INDEX IF NOT EXISTS idx_radio_net_event_session ON radio_net_event(session_id,id)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)

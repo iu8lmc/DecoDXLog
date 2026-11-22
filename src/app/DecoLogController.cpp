@@ -1205,6 +1205,8 @@ bool DecoLogController::openDatabase(const QString& path)
             m_net->setSerialSharing(on);
     };
     m_activation = new ActivationController(std::move(actCtx), this);
+    m_radioNet = new core::RadioNet(&m_db, this);
+    m_radioNet->load();
     // Un QSO corretto, cancellato o importato cambia il punteggio della gara:
     // quello in memoria non vale piu'. Collegato qui, prima delle finestre,
     // cosi' le finestre leggono gia' il conto nuovo.

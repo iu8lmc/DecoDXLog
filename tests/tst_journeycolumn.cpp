@@ -3,6 +3,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSettings>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
 #include "core/LogDatabase.h"
@@ -46,6 +47,27 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetRosterUiAndRestartDoNotCreateQsos()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionet:seed"), output), output.constData());
+        QVERIFY2(output.contains("PROBE radioNet visible=true members=1 first=K1AAA"), output.constData());
+        {
+            decolog::core::LogDatabase db;
+            QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+            QCOMPARE(db.qsoCount(), 0);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("SELECT call,name,status FROM radio_net_member"));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toString(), QStringLiteral("K1AAA"));
+            QCOMPARE(q.value(1).toString(), QStringLiteral("Alice"));
+            QCOMPARE(q.value(2).toString(), QStringLiteral("present"));
+        }
+        QVERIFY2(launch(dir, QStringLiteral("radionet:resume"), output), output.constData());
+        QVERIFY2(output.contains("PROBE radioNet visible=true members=1 first=K1AAA"), output.constData());
+    }
+
     void importUndoDialogAcceptAndRejectAcrossRestart()
     {
         for (const bool accept : {false, true}) {

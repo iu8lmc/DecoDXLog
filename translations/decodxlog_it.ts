@@ -9863,6 +9863,10 @@ Campi extra conservati: %8</translation>
         <translation>Chat ON4KST…</translation>
     </message>
     <message>
+        <source>Radio net manager…</source>
+        <translation>Gestione rete radio…</translation>
+    </message>
+    <message>
         <source>Decodium traffic monitor…</source>
         <translation>Monitor del traffico Decodium…</translation>
     </message>
@@ -14524,6 +14528,230 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Club Log REST: HTTP %1: %2</source>
         <translation>Club Log REST: HTTP %1: %2</translation>
+    </message>
+</context>
+
+<context>
+    <name>RadioNetDialog</name>
+    <message>
+        <source>Radio net manager</source>
+        <translation>Gestione rete radio</translation>
+    </message>
+    <message>
+        <source>Roster entries do not create QSO</source>
+        <translation>I partecipanti non generano automaticamente QSO</translation>
+    </message>
+    <message>
+        <source>Radio net session</source>
+        <translation>Sessione rete radio</translation>
+    </message>
+    <message>
+        <source>New session name</source>
+        <translation>Nome nuova sessione</translation>
+    </message>
+    <message>
+        <source>New radio net session name</source>
+        <translation>Nome della nuova sessione radio</translation>
+    </message>
+    <message>
+        <source>Start session</source>
+        <translation>Avvia sessione</translation>
+    </message>
+    <message>
+        <source>Close session</source>
+        <translation>Chiudi sessione</translation>
+    </message>
+    <message>
+        <source>Reopen</source>
+        <translation>Riapri</translation>
+    </message>
+    <message>
+        <source>Started: %1 UTC</source>
+        <translation>Iniziata: %1 UTC</translation>
+    </message>
+    <message>
+        <source>Start or select a session.</source>
+        <translation>Avvia o seleziona una sessione.</translation>
+    </message>
+    <message>
+        <source>Callsign</source>
+        <translation>Nominativo</translation>
+    </message>
+    <message>
+        <source>Participant callsign</source>
+        <translation>Nominativo partecipante</translation>
+    </message>
+    <message>
+        <source>Name</source>
+        <translation>Nome</translation>
+    </message>
+    <message>
+        <source>Participant name</source>
+        <translation>Nome partecipante</translation>
+    </message>
+    <message>
+        <source>Notes</source>
+        <translation>Note</translation>
+    </message>
+    <message>
+        <source>Participant notes</source>
+        <translation>Note partecipante</translation>
+    </message>
+    <message>
+        <source>Check in</source>
+        <translation>Registra presenza</translation>
+    </message>
+    <message>
+        <source>Next turn</source>
+        <translation>Turno successivo</translation>
+    </message>
+    <message>
+        <source>Participants</source>
+        <translation>Partecipanti</translation>
+    </message>
+    <message>
+        <source>Participant status for %1</source>
+        <translation>Stato partecipante %1</translation>
+    </message>
+    <message>
+        <source>Present</source>
+        <translation>Presente</translation>
+    </message>
+    <message>
+        <source>Waiting</source>
+        <translation>In attesa</translation>
+    </message>
+    <message>
+        <source>Absent</source>
+        <translation>Assente</translation>
+    </message>
+    <message>
+        <source>Departed</source>
+        <translation>Uscito</translation>
+    </message>
+    <message>
+        <source>Move %1 up</source>
+        <translation>Sposta %1 in alto</translation>
+    </message>
+    <message>
+        <source>Move %1 down</source>
+        <translation>Sposta %1 in basso</translation>
+    </message>
+    <message>
+        <source>Recent session history (latest 200)</source>
+        <translation>Storico recente della sessione (ultimi 200)</translation>
+    </message>
+    <message>
+        <source>Session started</source>
+        <translation>Sessione avviata</translation>
+    </message>
+    <message>
+        <source>Session closed</source>
+        <translation>Sessione chiusa</translation>
+    </message>
+    <message>
+        <source>Session reopened</source>
+        <translation>Sessione riaperta</translation>
+    </message>
+    <message>
+        <source>Checked in · %1 · %2</source>
+        <translation>Presente · %1 · %2</translation>
+    </message>
+    <message>
+        <source>Checked in</source>
+        <translation>Presente</translation>
+    </message>
+    <message>
+        <source>Turn</source>
+        <translation>Turno</translation>
+    </message>
+    <message>
+        <source>Order changed</source>
+        <translation>Ordine modificato</translation>
+    </message>
+    <message>
+        <source>Status: %1</source>
+        <translation>Stato: %1</translation>
+    </message>
+</context>
+
+<context>
+    <name>decolog::core::RadioNet</name>
+    <message>
+        <source>Log is not open</source>
+        <translation>Il log non è aperto</translation>
+    </message>
+    <message>
+        <source>Radio net session not found</source>
+        <translation>Sessione radio non trovata</translation>
+    </message>
+    <message>
+        <source>Enter a session name (up to 160 characters)</source>
+        <translation>Inserisci un nome di sessione (massimo 160 caratteri)</translation>
+    </message>
+    <message>
+        <source>Cannot save session</source>
+        <translation>Impossibile salvare la sessione</translation>
+    </message>
+    <message>
+        <source>Open an active radio net first</source>
+        <translation>Apri prima una rete radio attiva</translation>
+    </message>
+    <message>
+        <source>Use 2–32 letters, digits or slashes for the callsign</source>
+        <translation>Usa 2–32 lettere, cifre o barre per il nominativo</translation>
+    </message>
+    <message>
+        <source>Name or notes are too long</source>
+        <translation>Nome o note troppo lunghi</translation>
+    </message>
+    <message>
+        <source>Cannot save check-in</source>
+        <translation>Impossibile salvare la presenza</translation>
+    </message>
+    <message>
+        <source>Invalid participant status</source>
+        <translation>Stato partecipante non valido</translation>
+    </message>
+    <message>
+        <source>Participant not found</source>
+        <translation>Partecipante non trovato</translation>
+    </message>
+    <message>
+        <source>Cannot save status</source>
+        <translation>Impossibile salvare lo stato</translation>
+    </message>
+    <message>
+        <source>No available participants</source>
+        <translation>Nessun partecipante disponibile</translation>
+    </message>
+    <message>
+        <source>Cannot save turn</source>
+        <translation>Impossibile salvare il turno</translation>
+    </message>
+    <message>
+        <source>Invalid movement</source>
+        <translation>Spostamento non valido</translation>
+    </message>
+    <message>
+        <source>Participant is already at the edge</source>
+        <translation>Il partecipante è già al limite</translation>
+    </message>
+    <message>
+        <source>Cannot reorder participant</source>
+        <translation>Impossibile riordinare il partecipante</translation>
+    </message>
+    <message>
+        <source>Cannot close session</source>
+        <translation>Impossibile chiudere la sessione</translation>
+    </message>
+    <message>
+        <source>Select a closed session</source>
+        <translation>Seleziona una sessione chiusa</translation>
+    </message>
+    <message>
+        <source>Cannot reopen session</source>
+        <translation>Impossibile riaprire la sessione</translation>
     </message>
 </context>
 </TS>

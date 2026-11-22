@@ -1,0 +1,7 @@
+# Radio net manager (desktop, initial implementation)
+
+Open **Radio net manager** from the main menu. Enter a session name and choose **Start session**; the active station profile is stored with it. Check in a callsign with optional name and notes. Re-entering the same callsign in the same session returns it to present rather than creating a second participant. An empty name or note on re-entry retains the existing value. Use the status selector for present, waiting, absent or departed, the arrows to change call order, and **Next turn** to advance among present and waiting participants. Close and reopen a selected session as needed. The session, order and event history are stored in the current log and reload on restart.
+
+A roster entry does not create or transmit a QSO. Use the normal logging workflow when a contact is actually completed. The current window displays the latest 200 session events; the database retains the event history. Sessions and roster are local to the log: cloud synchronisation, session export, a direct link to QSO entry, reminders/timers and complete paginated history are not implemented in this increment. Concurrent live refresh between different application instances is not established.
+
+Schema 16 adds the local session, member and event tables in a transaction. Keep a verified backup before upgrading; downgrade to an older application has not been tested. See `docs/evolution/PROGRESS.md` for test evidence and remaining work.

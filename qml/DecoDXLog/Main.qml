@@ -1248,6 +1248,10 @@ RoundedWindow {
         }
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
+        else if (what[0] === "radionet") {
+            radioNetDialog.open()
+            Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed") })
+        }
         else if (what[0] === "undoimport") {
             decolog.previewImportUndo()
         }
@@ -1713,6 +1717,7 @@ RoundedWindow {
         }
     }
     ActivationDialog { id: activationDialog }
+    RadioNetDialog { id: radioNetDialog }
     ContestSubmitDialog { id: submitDialog }
     Timer {
         id: benchTimer
@@ -2652,6 +2657,7 @@ RoundedWindow {
             onAwardsRequested: awardsDialog.openAt("")
             onClusterRequested: window.openCluster(0)
             onActivationRequested: activationDialog.openDialog()
+            onRadioNetRequested: radioNetDialog.open()
             contestModeOn: window.contestModeOn
             contestOpenPanels: contestLayout.shownList
             onContestCommand: (what, arg) => window.deskDo(what, arg)

@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 15;
+constexpr int kSchemaVersion = 16;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -59,6 +59,45 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void radioNetSessionStorageDoesNotCreateQsos()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY2(q.exec("INSERT INTO radio_net_session(uuid,title,started_at) VALUES('fixture','Test net','2026-01-01T12:00:00Z')"), qPrintable(q.lastError().text()));
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
+    void schema15UpgradePreservesImportJournalAndQsos()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("v15.sqlite"));
+        qint64 id = 0;
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            const auto imported = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+            QCOMPARE(imported.inserted, 1);
+            id = imported.insertedIds.first();
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("DROP TABLE radio_net_event"));
+            QVERIFY(q.exec("DROP TABLE radio_net_member"));
+            QVERIFY(q.exec("DROP TABLE radio_net_session"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version >= 16"));
+            QVERIFY(q.exec("INSERT INTO schema_version(version) VALUES (15)"));
+        }
+        {
+            LogDatabase db;
+            QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), 16);
+            QVERIFY(db.record(id).has_value());
+            const auto undo = db.undoLatestImport();
+            QCOMPARE(undo.deleted, 1);
+            QCOMPARE(undo.changed, 0);
+        }
+    }
+
     void fingerprintCompatibilityFixture()
     {
         const QString path = qEnvironmentVariable("DECODXLOG_FINGERPRINT_FIXTURE");
@@ -269,7 +308,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 15);
+            QCOMPARE(db.schemaVersion(), 16);
             const auto result = db.undoLatestImport();
             QCOMPARE(result.changed, 1);
             QCOMPARE(result.deleted, 0);
@@ -488,7 +527,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 15);
+            QCOMPARE(db.schemaVersion(), 16);
             QSqlQuery q(db.connection());
             QVERIFY(q.exec("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_import_qso_page'"));
             QVERIFY(q.next());
@@ -590,7 +629,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 15);
+            QCOMPARE(db.schemaVersion(), 16);
             QCOMPARE(db.qsoCount(), 1);
             QCOMPARE(db.meta(id)->uuid, uuid);
             QSqlQuery q(db.connection());
