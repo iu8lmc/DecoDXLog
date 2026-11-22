@@ -24,3 +24,5 @@
 - G08 optional reminders store a UTC deadline or cancellation as session history, without a schema migration. The countdown is visual in the selected manager window; no background or operating-system alert is claimed.
 
 - G09 manual QSO entry exposes distinct RX frequency alongside the satellite fields and validates positive finite RX MHz. When explicitly supplied, the regular frequency is the TX frequency; existing automatic split handling remains for a blank RX. This is data entry, not an orbital tracker or CAT ownership mechanism.
+
+- G09 PREDICT UDP snapshot client is read-only, requires a numeric IP address, and verifies tracking mode both before and after the sample. A TLE epoch is exposed separately; the snapshot does not itself prove accurate orbital data or a continuously updating server. The core is not yet wired into desktop workflows.
