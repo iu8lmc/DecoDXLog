@@ -8,7 +8,7 @@ CREATE TABLE schema_version (
     version     INTEGER NOT NULL,
     applied_at  TEXT    NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
 );
-INSERT INTO schema_version (version) VALUES (11);
+INSERT INTO schema_version (version) VALUES (12);
 
 CREATE TABLE operator_profile (
     id INTEGER PRIMARY KEY,
@@ -201,6 +201,20 @@ CREATE TABLE sync_state (
 CREATE TABLE app_setting (
     key     TEXT PRIMARY KEY,
     value   TEXT
+);
+
+-- Journal for committed imports; entries use UUID as well as local ID.
+CREATE TABLE import_batch (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE import_qso (
+    batch_id INTEGER NOT NULL REFERENCES import_batch(id),
+    qso_id INTEGER NOT NULL,
+    qso_uuid TEXT NOT NULL,
+    imported_revision INTEGER NOT NULL,
+    PRIMARY KEY (batch_id, qso_uuid)
 );
 
 -- Risposte API idempotenti, persistenti attraverso riavvii e retry.

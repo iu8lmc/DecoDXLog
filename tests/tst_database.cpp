@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 11;
+constexpr int kSchemaVersion = 12;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -59,6 +59,87 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void importedQsoJournalSurvivesRestartAndExcludesIndependentQsos()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("journal.sqlite"));
+        qint64 importedId = 0;
+        qint64 independentId = 0;
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            const auto result = db.importAdif("<CALL:5>K1IMP<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+            QCOMPARE(result.inserted, 1);
+            importedId = result.insertedIds.first();
+            independentId = db.insertQso({{"CALL", "K1NEW"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1100"},
+                                          {"BAND", "20m"}, {"MODE", "CW"}}, "radio").id;
+            QVERIFY(independentId > 0);
+        }
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            QSqlQuery q(db.connection());
+            QVERIFY2(q.exec("SELECT qso_id, qso_uuid, imported_revision FROM import_qso"), qPrintable(q.lastError().text()));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toLongLong(), importedId);
+            QCOMPARE(q.value(1).toString(), db.meta(importedId)->uuid);
+            QCOMPARE(q.value(2).toInt(), db.meta(importedId)->revision);
+            QVERIFY(!q.next());
+            QVERIFY(db.record(independentId).has_value());
+        }
+    }
+
+    void failedJournalWriteRollsBackImportedQso()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("CREATE TRIGGER fail_journal BEFORE INSERT ON import_qso BEGIN SELECT RAISE(ABORT, 'journal failure'); END"));
+        const auto result = db.importAdif("<CALL:5>K1IMP<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(result.inserted, 0);
+        QCOMPARE(result.invalid, 1);
+        QVERIFY(result.insertedIds.isEmpty());
+        QVERIFY(!result.errors.isEmpty());
+        QCOMPARE(db.qsoCount(), 0);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM import_batch"));
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
+    }
+
+    void upgradeFromSchema11PreservesExistingQso()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("v11.sqlite"));
+        qint64 id = 0;
+        QString uuid;
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            id = db.insertQso({{"CALL", "K1OLD"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1000"},
+                               {"BAND", "20m"}, {"MODE", "CW"}}, "radio").id;
+            QVERIFY(id > 0);
+            uuid = db.meta(id)->uuid;
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("DROP TABLE import_qso"));
+            QVERIFY(q.exec("DROP TABLE import_batch"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version >= 12"));
+            QVERIFY(q.exec("INSERT INTO schema_version (version) VALUES (11)"));
+        }
+        {
+            LogDatabase db;
+            QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), 12);
+            QCOMPARE(db.qsoCount(), 1);
+            QCOMPARE(db.meta(id)->uuid, uuid);
+            QSqlQuery q(db.connection());
+            QVERIFY2(q.exec("SELECT COUNT(*) FROM import_qso"), qPrintable(q.lastError().text()));
+            QVERIFY(q.next());
+            QCOMPARE(q.value(0).toInt(), 0);
+        }
+    }
+
     void failedImportCommitDoesNotReportRolledBackQsos()
     {
         QTemporaryDir dir;
@@ -78,6 +159,9 @@ private slots:
         QVERIFY(result.insertedIds.isEmpty());
         QVERIFY(!result.errors.isEmpty());
         QCOMPARE(db.qsoCount(), 1);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM import_qso"));
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(), 0);
         QVERIFY(db.record(existing.id).has_value());
         QVERIFY(q.exec("DROP TRIGGER fail_import_commit"));
         const auto retry = db.importAdif("<CALL:5>K1NEW<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
@@ -103,7 +187,7 @@ private slots:
         const auto result = db.importAdif(
             "<CALL:6>K1GOOD<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
             "<CALL:5>K1BAD<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>",
-            "test", 0, [&progress, &db, &independentId](int done, int) {
+            "import", 0, [&progress, &db, &independentId](int done, int) {
                 progress << done;
                 if (done == 1)
                     independentId = db.insertQso({{"CALL", "K1LIVE"}, {"QSO_DATE", "20260101"},
@@ -117,6 +201,10 @@ private slots:
         QCOMPARE(db.record(result.insertedIds.first())->value("CALL"), QString("K1GOOD"));
         QCOMPARE(progress, QList<int>{1});
         QVERIFY(!result.errors.isEmpty());
+        QVERIFY(q.exec("SELECT COUNT(*), MIN(qso_id) FROM import_qso"));
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(), 1);
+        QCOMPARE(q.value(1).toLongLong(), result.insertedIds.first());
     }
 
     void importRefusesAnAlreadyActiveTransaction()

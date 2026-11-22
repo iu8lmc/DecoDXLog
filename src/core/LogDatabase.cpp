@@ -406,6 +406,8 @@ bool LogDatabase::migrate()
               QStringLiteral("INSERT OR IGNORE INTO operating_location(location_key, label, gridsquare, dxcc, updated_at) SELECT DISTINCT operating_location, operating_location, my_gridsquare, my_dxcc, strftime('%Y-%m-%dT%H:%M:%SZ','now') FROM station_profile WHERE IFNULL(operating_location,'') <> ''"),
               QStringLiteral("INSERT OR IGNORE INTO dxcc_entity(id, name, updated_at) SELECT DISTINCT my_dxcc, '', strftime('%Y-%m-%dT%H:%M:%SZ','now') FROM station_profile WHERE IFNULL(my_dxcc,0) > 0"),
               QStringLiteral("UPDATE station_profile SET operator_profile_id = (SELECT id FROM operator_profile WHERE callsign = station_profile.operator), operating_location_id = (SELECT id FROM operating_location WHERE location_key = station_profile.operating_location), dxcc_entity_id = my_dxcc WHERE operator_profile_id IS NULL OR operating_location_id IS NULL OR dxcc_entity_id IS NULL")}, nullptr},
+        {12, {QStringLiteral("CREATE TABLE IF NOT EXISTS import_batch (id INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)"),
+              QStringLiteral("CREATE TABLE IF NOT EXISTS import_qso (batch_id INTEGER NOT NULL REFERENCES import_batch(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, imported_revision INTEGER NOT NULL, PRIMARY KEY (batch_id, qso_uuid))")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1976,6 +1978,8 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
     const QString programId = doc.header.value(QStringLiteral("PROGRAMID"));
     const int total = static_cast<int>(doc.records.size());
     const int batch = qMax(1, batchSize);
+    const QString importUuid = source == QLatin1String("import")
+        ? QUuid::createUuid().toString(QUuid::WithoutBraces) : QString();
 
     QSqlDatabase db = connection();
     int done = 0;
@@ -2033,7 +2037,25 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
                 result.errors << QStringLiteral("Cannot start import item: %1").arg(m_lastError);
                 return result;
             }
-            const InsertResult r = insertQso(record, source, programId, false, stationProfileId);
+            InsertResult r = insertQso(record, source, programId, false, stationProfileId);
+            if (r.status == InsertResult::Status::Inserted && !importUuid.isEmpty()) {
+                QSqlQuery journal(db);
+                journal.prepare(QStringLiteral("INSERT OR IGNORE INTO import_batch(uuid, created_at) VALUES (?, ?)"));
+                journal.addBindValue(importUuid);
+                journal.addBindValue(nowIso());
+                bool journalOk = journal.exec();
+                if (journalOk) {
+                    journal.prepare(QStringLiteral("INSERT INTO import_qso(batch_id, qso_id, qso_uuid, imported_revision) "
+                        "SELECT b.id, q.id, q.uuid, q.revision FROM import_batch b, qso q WHERE b.uuid = ? AND q.id = ?"));
+                    journal.addBindValue(importUuid);
+                    journal.addBindValue(r.id);
+                    journalOk = journal.exec() && journal.numRowsAffected() == 1;
+                }
+                if (!journalOk) {
+                    r.status = InsertResult::Status::Error;
+                    r.message = QStringLiteral("Cannot record imported QSO: %1").arg(journal.lastError().text());
+                }
+            }
             if (r.status != InsertResult::Status::Inserted
                 && !savepoint.exec(QStringLiteral("ROLLBACK TO decolog_import_item"))) {
                 m_lastError = savepoint.lastError().text();
