@@ -24,6 +24,8 @@ DialogFrame {
     property var enrichments: []
     property var attachments: []
     property var managerSuggestion: ({})
+    QslOcrDialog { id: qslOcrDialog }
+    function probeOcr(url) { qslOcrDialog.open(); qslOcrDialog.probe(url) }
 
     title: qsTr("QSO detail")
     dotColor: Theme.primaryColor
@@ -766,6 +768,12 @@ DialogFrame {
                         buttonHeight: 24
                         fontPixelSize: 11
                         onClicked: attachmentPicker.open()
+                    }
+                    GlassButton {
+                        text: qsTr("Read image with local OCR…")
+                        buttonHeight: 24
+                        fontPixelSize: 11
+                        onClicked: qslOcrDialog.open()
                     }
                     Text { Layout.fillWidth: true; text: qsTr("Not a confirmation by itself"); color: Theme.textSecondary; font.pixelSize: 10 }
                 }

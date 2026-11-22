@@ -1275,6 +1275,7 @@ RoundedWindow {
         else if (what[0] === "predictdraftfm") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3], true, "FM")) }
         else if (what[0] === "roverprobe") { roverDialog.open(); Qt.callLater(() => roverDialog.probe()) }
         else if (what[0] === "vuccboundary") Qt.callLater(() => console.warn("PROBE vuccBoundary " + JSON.stringify(decolog.vuccPreview("6m", "", "", 100))))
+        else if (what[0] === "qslocr") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1])) }
         else if (what[0] === "radionet") {
             radioNetDialog.open()
             Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso" || what[1] === "save" || what[1] === "reminder", what[1] === "qso" || what[1] === "save", what[1] === "save", what[1] === "history", what[1] === "reminder", what[1] === "qsohistory") })

@@ -3,6 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QFileInfo>
+#include <QFile>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSettings>
@@ -11,6 +12,7 @@
 #include <QTest>
 #include "core/LogDatabase.h"
 #include "core/RadioNet.h"
+#include "core/TesseractOcr.h"
 
 class TestJourneyColumn : public QObject {
     Q_OBJECT
@@ -51,6 +53,32 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void qslOcrDialogReadsImageWithoutChangingQso()
+    {
+        decolog::core::TesseractOcr engine;
+        if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("card.png");
+        const QString fixture = QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png");
+        QVERIFY(!fixture.isEmpty());
+        QVERIFY(QFile::copy(fixture, path));
+        {
+            decolog::core::LogDatabase db;
+            QVERIFY(db.open(dir.filePath("test.sqlite")));
+            decolog::core::AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20260923"},
+                                             {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "SSB"}};
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, decolog::core::InsertResult::Status::Inserted);
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("qslocr:") + path, output), output.constData());
+        QVERIFY2(output.contains("PROBE qslOcr success=true hasCall=true count=1"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath("test.sqlite")));
+        QCOMPARE(db.qsoCount(), 1);
+        QVERIFY(db.qslAttachments(1).isEmpty());
+        QCOMPARE(db.record(1)->value("CALL"), QString("K1ABC"));
+    }
     void roverManualQsoRespectsHistoryAndExplicitOverride()
     {
         QTemporaryDir dir;

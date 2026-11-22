@@ -1208,6 +1208,7 @@ bool DecoLogController::openDatabase(const QString& path)
     m_activation = new ActivationController(std::move(actCtx), this);
     m_radioNet = new core::RadioNet(&m_db, this);
     m_rover = new core::RoverSession(&m_db, this);
+    m_qslOcr = new core::TesseractOcr(QString(), this);
     m_predictTracker = new core::PredictTracker(this);
     m_predictPassPlanner = new core::PredictPassPlanner(this);
     m_radioNet->load();

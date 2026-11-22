@@ -6793,6 +6793,10 @@ QSL 状态：%6 · UTC 不完整：%7。
         <source>Save · rev %1</source>
         <translation>保存 · rev %1</translation>
     </message>
+    <message>
+        <source>Read image with local OCR…</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>QsoJourney</name>
@@ -15153,6 +15157,100 @@ QSL 状态：%6 · UTC 不完整：%7。
     </message>
     <message>
         <source>System clock moved backwards; cannot record rover position</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>QslOcrDialog</name>
+    <message>
+        <source>Read QSL image locally</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Review every result</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Select a local QSL image</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Images (*.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Local OCR is a suggestion only. Verify calls, dates, times and every other field against the image. It does not change the QSO or confirmation status.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose image…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No image selected</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Read image</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Engine: %1 · English model</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tesseract OCR is not installed or not on the search path.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reading locally…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Recognized text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Low-confidence words (below 75/100; not a probability)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use Import scan or image in the QSO detail to attach the original separately.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::TesseractOcr</name>
+    <message>
+        <source>OCR timed out</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot start the OCR engine</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>OCR cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>OCR output is too large</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>OCR engine failed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose a readable local image up to 32 MB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Unsupported image or image dimensions too large</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Tesseract OCR was not found</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

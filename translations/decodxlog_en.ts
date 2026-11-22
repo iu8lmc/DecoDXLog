@@ -6801,6 +6801,10 @@ Extra fields are preserved: %8</source>
         <source>Save · rev %1</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Read image with local OCR…</source>
+        <translation>Read image with local OCR…</translation>
+    </message>
 </context>
 <context>
     <name>QsoJourney</name>
@@ -15213,6 +15217,100 @@ Extra fields are preserved: %8</source>
     <message>
         <source>System clock moved backwards; cannot record rover position</source>
         <translation>System clock moved backwards; cannot record rover position</translation>
+    </message>
+</context>
+<context>
+    <name>QslOcrDialog</name>
+    <message>
+        <source>Read QSL image locally</source>
+        <translation>Read QSL image locally</translation>
+    </message>
+    <message>
+        <source>Review every result</source>
+        <translation>Review every result</translation>
+    </message>
+    <message>
+        <source>Select a local QSL image</source>
+        <translation>Select a local QSL image</translation>
+    </message>
+    <message>
+        <source>Images (*.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp)</source>
+        <translation>Images (*.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp)</translation>
+    </message>
+    <message>
+        <source>Local OCR is a suggestion only. Verify calls, dates, times and every other field against the image. It does not change the QSO or confirmation status.</source>
+        <translation>Local OCR is a suggestion only. Verify calls, dates, times and every other field against the image. It does not change the QSO or confirmation status.</translation>
+    </message>
+    <message>
+        <source>Choose image…</source>
+        <translation>Choose image…</translation>
+    </message>
+    <message>
+        <source>No image selected</source>
+        <translation>No image selected</translation>
+    </message>
+    <message>
+        <source>Read image</source>
+        <translation>Read image</translation>
+    </message>
+    <message>
+        <source>Engine: %1 · English model</source>
+        <translation>Engine: %1 · English model</translation>
+    </message>
+    <message>
+        <source>Tesseract OCR is not installed or not on the search path.</source>
+        <translation>Tesseract OCR is not installed or not on the search path.</translation>
+    </message>
+    <message>
+        <source>Reading locally…</source>
+        <translation>Reading locally…</translation>
+    </message>
+    <message>
+        <source>Recognized text</source>
+        <translation>Recognized text</translation>
+    </message>
+    <message>
+        <source>Low-confidence words (below 75/100; not a probability)</source>
+        <translation>Low-confidence words (below 75/100; not a probability)</translation>
+    </message>
+    <message>
+        <source>Use Import scan or image in the QSO detail to attach the original separately.</source>
+        <translation>Use Import scan or image in the QSO detail to attach the original separately.</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::TesseractOcr</name>
+    <message>
+        <source>OCR timed out</source>
+        <translation>OCR timed out</translation>
+    </message>
+    <message>
+        <source>Cannot start the OCR engine</source>
+        <translation>Cannot start the OCR engine</translation>
+    </message>
+    <message>
+        <source>OCR cancelled</source>
+        <translation>OCR cancelled</translation>
+    </message>
+    <message>
+        <source>OCR output is too large</source>
+        <translation>OCR output is too large</translation>
+    </message>
+    <message>
+        <source>OCR engine failed</source>
+        <translation>OCR engine failed</translation>
+    </message>
+    <message>
+        <source>Choose a readable local image up to 32 MB</source>
+        <translation>Choose a readable local image up to 32 MB</translation>
+    </message>
+    <message>
+        <source>Unsupported image or image dimensions too large</source>
+        <translation>Unsupported image or image dimensions too large</translation>
+    </message>
+    <message>
+        <source>Tesseract OCR was not found</source>
+        <translation>Tesseract OCR was not found</translation>
     </message>
 </context>
 </TS>
