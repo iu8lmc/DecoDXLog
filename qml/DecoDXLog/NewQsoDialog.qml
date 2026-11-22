@@ -112,7 +112,7 @@ DialogFrame {
         for (const f of [callField, gridField, nameField, qthField, commentField, potaField, sotaField,
                          iotaField, wwffField, dciField, tagsField, countryField, addressField, stateField,
                          cntyField, contField, cqzField, ituzField, dxccField, qslViaField,
-                         satNameField, satModeField])
+                         satNameField, satModeField, rxFreqField])
             f.text = ""
         propModeBox.currentIndex = 0
         sentField.text = root.defaultReport(root.tuneMode())
@@ -151,10 +151,25 @@ DialogFrame {
         console.warn("PROBE radioNetRepeat closed=" + !root.visible + " error=" + errorText.text)
     }
 
+    function probeSatelliteSplit() {
+        callField.text = "K1AAA"
+        freqField.text = "145.900000"
+        rxFreqField.text = "invalid"
+        modeBox.currentIndex = modeBox.find("CW")
+        propModeBox.currentIndex = propModeBox.find("SAT")
+        satNameField.text = "FO-29"
+        satModeField.text = "U/V"
+        root.submit(false)
+        console.warn("PROBE satelliteInvalid kept=" + (root.visible && errorText.text.length > 0))
+        rxFreqField.text = "435.250000"
+        root.submit(false)
+        console.warn("PROBE satelliteSaved closed=" + !root.visible + " error=" + errorText.text)
+    }
+
     function submit(keep) {
         const error = decolog.logManualQso({
             call: callField.text, date: dateField.text, time: timeField.text,
-            band: bandBox.currentIndex > 0 ? bandBox.currentText : "", freq: freqField.text,
+            band: bandBox.currentIndex > 0 ? bandBox.currentText : "", freq: freqField.text, freq_rx: rxFreqField.text,
             mode: modeBox.editText, submode: submodeBox.editText,
             rst_sent: sentField.text, rst_rcvd: rcvdField.text,
             gridsquare: gridField.text, name: nameField.text, qth: qthField.text, tx_pwr: pwrField.text,
@@ -388,9 +403,10 @@ DialogFrame {
                 LabeledField {
                     Layout.preferredWidth: 1
                     Layout.horizontalStretchFactor: 2; Layout.fillWidth: true
-                    label: qsTr("Freq MHz")
+                    label: qsTr("Freq / TX MHz")
                     StyledTextField {
                         id: freqField
+                        objectName: "manualTxFrequency"
                         Layout.fillWidth: true
                         onTextChanged: {
                             const i = bandBox.find(decolog.bandForFrequency(text))
@@ -582,13 +598,19 @@ DialogFrame {
                     Layout.preferredWidth: 1
                     Layout.horizontalStretchFactor: 4; Layout.fillWidth: true
                     label: qsTr("Satellite")
-                    StyledTextField { id: satNameField; Layout.fillWidth: true; uppercase: true; placeholderText: "OSCAR-100" }
+                    StyledTextField { id: satNameField; objectName: "manualSatellite"; Layout.fillWidth: true; uppercase: true; placeholderText: "OSCAR-100" }
                 }
                 LabeledField {
                     Layout.preferredWidth: 1
                     Layout.horizontalStretchFactor: 4; Layout.fillWidth: true
                     label: qsTr("Sat mode")
                     StyledTextField { id: satModeField; Layout.fillWidth: true; uppercase: true; placeholderText: "U/V" }
+                }
+                LabeledField {
+                    Layout.preferredWidth: 1
+                    Layout.horizontalStretchFactor: 4; Layout.fillWidth: true
+                    label: qsTr("RX frequency MHz")
+                    StyledTextField { id: rxFreqField; objectName: "manualRxFrequency"; Layout.fillWidth: true; placeholderText: "—" }
                 }
             }
             RowLayout {

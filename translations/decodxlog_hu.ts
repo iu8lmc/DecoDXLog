@@ -5055,6 +5055,14 @@ A további mezők megmaradnak: %8</translation>
         <translation>Sáv</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>Frekv. MHz</translation>
     </message>
@@ -11388,6 +11396,10 @@ A további mezők megmaradnak: %8</translation>
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>Az Új QSO mezőinek beállításait nem sikerült elmenteni.</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

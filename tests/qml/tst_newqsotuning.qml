@@ -17,6 +17,7 @@ TestCase {
         property var newQsoCustomFields: []
         property var submitted: null
         property int submissions: 0
+        property int tuneCalls: 0
         property bool enterToLogQso: false
         function newQsoFieldOptions() { return [{key: "IOTA", label: "IOTA"}] }
         function logManualQso(fields) { submitted = fields; submissions++; return "" }
@@ -41,13 +42,37 @@ TestCase {
         function bandFrequency(band, mode) { return mode === "FT8" ? 50.313 : 50.318 }
         function showDate(value) { return value }
         function readDate(value) { return value }
-        function tuneTo() {}
+        function tuneTo() { tuneCalls++ }
         signal tuningChanged()
         signal qsoPrepared(var fields)
         signal lookupChanged()
     }
     Component { id: panelComponent; NewQsoPanel { width: 580; height: 700 } }
     Component { id: dialogComponent; NewQsoDialog {} }
+
+    function test_satelliteSplitFrequencies() {
+        decolog.tuneCalls = 0
+        decolog.rig.connected = true
+        const form = createTemporaryObject(dialogComponent, testCase)
+        verify(form !== null)
+        form.open()
+        const tx = findChild(form, "manualTxFrequency")
+        const rx = findChild(form, "manualRxFrequency")
+        const sat = findChild(form, "manualSatellite")
+        verify(tx !== null && rx !== null && sat !== null)
+        tx.text = "145.900000"
+        rx.text = "435.250000"
+        sat.text = "FO-29"
+        form.submit(true)
+        compare(decolog.submitted.freq, "145.900000")
+        compare(decolog.submitted.freq_rx, "435.250000")
+        compare(decolog.submitted.sat_name, "FO-29")
+        compare(decolog.tuneCalls, 0)
+        form.close()
+        form.open()
+        compare(rx.text, "", "A new draft must not inherit a stale receive frequency")
+        decolog.rig.connected = false
+    }
 
     function test_manualLoggingKeys_data() {
         const rows = []

@@ -5067,6 +5067,14 @@ Campos extra conservados: %8</translation>
         <translation>Banda</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>Frec. MHz</translation>
     </message>
@@ -11425,6 +11433,10 @@ Campos extra conservados: %8</translation>
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>No se pudieron guardar los ajustes de los campos de Nuevo QSO.</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

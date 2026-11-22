@@ -3694,6 +3694,12 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     // ascoltando, la trasmissione la sa la radio.
     QString freqRx = text("freq_rx");
     freqRx.replace(QLatin1Char(','), QLatin1Char('.'));
+    if (!freqRx.isEmpty()) {
+        bool valid = false;
+        const double mhz = freqRx.toDouble(&valid);
+        if (!valid || !std::isfinite(mhz) || mhz <= 0)
+            return tr("Enter a valid receive frequency in MHz");
+    }
     if (auto* rig = qobject_cast<RigController*>(m_rig); rig && rig->connected() && rig->split()
         && rig->txFrequencyHz() > 0 && freqRx.isEmpty()) {
         const double typed = freq.toDouble();

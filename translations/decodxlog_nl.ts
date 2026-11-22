@@ -5067,6 +5067,14 @@ Extra velden blijven behouden: %8</translation>
         <translation>Band</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>Freq MHz</translation>
     </message>
@@ -11425,6 +11433,10 @@ Extra velden blijven behouden: %8</translation>
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>De instellingen voor de velden van Nieuwe QSO konden niet worden opgeslagen.</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

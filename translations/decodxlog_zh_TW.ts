@@ -5055,6 +5055,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <translation>頻段</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>頻率 MHz</translation>
     </message>
@@ -11388,6 +11396,10 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>無法儲存新增 QSO 欄位設定。</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

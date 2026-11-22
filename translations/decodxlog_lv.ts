@@ -5079,6 +5079,14 @@ Papildu lauki tiek saglabāti: %8</translation>
         <translation>Josla</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>Frekv. MHz</translation>
     </message>
@@ -11462,6 +11470,10 @@ Papildu lauki tiek saglabāti: %8</translation>
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>Jaunā QSO lauku iestatījumus neizdevās saglabāt.</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

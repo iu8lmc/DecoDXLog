@@ -5067,6 +5067,14 @@ Camps extra conservats: %8</translation>
         <translation>Banda</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>Freq MHz</translation>
     </message>
@@ -11425,6 +11433,10 @@ Camps extra conservats: %8</translation>
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>No s&apos;han pogut desar els ajustos dels camps de QSO nou.</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

@@ -5055,6 +5055,14 @@ QSL の状態: %6 · UTC が不完全: %7。
         <translation>バンド</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>周波数 MHz</translation>
     </message>
@@ -11388,6 +11396,10 @@ QSL の状態: %6 · UTC が不完全: %7。
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>新しい QSO の項目設定を保存できませんでした。</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

@@ -5079,6 +5079,14 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation>Bandă</translation>
     </message>
     <message>
+        <source>Freq / TX MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>RX frequency MHz</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Freq MHz</source>
         <translation>Frecv. MHz</translation>
     </message>
@@ -11462,6 +11470,10 @@ Câmpuri suplimentare păstrate: %8</translation>
     <message>
         <source>The New QSO field settings could not be saved.</source>
         <translation>Setările câmpurilor pentru QSO nou nu au putut fi salvate.</translation>
+    </message>
+    <message>
+        <source>Enter a valid receive frequency in MHz</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Enter a valid UTC date</source>

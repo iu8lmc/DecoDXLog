@@ -1248,6 +1248,10 @@ RoundedWindow {
         }
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
+        else if (what[0] === "satellitesplit") {
+            newQsoDialog.open()
+            Qt.callLater(function () { newQsoDialog.probeSatelliteSplit() })
+        }
         else if (what[0] === "radionet") {
             radioNetDialog.open()
             Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso" || what[1] === "save" || what[1] === "reminder", what[1] === "qso" || what[1] === "save", what[1] === "save", what[1] === "history", what[1] === "reminder") })

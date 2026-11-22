@@ -48,6 +48,32 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void manualSatelliteSplitPersistsBothFrequencies()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("satellitesplit"), output), output.constData());
+        QVERIFY2(output.contains("PROBE satelliteInvalid kept=true"), output.constData());
+        QVERIFY2(output.contains("PROBE satelliteSaved closed=true"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), 1);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT freq,freq_rx,band,band_rx,sat_name,sat_mode,prop_mode FROM qso WHERE deleted=0"));
+        QVERIFY(q.next());
+        QCOMPARE(q.value(0).toDouble(), 145.9);
+        QCOMPARE(q.value(1).toDouble(), 435.25);
+        QCOMPARE(q.value(2).toString(), QStringLiteral("2m"));
+        QCOMPARE(q.value(3).toString(), QStringLiteral("70cm"));
+        QCOMPARE(q.value(4).toString(), QStringLiteral("FO-29"));
+        QCOMPARE(q.value(5).toString(), QStringLiteral("U/V"));
+        QCOMPARE(q.value(6).toString(), QStringLiteral("SAT"));
+        const QByteArray adif = db.exportAdif().toLower();
+        QVERIFY(adif.contains("<freq_rx:10>435.250000"));
+        QVERIFY(adif.contains("<band_rx:4>70cm"));
+    }
+
     void radioNetReminderShowsWhenDue()
     {
         QTemporaryDir dir;
