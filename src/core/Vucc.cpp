@@ -1,7 +1,9 @@
 #include "core/Vucc.h"
+#include "core/Maidenhead.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QJsonParseError>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -11,6 +13,84 @@ namespace decolog::core::vucc {
 
 namespace {
 QString norm(const QString& value) { return value.trimmed().toUpper(); }
+
+bool validLocator(const QString& grid)
+{
+    const QString value = norm(grid);
+    return value.size() >= 4 && maidenhead::toLatLon(value).has_value();
+}
+
+QStringList boundaryGrids(const QString& text, const QString& primary)
+{
+    const QStringList values = norm(text).split(QLatin1Char(','), Qt::KeepEmptyParts);
+    if (values.size() != 2 && values.size() != 4)
+        return {};
+    constexpr int longitudeCells = 180 * 24;
+    struct Rectangle { int x, y, size; };
+    QSet<QString> unique;
+    QList<Rectangle> rectangles;
+    QStringList result;
+    const QString normalizedPrimary = norm(primary);
+    bool primaryMatches = normalizedPrimary.isEmpty();
+    if (!primaryMatches && !validLocator(normalizedPrimary))
+        return {};
+    for (const QString& part : values) {
+        const QString grid = part.trimmed();
+        if ((grid.size() != 4 && grid.size() != 6) || !validLocator(grid) || unique.contains(grid))
+            return {};
+        unique.insert(grid);
+        int x = ((grid[0].unicode() - 'A') * 10 + grid[2].digitValue()) * 24;
+        int y = ((grid[1].unicode() - 'A') * 10 + grid[3].digitValue()) * 24;
+        const int size = grid.size() == 6 ? 1 : 24;
+        if (grid.size() == 6) {
+            x += grid[4].unicode() - 'A';
+            y += grid[5].unicode() - 'A';
+        }
+        if (!rectangles.isEmpty()) {
+            const int origin = rectangles.first().x;
+            if (x - origin > longitudeCells / 2) x -= longitudeCells;
+            if (x - origin < -longitudeCells / 2) x += longitudeCells;
+        }
+        rectangles.append({x, y, size});
+        result.append(grid.left(4));
+        const int common = qMin(int(normalizedPrimary.size()), int(grid.size()));
+        if (common >= 4 && normalizedPrimary.left(common) == grid.left(common))
+            primaryMatches = true;
+    }
+    if (!primaryMatches)
+        return {};
+    if (rectangles.size() == 2) {
+        const auto a = rectangles[0], b = rectangles[1];
+        const bool verticalEdge = (a.x + a.size == b.x || b.x + b.size == a.x)
+                                  && qMax(a.y, b.y) < qMin(a.y + a.size, b.y + b.size);
+        const bool horizontalEdge = (a.y + a.size == b.y || b.y + b.size == a.y)
+                                    && qMax(a.x, b.x) < qMin(a.x + a.size, b.x + b.size);
+        if (!verticalEdge && !horizontalEdge)
+            return {};
+    } else {
+        int minUpperX = rectangles.first().x + rectangles.first().size;
+        int minUpperY = rectangles.first().y + rectangles.first().size;
+        int maxLowerX = rectangles.first().x, maxLowerY = rectangles.first().y;
+        for (const auto& r : rectangles) {
+            maxLowerX = qMax(maxLowerX, r.x); maxLowerY = qMax(maxLowerY, r.y);
+            minUpperX = qMin(minUpperX, r.x + r.size); minUpperY = qMin(minUpperY, r.y + r.size);
+        }
+        if (maxLowerX != minUpperX || maxLowerY != minUpperY)
+            return {};
+        QSet<int> quadrants;
+        for (const auto& r : rectangles) {
+            const int xSide = r.x == maxLowerX ? 1 : r.x + r.size == maxLowerX ? 0 : -1;
+            const int ySide = r.y == maxLowerY ? 1 : r.y + r.size == maxLowerY ? 0 : -1;
+            if (xSide < 0 || ySide < 0)
+                return {};
+            quadrants.insert(xSide + 2 * ySide);
+        }
+        if (quadrants.size() != 4)
+            return {};
+    }
+    result.removeDuplicates();
+    return result;
+}
 }
 
 bool validGrid4(const QString& grid)
@@ -47,9 +127,11 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         return a.qsoId < b.qsoId;
     });
     for (const Entry& entry : sorted) {
-        const QString grid = norm(entry.grid).left(4);
-        if (entry.qsoId <= 0 || !validGrid4(grid)) {
-            result.exclusions << QStringLiteral("QSO %1: invalid GRID4").arg(entry.qsoId);
+        const QStringList candidates = entry.grids.trimmed().isEmpty()
+            ? (validLocator(entry.grid) ? QStringList{norm(entry.grid).left(4)} : QStringList{})
+            : boundaryGrids(entry.grids, entry.grid);
+        if (entry.qsoId <= 0 || candidates.isEmpty()) {
+            result.exclusions << QStringLiteral("QSO %1: invalid or inconsistent grid data").arg(entry.qsoId);
             continue;
         }
         if (norm(entry.band) != norm(rules.band)) {
@@ -68,14 +150,16 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             result.exclusions << QStringLiteral("QSO %1: confirmation evidence required").arg(entry.qsoId);
             continue;
         }
-        if (grids.contains(grid)) {
-            result.exclusions << QStringLiteral("QSO %1: GRID4 already credited").arg(entry.qsoId);
-            continue;
+        for (const QString& grid : candidates) {
+            if (grids.contains(grid)) {
+                result.exclusions << QStringLiteral("QSO %1: GRID4 %2 already credited").arg(entry.qsoId).arg(grid);
+                continue;
+            }
+            Entry credited = entry;
+            credited.grid = grid;
+            result.eligible << credited;
+            grids.insert(grid);
         }
-        Entry credited = entry;
-        credited.grid = grid;
-        result.eligible << credited;
-        grids.insert(grid);
     }
     return result;
 }
@@ -89,9 +173,10 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "SELECT q.id, q.gridsquare, q.band, IFNULL(p.award_account, ''), "
             "IFNULL(p.operating_location, ''), "
             "EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
-            "(SELECT group_concat(s.service, ',') FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y') "
+            "(SELECT group_concat(s.service, ',') FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
+            "IFNULL(q.adif_extra, '') "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
-            "WHERE q.deleted = 0 AND IFNULL(q.gridsquare, '') <> '' ORDER BY q.id"))) {
+            "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
         return {};
     }
@@ -104,6 +189,26 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.site = query.value(4).toString();
         entry.confirmed = query.value(5).toBool();
         entry.evidence = query.value(6).toString();
+        const QByteArray extra = query.value(7).toByteArray();
+        if (!extra.isEmpty()) {
+            QJsonParseError parseError;
+            const QJsonDocument doc = QJsonDocument::fromJson(extra, &parseError);
+            if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+                if (error) *error = QStringLiteral("QSO %1: invalid ADIF extra data").arg(entry.qsoId);
+                return {};
+            }
+            const QJsonObject object = doc.object();
+            const QJsonValue grids = object.value(QStringLiteral("VUCC_GRIDS"));
+            const QJsonValue myGrids = object.value(QStringLiteral("MY_VUCC_GRIDS"));
+            if ((!grids.isUndefined() && !grids.isString()) || (!myGrids.isUndefined() && !myGrids.isString())) {
+                if (error) *error = QStringLiteral("QSO %1: invalid VUCC grid field type").arg(entry.qsoId);
+                return {};
+            }
+            entry.grids = grids.toString();
+            entry.myGrids = myGrids.toString();
+        }
+        if (entry.grid.trimmed().isEmpty() && entry.grids.trimmed().isEmpty())
+            continue;
         entries << entry;
     }
     return entries;
@@ -118,6 +223,8 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("account"), entry.account},
                                 {QStringLiteral("site"), entry.site},
+                                {QStringLiteral("reportedVuccGrids"), entry.grids},
+                                {QStringLiteral("reportedMyVuccGrids"), entry.myGrids},
                                 {QStringLiteral("evidence"), entry.evidence}});
     }
     QJsonArray exclusions;

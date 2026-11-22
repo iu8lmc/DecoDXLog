@@ -30,3 +30,5 @@
 - G09 PREDICT pass requests accept a strict ASCII satellite-name allowlist because upstream PREDICT 2.2.x invokes a shell. Pass streams are bounded and require ordered points, plausible horizon endpoints and unchanged TLE; these checks cannot guarantee UDP completeness and may reject slow passes.
 
 - G09 preview scales PREDICT normalized 100 MHz Doppler by the user-entered nominal downlink, and applies the opposite sign to nominal uplink; it never tunes. An explicit draft requires a local reading at most 10 seconds old and a non-future TLE at most 14 days old. These bounds are cautionary and do not establish orbital or frequency correctness.
+
+- G02 VUCC preview expands only reported two/four adjacent 4- or 6-character VUCC_GRIDS into unique GRID4 candidates; malformed or inconsistent reports are excluded. MY_VUCC_GRIDS is preserved as reported provenance, not validated as an operating site or award eligibility. Official rules remain unverified.

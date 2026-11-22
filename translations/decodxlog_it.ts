@@ -774,8 +774,8 @@
         <translation>Servono prove confermate: imposta banda, conto e sito, poi guarda l&apos;anteprima.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>GRID4 validi: %1 / %2 · esclusi: %3 · regole esterne verificate: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation>GRID4 candidati: %1 / %2 · esclusi: %3 · regole esterne verificate: %4</translation>
     </message>
     <message>
         <source>yes</source>

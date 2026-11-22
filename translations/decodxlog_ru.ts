@@ -776,8 +776,8 @@
         <translation>Нужны подтверждённые данные: задайте диапазон, учётную запись и место работы, затем откройте предпросмотр.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>Подходящих GRID4: %1 / %2 · исключено: %3 · внешние правила проверены: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

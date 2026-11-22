@@ -774,8 +774,8 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation type="unfinished"></translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</translation>
     </message>
     <message>
         <source>yes</source>

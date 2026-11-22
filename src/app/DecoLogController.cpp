@@ -2830,6 +2830,8 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("account"), entry.account},
                                 {QStringLiteral("site"), entry.site},
+                                {QStringLiteral("reportedVuccGrids"), entry.grids},
+                                {QStringLiteral("reportedMyVuccGrids"), entry.myGrids},
                                 {QStringLiteral("evidence"), entry.evidence}};
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},

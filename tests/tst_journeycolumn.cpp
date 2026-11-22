@@ -1,4 +1,7 @@
 #include <QDir>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QFileInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -48,6 +51,32 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void vuccBoundaryPreviewInApplication()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        {
+            decolog::core::LogDatabase db;
+            QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+            const QByteArray input = "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>6m<MODE:2>CW"
+                                     "<QSL_RCVD:1>Y<GRIDSQUARE:4>EM98<VUCC_GRIDS:19>EM98,FM08,EM97,FM07<EOR>";
+            QCOMPARE(db.importAdif(input).inserted, 1);
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("vuccboundary"), output), output.constData());
+        const QByteArray marker = "PROBE vuccBoundary ";
+        const int start = output.indexOf(marker);
+        QVERIFY2(start >= 0, output.constData());
+        const int end = output.indexOf('\n', start);
+        const auto document = QJsonDocument::fromJson(output.mid(start + marker.size(), end - start - marker.size()));
+        QVERIFY(!document.isNull());
+        QCOMPARE(document.object().value("eligible").toArray().size(), 4);
+        QVERIFY(!document.object().value("officialRulesVerified").toBool());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), 1);
+    }
+
     void exportTrackerQsoFixture()
     {
         const QString path = qEnvironmentVariable("DECOLOG_TEST_SATELLITE_DB");

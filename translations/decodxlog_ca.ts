@@ -774,8 +774,8 @@
         <translation>Calen proves confirmades: configura banda, compte i lloc i mira la previsualització.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>GRID4 vàlids: %1 / %2 · exclosos: %3 · regles externes verificades: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

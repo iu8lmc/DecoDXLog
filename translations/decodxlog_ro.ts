@@ -776,8 +776,8 @@
         <translation>Sunt necesare dovezi confirmate: setează banda, contul și locația, apoi vezi previzualizarea.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>GRID4 eligibile: %1 / %2 · excluse: %3 · reguli externe verificate: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

@@ -15,6 +15,8 @@ struct Entry {
     QString site;
     bool confirmed{false};
     QString evidence;
+    QString grids;
+    QString myGrids;
 };
 
 struct Rules {

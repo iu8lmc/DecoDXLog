@@ -774,8 +774,8 @@
         <translation>Des preuves confirmées sont requises : réglez la bande, le compte et le site, puis lancez l&apos;aperçu.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>GRID4 éligibles : %1 / %2 · exclus : %3 · règles externes vérifiées : %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

@@ -772,8 +772,8 @@
         <translation>需要已確認的證據：請設定波段、帳戶和地點，然後檢視預覽。</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>有效 GRID4：%1 / %2 · 已排除：%3 · 外部規則已驗證：%4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

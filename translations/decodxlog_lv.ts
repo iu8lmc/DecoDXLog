@@ -776,8 +776,8 @@
         <translation>Nepieciešami apstiprināti pierādījumi; iestatiet joslu, kontu un vietu, tad skatiet priekšskatījumu.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>Derīgi GRID4: %1 / %2 · izslēgti: %3 · ārējie noteikumi pārbaudīti: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

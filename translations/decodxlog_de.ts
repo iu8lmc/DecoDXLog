@@ -774,8 +774,8 @@
         <translation>Bestätigte Nachweise sind erforderlich; Band, Konto und Standort einstellen und die Vorschau ansehen.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>Gültige GRID4: %1 / %2 · ausgeschlossen: %3 · externe Regeln geprüft: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

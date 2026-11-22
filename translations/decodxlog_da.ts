@@ -774,8 +774,8 @@
         <translation>Bekræftet dokumentation er påkrævet; indstil bånd, konto og sted, og se forhåndsvisningen.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>Gyldige GRID4: %1 / %2 · udeladt: %3 · eksterne regler verificeret: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

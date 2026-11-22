@@ -774,8 +774,8 @@
         <translation>Bevestigd bewijs is vereist; stel band, account en standplaats in en bekijk het voorbeeld.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>Geldige GRID4: %1 / %2 · uitgesloten: %3 · externe regels geverifieerd: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

@@ -523,7 +523,7 @@ DialogFrame {
                         Layout.fillWidth: true
                         text: root.vuccResult.valid === undefined
                               ? qsTr("Confirmed evidence is required; configure the band/account/site and preview.")
-                              : qsTr("Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4")
+                              : qsTr("Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4")
                                 .arg(root.vuccResult.eligible.length || 0).arg(root.vuccTarget)
                                 .arg(root.vuccResult.exclusions.length || 0)
                                 .arg(root.vuccResult.officialRulesVerified ? qsTr("yes") : qsTr("no"))

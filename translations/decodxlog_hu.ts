@@ -772,8 +772,8 @@
         <translation>Megerősített bizonyíték szükséges; állítsd be a sávot, a fiókot és a helyet, majd nézd meg az előnézetet.</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>Érvényes GRID4: %1 / %2 · kizárva: %3 · külső szabályok ellenőrizve: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>

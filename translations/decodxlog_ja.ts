@@ -772,8 +772,8 @@
         <translation>確認済みの証拠が必要です。バンド・アカウント・運用場所を設定してプレビューしてください。</translation>
     </message>
     <message>
-        <source>Eligible GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
-        <translation>有効な GRID4: %1 / %2 · 除外: %3 · 外部ルール検証済み: %4</translation>
+        <source>Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>yes</source>
