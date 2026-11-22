@@ -59,6 +59,28 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void fingerprintCompatibilityFixture()
+    {
+        const QString path = qEnvironmentVariable("DECODXLOG_FINGERPRINT_FIXTURE");
+        const QString mode = qEnvironmentVariable("DECODXLOG_FINGERPRINT_MODE");
+        if (path.isEmpty() || mode.isEmpty()) QSKIP("explicit compatibility fixture only");
+        LogDatabase db;
+        QVERIFY2(db.open(path), qPrintable(db.lastError()));
+        if (mode == QStringLiteral("create")) {
+            const auto imported = db.importAdif(
+                "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<LOTW_QSL_RCVD:1>Y<EOR>"
+                "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<USERDEF1:3>abc<EOR>");
+            QCOMPARE(imported.inserted, 2);
+        } else {
+            QCOMPARE(mode, QStringLiteral("verify"));
+            const auto undone = db.undoLatestImport();
+            QCOMPARE(undone.deleted, 2);
+            QCOMPARE(undone.changed, 0);
+            QCOMPARE(undone.failed, 0);
+            QCOMPARE(db.qsoCount(), 0);
+        }
+    }
+
     void importedQsoJournalSurvivesRestartAndExcludesIndependentQsos()
     {
         QTemporaryDir dir;

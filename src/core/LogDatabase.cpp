@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <array>
 #include <limits>
+#include <memory>
 
 namespace decolog::core {
 
@@ -972,34 +973,53 @@ QString LogDatabase::snapshotJson(qint64 id) const
     return QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact));
 }
 
-QString LogDatabase::importFingerprint(qint64 id) const
-{
-    QJsonArray parts;
-    const QStringList queries{
-        QStringLiteral("SELECT * FROM qso WHERE id=?"),
-        QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,last_error,via FROM qsl_status WHERE qso_id=? ORDER BY service"),
-        QStringLiteral("SELECT a.id,a.sha256,a.filename,a.mime,a.size,a.created_at FROM qsl_attachment_qso x "
-                       "JOIN qsl_attachment a ON a.id=x.attachment_id WHERE x.qso_id=? ORDER BY a.id"),
-        QStringLiteral("SELECT id,field,previous_value,value,source,kind,acquired_at,valid_from,valid_to FROM qso_enrichment WHERE qso_id=? ORDER BY id")
-    };
-    for (const QString& sql : queries) {
-        QSqlQuery q(connection());
-        q.prepare(sql);
-        q.addBindValue(id);
-        if (!q.exec()) return {};
-        QJsonArray rows;
-        const int columns = q.record().count();
-        while (q.next()) {
-            QJsonArray row;
-            for (int i = 0; i < columns; ++i) row.append(QJsonValue::fromVariant(q.value(i)));
-            rows.append(row);
-        }
-        if (sql == queries.first() && rows.size() != 1) return {};
-        parts.append(rows);
+namespace {
+class ImportFingerprintReader {
+public:
+    explicit ImportFingerprintReader(const QSqlDatabase& db)
+        : m_queries{QSqlQuery(db), QSqlQuery(db), QSqlQuery(db), QSqlQuery(db)}
+    {
+        const std::array<QString, 4> statements{
+            QStringLiteral("SELECT * FROM qso WHERE id=?"),
+            QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,last_error,via FROM qsl_status WHERE qso_id=? ORDER BY service"),
+            QStringLiteral("SELECT a.id,a.sha256,a.filename,a.mime,a.size,a.created_at FROM qsl_attachment_qso x "
+                           "JOIN qsl_attachment a ON a.id=x.attachment_id WHERE x.qso_id=? ORDER BY a.id"),
+            QStringLiteral("SELECT id,field,previous_value,value,source,kind,acquired_at,valid_from,valid_to FROM qso_enrichment WHERE qso_id=? ORDER BY id")
+        };
+        for (size_t i = 0; i < statements.size(); ++i)
+            if (!m_queries[i].prepare(statements[i])) m_ready = false;
     }
-    return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(parts).toJson(QJsonDocument::Compact),
-                                                        QCryptographicHash::Sha256).toHex());
-}
+
+    QString read(qint64 id)
+    {
+        if (!m_ready) return {};
+        QJsonArray parts;
+        for (size_t index = 0; index < m_queries.size(); ++index) {
+            QSqlQuery& q = m_queries[index];
+            q.bindValue(0, id);
+            if (!q.exec()) return {};
+            QJsonArray rows;
+            const int columns = q.record().count();
+            while (q.next()) {
+                QJsonArray row;
+                for (int i = 0; i < columns; ++i) row.append(QJsonValue::fromVariant(q.value(i)));
+                rows.append(row);
+            }
+            q.finish();
+            if (index == 0 && rows.size() != 1) return {};
+            parts.append(rows);
+        }
+        return QString::fromLatin1(QCryptographicHash::hash(QJsonDocument(parts).toJson(QJsonDocument::Compact),
+                                                            QCryptographicHash::Sha256).toHex());
+    }
+private:
+    std::array<QSqlQuery, 4> m_queries;
+    bool m_ready{true};
+};
+} // namespace
+
+/* Fingerprints retain the schema-13 JSON representation; only SQL statements
+ * are reused. Older stored hashes therefore remain valid. */
 
 InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 stationProfileId,
                                     const QString& reason)
@@ -2012,6 +2032,17 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
         ? QUuid::createUuid().toString(QUuid::WithoutBraces) : QString();
 
     QSqlDatabase db = connection();
+    std::unique_ptr<ImportFingerprintReader> fingerprintReader;
+    QSqlQuery batchJournal(db), itemJournal(db);
+    if (!importUuid.isEmpty()) {
+        fingerprintReader = std::make_unique<ImportFingerprintReader>(db);
+        if (!batchJournal.prepare(QStringLiteral("INSERT OR IGNORE INTO import_batch(uuid, created_at) VALUES (?, ?)"))
+            || !itemJournal.prepare(QStringLiteral("INSERT INTO import_qso(batch_id, qso_id, qso_uuid, imported_revision, baseline_hash) "
+                "SELECT b.id, q.id, q.uuid, q.revision, ? FROM import_batch b, qso q WHERE b.uuid = ? AND q.id = ?"))) {
+            result.errors << QStringLiteral("Cannot prepare import journal");
+            return result;
+        }
+    }
     int done = 0;
     while (done < total) {
         const int end = total - done > batch ? done + batch : total;
@@ -2069,24 +2100,28 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
             }
             InsertResult r = insertQso(record, source, programId, false, stationProfileId);
             if (r.status == InsertResult::Status::Inserted && !importUuid.isEmpty()) {
-                QSqlQuery journal(db);
-                journal.prepare(QStringLiteral("INSERT OR IGNORE INTO import_batch(uuid, created_at) VALUES (?, ?)"));
-                journal.addBindValue(importUuid);
-                journal.addBindValue(nowIso());
-                bool journalOk = journal.exec();
+                batchJournal.bindValue(0, importUuid);
+                batchJournal.bindValue(1, nowIso());
+                bool journalOk = batchJournal.exec();
+                QString journalError = batchJournal.lastError().text();
+                batchJournal.finish();
                 if (journalOk) {
-                    const QString fingerprint = importFingerprint(r.id);
+                    const QString fingerprint = fingerprintReader->read(r.id);
                     journalOk = !fingerprint.isEmpty();
-                    journal.prepare(QStringLiteral("INSERT INTO import_qso(batch_id, qso_id, qso_uuid, imported_revision, baseline_hash) "
-                        "SELECT b.id, q.id, q.uuid, q.revision, ? FROM import_batch b, qso q WHERE b.uuid = ? AND q.id = ?"));
-                    journal.addBindValue(fingerprint);
-                    journal.addBindValue(importUuid);
-                    journal.addBindValue(r.id);
-                    journalOk = journalOk && journal.exec() && journal.numRowsAffected() == 1;
+                    itemJournal.bindValue(0, fingerprint);
+                    itemJournal.bindValue(1, importUuid);
+                    itemJournal.bindValue(2, r.id);
+                    if (journalOk) {
+                        journalOk = itemJournal.exec() && itemJournal.numRowsAffected() == 1;
+                        journalError = itemJournal.lastError().text();
+                    } else {
+                        journalError = QStringLiteral("fingerprint unavailable");
+                    }
+                    itemJournal.finish();
                 }
                 if (!journalOk) {
                     r.status = InsertResult::Status::Error;
-                    r.message = QStringLiteral("Cannot record imported QSO: %1").arg(journal.lastError().text());
+                    r.message = QStringLiteral("Cannot record imported QSO: %1").arg(journalError);
                 }
             }
             if (r.status != InsertResult::Status::Inserted
@@ -2141,6 +2176,7 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
 {
     ImportUndoResult out;
     QSqlDatabase db = connection();
+    ImportFingerprintReader fingerprintReader(db);
     QSqlQuery batch(db);
     if (!batch.exec(QStringLiteral("SELECT id FROM import_batch ORDER BY id DESC LIMIT 1"))) {
         out.errors << batch.lastError().text();
@@ -2184,7 +2220,7 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
             continue;
         }
         if (item.fingerprint.isEmpty() || current->revision != item.revision
-            || importFingerprint(item.id) != item.fingerprint) {
+            || fingerprintReader.read(item.id) != item.fingerprint) {
             ++out.changed;
             db.rollback();
             continue;
