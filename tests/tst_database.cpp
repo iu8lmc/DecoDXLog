@@ -238,6 +238,29 @@ private slots:
         QVERIFY(!second.meta(independent.id)->deleted);
     }
 
+    void cancelUndoKeepsUnprocessedItemsForRetry()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif(
+            "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted, 2);
+        QList<int> observed;
+        const auto interrupted = db.undoLatestImport([&observed](int done, int) {
+            observed << done;
+            return done < 1;
+        });
+        QVERIFY(interrupted.cancelled);
+        QCOMPARE(interrupted.deleted, 1);
+        QCOMPARE(observed, (QList<int>{0, 1}));
+        QVERIFY(db.meta(imported.insertedIds.first())->deleted);
+        QVERIFY(!db.meta(imported.insertedIds.last())->deleted);
+        const auto retry = db.undoLatestImport();
+        QCOMPARE(retry.alreadyDeleted, 1);
+        QCOMPARE(retry.deleted, 1);
+    }
+
     void upgradeFromSchema11PreservesExistingQso()
     {
         QTemporaryDir dir;

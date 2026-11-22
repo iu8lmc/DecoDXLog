@@ -394,7 +394,9 @@ GlassPanel {
             spacing: 6
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: qsTr("Importing %1%").arg(Math.round(decolog.importProgress * 100))
+                text: decolog.importUndoRunning
+                      ? qsTr("Undoing import %1%").arg(Math.round(decolog.importProgress * 100))
+                      : qsTr("Importing %1%").arg(Math.round(decolog.importProgress * 100))
                 color: Theme.accentColor
                 font.family: Theme.monoFamily
                 font.pixelSize: 11
@@ -405,6 +407,11 @@ GlassPanel {
                 from: 0
                 to: 1
                 value: Math.max(0, decolog.importProgress)
+            }
+            GlassButton {
+                visible: decolog.importUndoRunning
+                text: qsTr("Cancel")
+                onClicked: decolog.cancelImportUndo()
             }
         },
         // Un ordine o un filtro su un log grande si preparano da parte.

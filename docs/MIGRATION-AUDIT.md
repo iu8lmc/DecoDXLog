@@ -8,9 +8,12 @@ a private in-memory copy of the current log; the real database is not touched.
 
 The committed import report also records inserted IDs, duplicates, invalid
 records, incomplete UTC, QSL-bearing records and unmapped fields. Imports are
-performed in batches and the controller retains the inserted IDs so the last
-import can be undone: the QSO rows are moved to recycle/history rather than
-being hard-deleted.
+performed in batches and a per-log journal records the identity and baseline of
+each new QSO. The File menu offers undo of the latest recorded import, after
+confirmation. The operation runs in the background and moves unchanged QSO to
+recycle/history; modified, missing and older entries without a baseline are
+left for review. Cancellation stops between QSO and a retry can continue.
+Imports made before this journal cannot be recovered through this action.
 
 Verified locally:
 

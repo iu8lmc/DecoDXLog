@@ -11,6 +11,7 @@ Rectangle {
     signal setupRequested()
     signal logsRequested()
     signal importRequested()
+    signal undoImportRequested()
     signal exportRequested()
     signal exportPeriodRequested()
     signal spotRequested()
@@ -171,6 +172,7 @@ Rectangle {
                 StyledMenuItem { text: qsTr("Decodium traffic monitor…"); onTriggered: root.trafficRequested() }
                 MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSoft } }
                 StyledMenuItem { text: qsTr("Import a log (ADIF, CSV, N1MM)…"); onTriggered: root.importRequested() }
+                StyledMenuItem { text: qsTr("Undo last import…"); enabled: decolog.importProgress < 0; onTriggered: root.undoImportRequested() }
                 StyledMenuItem { text: qsTr("Export ADIF…"); onTriggered: root.exportRequested() }
                 StyledMenuItem { text: qsTr("Export a period (from… to…)…"); onTriggered: root.exportPeriodRequested() }
                 StyledMenuItem { text: qsTr("Open the log folder"); onTriggered: root.logFolderRequested() }

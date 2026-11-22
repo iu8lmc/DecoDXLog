@@ -3998,6 +3998,10 @@ A Decodiumban: Settings → Reporting → UDP Server 127.0.0.1, port: %1, és &q
         <translation>%1 kijelölve</translation>
     </message>
     <message>
+        <source>Undoing import %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Importing %1%</source>
         <translation>Importálás %1%</translation>
     </message>
@@ -4773,6 +4777,14 @@ Nyisd meg egyszer a DecoDXLog-ban a frissítéshez.</translation>
     <message>
         <source>All files (*)</source>
         <translation>Minden fájl (*)</translation>
+    </message>
+    <message>
+        <source>Undo last import</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move unchanged QSO from the latest recorded import to the recycle history? Changed, unavailable and older unverified entries remain in the log for review.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Import preview</source>
@@ -9760,6 +9772,10 @@ A további mezők megmaradnak: %8</translation>
         <translation>Decodium forgalomfigyelő…</translation>
     </message>
     <message>
+        <source>Undo last import…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Import a log (ADIF, CSV, N1MM)…</source>
         <translation>Napló importálása (ADIF, CSV, N1MM)…</translation>
     </message>
@@ -11773,6 +11789,18 @@ A további mezők megmaradnak: %8</translation>
     </message>
     <message>
         <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo cancelled; unprocessed QSO remain available for retry.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No recorded import is available to undo.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

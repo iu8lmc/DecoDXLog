@@ -4008,6 +4008,10 @@ I Decodium: Settings → Reporting → UDP Server 127.0.0.1, port %1, og &quot;A
         <translation>%1 valgt</translation>
     </message>
     <message>
+        <source>Undoing import %1%</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Importing %1%</source>
         <translation>Importerer %1%</translation>
     </message>
@@ -4785,6 +4789,14 @@ Open it once in DecoDXLog to bring it up to date.</source>
     <message>
         <source>All files (*)</source>
         <translation>Alle filer (*)</translation>
+    </message>
+    <message>
+        <source>Undo last import</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Move unchanged QSO from the latest recorded import to the recycle history? Changed, unavailable and older unverified entries remain in the log for review.</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <source>Import preview</source>
@@ -9783,6 +9795,10 @@ Ekstra felter bevares: %8</translation>
         <translation>Decodium-trafikmonitor…</translation>
     </message>
     <message>
+        <source>Undo last import…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Import a log (ADIF, CSV, N1MM)…</source>
         <translation>Importér en log (ADIF, CSV, N1MM)…</translation>
     </message>
@@ -11813,6 +11829,18 @@ Ekstra felter bevares: %8</translation>
     </message>
     <message>
         <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo finished on a log that is no longer open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Import undo cancelled; unprocessed QSO remain available for retry.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No recorded import is available to undo.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

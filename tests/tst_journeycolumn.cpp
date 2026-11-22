@@ -46,6 +46,30 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void importUndoDialogAcceptAndRejectAcrossRestart()
+    {
+        for (const bool accept : {false, true}) {
+            QTemporaryDir dir; QVERIFY(dir.isValid());
+            qint64 importedId = 0, independentId = 0;
+            {
+                decolog::core::LogDatabase db;
+                QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+                const auto imported = db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>");
+                QCOMPARE(imported.inserted, 1);
+                importedId = imported.insertedIds.first();
+                independentId = db.insertQso({{"CALL", "K1BBB"}, {"QSO_DATE", "20260101"},
+                    {"TIME_ON", "1000"}, {"BAND", "20m"}, {"MODE", "CW"}}, "radio").id;
+                QVERIFY(independentId > 0);
+            }
+            QByteArray output;
+            QVERIFY2(launch(dir, accept ? QStringLiteral("undoimport") : QStringLiteral("undoimport:cancel"), output), output.constData());
+            decolog::core::LogDatabase reopened;
+            QVERIFY(reopened.open(dir.filePath(QStringLiteral("test.sqlite"))));
+            QCOMPARE(reopened.meta(importedId)->deleted, accept);
+            QVERIFY(!reopened.meta(independentId)->deleted);
+        }
+    }
+
     void migratesLegacyLayoutAndPersistsActualHeaderDrag()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

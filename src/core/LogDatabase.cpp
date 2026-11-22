@@ -2137,7 +2137,7 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
     return result;
 }
 
-ImportUndoResult LogDatabase::undoLatestImport()
+ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int)>& progress)
 {
     ImportUndoResult out;
     QSqlDatabase db = connection();
@@ -2160,7 +2160,13 @@ ImportUndoResult LogDatabase::undoLatestImport()
     while (items.next()) rows << Item{items.value(0).toLongLong(), items.value(1).toString(),
                                        items.value(2).toInt(), items.value(3).toString()};
     items.finish();
+    int done = 0;
     for (const Item& item : std::as_const(rows)) {
+        if (progress && !progress(done, int(rows.size()))) {
+            out.cancelled = true;
+            break;
+        }
+        ++done;
         if (!db.transaction()) {
             ++out.failed;
             out.errors << db.lastError().text();
@@ -2197,6 +2203,7 @@ ImportUndoResult LogDatabase::undoLatestImport()
         }
         ++out.deleted;
     }
+    if (!out.cancelled && progress) progress(done, int(rows.size()));
     return out;
 }
 

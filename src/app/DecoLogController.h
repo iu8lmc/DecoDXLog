@@ -269,6 +269,7 @@ class DecoLogController : public QObject {
 
     // L'importazione ADIF gira su un altro filo: da 0 a 1 mentre va, -1 ferma.
     Q_PROPERTY(double importProgress READ importProgress NOTIFY importChanged)
+    Q_PROPERTY(bool importUndoRunning READ importUndoRunning NOTIFY importChanged)
     // Anche una modifica in blocco: da 0 a 1 mentre va, -1 ferma.
     Q_PROPERTY(double bulkProgress READ bulkProgress NOTIFY bulkChanged)
     Q_PROPERTY(bool exportBusy READ exportBusy NOTIFY exportBusyChanged)
@@ -644,6 +645,7 @@ public:
     Q_INVOKABLE void cancelLotw() { m_lotw.cancel(); }
 
     double importProgress() const { return m_importProgress; }
+    bool importUndoRunning() const { return m_importUndoRunning; }
     double bulkProgress() const { return m_bulkProgress; }
     bool exportBusy() const { return m_exportsPending > 0; }
     QVariantMap duplicates() const { return m_duplicates; }
@@ -741,6 +743,7 @@ public:
     Q_INVOKABLE void importAdif(const QUrl& file);
     Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false, const QString& stationCall = {});
     Q_INVOKABLE bool undoLastImport();
+    Q_INVOKABLE void cancelImportUndo();
     Q_INVOKABLE QVariantList qsoEnrichments(qint64 qsoId) const;
     Q_INVOKABLE bool undoQsoEnrichment(qint64 qsoId, const QString& field);
     Q_INVOKABLE void exportAdif(const QUrl& file);
@@ -1146,6 +1149,8 @@ private:
     // L'ultima richiesta di statistiche: le altre, ancora in coda, si saltano.
     std::shared_ptr<std::atomic<int>> m_statsLatest{std::make_shared<std::atomic<int>>(0)};
     double m_importProgress{-1};
+    bool m_importUndoRunning{false};
+    std::shared_ptr<std::atomic_bool> m_importUndoCancel;
     void finishImport(const QString& path, const core::ImportResult& result);
     double m_bulkProgress{-1};
     bool m_udpResendActive{false};

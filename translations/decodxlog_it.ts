@@ -4020,6 +4020,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
         <translation>%1 scelti</translation>
     </message>
     <message>
+        <source>Undoing import %1%</source>
+        <translation>Annullamento importazione %1%</translation>
+    </message>
+    <message>
         <source>Importing %1%</source>
         <translation>Importo %1%</translation>
     </message>
@@ -4801,6 +4805,14 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
     <message>
         <source>All files (*)</source>
         <translation>Tutti i file (*)</translation>
+    </message>
+    <message>
+        <source>Undo last import</source>
+        <translation>Annulla ultima importazione</translation>
+    </message>
+    <message>
+        <source>Move unchanged QSO from the latest recorded import to the recycle history? Changed, unavailable and older unverified entries remain in the log for review.</source>
+        <translation>Spostare nel cestino i QSO non modificati dell’ultima importazione registrata? I QSO modificati, non disponibili e le vecchie voci non verificate restano nel log per la revisione.</translation>
     </message>
     <message>
         <source>Import preview</source>
@@ -9815,6 +9827,10 @@ Campi extra conservati: %8</translation>
         <translation>Monitor del traffico Decodium…</translation>
     </message>
     <message>
+        <source>Undo last import…</source>
+        <translation>Annulla ultima importazione…</translation>
+    </message>
+    <message>
         <source>Import a log (ADIF, CSV, N1MM)…</source>
         <translation>Importa un log (ADIF, CSV, N1MM)…</translation>
     </message>
@@ -11902,6 +11918,18 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.</source>
         <translation>Annullamento importazione: %1 modificati, %2 non disponibili, %3 non riusciti. Esamina questi QSO prima di procedere.</translation>
+    </message>
+    <message>
+        <source>Import undo finished on a log that is no longer open</source>
+        <translation>L’annullamento è terminato su un log non più aperto</translation>
+    </message>
+    <message>
+        <source>Import undo cancelled; unprocessed QSO remain available for retry.</source>
+        <translation>Annullamento interrotto; i QSO non elaborati restano disponibili per un nuovo tentativo.</translation>
+    </message>
+    <message>
+        <source>No recorded import is available to undo.</source>
+        <translation>Non ci sono importazioni registrate da annullare.</translation>
     </message>
     <message>
         <source>Undid the last import: %1 QSO(s) moved to the recycle history.</source>

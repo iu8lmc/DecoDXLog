@@ -1248,6 +1248,13 @@ RoundedWindow {
         }
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
+        else if (what[0] === "undoimport") {
+            undoImportDialog.open()
+            Qt.callLater(function () {
+                if (what[1] === "cancel") undoImportDialog.reject()
+                else undoImportDialog.accept()
+            })
+        }
         else if (what[0] === "qso") { openQso(parseInt(what[1])); if (what[2]) qsoDialog.currentTab = parseInt(what[2]) }
         else if (what[0] === "profiles") profilesDialog.open()
         else if (what[0] === "setup") { setupDialog.page = parseInt(what[1] || "3"); setupDialog.open(); if (what[2] === "end") Qt.callLater(setupDialog.scrollToBottom); else if (what[2]) { const y = parseInt(what[2]); Qt.callLater(() => setupDialog.scrollTo(y)) } }
@@ -1871,6 +1878,32 @@ RoundedWindow {
     }
     property url pendingImport
     property var importPreview: ({})
+    DialogFrame {
+        id: undoImportDialog
+        title: qsTr("Undo last import")
+        dialogKey: "undo-import"
+        dotColor: Theme.warningColor
+        width: 560
+        height: 220
+        onAccepted: decolog.undoLastImport()
+        body: ColumnLayout {
+            anchors.margins: 16
+            spacing: 10
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: qsTr("Move unchanged QSO from the latest recorded import to the recycle history? Changed, unavailable and older unverified entries remain in the log for review.")
+                color: Theme.textPrimary
+            }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                GlassButton { text: qsTr("Cancel"); onClicked: undoImportDialog.reject() }
+                GlassButton { text: qsTr("Undo last import"); onClicked: undoImportDialog.accept() }
+            }
+        }
+    }
     // Una finestra del programma, come le altre: un Dialog di stile resta
     // chiaro anche con i temi scuri (Ocean Blue) e il testo non si legge.
     DialogFrame {
@@ -2455,6 +2488,7 @@ RoundedWindow {
             onSetupRequested: setupDialog.open()
             onLogsRequested: logsDialog.openDialog()
             onImportRequested: importDialog.open()
+            onUndoImportRequested: undoImportDialog.open()
             onExportRequested: exportDialog.open()
             onExportPeriodRequested: exportPeriodDialog.openDialog()
             onSpotRequested: spotDialog.openCurrent()

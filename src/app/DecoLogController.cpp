@@ -5222,23 +5222,74 @@ void DecoLogController::finishImport(const QString& path, const ImportResult& r)
 
 bool DecoLogController::undoLastImport()
 {
-    if (m_importProgress >= 0)
+    const QString dbPath = m_db.path();
+    if (m_importProgress >= 0 || !m_db.isOpen() || dbPath.isEmpty() || dbPath == QLatin1String(":memory:"))
         return false;
-    const auto result = m_db.undoLatestImport();
-    if (result.changed || result.unavailable || result.failed || !result.errors.isEmpty())
-        addActivity(QStringLiteral("IMPORT"),
+    m_importUndoCancel = std::make_shared<std::atomic_bool>(false);
+    const auto cancel = m_importUndoCancel;
+    m_importUndoRunning = true;
+    m_importProgress = 0;
+    emit importChanged();
+    QPointer<DecoLogController> self(this);
+    m_importPool.start([self, dbPath, cancel] {
+        core::ImportUndoResult result;
+        core::LogDatabase db;
+        if (!db.open(dbPath)) {
+            result.errors << db.lastError();
+            result.failed = 1;
+        } else {
+            int lastPercent = -1;
+            result = db.undoLatestImport([self, cancel, &lastPercent](int done, int total) {
+                const int percent = total ? done * 100 / total : 100;
+                if (percent != lastPercent) {
+                    lastPercent = percent;
+                    QMetaObject::invokeMethod(self.data(), [self, percent] {
+                        if (self && self->m_importUndoRunning) {
+                            self->m_importProgress = percent / 100.0;
+                            emit self->importChanged();
+                        }
+                    }, Qt::QueuedConnection);
+                }
+                return !cancel->load();
+            });
+        }
+        QMetaObject::invokeMethod(self.data(), [self, dbPath, result] {
+            if (!self) return;
+            self->m_importProgress = -1;
+            self->m_importUndoRunning = false;
+            self->m_importUndoCancel.reset();
+            emit self->importChanged();
+            if (!self->m_db.isOpen() || self->m_db.path() != dbPath) {
+                self->addActivity(QStringLiteral("IMPORT"), tr("Import undo finished on a log that is no longer open"), QStringLiteral("warning"));
+                return;
+            }
+            if (result.changed || result.unavailable || result.failed || !result.errors.isEmpty())
+                self->addActivity(QStringLiteral("IMPORT"),
                     tr("Import undo: %1 changed, %2 unavailable, %3 failed. Review these QSO before proceeding.")
                         .arg(result.changed).arg(result.unavailable).arg(result.failed), QStringLiteral("warning"));
-    if (result.deleted == 0)
-        return false;
-    addActivity(QStringLiteral("IMPORT"), tr("Undid the last import: %1 QSO(s) moved to the recycle history.")
-                                              .arg(result.deleted), QStringLiteral("warning"));
-    m_model->reload();
-    m_profiles->reload();
-    emit logChanged();
-    m_decoLink.resendSnapshot();
-    refreshCallInfo();
+            for (const QString& error : result.errors)
+                self->addActivity(QStringLiteral("IMPORT"), error, QStringLiteral("warning"));
+            if (result.cancelled)
+                self->addActivity(QStringLiteral("IMPORT"), tr("Import undo cancelled; unprocessed QSO remain available for retry."), QStringLiteral("warning"));
+            if (!result.batchId && result.errors.isEmpty())
+                self->addActivity(QStringLiteral("IMPORT"), tr("No recorded import is available to undo."), QStringLiteral("warning"));
+            if (result.deleted > 0) {
+                self->addActivity(QStringLiteral("IMPORT"), tr("Undid the last import: %1 QSO(s) moved to the recycle history.")
+                                      .arg(result.deleted), QStringLiteral("warning"));
+                self->m_model->reload();
+                self->m_profiles->reload();
+                emit self->logChanged();
+                self->m_decoLink.resendSnapshot();
+                self->refreshCallInfo();
+            }
+        }, Qt::QueuedConnection);
+    });
     return true;
+}
+
+void DecoLogController::cancelImportUndo()
+{
+    if (m_importUndoCancel) m_importUndoCancel->store(true);
 }
 
 QVariantList DecoLogController::qsoEnrichments(qint64 qsoId) const
