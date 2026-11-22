@@ -14,7 +14,14 @@ DialogFrame {
     // Optional explicit handoff; applied only when opening a fresh dialog.
     property string initialCall: ""
     property string initialName: ""
+    property string initialSatellite: ""
+    property string initialTxMHz: ""
+    property string initialRxMHz: ""
+    property bool trackerPrepared: false
     readonly property string enteredCallForProbe: callField.text
+    readonly property string initialTxForProbe: freqField.text
+    readonly property string initialRxForProbe: rxFreqField.text
+    readonly property string initialSatelliteForProbe: satNameField.text
     readonly property var stationProfile: profileId > 0
                                            ? decolog.stationProfiles.byId(profileId)
                                            : decolog.stationProfiles.activeProfile
@@ -210,12 +217,22 @@ DialogFrame {
 
     onOpened: {
         clearAll()
+        root.trackerPrepared = root.initialSatellite.length > 0
         if (root.initialCall.length > 0) callField.text = root.initialCall
         if (root.initialName.length > 0) nameField.text = root.initialName
         root.initialCall = ""
         root.initialName = ""
         if (decolog.shownFrequency.length)
             freqField.text = decolog.shownFrequency
+        if (root.initialSatellite.length > 0) {
+            satNameField.text = root.initialSatellite
+            propModeBox.currentIndex = propModeBox.find("SAT")
+        }
+        if (root.initialTxMHz.length > 0) freqField.text = root.initialTxMHz
+        if (root.initialRxMHz.length > 0) rxFreqField.text = root.initialRxMHz
+        root.initialSatellite = ""
+        root.initialTxMHz = ""
+        root.initialRxMHz = ""
         const pwr = root.stationProfile.defaultTxPwr
         pwrField.text = pwr > 0 ? String(pwr) : ""
     }
@@ -257,6 +274,13 @@ DialogFrame {
     }
 
     body: ColumnLayout {
+        Text {
+            Layout.fillWidth: true
+            visible: root.trackerPrepared
+            text: qsTr("Tracker frequencies are a fixed snapshot; review them before saving.")
+            color: Theme.warningColor
+            wrapMode: Text.Wrap
+        }
         spacing: 12
 
         GridLayout {

@@ -74,6 +74,26 @@ TestCase {
         decolog.rig.connected = false
     }
 
+    function test_trackerDraftDoesNotTuneConnectedRig() {
+        decolog.tuneCalls = 0
+        decolog.rig.connected = true
+        const form = createTemporaryObject(dialogComponent, testCase)
+        verify(form !== null)
+        form.initialSatellite = "FO-29"
+        form.initialTxMHz = "145.998596"
+        form.initialRxMHz = "435.004184"
+        form.open()
+        compare(findChild(form, "manualTxFrequency").text, "145.998596")
+        compare(findChild(form, "manualRxFrequency").text, "435.004184")
+        compare(findChild(form, "manualSatellite").text, "FO-29")
+        compare(decolog.tuneCalls, 0)
+        form.submit(true)
+        compare(decolog.submitted.prop_mode, "SAT")
+        compare(decolog.submitted.freq, "145.998596")
+        compare(decolog.submitted.freq_rx, "435.004184")
+        decolog.rig.connected = false
+    }
+
     function test_manualLoggingKeys_data() {
         const rows = []
         for (const full of [false, true]) {

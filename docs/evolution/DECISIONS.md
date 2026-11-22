@@ -28,3 +28,5 @@
 - G09 PREDICT UDP snapshot client is read-only, requires a numeric IP address, and verifies tracking mode both before and after the sample. A TLE epoch is exposed separately; the snapshot does not itself prove accurate orbital data or a continuously updating server. The core is not yet wired into desktop workflows.
 
 - G09 PREDICT pass requests accept a strict ASCII satellite-name allowlist because upstream PREDICT 2.2.x invokes a shell. Pass streams are bounded and require ordered points, plausible horizon endpoints and unchanged TLE; these checks cannot guarantee UDP completeness and may reject slow passes.
+
+- G09 preview scales PREDICT normalized 100 MHz Doppler by the user-entered nominal downlink, and applies the opposite sign to nominal uplink; it never tunes. An explicit draft requires a local reading at most 10 seconds old and a non-future TLE at most 14 days old. These bounds are cautionary and do not establish orbital or frequency correctness.

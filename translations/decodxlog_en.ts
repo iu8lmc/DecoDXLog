@@ -5175,6 +5175,10 @@ Extra fields are preserved: %8</source>
         <source>LOG QSO</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Tracker frequencies are a fixed snapshot; review them before saving.</source>
+        <translation>Tracker frequencies are a fixed snapshot; review them before saving.</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
@@ -14984,6 +14988,65 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Orbital data may be stale; verify before use.</source>
         <translation>Orbital data may be stale; verify before use.</translation>
+    </message>
+    <message>
+        <source>Read the selected satellite first.</source>
+        <translation>Read the selected satellite first.</translation>
+    </message>
+    <message>
+        <source>Finish or close the existing satellite QSO draft first.</source>
+        <translation>Finish or close the existing satellite QSO draft first.</translation>
+    </message>
+    <message>
+        <source>Review the draft before saving; no radio command was sent.</source>
+        <translation>Review the draft before saving; no radio command was sent.</translation>
+    </message>
+    <message>
+        <source>Nominal uplink TX MHz</source>
+        <translation>Nominal uplink TX MHz</translation>
+    </message>
+    <message>
+        <source>Nominal downlink RX MHz</source>
+        <translation>Nominal downlink RX MHz</translation>
+    </message>
+    <message>
+        <source>Preview Doppler</source>
+        <translation>Preview Doppler</translation>
+    </message>
+    <message>
+        <source>Corrected TX %1 MHz · RX %2 MHz</source>
+        <translation>Corrected TX %1 MHz · RX %2 MHz</translation>
+    </message>
+    <message>
+        <source>Prepare QSO…</source>
+        <translation>Prepare QSO…</translation>
+    </message>
+    <message>
+        <source>Tracker reading expired; read it again.</source>
+        <translation>Tracker reading expired; read it again.</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::PredictTracker</name>
+    <message>
+        <source>A current PREDICT reading is required</source>
+        <translation>A current PREDICT reading is required</translation>
+    </message>
+    <message>
+        <source>Enter valid positive TX and RX frequencies in MHz</source>
+        <translation>Enter valid positive TX and RX frequencies in MHz</translation>
+    </message>
+    <message>
+        <source>The tracker reading has expired; read it again</source>
+        <translation>The tracker reading has expired; read it again</translation>
+    </message>
+    <message>
+        <source>Orbital data is old or dated in the future</source>
+        <translation>Orbital data is old or dated in the future</translation>
+    </message>
+    <message>
+        <source>Doppler correction produced an invalid frequency</source>
+        <translation>Doppler correction produced an invalid frequency</translation>
     </message>
 </context>
 </TS>

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import datetime
 
 class Fixture(socketserver.BaseRequestHandler):
     def handle(self):
@@ -25,7 +26,9 @@ class Fixture(socketserver.BaseRequestHandler):
         elif command == 'GET_DOPPLER OSCAR-7':
             reply = '961.742249\n'
         elif command == 'GET_TLE OSCAR-7':
-            reply = 'OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n'
+            now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+            epoch = f'{now.year % 100:02}{now.timetuple().tm_yday:03}.00000000' if getattr(self.server, 'fresh', False) else '18126.90857181'
+            reply = f'OSCAR-7\n1 07530U 74089B   {epoch} -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n'
         elif command.startswith('PREDICT "OSCAR-7" '):
             start = int(command.rsplit(' ', 1)[1])
             base = 1800000180 if start >= 1800000180 else 1800000000
@@ -145,3 +148,32 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
             assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
         server.shutdown()
         print(f'PASS pass: {server.commands}')
+
+for fresh in (False, True):
+    with tempfile.TemporaryDirectory(prefix='decolog-predict-draft-') as tmp:
+        root = pathlib.Path(tmp)
+        with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
+            server.commands = []
+            server.stopped = False
+            server.fresh = fresh
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            env = os.environ.copy()
+            env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
+                       DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='2800')
+            command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
+                       '--db', str(root/'test.sqlite'), '--port', '0', '--show',
+                       f'predictdraft:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
+            output = result.stdout + result.stderr
+            expected = ('PROBE predictDraft visible=true tx=145.998596 rx=435.004184 sat=OSCAR-7' if fresh
+                        else 'PROBE predictDraft visible=false')
+            if result.returncode or expected not in output:
+                raise SystemExit(f'FAIL draft fresh={fresh}: {output}; requests={server.commands}')
+            if fresh and 'PROBE predictDraftPreserved=true notice=true' not in output:
+                raise SystemExit(f'FAIL draft overwrite: {output}')
+            with sqlite3.connect(root/'test.sqlite') as db:
+                assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
+            if server.commands != ['GET_MODE', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']:
+                raise SystemExit(f'Unexpected draft commands: {server.commands}')
+            server.shutdown()
+            print(f'PASS draft fresh={fresh}')

@@ -76,6 +76,7 @@ class TestPredictTracker : public QObject {
         QVERIFY(tracker.metaObject()->indexOfProperty("snapshot") >= 0);
         QVERIFY(tracker.metaObject()->indexOfProperty("busy") >= 0);
         QVERIFY(tracker.metaObject()->indexOfMethod("request(QString,int,QString)") >= 0);
+        QVERIFY(tracker.metaObject()->indexOfMethod("correctedFrequencies(double,double)") >= 0);
     }
     void actualPredictServerWhenConfigured()
     {
@@ -98,6 +99,12 @@ class TestPredictTracker : public QObject {
         QUdpSocket server;
         QVERIFY(server.bind(QHostAddress::LocalHost, 0));
         QStringList commands;
+        const QDate epochDate = QDateTime::currentDateTimeUtc().date().addDays(-1);
+        QByteArray epoch = QStringLiteral("%1%2.00000000")
+                               .arg(epochDate.year() % 100, 2, 10, QLatin1Char('0'))
+                               .arg(epochDate.dayOfYear(), 3, 10, QLatin1Char('0'))
+                               .toLatin1();
+        QByteArray doppler = "961.742249\n";
         connect(&server, &QUdpSocket::readyRead, &server, [&] {
             while (server.hasPendingDatagrams()) {
                 QByteArray request;
@@ -113,9 +120,10 @@ class TestPredictTracker : public QObject {
                     reply = "FO-29\n151.79\n-70.04\n203.75\n-60.01\n1800000000\n5988.49\n11881.33\n773.71\n7."
                             "47\n6292\nD\n279.37\n-32.42\n360.00\n";
                 else if (request.startsWith("GET_DOPPLER "))
-                    reply = "961.742249\n";
+                    reply = doppler;
                 else if (request.startsWith("GET_TLE "))
-                    reply = "FO-29\n1 24278U 96046B   26326.50000000  .00000000  00000-0  00000-0 0  9991\n2 24278  "
+                    reply = QByteArray("FO-29\n1 24278U 96046B   ") + epoch +
+                            "  .00000000  00000-0  00000-0 0  9991\n2 24278  "
                             "98.5000  80.0000 0350000  40.0000 320.0000 13.50000000100000\n";
                 server.writeDatagram(reply, from, port);
             }
@@ -131,8 +139,30 @@ class TestPredictTracker : public QObject {
         QCOMPARE(snapshot.value("elevation").toDouble(), -60.01);
         QCOMPARE(snapshot.value("doppler100MHz").toDouble(), 961.742249);
         QVERIFY(snapshot.value("tleEpoch").toDateTime().isValid());
+        const QVariantMap corrected = tracker.correctedFrequencies(146.0, 435.0);
+        QVERIFY2(corrected.value("ok").toBool(), qPrintable(corrected.value("error").toString()));
+        QVERIFY(qAbs(corrected.value("txMHz").toDouble() - 145.99859585631646) < 1e-9);
+        QVERIFY(qAbs(corrected.value("rxMHz").toDouble() - 435.00418357878315) < 1e-9);
+        QVERIFY(!tracker.correctedFrequencies(-1, 435).value("ok").toBool());
         QCOMPARE(commands,
                  QStringList({"GET_MODE", "GET_SAT FO-29", "GET_DOPPLER FO-29", "GET_TLE FO-29", "GET_MODE"}));
+        doppler = "-961.742249\n";
+        done.clear();
+        QVERIFY(tracker.request("127.0.0.1", server.localPort(), "FO-29"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(done.first().at(0).toBool());
+        const QVariantMap receding = tracker.correctedFrequencies(146.0, 435.0);
+        QVERIFY(receding.value("ok").toBool());
+        QVERIFY(qAbs(receding.value("txMHz").toDouble() - 146.00140414368354) < 1e-9);
+        QVERIFY(qAbs(receding.value("rxMHz").toDouble() - 434.99581642121685) < 1e-9);
+        QTest::qWait(11000);
+        QVERIFY(!tracker.correctedFrequencies(146, 435).value("ok").toBool());
+        epoch = "18001.00000000";
+        done.clear();
+        QVERIFY(tracker.request("127.0.0.1", server.localPort(), "FO-29"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(done.first().at(0).toBool());
+        QVERIFY(!tracker.correctedFrequencies(146, 435).value("ok").toBool());
     }
     void rejectsInvalidNamesAndTrackingModeChange()
     {

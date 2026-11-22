@@ -11,6 +11,33 @@ PredictTracker::PredictTracker(QObject *parent) : QObject(parent)
     m_timeout.setInterval(1200);
     connect(&m_timeout, &QTimer::timeout, this, [this] { fail(QStringLiteral("PREDICT request timed out")); });
 }
+QVariantMap PredictTracker::correctedFrequencies(double txMHz, double rxMHz) const
+{
+    const auto failResult = [](const QString &error) {
+        return QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), error}};
+    };
+    if (m_busy || m_snapshot.isEmpty())
+        return failResult(tr("A current PREDICT reading is required"));
+    if (!std::isfinite(txMHz) || !std::isfinite(rxMHz) || txMHz <= 0 || rxMHz <= 0 || txMHz > 1000000 ||
+        rxMHz > 1000000)
+        return failResult(tr("Enter valid positive TX and RX frequencies in MHz"));
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QDateTime received = m_snapshot.value(QStringLiteral("receivedAt")).toDateTime();
+    const QDateTime epoch = m_snapshot.value(QStringLiteral("tleEpoch")).toDateTime();
+    if (!received.isValid() || received > now || received.secsTo(now) > 10)
+        return failResult(tr("The tracker reading has expired; read it again"));
+    if (!epoch.isValid() || epoch > now || epoch.secsTo(now) > 14 * 86400)
+        return failResult(tr("Orbital data is old or dated in the future"));
+    const double doppler = m_snapshot.value(QStringLiteral("doppler100MHz")).toDouble();
+    const double correctedTx = txMHz - (doppler * txMHz / 100.0) / 1000000.0;
+    const double correctedRx = rxMHz + (doppler * rxMHz / 100.0) / 1000000.0;
+    if (!std::isfinite(correctedTx) || !std::isfinite(correctedRx) || correctedTx <= 0 || correctedRx <= 0)
+        return failResult(tr("Doppler correction produced an invalid frequency"));
+    return {{QStringLiteral("ok"), true},
+            {QStringLiteral("txMHz"), correctedTx},
+            {QStringLiteral("rxMHz"), correctedRx},
+            {QStringLiteral("satellite"), m_satellite}};
+}
 bool PredictTracker::request(const QString &host, int port, const QString &satellite)
 {
     static const QRegularExpression valid(QStringLiteral("^[\\x21-\\x7e][\\x20-\\x7e]{0,24}$"));
