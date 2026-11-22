@@ -5174,6 +5174,10 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>Tracker frequencies are a fixed snapshot; review them before saving.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>My grid (optional)</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
@@ -10031,6 +10035,14 @@ QSL 狀態：%6 · UTC 不完整：%7。
         <source>DXpedition calendar</source>
         <translation>DXpedition 行事曆</translation>
     </message>
+    <message>
+        <source>Rover location history…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rover: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -12272,6 +12284,22 @@ QSL 狀態：%6 · UTC 不完整：%7。
     <message>
         <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
         <translation>已修復舊匯入中的 %1 筆 QSO；%2 筆失敗（原文字保留在歷程中）</translation>
+    </message>
+    <message>
+        <source>Enter a valid station locator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter the station locator explicitly when rover and activation are both active.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The rover session uses a different station profile; enter the locator explicitly.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The rover locator is unavailable</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -14987,6 +15015,116 @@ QSL 狀態：%6 · UTC 不完整：%7。
     </message>
     <message>
         <source>Doppler correction produced an invalid frequency</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>RoverDialog</name>
+    <message>
+        <source>Rover location history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Manual QSO locations; no radio control</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A session records locator changes. New manual QSO use the position for their UTC minute. Other incoming QSO are not changed.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>If positions change in the same minute, or an activation is active, enter My grid explicitly in the full QSO dialog.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>New rover session name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Station locator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rover station locator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start rover</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Record position</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Close rover</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Active: %1 · current locator: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No active rover session</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rover session history</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::RoverSession</name>
+    <message>
+        <source>Log is not open</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a session name and a valid locator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot save rover session</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a valid locator</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Start a rover session first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot save rover position</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No active rover session</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Rover session not found</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The QSO time is outside the rover position history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Several rover positions were recorded in this minute; resolve the QSO locator manually</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot read rover position history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>System clock moved backwards; cannot record rover position</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

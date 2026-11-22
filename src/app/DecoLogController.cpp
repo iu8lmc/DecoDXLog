@@ -42,6 +42,7 @@
 #include <QRegularExpression>
 #include <QSettings>
 #include <QSysInfo>
+#include <QTimeZone>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QUdpSocket>
@@ -1206,6 +1207,7 @@ bool DecoLogController::openDatabase(const QString& path)
     };
     m_activation = new ActivationController(std::move(actCtx), this);
     m_radioNet = new core::RadioNet(&m_db, this);
+    m_rover = new core::RoverSession(&m_db, this);
     m_predictTracker = new core::PredictTracker(this);
     m_predictPassPlanner = new core::PredictPassPlanner(this);
     m_radioNet->load();
@@ -2832,6 +2834,7 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
                                 {QStringLiteral("site"), entry.site},
                                 {QStringLiteral("reportedVuccGrids"), entry.grids},
                                 {QStringLiteral("reportedMyVuccGrids"), entry.myGrids},
+                                {QStringLiteral("reportedMyGrid"), entry.myGrid},
                                 {QStringLiteral("evidence"), entry.evidence}};
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},
@@ -3730,6 +3733,12 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     r.set(QStringLiteral("NAME"), text("name"));
     r.set(QStringLiteral("QTH"), text("qth"));
     r.set(QStringLiteral("GRIDSQUARE"), text("gridsquare").toUpper());
+    const QString explicitMyGrid = text("my_gridsquare").toUpper();
+    if (!explicitMyGrid.isEmpty()) {
+        if (explicitMyGrid.size() < 4 || !maidenhead::toLatLon(explicitMyGrid))
+            return tr("Enter a valid station locator");
+        r.set(QStringLiteral("MY_GRIDSQUARE"), explicitMyGrid);
+    }
     r.set(QStringLiteral("TX_PWR"), text("tx_pwr"));
     r.set(QStringLiteral("POTA_REF"), text("pota_ref").toUpper());
     r.set(QStringLiteral("SOTA_REF"), text("sota_ref").toUpper());
@@ -3794,6 +3803,18 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     }
     if (m_activation->active() && m_activation->session().stationProfileId > 0)
         profileId = m_activation->session().stationProfileId;
+    if (m_rover && !m_rover->session().isEmpty() && explicitMyGrid.isEmpty()) {
+        if (m_activation->active())
+            return tr("Enter the station locator explicitly when rover and activation are both active.");
+        const qint64 roverProfile = m_rover->session().value(QStringLiteral("profileId")).toLongLong();
+        if (roverProfile != profileId)
+            return tr("The rover session uses a different station profile; enter the locator explicitly.");
+        QString roverError;
+        const QString roverGrid = m_rover->gridAt(QDateTime(date, time, QTimeZone::UTC), &roverError);
+        if (!roverError.isEmpty() || roverGrid.isEmpty())
+            return roverError.isEmpty() ? tr("The rover locator is unavailable") : roverError;
+        r.set(QStringLiteral("MY_GRIDSQUARE"), roverGrid);
+    }
     applyProfile(r, profileId);
     applyEntity(r);
     m_activation->applyTo(r);

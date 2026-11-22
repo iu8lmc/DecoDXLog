@@ -21,6 +21,7 @@ Rectangle {
     signal trafficRequested()
     signal activationRequested()
     signal radioNetRequested()
+    signal roverRequested()
     signal predictRequested()
     signal profilesRequested()
     // Il menu Pannelli e' un Popup nell'overlay della finestra principale:
@@ -173,6 +174,7 @@ Rectangle {
                 }
                 StyledMenuItem { text: qsTr("Decodium traffic monitor…"); onTriggered: root.trafficRequested() }
                 StyledMenuItem { text: qsTr("Radio net manager…"); onTriggered: root.radioNetRequested() }
+                StyledMenuItem { text: qsTr("Rover location history…"); onTriggered: root.roverRequested() }
                 StyledMenuItem { text: qsTr("PREDICT satellite tracker…"); onTriggered: root.predictRequested() }
                 MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSoft } }
                 StyledMenuItem { text: qsTr("Import a log (ADIF, CSV, N1MM)…"); onTriggered: root.importRequested() }
@@ -237,6 +239,13 @@ Rectangle {
                     font.pixelSize: 11
                 }
             }
+        }
+
+        Block {
+            visible: !!(decolog.rover && decolog.rover.session && decolog.rover.session.id)
+            clickable: true
+            onClicked: root.roverRequested()
+            Text { text: qsTr("Rover: %1").arg(decolog.rover && decolog.rover.session ? decolog.rover.session.grid || "—" : "—"); color: Theme.warningColor; font.bold: true }
         }
 
         // Frequenza e modo di Decodium: DecoDXLog non tocca il CAT, li legge dallo Status.

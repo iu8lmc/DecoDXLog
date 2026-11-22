@@ -32,3 +32,5 @@
 - G09 preview scales PREDICT normalized 100 MHz Doppler by the user-entered nominal downlink, and applies the opposite sign to nominal uplink; it never tunes. An explicit draft requires a local reading at most 10 seconds old and a non-future TLE at most 14 days old. These bounds are cautionary and do not establish orbital or frequency correctness.
 
 - G02 VUCC preview expands only reported two/four adjacent 4- or 6-character VUCC_GRIDS into unique GRID4 candidates; malformed or inconsistent reports are excluded. MY_VUCC_GRIDS is preserved as reported provenance, not validated as an operating site or award eligibility. Official rules remain unverified.
+
+- G09 rover stores a separate local session and position history. Only explicit manual QSO entry may inherit a position from an active session with the same station profile; distinct positions in one minute, concurrent activation or a mismatched profile require an explicit own grid. Existing QSO are not rewritten. Position precision is one minute, a backward clock rejects new positions, and cross-process attribution is not guaranteed.

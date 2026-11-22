@@ -1273,6 +1273,7 @@ RoundedWindow {
         else if (what[0] === "predictdraft") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3])) }
         else if (what[0] === "predictdraftsave") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3], true)) }
         else if (what[0] === "predictdraftfm") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3], true, "FM")) }
+        else if (what[0] === "roverprobe") { roverDialog.open(); Qt.callLater(() => roverDialog.probe()) }
         else if (what[0] === "vuccboundary") Qt.callLater(() => console.warn("PROBE vuccBoundary " + JSON.stringify(decolog.vuccPreview("6m", "", "", 100))))
         else if (what[0] === "radionet") {
             radioNetDialog.open()
@@ -1744,6 +1745,7 @@ RoundedWindow {
     }
     ActivationDialog { id: activationDialog }
     RadioNetDialog { id: radioNetDialog }
+    RoverDialog { id: roverDialog }
     PredictDialog { id: predictDialog }
     ContestSubmitDialog { id: submitDialog }
     Timer {
@@ -2685,6 +2687,7 @@ RoundedWindow {
             onClusterRequested: window.openCluster(0)
             onActivationRequested: activationDialog.openDialog()
             onRadioNetRequested: radioNetDialog.open()
+            onRoverRequested: roverDialog.open()
             onPredictRequested: predictDialog.open()
             contestModeOn: window.contestModeOn
             contestOpenPanels: contestLayout.shownList

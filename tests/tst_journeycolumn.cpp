@@ -51,6 +51,44 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void roverManualQsoRespectsHistoryAndExplicitOverride()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("roverprobe"), output), output.constData());
+        QVERIFY2(output.contains("PROBE roverStarted=true grid=JN71DC"), output.constData());
+        QVERIFY2(output.contains("PROBE roverFirst count=1 closed=true"), output.constData());
+        QVERIFY2(output.contains("PROBE roverAmbiguous kept=true count=1"), output.constData());
+        QVERIFY2(output.contains("PROBE roverOverride closed=true count=2"), output.constData());
+        QVERIFY2(output.contains("PROBE roverActivation error= kept=true count=2"), output.constData());
+        QVERIFY2(output.contains("PROBE roverActivationOverride closed=true count=3"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), 3);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT id,call FROM qso WHERE deleted=0 ORDER BY id"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QStringLiteral("K1AAA")); QCOMPARE(db.record(q.value(0).toLongLong())->value("MY_GRIDSQUARE"), QStringLiteral("JN71DC"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QStringLiteral("K1BBB")); QCOMPARE(db.record(q.value(0).toLongLong())->value("MY_GRIDSQUARE"), QStringLiteral("JM67AB"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QStringLiteral("K1CCC")); QCOMPARE(db.record(q.value(0).toLongLong())->value("MY_GRIDSQUARE"), QStringLiteral("JM67AB"));
+        QVERIFY(!q.next());
+        const auto exported = db.exportAdif();
+        const auto parsed = decolog::core::adif::parse(exported);
+        QCOMPARE(parsed.records.size(), 3);
+        QCOMPARE(parsed.records.at(0).value("MY_GRIDSQUARE"), QStringLiteral("JN71DC"));
+        QCOMPARE(parsed.records.at(1).value("MY_GRIDSQUARE"), QStringLiteral("JM67AB"));
+        QCOMPARE(parsed.records.at(2).value("MY_GRIDSQUARE"), QStringLiteral("JM67AB"));
+        decolog::core::LogDatabase imported;
+        QVERIFY(imported.open(":memory:"));
+        QCOMPARE(imported.importAdif(exported).inserted, 3);
+        const auto roundtrip = decolog::core::adif::parse(imported.exportAdif());
+        QCOMPARE(roundtrip.records.size(), 3);
+        QCOMPARE(roundtrip.records.at(0).value("MY_GRIDSQUARE"), QStringLiteral("JN71DC"));
+        QCOMPARE(roundtrip.records.at(1).value("MY_GRIDSQUARE"), QStringLiteral("JM67AB"));
+        QCOMPARE(roundtrip.records.at(2).value("MY_GRIDSQUARE"), QStringLiteral("JM67AB"));
+        QSqlQuery history(db.connection());
+        QVERIFY(history.exec("SELECT COUNT(*) FROM rover_position")); QVERIFY(history.next()); QCOMPARE(history.value(0).toInt(), 2);
+    }
     void vuccBoundaryPreviewInApplication()
     {
         QTemporaryDir dir;

@@ -96,6 +96,8 @@ add_library(decolog_core STATIC
     src/core/PredictPassPlanner.h
     src/core/PredictTracker.cpp
     src/core/PredictTracker.h
+    src/core/RoverSession.cpp
+    src/core/RoverSession.h
     src/core/RadioNet.cpp
     src/core/RadioNet.h
     src/core/Adif.cpp
@@ -478,6 +480,7 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/UpdateDialog.qml
     qml/DecoDXLog/ActivationDialog.qml
     qml/DecoDXLog/RadioNetDialog.qml
+    qml/DecoDXLog/RoverDialog.qml
     qml/DecoDXLog/PredictDialog.qml
     qml/DecoDXLog/LogsDialog.qml
     qml/DecoDXLog/ContestLayout.qml
@@ -704,7 +707,7 @@ if(DECODXLOG_BUILD_TESTS)
             $<TARGET_FILE:clublog_live50> $<TARGET_FILE:clublog_stage_existing>)
         set_tests_properties(clublog_live50_simulation PROPERTIES TIMEOUT 60)
     endif()
-    foreach(name adif protocol database countries credentials callbook callbookprofile awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc radionet predicttracker predictpass)
+    foreach(name adif protocol database countries credentials callbook callbookprofile awards decolink decoportlog lotw spots cluster qsl cabrillo solar rotor rig modes newqsofields updates cw cwkeyer cloud cloudsettings vault mailsender dates tci rotorgateway worldclock propagation kstchat flrig supercheck contestnet winkeyer catshare logbackup qsldownload decodiumlog n1mm localapi clublogcty migration voacap connectionprobe ctcdecoder lexicon cwcalls cwskimmer slowop diagnostics architecture serialports dxassistant netcontroller cqmarathon cqmarathon_db vucc radionet predicttracker predictpass roversession)
         qt_add_executable(tst_${name} tests/tst_${name}.cpp)
         target_link_libraries(tst_${name} PRIVATE decolog_core Qt6::Test)
         set_target_properties(tst_${name} PROPERTIES WIN32_EXECUTABLE OFF)

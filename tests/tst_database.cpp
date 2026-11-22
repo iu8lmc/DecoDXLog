@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 16;
+constexpr int kSchemaVersion = 17;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -59,6 +59,14 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void roverHistorySchemaDoesNotCreateQsos()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY2(q.exec("INSERT INTO rover_session(uuid,title,started_at) VALUES('fixture','Rover','2026-01-01T12:00Z')"), qPrintable(q.lastError().text()));
+        QCOMPARE(db.qsoCount(), 0);
+    }
     void radioNetSessionStorageDoesNotCreateQsos()
     {
         LogDatabase db;
@@ -90,7 +98,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 16);
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
             QVERIFY(db.record(id).has_value());
             const auto undo = db.undoLatestImport();
             QCOMPARE(undo.deleted, 1);
@@ -308,7 +316,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 16);
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
             const auto result = db.undoLatestImport();
             QCOMPARE(result.changed, 1);
             QCOMPARE(result.deleted, 0);
@@ -527,7 +535,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 16);
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
             QSqlQuery q(db.connection());
             QVERIFY(q.exec("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_import_qso_page'"));
             QVERIFY(q.next());
@@ -629,7 +637,7 @@ private slots:
         {
             LogDatabase db;
             QVERIFY2(db.open(path), qPrintable(db.lastError()));
-            QCOMPARE(db.schemaVersion(), 16);
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
             QCOMPARE(db.qsoCount(), 1);
             QCOMPARE(db.meta(id)->uuid, uuid);
             QSqlQuery q(db.connection());

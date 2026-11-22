@@ -1,0 +1,7 @@
+# Rover position history
+
+Open **Rover** from the desktop menu. Start a session with a title, your current station profile and a valid 4-, 6- or 8-character Maidenhead locator. Record each position change, then close the session when finished. History remains available after reopening the log. Only one rover session may be active in a database.
+
+During an active session the manual QSO dialog uses the last recorded locator at the entered UTC minute, for the same station profile. Set **My grid** explicitly to override it. If distinct positions were recorded in that minute, or a separate activation is active, the dialog requires an explicit locator. A future QSO time or one before the recorded history also requires an explicit locator. The operator must record position changes promptly and review the entered QSO time; events and QSO times have minute precision and cannot distinguish events within the initial minute. A backwards system clock prevents a new position from being recorded.
+
+This does not rewrite existing QSO or automatically apply locations to imported, contest or externally received contacts. The chosen locator is saved as ADIF `MY_GRIDSQUARE`; exporting QSO does not export the separate session history. Position history is stored locally in the SQLite log (schema 17), so include the database in backups. Do not assume concurrent writers in separate application instances are coordinated for QSO attribution. VUCC candidate previews display reported own locators as provenance; they do not determine award eligibility from this history.

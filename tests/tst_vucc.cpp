@@ -64,7 +64,7 @@ private slots:
         QVERIFY(temp.isValid());
         const QString path = temp.filePath("log.sqlite");
         const QByteArray input = "<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>6m<MODE:2>CW"
-                                 "<QSL_RCVD:1>Y<VUCC_GRIDS:9>EM98,FM08<MY_VUCC_GRIDS:9>JN52,JN53<EOR>";
+                                 "<QSL_RCVD:1>Y<VUCC_GRIDS:9>EM98,FM08<MY_GRIDSQUARE:4>JN52<MY_VUCC_GRIDS:9>JN52,JN53<EOR>";
         {
             decolog::core::LogDatabase writer;
             QVERIFY(writer.open(path));
@@ -77,10 +77,12 @@ private slots:
         QVERIFY2(error.isEmpty(), qPrintable(error));
         QCOMPARE(entries.size(), 1);
         QCOMPARE(entries.first().myGrids, QStringLiteral("JN52,JN53"));
+        QCOMPARE(entries.first().myGrid, QStringLiteral("JN52"));
         const auto preview = select(entries, Rules{{}, {}, "6m", 100});
         QCOMPARE(preview.eligible.size(), 2);
         const auto exported = preview.toJson().object().value("eligible").toArray().first().toObject();
         QCOMPARE(exported.value("reportedMyVuccGrids").toString(), QStringLiteral("JN52,JN53"));
+        QCOMPARE(exported.value("reportedMyGrid").toString(), QStringLiteral("JN52"));
         const auto record = decolog::core::adif::parse(db.exportAdif()).records.first();
         QCOMPARE(record.value("MY_VUCC_GRIDS"), QStringLiteral("JN52,JN53"));
         QCOMPARE(record.value("VUCC_GRIDS"), QStringLiteral("EM98,FM08"));

@@ -116,7 +116,7 @@ DialogFrame {
     }
 
     function clearAll() {
-        for (const f of [callField, gridField, nameField, qthField, commentField, potaField, sotaField,
+        for (const f of [callField, gridField, myGridField, nameField, qthField, commentField, potaField, sotaField,
                          iotaField, wwffField, dciField, tagsField, countryField, addressField, stateField,
                          cntyField, contField, cqzField, ituzField, dxccField, qslViaField,
                          satNameField, satModeField, rxFreqField])
@@ -193,6 +193,13 @@ DialogFrame {
         root.submit(false)
         console.warn("PROBE predictDraftSaved=" + !root.visible + " error=" + errorText.text)
     }
+    function probeRoverLog(call, ownGrid) {
+        callField.text = call
+        freqField.text = "14.050000"
+        modeBox.currentIndex = modeBox.find("CW")
+        myGridField.text = ownGrid
+        root.submit(false)
+    }
 
     function submit(keep) {
         const error = decolog.logManualQso({
@@ -200,7 +207,7 @@ DialogFrame {
             band: bandBox.currentIndex > 0 ? bandBox.currentText : "", freq: freqField.text, freq_rx: rxFreqField.text,
             mode: modeBox.editText, submode: submodeBox.editText,
             rst_sent: sentField.text, rst_rcvd: rcvdField.text,
-            gridsquare: gridField.text, name: nameField.text, qth: qthField.text, tx_pwr: pwrField.text,
+            gridsquare: gridField.text, my_gridsquare: myGridField.text, name: nameField.text, qth: qthField.text, tx_pwr: pwrField.text,
             pota_ref: potaField.text, sota_ref: sotaField.text, iota: iotaField.text, wwff_ref: wwffField.text,
             dci: dciField.text,
             prop_mode: propModeBox.editText, sat_name: satNameField.text, sat_mode: satModeField.text,
@@ -214,7 +221,7 @@ DialogFrame {
         if (error.length > 0)
             return
         if (keep) {
-            for (const f of [callField, gridField, nameField, qthField, commentField, countryField,
+            for (const f of [callField, gridField, myGridField, nameField, qthField, commentField, countryField,
                              addressField, stateField, cntyField, contField, cqzField, ituzField,
                              dxccField, qslViaField])
                 f.text = ""
@@ -506,6 +513,12 @@ DialogFrame {
                     Layout.horizontalStretchFactor: 2; Layout.fillWidth: true
                     label: qsTr("Grid")
                     StyledTextField { id: gridField; Layout.fillWidth: true; uppercase: true }
+                }
+                LabeledField {
+                    Layout.preferredWidth: 1
+                    Layout.horizontalStretchFactor: 2; Layout.fillWidth: true
+                    label: qsTr("My grid (optional)")
+                    StyledTextField { id: myGridField; objectName: "manualMyGrid"; Layout.fillWidth: true; uppercase: true }
                 }
                 LabeledField {
                     Layout.preferredWidth: 1

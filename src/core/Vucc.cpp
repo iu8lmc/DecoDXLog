@@ -200,12 +200,15 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             const QJsonObject object = doc.object();
             const QJsonValue grids = object.value(QStringLiteral("VUCC_GRIDS"));
             const QJsonValue myGrids = object.value(QStringLiteral("MY_VUCC_GRIDS"));
-            if ((!grids.isUndefined() && !grids.isString()) || (!myGrids.isUndefined() && !myGrids.isString())) {
+            const QJsonValue myGrid = object.value(QStringLiteral("MY_GRIDSQUARE"));
+            if ((!grids.isUndefined() && !grids.isString()) || (!myGrids.isUndefined() && !myGrids.isString()) ||
+                (!myGrid.isUndefined() && !myGrid.isString())) {
                 if (error) *error = QStringLiteral("QSO %1: invalid VUCC grid field type").arg(entry.qsoId);
                 return {};
             }
             entry.grids = grids.toString();
             entry.myGrids = myGrids.toString();
+            entry.myGrid = myGrid.toString();
         }
         if (entry.grid.trimmed().isEmpty() && entry.grids.trimmed().isEmpty())
             continue;
@@ -225,6 +228,7 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("site"), entry.site},
                                 {QStringLiteral("reportedVuccGrids"), entry.grids},
                                 {QStringLiteral("reportedMyVuccGrids"), entry.myGrids},
+                                {QStringLiteral("reportedMyGrid"), entry.myGrid},
                                 {QStringLiteral("evidence"), entry.evidence}});
     }
     QJsonArray exclusions;

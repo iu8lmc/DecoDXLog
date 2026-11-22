@@ -5179,6 +5179,10 @@ Extra fields are preserved: %8</source>
         <source>Tracker frequencies are a fixed snapshot; review them before saving.</source>
         <translation>Tracker frequencies are a fixed snapshot; review them before saving.</translation>
     </message>
+    <message>
+        <source>My grid (optional)</source>
+        <translation>My grid (optional)</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
@@ -10047,6 +10051,14 @@ Extra fields are preserved: %8</source>
         <source>DXpedition calendar</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Rover location history…</source>
+        <translation>Rover location history…</translation>
+    </message>
+    <message>
+        <source>Rover: %1</source>
+        <translation>Rover: %1</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -12312,6 +12324,22 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Repaired %1 QSO from an old import; %2 failed (previous text stays in history)</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a valid station locator</source>
+        <translation>Enter a valid station locator</translation>
+    </message>
+    <message>
+        <source>Enter the station locator explicitly when rover and activation are both active.</source>
+        <translation>Enter the station locator explicitly when rover and activation are both active.</translation>
+    </message>
+    <message>
+        <source>The rover session uses a different station profile; enter the locator explicitly.</source>
+        <translation>The rover session uses a different station profile; enter the locator explicitly.</translation>
+    </message>
+    <message>
+        <source>The rover locator is unavailable</source>
+        <translation>The rover locator is unavailable</translation>
     </message>
 </context>
 <context>
@@ -15047,6 +15075,116 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Doppler correction produced an invalid frequency</source>
         <translation>Doppler correction produced an invalid frequency</translation>
+    </message>
+</context>
+<context>
+    <name>RoverDialog</name>
+    <message>
+        <source>Rover location history</source>
+        <translation>Rover location history</translation>
+    </message>
+    <message>
+        <source>Manual QSO locations; no radio control</source>
+        <translation>Manual QSO locations; no radio control</translation>
+    </message>
+    <message>
+        <source>A session records locator changes. New manual QSO use the position for their UTC minute. Other incoming QSO are not changed.</source>
+        <translation>A session records locator changes. New manual QSO use the position for their UTC minute. Other incoming QSO are not changed.</translation>
+    </message>
+    <message>
+        <source>If positions change in the same minute, or an activation is active, enter My grid explicitly in the full QSO dialog.</source>
+        <translation>If positions change in the same minute, or an activation is active, enter My grid explicitly in the full QSO dialog.</translation>
+    </message>
+    <message>
+        <source>New rover session name</source>
+        <translation>New rover session name</translation>
+    </message>
+    <message>
+        <source>Station locator</source>
+        <translation>Station locator</translation>
+    </message>
+    <message>
+        <source>Rover station locator</source>
+        <translation>Rover station locator</translation>
+    </message>
+    <message>
+        <source>Start rover</source>
+        <translation>Start rover</translation>
+    </message>
+    <message>
+        <source>Record position</source>
+        <translation>Record position</translation>
+    </message>
+    <message>
+        <source>Close rover</source>
+        <translation>Close rover</translation>
+    </message>
+    <message>
+        <source>Active: %1 · current locator: %2</source>
+        <translation>Active: %1 · current locator: %2</translation>
+    </message>
+    <message>
+        <source>No active rover session</source>
+        <translation>No active rover session</translation>
+    </message>
+    <message>
+        <source>Rover session history</source>
+        <translation>Rover session history</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::RoverSession</name>
+    <message>
+        <source>Log is not open</source>
+        <translation>Log is not open</translation>
+    </message>
+    <message>
+        <source>Enter a session name and a valid locator</source>
+        <translation>Enter a session name and a valid locator</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available</source>
+        <translation>The selected station profile is not available</translation>
+    </message>
+    <message>
+        <source>Cannot save rover session</source>
+        <translation>Cannot save rover session</translation>
+    </message>
+    <message>
+        <source>Enter a valid locator</source>
+        <translation>Enter a valid locator</translation>
+    </message>
+    <message>
+        <source>Start a rover session first</source>
+        <translation>Start a rover session first</translation>
+    </message>
+    <message>
+        <source>Cannot save rover position</source>
+        <translation>Cannot save rover position</translation>
+    </message>
+    <message>
+        <source>No active rover session</source>
+        <translation>No active rover session</translation>
+    </message>
+    <message>
+        <source>Rover session not found</source>
+        <translation>Rover session not found</translation>
+    </message>
+    <message>
+        <source>The QSO time is outside the rover position history</source>
+        <translation>The QSO time is outside the rover position history</translation>
+    </message>
+    <message>
+        <source>Several rover positions were recorded in this minute; resolve the QSO locator manually</source>
+        <translation>Several rover positions were recorded in this minute; resolve the QSO locator manually</translation>
+    </message>
+    <message>
+        <source>Cannot read rover position history</source>
+        <translation>Cannot read rover position history</translation>
+    </message>
+    <message>
+        <source>System clock moved backwards; cannot record rover position</source>
+        <translation>System clock moved backwards; cannot record rover position</translation>
     </message>
 </context>
 </TS>

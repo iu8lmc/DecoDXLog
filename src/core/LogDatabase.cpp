@@ -426,6 +426,10 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TABLE IF NOT EXISTS radio_net_event (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES radio_net_session(id), member_id INTEGER REFERENCES radio_net_member(id), event TEXT NOT NULL, recorded_at TEXT NOT NULL, detail TEXT NOT NULL DEFAULT '')"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_radio_net_member_order ON radio_net_member(session_id,sort_order,id)"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_radio_net_event_session ON radio_net_event(session_id,id)")}, nullptr},
+        {17, {QStringLiteral("CREATE TABLE IF NOT EXISTS rover_session (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL UNIQUE, title TEXT NOT NULL, station_profile_id INTEGER REFERENCES station_profile(id), started_at TEXT NOT NULL, ended_at TEXT)"),
+              QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_rover_one_active ON rover_session((1)) WHERE ended_at IS NULL"),
+              QStringLiteral("CREATE TABLE IF NOT EXISTS rover_position (id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES rover_session(id), gridsquare TEXT NOT NULL, effective_at TEXT NOT NULL, recorded_at TEXT NOT NULL)"),
+              QStringLiteral("CREATE INDEX IF NOT EXISTS idx_rover_position_time ON rover_position(session_id,effective_at,id)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)

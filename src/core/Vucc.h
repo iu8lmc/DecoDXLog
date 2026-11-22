@@ -17,6 +17,7 @@ struct Entry {
     QString evidence;
     QString grids;
     QString myGrids;
+    QString myGrid;
 };
 
 struct Rules {

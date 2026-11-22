@@ -5198,6 +5198,10 @@ Campi extra conservati: %8</translation>
         <source>Tracker frequencies are a fixed snapshot; review them before saving.</source>
         <translation>Le frequenze del tracker sono una fotografia statica; controllale prima di salvare.</translation>
     </message>
+    <message>
+        <source>My grid (optional)</source>
+        <translation>Mio locator (facoltativo)</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
@@ -10082,6 +10086,14 @@ Campi extra conservati: %8</translation>
         <source>Search…</source>
         <translation>Cerca…</translation>
     </message>
+    <message>
+        <source>Rover location history…</source>
+        <translation>Cronologia posizioni rover…</translation>
+    </message>
+    <message>
+        <source>Rover: %1</source>
+        <translation>Rover: %1</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -12355,6 +12367,22 @@ Campi extra conservati: %8</translation>
     <message>
         <source>UDP resend stopped after %1 of %2 QSO</source>
         <translation>Rinvio UDP interrotto dopo %1 di %2 QSO</translation>
+    </message>
+    <message>
+        <source>Enter a valid station locator</source>
+        <translation>Inserisci un locator di stazione valido</translation>
+    </message>
+    <message>
+        <source>Enter the station locator explicitly when rover and activation are both active.</source>
+        <translation>Inserisci esplicitamente il locator della stazione quando rover e attivazione sono entrambi attivi.</translation>
+    </message>
+    <message>
+        <source>The rover session uses a different station profile; enter the locator explicitly.</source>
+        <translation>La sessione rover usa un profilo stazione diverso; inserisci esplicitamente il locator.</translation>
+    </message>
+    <message>
+        <source>The rover locator is unavailable</source>
+        <translation>Il locator rover non è disponibile</translation>
     </message>
 </context>
 <context>
@@ -15090,6 +15118,116 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Doppler correction produced an invalid frequency</source>
         <translation>La correzione Doppler ha prodotto una frequenza non valida</translation>
+    </message>
+</context>
+<context>
+    <name>RoverDialog</name>
+    <message>
+        <source>Rover location history</source>
+        <translation>Cronologia posizioni rover</translation>
+    </message>
+    <message>
+        <source>Manual QSO locations; no radio control</source>
+        <translation>Posizioni QSO manuali; nessun comando radio</translation>
+    </message>
+    <message>
+        <source>A session records locator changes. New manual QSO use the position for their UTC minute. Other incoming QSO are not changed.</source>
+        <translation>Una sessione registra i cambi di locator. I nuovi QSO manuali usano la posizione del loro minuto UTC. Gli altri QSO in arrivo non vengono modificati.</translation>
+    </message>
+    <message>
+        <source>If positions change in the same minute, or an activation is active, enter My grid explicitly in the full QSO dialog.</source>
+        <translation>Se le posizioni cambiano nello stesso minuto o è attiva un’attivazione, inserisci esplicitamente il tuo locator nel modulo QSO completo.</translation>
+    </message>
+    <message>
+        <source>New rover session name</source>
+        <translation>Nome nuova sessione rover</translation>
+    </message>
+    <message>
+        <source>Station locator</source>
+        <translation>Locator della stazione</translation>
+    </message>
+    <message>
+        <source>Rover station locator</source>
+        <translation>Locator della stazione rover</translation>
+    </message>
+    <message>
+        <source>Start rover</source>
+        <translation>Avvia rover</translation>
+    </message>
+    <message>
+        <source>Record position</source>
+        <translation>Registra posizione</translation>
+    </message>
+    <message>
+        <source>Close rover</source>
+        <translation>Chiudi rover</translation>
+    </message>
+    <message>
+        <source>Active: %1 · current locator: %2</source>
+        <translation>Attiva: %1 · locator attuale: %2</translation>
+    </message>
+    <message>
+        <source>No active rover session</source>
+        <translation>Nessuna sessione rover attiva</translation>
+    </message>
+    <message>
+        <source>Rover session history</source>
+        <translation>Cronologia sessioni rover</translation>
+    </message>
+</context>
+<context>
+    <name>decolog::core::RoverSession</name>
+    <message>
+        <source>Log is not open</source>
+        <translation>Il log non è aperto</translation>
+    </message>
+    <message>
+        <source>Enter a session name and a valid locator</source>
+        <translation>Inserisci un nome sessione e un locator valido</translation>
+    </message>
+    <message>
+        <source>The selected station profile is not available</source>
+        <translation>Il profilo stazione selezionato non è disponibile</translation>
+    </message>
+    <message>
+        <source>Cannot save rover session</source>
+        <translation>Impossibile salvare la sessione rover</translation>
+    </message>
+    <message>
+        <source>Enter a valid locator</source>
+        <translation>Inserisci un locator valido</translation>
+    </message>
+    <message>
+        <source>Start a rover session first</source>
+        <translation>Avvia prima una sessione rover</translation>
+    </message>
+    <message>
+        <source>Cannot save rover position</source>
+        <translation>Impossibile salvare la posizione rover</translation>
+    </message>
+    <message>
+        <source>No active rover session</source>
+        <translation>Nessuna sessione rover attiva</translation>
+    </message>
+    <message>
+        <source>Rover session not found</source>
+        <translation>Sessione rover non trovata</translation>
+    </message>
+    <message>
+        <source>The QSO time is outside the rover position history</source>
+        <translation>L’orario del QSO è fuori dalla cronologia posizioni rover</translation>
+    </message>
+    <message>
+        <source>Several rover positions were recorded in this minute; resolve the QSO locator manually</source>
+        <translation>Più posizioni rover sono state registrate nello stesso minuto; inserisci manualmente il locator del QSO</translation>
+    </message>
+    <message>
+        <source>Cannot read rover position history</source>
+        <translation>Impossibile leggere la cronologia delle posizioni rover</translation>
+    </message>
+    <message>
+        <source>System clock moved backwards; cannot record rover position</source>
+        <translation>L’orologio di sistema è tornato indietro; impossibile registrare la posizione rover</translation>
     </message>
 </context>
 </TS>

@@ -31,6 +31,7 @@
 #include "core/CqMarathon.h"
 #include "core/Vucc.h"
 #include "core/RadioNet.h"
+#include "core/RoverSession.h"
 #include "core/PredictTracker.h"
 #include "core/PredictPassPlanner.h"
 #include "core/Callbook.h"
@@ -104,6 +105,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* cloud READ cloud CONSTANT)
     Q_PROPERTY(QObject* activation READ activation CONSTANT)
     Q_PROPERTY(QObject* radioNet READ radioNet CONSTANT)
+    Q_PROPERTY(QObject* rover READ rover CONSTANT)
     Q_PROPERTY(QObject* predictTracker READ predictTracker CONSTANT)
     Q_PROPERTY(QObject* predictPassPlanner READ predictPassPlanner CONSTANT)
     // I log della stazione: quello aperto e gli altri, per i contest.
@@ -321,6 +323,7 @@ public:
     QObject* qsoModel() const { return m_model; }
     QObject* stationProfiles() const { return m_profiles; }
     QObject* radioNet() const { return m_radioNet; }
+    QObject* rover() const { return m_rover; }
     QObject* predictTracker() const { return m_predictTracker; }
     QObject* predictPassPlanner() const { return m_predictPassPlanner; }
     QObject* credentials() const { return m_credentials; }
@@ -1114,6 +1117,7 @@ private:
     CloudController*     m_cloud{nullptr};
     ActivationController* m_activation{nullptr};
     core::RadioNet* m_radioNet{nullptr};
+    core::RoverSession* m_rover{nullptr};
     core::PredictTracker* m_predictTracker{nullptr};
     core::PredictPassPlanner* m_predictPassPlanner{nullptr};
     LogLibrary* m_logs{nullptr};
