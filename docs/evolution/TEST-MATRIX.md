@@ -1,0 +1,10 @@
+# Test matrix
+
+| Requirement | A/B evidence | Environment | Remaining |
+|---|---|---|---|
+| G01 generic web score labelled | A: `PYTHONPATH=server python3 -m pytest server/tests/test_web.py::test_the_contest_page_counts_the_score -q` failed on missing label; B: same test plus `server/tests/test_analytics.py`, 22 passed. Two synthetic QSO; calculation retained. | macOS arm64, local Python test client | Browser rendering and shared desktop/web rules not verified. |
+| G02 Marathon UTC year | A: `tst_cqmarathon editionUsesUtcAcrossYearBoundary` failed: local-offset timestamp excluded though same UTC instant belongs to 2026. B: `QT_QPA_PLATFORM=offscreen ctest --test-dir /tmp/decolog-evolution-build -R '^(cqmarathon|cqmarathon_db|vucc)$' --output-on-failure` passed 3/3 including equivalent ISO instants and JSON comparison. | macOS arm64, Qt 6.11.2, synthetic entries | Official edition rules, zone selection, submission format, UI and cross-platform proof remain open. |
+| G05 import/undo | `ctest -R` focused database/migration/qmlpopups passed; no before/after change | macOS arm64 | Synthetic concurrent import/undo and anonymised real exports for each source. |
+| G00 full desktop | Clean Release build passed | macOS arm64 | Apple M4, macOS arm64, Qt 6.11.2; Windows/Linux, clean install and hardware remain open. |
+
+No A/B test can be inferred from static inspection. Record fixture, before/after result, commands and platform for every subsequent increment.

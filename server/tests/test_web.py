@@ -560,5 +560,7 @@ def test_the_contest_page_counts_the_score(client):
     assert page.status_code == 200
     assert "Punteggio" in page.text
     assert "Moltiplicatori" in page.text
+    assert "Stima generica" in page.text
+    assert "non applica i regolamenti specifici" in page.text
     # Due QSO, due entita': quattro punti di punteggio.
     assert ">2<" in page.text

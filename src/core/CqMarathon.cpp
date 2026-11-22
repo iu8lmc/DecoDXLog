@@ -62,7 +62,7 @@ Result select(const QList<Entry>& entries, const Rules& rules)
     });
     QHash<int, int> entityCount;
     for (const Entry& entry : sorted) {
-        if (!entry.timestamp.isValid() || entry.timestamp.date().year() != rules.year) {
+        if (!entry.timestamp.isValid() || entry.timestamp.toUTC().date().year() != rules.year) {
             result.exclusions << QStringLiteral("QSO %1: outside edition year").arg(entry.qsoId);
             continue;
         }

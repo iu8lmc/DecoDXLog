@@ -8,6 +8,24 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void editionUsesUtcAcrossYearBoundary()
+    {
+        const auto local = QDateTime::fromString(QStringLiteral("2027-01-01T00:30:00+01:00"), Qt::ISODate);
+        const auto utc = local.toUTC();
+        Entry a{1, QStringLiteral("K1AAA"), 291, 5, QStringLiteral("20m"), QStringLiteral("CW"), local};
+        Entry b = a;
+        b.timestamp = utc;
+        const Rules rules{2026, QStringLiteral("mixed"), 1};
+        QCOMPARE(select({a}, rules).selected.size(), 1);
+        QCOMPARE(select({b}, rules).selected.size(), 1);
+        QCOMPARE(select({a}, rules).toJson().object().value(QStringLiteral("selected")),
+                 select({b}, rules).toJson().object().value(QStringLiteral("selected")));
+        a.timestamp = QDateTime::fromString(QStringLiteral("2026-12-31T23:30:00-01:00"), Qt::ISODate);
+        b.timestamp = a.timestamp.toUTC();
+        QVERIFY(select({a}, rules).selected.isEmpty());
+        QVERIFY(select({b}, rules).selected.isEmpty());
+    }
+
     void selectsDeterministicallyByEditionCategoryAndEntity()
     {
         const QDateTime t1(QDate(2026, 1, 2), QTime(10, 0), QTimeZone::UTC);

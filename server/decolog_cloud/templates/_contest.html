@@ -1,4 +1,8 @@
-{# Il punteggio della gara: QSO validi, punti, moltiplicatori, totale. #}
+{# Stima generica, non lo scoring regolamentare del desktop. #}
+<p class="dim small" role="note">
+  <strong>Stima generica:</strong> questa pagina non applica i regolamenti specifici
+  dei contest e il risultato può differire dal punteggio calcolato dal desktop.
+</p>
 <form class="filters" method="get" action="/contest" style="margin-bottom:10px">
   <label>Ultime
     <select name="hours" onchange="this.form.submit()">
@@ -58,6 +62,6 @@
 <p class="dim small" style="margin-top:10px">
   Si conta come in gara: stesso nominativo, stessa banda e stesso gruppo di modi e' un
   duplicato e non vale; i moltiplicatori si contano una volta per banda; il punteggio e'
-  punti per moltiplicatori. Le regole vere cambiano da contest a contest — qui ci sono
-  quelle che valgono quasi sempre, e i punti per QSO si cambiano qui sopra.
+  punti per moltiplicatori. I punti per QSO si cambiano qui sopra; duplicati,
+  moltiplicatori e punti effettivi dipendono dal regolamento della gara.
 </p>
