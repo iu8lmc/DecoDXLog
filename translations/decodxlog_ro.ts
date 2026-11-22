@@ -14684,6 +14684,38 @@ Câmpuri suplimentare păstrate: %8</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Reminder set for %1 UTC</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reminder cleared</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reminder (seconds)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reminder duration in seconds</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set reminder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Clear reminder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reminder in %1 s</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Reminder due</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -14769,6 +14801,10 @@ Câmpuri suplimentare păstrate: %8</translation>
     </message>
     <message>
         <source>Enter a session name (up to 160 characters)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a reminder duration from 1 to 86400 seconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

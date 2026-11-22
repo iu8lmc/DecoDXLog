@@ -10,6 +10,8 @@ DialogFrame {
     readonly property var net: decolog.radioNet
     readonly property var current: net.session
     readonly property var summary: net.summary
+    readonly property var reminder: net.reminder
+    property double reminderClock: Date.now()
     title: qsTr("Radio net manager")
     dialogKey: "radio-net"
     width: 1000
@@ -19,6 +21,7 @@ DialogFrame {
     property bool probeOpenQso: false
     property bool probeSaveQso: false
     property bool probeHistory: false
+    property bool probeReminder: false
     property var historyAnchors: [0]
     property var historyRows: []
     property bool historyHasOlder: false
@@ -44,6 +47,12 @@ DialogFrame {
         root.refreshHistory()
     }
     onOpened: refreshHistory()
+    Timer {
+        interval: 250
+        repeat: true
+        running: root.visible && !!root.reminder.scheduled
+        onTriggered: root.reminderClock = Date.now()
+    }
     NewQsoDialog {
         id: participantQso
         profileDialogKey: "radio-net-qso"
@@ -80,6 +89,8 @@ DialogFrame {
         }
         case "turn": return qsTr("Turn")
         case "reorder": return qsTr("Order changed")
+        case "reminder_set": return qsTr("Reminder set for %1 UTC").arg(row.detail)
+        case "reminder_clear": return qsTr("Reminder cleared")
         case "status": {
             const labels = {present: qsTr("Present"), waiting: qsTr("Waiting"), absent: qsTr("Absent"), departed: qsTr("Departed")}
             return qsTr("Status: %1").arg(labels[row.detail] || row.detail)
@@ -88,10 +99,11 @@ DialogFrame {
         }
     }
     // Exercised only by the explicitly requested isolated --show probe.
-    function probe(seed, openQso, saveQso, history) {
+    function probe(seed, openQso, saveQso, history, reminder) {
         root.probeOpenQso = openQso
         root.probeSaveQso = saveQso
         root.probeHistory = history
+        root.probeReminder = reminder
         if (seed) {
             sessionTitle.text = "Test net"
             startButton.clicked()
@@ -122,6 +134,12 @@ DialogFrame {
                 newerButton.clicked()
                 console.warn("PROBE historyReturn count=" + root.historyRows.length + " newer=" + newerButton.enabled)
             }
+            if (root.probeReminder) {
+                reminderSeconds.text = "1"
+                setReminderButton.clicked()
+                console.warn("PROBE reminderScheduled=" + !!root.reminder.scheduled)
+                reminderProbeTimer.start()
+            }
             if (root.probeOpenQso && row) {
                 row.openQso()
                 console.warn("PROBE radioNetQso visible=" + participantQso.visible + " call=" + participantQso.enteredCallForProbe)
@@ -136,6 +154,11 @@ DialogFrame {
                 }
             }
         }
+    }
+    Timer {
+        id: reminderProbeTimer
+        interval: 1600
+        onTriggered: console.warn("PROBE reminderDue=" + (reminderStatus.text === qsTr("Reminder due")))
     }
 
     body: ColumnLayout {
@@ -176,6 +199,29 @@ DialogFrame {
                   .arg(root.summary.absent || 0).arg(root.summary.departed || 0).arg(root.summary.checkIns || 0)
             color: Theme.textSecondary
             wrapMode: Text.Wrap
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            visible: !!root.current.id
+            Text { text: qsTr("Reminder (seconds)"); color: Theme.textSecondary }
+            StyledTextField {
+                id: reminderSeconds
+                Layout.preferredWidth: 90
+                text: "300"
+                validator: IntValidator { bottom: 1; top: 86400 }
+                Accessible.name: qsTr("Reminder duration in seconds")
+                enabled: !!root.current.active
+            }
+            GlassButton { id: setReminderButton; text: qsTr("Set reminder"); enabled: !!root.current.active && reminderSeconds.acceptableInput; onClicked: root.net.setReminder(Number(reminderSeconds.text)) }
+            GlassButton { text: qsTr("Clear reminder"); enabled: !!root.reminder.scheduled; onClicked: root.net.clearReminder() }
+            Text {
+                id: reminderStatus
+                Layout.fillWidth: true
+                visible: !!root.reminder.scheduled
+                readonly property double remaining: Math.ceil((Date.parse(root.reminder.deadline || "") - root.reminderClock) / 1000)
+                text: remaining > 0 ? qsTr("Reminder in %1 s").arg(remaining) : qsTr("Reminder due")
+                color: remaining > 0 ? Theme.textSecondary : Theme.warningColor
+            }
         }
         RowLayout {
             Layout.fillWidth: true

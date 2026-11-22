@@ -48,6 +48,23 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetReminderShowsWhenDue()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionet:reminder"), output), output.constData());
+        QVERIFY2(output.contains("PROBE reminderScheduled=true"), output.constData());
+        QVERIFY2(output.contains("PROBE reminderDue=true"), output.constData());
+        decolog::core::LogDatabase db;
+        QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        decolog::core::RadioNet net(&db);
+        net.load();
+        QVERIFY(net.reminder().value("scheduled").toBool());
+        QVERIFY(net.reminder().value("due").toBool());
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void radioNetNavigatesCompleteHistory()
     {
         QTemporaryDir dir;

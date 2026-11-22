@@ -19,6 +19,7 @@ class RadioNet : public QObject {
     Q_PROPERTY(QVariantList events READ events NOTIFY changed)
     Q_PROPERTY(QVariantMap session READ session NOTIFY changed)
     Q_PROPERTY(QVariantMap summary READ summary NOTIFY changed)
+    Q_PROPERTY(QVariantMap reminder READ reminder NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(bool exportBusy READ exportBusy NOTIFY exportChanged)
   public:
@@ -31,6 +32,7 @@ class RadioNet : public QObject {
     Q_INVOKABLE QVariantList historyPage(qint64 beforeId) const;
     QVariantMap session() const;
     QVariantMap summary() const;
+    QVariantMap reminder() const;
     QString error() const { return m_error; }
     bool exportBusy() const { return m_exportBusy; }
     Q_INVOKABLE bool selectSession(qint64 id);
@@ -41,6 +43,8 @@ class RadioNet : public QObject {
     Q_INVOKABLE bool nextTurn();
     Q_INVOKABLE bool closeSession();
     Q_INVOKABLE bool reopenSession();
+    Q_INVOKABLE bool setReminder(int seconds);
+    Q_INVOKABLE bool clearReminder();
     Q_INVOKABLE bool exportSession(const QUrl &file);
     Q_INVOKABLE void cancelExport();
   signals:

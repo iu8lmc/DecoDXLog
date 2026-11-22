@@ -20,3 +20,5 @@
 - G08 export streams the complete selected session from a worker-owned SQLite read transaction to an atomically replaced local JSON file. A participant may explicitly open a prefilled QSO draft; roster actions never save a QSO and an existing radio-net draft is not overwritten. The export format is application-specific and saved QSO association is not yet implemented.
 
 - G08 history uses indexed descending event IDs as page boundaries, fetching at most 201 rows to show 200 and determine whether older events exist. New events appear when the newest page is revisited; browsing is not a frozen snapshot.
+
+- G08 optional reminders store a UTC deadline or cancellation as session history, without a schema migration. The countdown is visual in the selected manager window; no background or operating-system alert is claimed.

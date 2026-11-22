@@ -76,6 +76,63 @@ QVariantMap RadioNet::session() const
             {QStringLiteral("active"), q.value(3).isNull()}};
 }
 bool RadioNet::active() const { return session().value(QStringLiteral("active")).toBool(); }
+QVariantMap RadioNet::reminder() const
+{
+    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+        return {};
+    QSqlQuery q(m_db->connection());
+    q.prepare(QStringLiteral("SELECT event,detail FROM radio_net_event WHERE session_id=? AND "
+                             "event IN ('reminder_set','reminder_clear') ORDER BY id DESC LIMIT 1"));
+    q.addBindValue(m_sessionId);
+    if (!q.exec() || !q.next() || q.value(0).toString() != QLatin1String("reminder_set"))
+        return {{QStringLiteral("scheduled"), false}};
+    const QString deadline = q.value(1).toString();
+    const QDateTime due = QDateTime::fromString(deadline, Qt::ISODateWithMs);
+    if (!due.isValid())
+        return {{QStringLiteral("scheduled"), false}};
+    return {{QStringLiteral("scheduled"), true},
+            {QStringLiteral("deadline"), deadline},
+            {QStringLiteral("due"), due <= QDateTime::currentDateTimeUtc()}};
+}
+
+bool RadioNet::setReminder(int seconds)
+{
+    if (!m_db || !m_db->isOpen() || seconds < 1 || seconds > 86400)
+        return fail(tr("Enter a reminder duration from 1 to 86400 seconds"));
+    QSqlDatabase db = m_db->connection();
+    if (!db.transaction())
+        return fail(db.lastError().text());
+    if (!active()) {
+        db.rollback();
+        return fail(tr("Open an active radio net first"));
+    }
+    const QString deadline = QDateTime::currentDateTimeUtc().addSecs(seconds).toString(Qt::ISODateWithMs);
+    if (!appendEvent(0, QStringLiteral("reminder_set"), deadline) || !db.commit()) {
+        const QString error = db.lastError().text();
+        db.rollback();
+        return fail(error.isEmpty() ? tr("Cannot save session") : error);
+    }
+    m_error.clear();
+    emit changed();
+    return true;
+}
+
+bool RadioNet::clearReminder()
+{
+    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+        return fail(tr("Radio net session not found"));
+    QSqlDatabase db = m_db->connection();
+    if (!db.transaction())
+        return fail(db.lastError().text());
+    if (!appendEvent(0, QStringLiteral("reminder_clear")) || !db.commit()) {
+        const QString error = db.lastError().text();
+        db.rollback();
+        return fail(error.isEmpty() ? tr("Cannot save session") : error);
+    }
+    m_error.clear();
+    emit changed();
+    return true;
+}
 QVariantMap RadioNet::summary() const
 {
     if (!m_db || !m_db->isOpen() || m_sessionId <= 0)

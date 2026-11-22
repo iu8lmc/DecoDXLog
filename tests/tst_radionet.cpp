@@ -14,6 +14,78 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void reminderSurvivesRestartAndCanBeCleared()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath("log.sqlite");
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            RadioNet net(&db);
+            QVERIFY(net.metaObject()->indexOfMethod("setReminder(int)") >= 0);
+            QVERIFY(net.start("Reminder"));
+            bool accepted = true;
+            QVERIFY(QMetaObject::invokeMethod(&net, "setReminder", Q_RETURN_ARG(bool, accepted), Q_ARG(int, 0)));
+            QVERIFY(!accepted);
+            QVERIFY(QMetaObject::invokeMethod(&net, "setReminder", Q_RETURN_ARG(bool, accepted), Q_ARG(int, 1)));
+            QVERIFY(accepted);
+            QVERIFY(net.property("reminder").toMap().value("scheduled").toBool());
+            const QString deadline = net.property("reminder").toMap().value("deadline").toString();
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("CREATE TRIGGER reject_reminder BEFORE INSERT ON radio_net_event WHEN "
+                           "NEW.event='reminder_set' BEGIN SELECT RAISE(ABORT, 'rejected'); END"));
+            QVERIFY(QMetaObject::invokeMethod(&net, "setReminder", Q_RETURN_ARG(bool, accepted), Q_ARG(int, 30)));
+            QVERIFY(!accepted);
+            QCOMPARE(net.property("reminder").toMap().value("deadline").toString(), deadline);
+            QVERIFY(q.exec("DROP TRIGGER reject_reminder"));
+            QCOMPARE(db.qsoCount(), 0);
+        }
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            RadioNet net(&db);
+            net.load();
+            QVERIFY(net.property("reminder").toMap().value("scheduled").toBool());
+            QTRY_VERIFY_WITH_TIMEOUT(net.property("reminder").toMap().value("due").toBool(), 3000);
+            bool cleared = false;
+            QVERIFY(QMetaObject::invokeMethod(&net, "clearReminder", Q_RETURN_ARG(bool, cleared)));
+            QVERIFY(cleared);
+            QVERIFY(!net.property("reminder").toMap().value("scheduled").toBool());
+            QCOMPARE(db.qsoCount(), 0);
+        }
+        {
+            LogDatabase db;
+            QVERIFY(db.open(path));
+            RadioNet net(&db);
+            net.load();
+            QVERIFY(!net.property("reminder").toMap().value("scheduled").toBool());
+        }
+    }
+
+    void remindersAreScopedToSessions()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        RadioNet net(&db);
+        QVERIFY(net.start("First"));
+        const qint64 first = net.session().value("id").toLongLong();
+        QVERIFY(net.setReminder(60));
+        const QString deadline = net.reminder().value("deadline").toString();
+        QVERIFY(net.start("Second"));
+        QVERIFY(!net.reminder().value("scheduled").toBool());
+        QVERIFY(net.setReminder(120));
+        QVERIFY(net.closeSession());
+        QVERIFY(!net.setReminder(5));
+        QVERIFY(net.clearReminder());
+        QVERIFY(!net.reminder().value("scheduled").toBool());
+        QVERIFY(net.selectSession(first));
+        QCOMPARE(net.reminder().value("deadline").toString(), deadline);
+        QVERIFY(net.setReminder(180));
+        QVERIFY(net.reminder().value("deadline").toString() != deadline);
+        QCOMPARE(db.qsoCount(), 0);
+    }
+
     void pagesCompleteHistoryWithoutChangingRoster()
     {
         LogDatabase db;

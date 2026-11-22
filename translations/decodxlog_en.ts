@@ -14611,6 +14611,38 @@ Extra fields are preserved: %8</source>
         <translation>Older</translation>
     </message>
     <message>
+        <source>Reminder set for %1 UTC</source>
+        <translation>Reminder set for %1 UTC</translation>
+    </message>
+    <message>
+        <source>Reminder cleared</source>
+        <translation>Reminder cleared</translation>
+    </message>
+    <message>
+        <source>Reminder (seconds)</source>
+        <translation>Reminder (seconds)</translation>
+    </message>
+    <message>
+        <source>Reminder duration in seconds</source>
+        <translation>Reminder duration in seconds</translation>
+    </message>
+    <message>
+        <source>Set reminder</source>
+        <translation>Set reminder</translation>
+    </message>
+    <message>
+        <source>Clear reminder</source>
+        <translation>Clear reminder</translation>
+    </message>
+    <message>
+        <source>Reminder in %1 s</source>
+        <translation>Reminder in %1 s</translation>
+    </message>
+    <message>
+        <source>Reminder due</source>
+        <translation>Reminder due</translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation>Recent session history (latest 200)</translation>
     </message>
@@ -14697,6 +14729,10 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Enter a session name (up to 160 characters)</source>
         <translation>Enter a session name (up to 160 characters)</translation>
+    </message>
+    <message>
+        <source>Enter a reminder duration from 1 to 86400 seconds</source>
+        <translation>Enter a reminder duration from 1 to 86400 seconds</translation>
     </message>
     <message>
         <source>Cannot save session</source>

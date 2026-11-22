@@ -14654,6 +14654,38 @@ Campi extra conservati: %8</translation>
         <translation>Più vecchi</translation>
     </message>
     <message>
+        <source>Reminder set for %1 UTC</source>
+        <translation>Promemoria impostato per %1 UTC</translation>
+    </message>
+    <message>
+        <source>Reminder cleared</source>
+        <translation>Promemoria cancellato</translation>
+    </message>
+    <message>
+        <source>Reminder (seconds)</source>
+        <translation>Promemoria (secondi)</translation>
+    </message>
+    <message>
+        <source>Reminder duration in seconds</source>
+        <translation>Durata del promemoria in secondi</translation>
+    </message>
+    <message>
+        <source>Set reminder</source>
+        <translation>Imposta promemoria</translation>
+    </message>
+    <message>
+        <source>Clear reminder</source>
+        <translation>Cancella promemoria</translation>
+    </message>
+    <message>
+        <source>Reminder in %1 s</source>
+        <translation>Promemoria tra %1 s</translation>
+    </message>
+    <message>
+        <source>Reminder due</source>
+        <translation>Promemoria scaduto</translation>
+    </message>
+    <message>
         <source>Recent session history (latest 200)</source>
         <translation>Storico recente della sessione (ultimi 200)</translation>
     </message>
@@ -14740,6 +14772,10 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Enter a session name (up to 160 characters)</source>
         <translation>Inserisci un nome di sessione (massimo 160 caratteri)</translation>
+    </message>
+    <message>
+        <source>Enter a reminder duration from 1 to 86400 seconds</source>
+        <translation>Inserisci una durata del promemoria tra 1 e 86400 secondi</translation>
     </message>
     <message>
         <source>Cannot save session</source>
