@@ -2393,8 +2393,8 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <translation>Confronto delle istantanee…</translation>
     </message>
     <message>
-        <source>The open log changed or a file was replaced; compare again.</source>
-        <translation>Il log aperto è cambiato oppure un file è stato sostituito; ripeti il confronto.</translation>
+        <source>A log changed or was replaced; compare again.</source>
+        <translation>Un log è cambiato oppure è stato sostituito; ripeti il confronto.</translation>
     </message>
     <message>
         <source>Matching %1 · only current %2 · only selected %3 · revision %4 · content %5 · deletion %6</source>

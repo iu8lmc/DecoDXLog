@@ -251,7 +251,7 @@ GlassPanel {
                 Text { Layout.fillWidth:true; elide:Text.ElideMiddle; textFormat:Text.PlainText; color:Theme.textSecondary; text:root.net.qsoComparisonSummary.remotePath || "" }
             }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.warningColor
-                text:qsoComparisonDialog.localError || root.net.qsoComparisonSummary.error || (root.net.qsoComparisonBusy ? qsTr("Comparing snapshots…") : root.net.qsoComparisonSummary.stale ? qsTr("The open log changed or a file was replaced; compare again.") : "") }
+                text:qsoComparisonDialog.localError || root.net.qsoComparisonSummary.error || (root.net.qsoComparisonBusy ? qsTr("Comparing snapshots…") : root.net.qsoComparisonSummary.stale ? qsTr("A log changed or was replaced; compare again.") : "") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
                 visible:root.net.qsoComparisonSummary.differences !== undefined
                 text:qsTr("Matching %1 · only current %2 · only selected %3 · revision %4 · content %5 · deletion %6")

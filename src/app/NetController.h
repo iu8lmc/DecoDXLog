@@ -199,6 +199,8 @@ private:
     QString m_qsoComparisonPath, m_qsoComparisonIdentity, m_qsoComparisonStamp, m_qsoComparisonRemotePath;
     QByteArray m_qsoComparisonFileIdentity, m_qsoComparisonRemoteFileIdentity;
     quint64 m_qsoComparisonOpenGeneration{0};
+    std::unique_ptr<core::LogDatabase> m_qsoComparisonRemoteWatcher;
+    qint64 m_qsoComparisonRemoteVersion{-1};
     void requestSerial();
     void noteSerial(const QString& stx);
 };

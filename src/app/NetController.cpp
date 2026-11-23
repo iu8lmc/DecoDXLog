@@ -36,8 +36,10 @@ NetController::NetController(Context context, QObject* parent)
             m_ctx.db->identity()!=m_qsoComparisonIdentity || m_ctx.db->openGeneration()!=m_qsoComparisonOpenGeneration ||
             m_ctx.db->openFileIdentity()!=m_qsoComparisonFileIdentity || !m_ctx.db->fileIdentityMatchesOpen() ||
             m_ctx.db->changeStamp()!=m_qsoComparisonStamp ||
-            fileidentity::read(m_qsoComparisonRemotePath)!=m_qsoComparisonRemoteFileIdentity) {
-            m_qsoComparisonTimer.stop(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true); emit qsoComparisonChanged();
+            fileidentity::read(m_qsoComparisonRemotePath)!=m_qsoComparisonRemoteFileIdentity ||
+            !m_qsoComparisonRemoteWatcher || !m_qsoComparisonRemoteWatcher->fileIdentityMatchesOpen() ||
+            m_qsoComparisonRemoteWatcher->dataVersion()!=m_qsoComparisonRemoteVersion) {
+            m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true); emit qsoComparisonChanged();
         }
     });
     m_durableRetry.setInterval(2000);
@@ -100,9 +102,14 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
     const QString localPath=m_ctx.db->path(), remotePath=remoteFile.toLocalFile(), identity=m_ctx.db->identity(), stamp=m_ctx.db->changeStamp();
     const QByteArray localFileIdentity=m_ctx.db->openFileIdentity(), remoteFileIdentity=fileidentity::read(remotePath);
     if (identity.isEmpty() || stamp.isEmpty() || remoteFileIdentity.isEmpty()) return false;
+    auto watcher=std::make_unique<LogDatabase>();
+    if (!watcher->openReadOnly(remotePath) || watcher->openFileIdentity()!=remoteFileIdentity || !watcher->fileIdentityMatchesOpen()) return false;
+    const qint64 remoteVersion=watcher->dataVersion();
+    if (remoteVersion<0) return false;
     const quint64 dbGeneration=m_ctx.db->openGeneration(), generation=++m_qsoComparisonGeneration;
     auto cancelled=std::make_shared<std::atomic_bool>(false); m_qsoComparisonCancel=cancelled;
-    m_qsoComparisonTimer.stop(); m_qsoComparisonBusy=true; m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear(); emit qsoComparisonChanged();
+    m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher=std::move(watcher); m_qsoComparisonRemoteVersion=remoteVersion;
+    m_qsoComparisonBusy=true; m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear(); emit qsoComparisonChanged();
     QPointer<NetController> self(this);
     m_qsoComparisonPool.start([self,cancelled,localPath,remotePath,identity,stamp,localFileIdentity,remoteFileIdentity,dbGeneration,generation] {
         ContestNetReconcile comparison; QVariantMap counts{{QStringLiteral("matching"),0},{QStringLiteral("localOnly"),0},{QStringLiteral("remoteOnly"),0},
@@ -153,11 +160,13 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
             if (!self || self->m_qsoComparisonGeneration!=generation) return;
             self->m_qsoComparisonBusy=false; self->m_qsoComparisonCancel.reset();
             if (cancelled->load() || !error.isEmpty()) {
+                self->m_qsoComparisonRemoteWatcher.reset();
                 self->m_qsoComparisonRows.clear(); self->m_qsoComparisonSummary={{QStringLiteral("error"),cancelled->load()?self->tr("Comparison cancelled"):error}};
             } else if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=localPath ||
                 self->m_ctx.db->identity()!=identity || self->m_ctx.db->openGeneration()!=dbGeneration ||
                 self->m_ctx.db->openFileIdentity()!=localFileIdentity || !self->m_ctx.db->fileIdentityMatchesOpen() ||
                 fileidentity::read(remotePath)!=remoteFileIdentity) {
+                self->m_qsoComparisonRemoteWatcher.reset();
                 self->m_qsoComparisonRows.clear(); self->m_qsoComparisonSummary={{QStringLiteral("error"),self->tr("A log changed; compare again.")}};
             } else {
                 self->m_qsoComparisonPath=localPath; self->m_qsoComparisonIdentity=identity; self->m_qsoComparisonStamp=stamp;
@@ -170,8 +179,11 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
                 self->m_qsoComparisonSummary.insert(QStringLiteral("truncated"),differences>rows.size());
                 self->m_qsoComparisonSummary.insert(QStringLiteral("localWatermark"),localWatermark); self->m_qsoComparisonSummary.insert(QStringLiteral("remoteWatermark"),remoteWatermark);
                 self->m_qsoComparisonSummary.insert(QStringLiteral("remoteIdentity"),remoteIdentity); self->m_qsoComparisonSummary.insert(QStringLiteral("remotePath"),remotePath);
-                const bool stale=self->m_ctx.db->changeStamp()!=stamp; self->m_qsoComparisonSummary.insert(QStringLiteral("stale"),stale);
-                if (!stale) self->m_qsoComparisonTimer.start();
+                const bool stale=self->m_ctx.db->changeStamp()!=stamp || !self->m_qsoComparisonRemoteWatcher ||
+                    !self->m_qsoComparisonRemoteWatcher->fileIdentityMatchesOpen() ||
+                    self->m_qsoComparisonRemoteWatcher->dataVersion()!=self->m_qsoComparisonRemoteVersion;
+                self->m_qsoComparisonSummary.insert(QStringLiteral("stale"),stale);
+                if (!stale) self->m_qsoComparisonTimer.start(); else self->m_qsoComparisonRemoteWatcher.reset();
             }
             emit self->qsoComparisonChanged();
         },Qt::QueuedConnection);
@@ -183,7 +195,7 @@ void NetController::cancelQsoComparison()
 {
     if (m_qsoComparisonCancel) m_qsoComparisonCancel->store(true);
     if (!m_qsoComparisonBusy) {
-        m_qsoComparisonTimer.stop(); m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear();
+        m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear();
         emit qsoComparisonChanged();
     }
 }
