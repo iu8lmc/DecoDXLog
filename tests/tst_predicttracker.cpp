@@ -1,11 +1,28 @@
 #include "core/PredictTracker.h"
+#include "core/Tle.h"
 #include <QSignalSpy>
 #include <QTest>
 #include <QUdpSocket>
 using namespace decolog::core;
+static QByteArray checksummed(QByteArray line)
+{
+    Q_ASSERT(line.size()==69);
+    int sum=0; for (int i=0;i<68;++i) { const char c=line[i]; if (c>='0' && c<='9') sum+=c-'0'; else if (c=='-') ++sum; }
+    line[68]=char('0'+sum%10); return line;
+}
 class TestPredictTracker : public QObject {
     Q_OBJECT
   private slots:
+    void tleIntegrityChecksRejectCorruptionAndMismatchedSatellites()
+    {
+        const QByteArray one="1 23455U 94089A   97320.90946019  .00000140  00000-0  10191-3 0  2621";
+        const QByteArray two="2 23455  99.0090 272.6745 0008546 223.1686 136.8816 14.11711747148495";
+        const auto valid=tle::inspect(one,two); QVERIFY2(valid.ok,qPrintable(valid.error));
+        QCOMPARE(valid.catalogue,QString("23455")); QCOMPARE(valid.epoch.date(),QDate(1997,11,16));
+        auto corrupt=one; corrupt[30]=corrupt[30]=='1' ? '2' : '1'; QVERIFY(!tle::inspect(corrupt,two).ok);
+        auto wrong=two; wrong[6]='6'; int sum=0; for (int i=0;i<68;++i) { const char c=wrong[i]; if (c>='0' && c<='9') sum+=c-'0'; else if (c=='-') ++sum; } wrong[68]=char('0'+sum%10);
+        QVERIFY(!tle::inspect(one,wrong).ok); QVERIFY(!tle::inspect(one,two.left(32)).ok);
+    }
     void listsSatellitesAndRejectsStoppedTracking()
     {
         PredictTracker tracker;
@@ -70,6 +87,24 @@ class TestPredictTracker : public QObject {
         QVERIFY(!done.takeFirst().at(0).toBool());
         QVERIFY(tracker.satellites().isEmpty());
     }
+    void rejectsCorruptTleWithoutPublishingSnapshot()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0));
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress host; quint16 port;
+                server.readDatagram(request.data(),request.size(),&host,&port); QByteArray response;
+                if (request.startsWith("GET_MODE")) response="MULTI\n";
+                else if (request.startsWith("GET_SAT ")) response="OSCAR-7\n1\n2\n3\n4\n1800000000\n6\n7\n8\n9\n10\nD\n";
+                else if (request.startsWith("GET_DOPPLER ")) response="10\n";
+                else response="OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9998\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n";
+                server.writeDatagram(response,host,port);
+            }
+        });
+        PredictTracker tracker; QSignalSpy done(&tracker,&PredictTracker::finished);
+        QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000);
+        QVERIFY(!done.first().at(0).toBool()); QVERIFY(tracker.snapshot().isEmpty());
+    }
     void publicStatusStartsWithoutSnapshot()
     {
         PredictTracker tracker;
@@ -132,9 +167,9 @@ class TestPredictTracker : public QObject {
                 else if (request.startsWith("GET_DOPPLER "))
                     reply = doppler;
                 else if (request.startsWith("GET_TLE "))
-                    reply = QByteArray("FO-29\n1 24278U 96046B   ") + epoch +
-                            "  .00000000  00000-0  00000-0 0  9991\n2 24278  "
-                            "98.5000  80.0000 0350000  40.0000 320.0000 13.50000000100000\n";
+                    reply = QByteArray("FO-29\n") + checksummed(QByteArray("1 24278U 96046B   ") + epoch +
+                            "  .00000000  00000-0  00000-0 0  9991") + "\n" +
+                            checksummed("2 24278  98.5000  80.0000 0350000  40.0000 320.0000 13.50000000100000") + "\n";
                 server.writeDatagram(reply, from, port);
             }
         });
@@ -148,6 +183,7 @@ class TestPredictTracker : public QObject {
         QVERIFY(tracker.publicStatus().value("available").toBool());
         QVERIFY(tracker.publicStatus().value("fresh").toBool());
         QVERIFY(tracker.publicStatus().value("orbitalFresh").toBool());
+        QCOMPARE(tracker.publicStatus().value("tleCatalogue").toString(),QString("24278"));
         QCOMPARE(snapshot.value("azimuth").toDouble(), 203.75);
         QCOMPARE(snapshot.value("elevation").toDouble(), -60.01);
         QCOMPARE(snapshot.value("doppler100MHz").toDouble(), 961.742249);
@@ -198,8 +234,8 @@ class TestPredictTracker : public QObject {
                 else if (request.startsWith("GET_DOPPLER "))
                     reply = "10\n";
                 else if (request.startsWith("GET_TLE "))
-                    reply = "FO-29\n1 24278U 96046B   26326.50000000  .00000000  00000-0  00000-0 0  9991\n2 24278  "
-                            "98.5000\n";
+                    reply = QByteArray("FO-29\n") + checksummed("1 24278U 96046B   26326.50000000  .00000000  00000-0  00000-0 0  9991") + "\n" +
+                            checksummed("2 24278  98.5000  80.0000 0350000  40.0000 320.0000 13.50000000100000") + "\n";
                 server.writeDatagram(reply, from, port);
             }
         });

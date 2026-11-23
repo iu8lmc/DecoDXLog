@@ -1,4 +1,5 @@
 #include "core/PredictPassPlanner.h"
+#include "core/Tle.h"
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QTimeZone>
@@ -93,16 +94,13 @@ void PredictPassPlanner::receive()
                 return;
             }
             if (m_stage == 0) {
-                bool yOk = false, dOk = false;
-                int yy = lines[1].mid(18, 2).toInt(&yOk);
-                double day = lines[1].mid(20, 12).toDouble(&dOk);
-                int year = yy >= 57 ? 1900 + yy : 2000 + yy;
-                if (!yOk || !dOk || !std::isfinite(day) || day < 1 || day >= (QDate::isLeapYear(year) ? 367 : 366)) {
-                    fail(QStringLiteral("Invalid TLE epoch"));
+                const auto checked=tle::inspect(lines[1].trimmed(),lines[2].trimmed());
+                if (!checked.ok) {
+                    fail(QStringLiteral("Invalid TLE: %1").arg(checked.error));
                     return;
                 }
-                m_pass.insert(QStringLiteral("tleEpoch"), QDateTime(QDate(year, 1, 1), QTime(0, 0), QTimeZone::UTC)
-                                                              .addMSecs(qRound64((day - 1) * 86400000.0)));
+                m_pass.insert(QStringLiteral("tleEpoch"),checked.epoch);
+                m_pass.insert(QStringLiteral("tleCatalogue"),checked.catalogue);
                 m_tle = raw.trimmed();
             } else if (raw.trimmed() != m_tle) {
                 fail(QStringLiteral("Orbital data changed during prediction"));

@@ -96,6 +96,8 @@ add_library(decolog_core STATIC
     src/core/Activation.h
     src/core/PredictPassPlanner.cpp
     src/core/PredictPassPlanner.h
+    src/core/Tle.cpp
+    src/core/Tle.h
     src/core/PredictTracker.cpp
     src/core/PredictTracker.h
     src/core/RoverSession.cpp

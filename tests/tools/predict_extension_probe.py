@@ -19,6 +19,11 @@ APP, ROOT = sys.argv[1:]
 TOKEN = "fedcba9876543210fedcba9876543210"
 
 
+def checksummed(line):
+    assert len(line) == 69
+    total = sum(int(c) if c.isdigit() else 1 if c == '-' else 0 for c in line[:68])
+    return line[:68] + str(total % 10)
+
 class Fixture(socketserver.BaseRequestHandler):
     def handle(self):
         packet, sock = self.request
@@ -33,7 +38,9 @@ class Fixture(socketserver.BaseRequestHandler):
         elif command == "GET_TLE OSCAR-7":
             epoch = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
             value = f"{epoch.year % 100:02}{epoch.timetuple().tm_yday:03}.00000000"
-            reply = f"OSCAR-7\n1 07530U 74089B   {value} -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842 94.8539\n"
+            first = checksummed(f"1 07530U 74089B   {value} -.00000043  00000-0  11708-4 0  9999")
+            second = checksummed("2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425")
+            reply = f"OSCAR-7\n{first}\n{second}\n"
         else:
             reply = "Huh?\n"
         sock.sendto(reply.encode("ascii"), self.client_address)

@@ -23,6 +23,22 @@ class TestPredictPass : public QObject {
         QVERIFY(planner.pass().value("los").toLongLong() > planner.pass().value("aos").toLongLong());
         QCOMPARE(planner.pass().value("tleEpoch").toDateTime().date().year(), 2018);
     }
+    void rejectsTleForTwoDifferentSatellitesBeforePrediction()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0)); QStringList commands;
+        QByteArray line2="2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425";
+        line2[6]='1'; int sum=0; for (int i=0;i<68;++i) { const char c=line2[i]; if (c>='0' && c<='9') sum+=c-'0'; else if (c=='-') ++sum; } line2[68]=char('0'+sum%10);
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress host; quint16 port;
+                server.readDatagram(request.data(),request.size(),&host,&port); commands << QString::fromLatin1(request).trimmed();
+                server.writeDatagram(QByteArray("OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n")+line2+"\n",host,port);
+            }
+        });
+        PredictPassPlanner planner; QSignalSpy done(&planner,&PredictPassPlanner::finished);
+        QVERIFY(planner.request("127.0.0.1",server.localPort(),"OSCAR-7",1800000000)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000);
+        QVERIFY(!done.first().at(0).toBool()); QVERIFY(planner.pass().isEmpty()); QCOMPARE(commands,QStringList({"GET_TLE OSCAR-7"}));
+    }
     void obtainsBoundedPassWithoutRadioCommands()
     {
         QUdpSocket server;

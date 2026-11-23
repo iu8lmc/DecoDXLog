@@ -1,4 +1,5 @@
 #include "core/PredictTracker.h"
+#include "core/Tle.h"
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QTimeZone>
@@ -29,6 +30,7 @@ QVariantMap PredictTracker::publicStatus() const
         result.insert(QStringLiteral("nextEventUnix"),m_snapshot.value(QStringLiteral("nextEventUnix")));
         result.insert(QStringLiteral("receivedAt"),received.toUTC().toString(Qt::ISODateWithMs));
         result.insert(QStringLiteral("tleEpoch"),epoch.toUTC().toString(Qt::ISODateWithMs));
+        result.insert(QStringLiteral("tleCatalogue"),m_snapshot.value(QStringLiteral("tleCatalogue")));
     }
     return result;
 }
@@ -222,17 +224,13 @@ void PredictTracker::receive()
                 fail(QStringLiteral("Invalid PREDICT TLE response"));
                 return;
             }
-            bool yearOk = false, dayOk = false;
-            const int yy = lines[1].mid(18, 2).toInt(&yearOk);
-            const double day = lines[1].mid(20, 12).toDouble(&dayOk);
-            const int year = yy >= 57 ? 1900 + yy : 2000 + yy;
-            if (!yearOk || !dayOk || !std::isfinite(day) || day < 1 || day >= (QDate::isLeapYear(year) ? 367 : 366)) {
-                fail(QStringLiteral("Invalid PREDICT TLE epoch"));
+            const auto checked=tle::inspect(lines[1].trimmed(),lines[2].trimmed());
+            if (!checked.ok) {
+                fail(QStringLiteral("Invalid PREDICT TLE: %1").arg(checked.error));
                 return;
             }
-            const auto epoch =
-                QDateTime(QDate(year, 1, 1), QTime(0, 0), QTimeZone::UTC).addMSecs(qRound64((day - 1.0) * 86400000.0));
-            m_pending.insert(QStringLiteral("tleEpoch"), epoch);
+            m_pending.insert(QStringLiteral("tleEpoch"),checked.epoch);
+            m_pending.insert(QStringLiteral("tleCatalogue"),checked.catalogue);
             m_pending.insert(QStringLiteral("receivedAt"), QDateTime::currentDateTimeUtc());
         }
         ++m_stage;

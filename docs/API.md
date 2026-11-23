@@ -48,8 +48,9 @@ booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
 ### `GET /api/v1/tracker`
 
 Restituisce l'ultima osservazione PREDICT acquisita dall'app, se disponibile,
-con satellite, azimut, elevazione, Doppler a 100 MHz, istante di ricezione ed
-epoca TLE. `available` indica che esiste una lettura; `fresh` vale solo entro
+con satellite, azimut, elevazione, Doppler a 100 MHz, istante di ricezione, numero di catalogo ed
+epoca TLE. Le due righe sono controllate per lunghezza, numero di catalogo,
+checksum ed epoca; il controllo non autentica la sorgente né valida l'orbita. `available` indica che esiste una lettura; `fresh` vale solo entro
 10 secondi e mentre non è in corso un'altra richiesta; `orbitalFresh` indica
 un'epoca TLE non futura e non più vecchia di 14 giorni. È un'istantanea, non
 una prova di connessione attuale, visibilità, validità della propagazione o
