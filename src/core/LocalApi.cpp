@@ -87,6 +87,7 @@ bool LocalApiServer::start(quint16 port)
     m_lastError.clear();
     connect(m_server, &QTcpServer::newConnection, this, [this] {
         while (QTcpSocket* s = m_server->nextPendingConnection()) {
+            s->setReadBufferSize(kMaxHeader + kMaxBody + 4);
             m_buffers.insert(s, {});
             connect(s, &QTcpSocket::readyRead, this, [this, s] { readFrom(s); });
             connect(s, &QTcpSocket::disconnected, this, [this, s] {
@@ -136,12 +137,18 @@ bool LocalApiServer::authorized(const HttpRequest& request) const
 
 void LocalApiServer::readFrom(QTcpSocket* socket)
 {
+    if (!m_buffers.contains(socket))
+        return;
     QByteArray& buffer = m_buffers[socket];
     buffer += socket->readAll();
     const qsizetype end = buffer.indexOf("\r\n\r\n");
     if (end < 0) {
         if (buffer.size() > kMaxHeader)
             answer(socket, HttpResponse::error(400, QStringLiteral("header too long")));
+        return;
+    }
+    if (end > kMaxHeader) {
+        answer(socket, HttpResponse::error(400, QStringLiteral("header too long")));
         return;
     }
     HttpRequest request;
@@ -158,10 +165,33 @@ void LocalApiServer::readFrom(QTcpSocket* socket)
     for (qsizetype i = 1; i < lines.size(); ++i) {
         const QByteArray line = lines.at(i).trimmed();
         const qsizetype colon = line.indexOf(':');
-        if (colon > 0)
-            request.headers.insert(line.left(colon).trimmed().toLower(), line.mid(colon + 1).trimmed());
+        if (colon > 0) {
+            const QByteArray name = line.left(colon).trimmed().toLower();
+            if ((name == "content-length" && request.headers.contains(name)) || name == "transfer-encoding") {
+                answer(socket, HttpResponse::error(400, QStringLiteral("unsupported request framing")));
+                return;
+            }
+            request.headers.insert(name, line.mid(colon + 1).trimmed());
+        }
     }
-    const qsizetype length = request.headers.value("content-length").toLongLong();
+    qsizetype length = 0;
+    if (request.headers.contains("content-length")) {
+        const QByteArray value = request.headers.value("content-length");
+        bool valid = !value.isEmpty();
+        for (char c : value)
+            valid = valid && c >= '0' && c <= '9';
+        bool converted = false;
+        const qulonglong parsed = value.toULongLong(&converted);
+        if (!valid || !converted) {
+            answer(socket, HttpResponse::error(400, QStringLiteral("invalid content length")));
+            return;
+        }
+        if (parsed > qulonglong(kMaxBody)) {
+            answer(socket, HttpResponse::error(413, QStringLiteral("body too large")));
+            return;
+        }
+        length = qsizetype(parsed);
+    }
     if (length > kMaxBody) {
         answer(socket, HttpResponse::error(413, QStringLiteral("body too large")));
         return;

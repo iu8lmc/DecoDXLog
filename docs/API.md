@@ -24,6 +24,15 @@ ne fa un'altra: i programmi che usavano quella vecchia vanno aggiornati.
 
 Tutte le risposte sono JSON.
 
+### `GET /api/v1/capabilities?apiVersion=1`
+
+Ritorna la versione del contratto e le operazioni effettivamente disponibili;
+una versione richiesta diversa da `1` produce `400`. Il campo `permissionModel`
+vale `shared-token`: la chiave attuale concede tutte le operazioni elencate,
+compresa la scrittura dei QSO. Non esistono ancora permessi per estensione,
+eventi, controllo TX o idempotenza transazionale durevole; i rispettivi campi
+booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
+
 ### `GET /api/v1/status`
 
     {"app":"DecoDXLog","version":"1.17.66","log":"decodxlog","qsos":26497,
@@ -67,15 +76,18 @@ profilo di stazione, attivazione aperta, doppioni, callbook e invio QSL automati
 ### Retry e idempotenza
 
 Per i retry del client si può aggiungere `Idempotency-Key` (massimo 128 caratteri)
-alla POST. La stessa chiave e lo stesso corpo restituiscono la stessa risposta e
-non creano un secondo QSO. Riutilizzare la chiave con un corpo diverso restituisce
+alla POST. Quando la risposta di idempotenza è stata salvata, la stessa chiave e lo stesso
+corpo restituiscono la stessa risposta senza creare un secondo QSO. Riutilizzare la chiave con un corpo diverso restituisce
 `409`. Anche senza la chiave, la deduplicazione normale del log impedisce che lo
 stesso contatto venga registrato due volte; contatti distinti restano distinti.
 
 Le chiavi sono persistite nel database del log, con una retention di 30 giorni;
 le voci scadute vengono rimosse alla prima consultazione. Il primo risultato
-salvato per una chiave resta immutabile: anche richieste concorrenti non possono
-sovrascriverlo. Dopo un riavvio, lo stesso retry restituisce quindi l'esito
-originale senza creare un secondo QSO.
+salvato per una chiave resta immutabile; questo non rende atomiche la scrittura
+del QSO e quella del risultato. Dopo un riavvio, lo stesso retry restituisce quindi l'esito
+originale senza creare un secondo QSO, se la registrazione della risposta è riuscita.
+Il QSO e la risposta di idempotenza non sono ancora salvati nella stessa transazione:
+un arresto o errore tra le due scritture può impedire il replay della risposta
+originale. Non usare questo meccanismo come garanzia esattamente-una-volta.
 L'API resta spenta per impostazione predefinita e, quando attiva, ascolta solo su
 `127.0.0.1`.

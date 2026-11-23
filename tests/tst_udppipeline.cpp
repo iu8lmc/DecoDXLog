@@ -494,6 +494,20 @@ private slots:
         QCOMPARE(qsos.size(), 1);
         QCOMPARE(qsos.at(0).toObject().value("call").toString(), QString("VK2AB"));
         QVERIFY(request("GET", QStringLiteral("/api/v1/status")).second.value("qsos").toInt() > 0);
+        const auto capabilities = request("GET", QStringLiteral("/api/v1/capabilities"));
+        QCOMPARE(capabilities.first, 200);
+        QCOMPARE(capabilities.second.value("apiVersion").toInt(), 1);
+        QCOMPARE(capabilities.second.value("permissionModel").toString(), QString("shared-token"));
+        QVERIFY(!capabilities.second.value("txControl").toBool());
+        QVERIFY(!capabilities.second.value("events").toBool());
+        QVERIFY(capabilities.second.value("operations").toArray().contains("qso.read"));
+        QVERIFY(capabilities.second.value("operations").toArray().contains("qso.write"));
+        QCOMPARE(request("POST", QStringLiteral("/api/v1/capabilities")).first,405);
+        QCOMPARE(request("GET", QStringLiteral("/api/v1/capabilities?apiVersion=1")).first,200);
+        QCOMPARE(request("GET", QStringLiteral("/api/v1/capabilities?apiVersion=2")).first,400);
+        QVERIFY(!capabilities.second.value("perExtensionPermissions").toBool());
+        QVERIFY(!capabilities.second.value("durableAtomicIdempotency").toBool());
+
         // Senza chiave, niente.
         QNetworkReply* anonymous = net.get(QNetworkRequest(QUrl(QStringLiteral("http://127.0.0.1:%1/api/v1/status").arg(m_apiPort))));
         QSignalSpy done(anonymous, &QNetworkReply::finished);

@@ -121,6 +121,27 @@ private slots:
         QVERIFY(answer.contains("0123456789"));
     }
 
+    void rejectsMalformedRequestFraming_data()
+    {
+        QTest::addColumn<QByteArray>("extraHeaders");
+        QTest::newRow("negative") << QByteArray("Content-Length: -1\r\n");
+        QTest::newRow("nonnumeric") << QByteArray("Content-Length: bad\r\n");
+        QTest::newRow("duplicate") << QByteArray("Content-Length: 0\r\nContent-Length: 0\r\n");
+        QTest::newRow("transfer-encoding") << QByteArray("Transfer-Encoding: chunked\r\n");
+        QTest::newRow("oversized-header") << QByteArray("X-Fill: ") + QByteArray(17000,'x') + "\r\n";
+    }
+    void rejectsMalformedRequestFraming()
+    {
+        QFETCH(QByteArray,extraHeaders);
+        QTcpSocket socket; socket.connectToHost(QHostAddress::LocalHost,m_server.port());
+        QVERIFY(socket.waitForConnected(3000));
+        socket.write("POST /api/v1/qso HTTP/1.1\r\nHost: x\r\nX-DecoDXLog-Token: " + m_token.toLatin1() + "\r\n" + extraHeaders + "\r\n");
+        socket.flush();
+        QTRY_VERIFY_WITH_TIMEOUT(socket.bytesAvailable()>0 || socket.waitForReadyRead(100),3000);
+        const auto response=socket.readAll();
+        QVERIFY2(response.startsWith("HTTP/1.1 400"),response.constData());
+    }
+
     void noKeyNoServer()
     {
         // Senza chiave anche con la chiave vuota si risponde 401.

@@ -3734,6 +3734,24 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
     if (!m_db.isOpen())
         return HttpResponse::error(503, QStringLiteral("no log open"));
 
+    if (path == QLatin1String("/api/v1/capabilities")) {
+        if (request.method != "GET")
+            return HttpResponse::error(405, QStringLiteral("use GET"));
+        const QString requested = request.query.queryItemValue(QStringLiteral("apiVersion"));
+        if (!requested.isEmpty() && requested != QLatin1String("1"))
+            return HttpResponse::error(400, QStringLiteral("unsupported API version"));
+        return HttpResponse::json(200, QJsonObject{
+            {QStringLiteral("apiVersion"), 1},
+            {QStringLiteral("permissionModel"), QStringLiteral("shared-token")},
+            {QStringLiteral("operations"), QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"),
+                                                       QStringLiteral("qso.read"), QStringLiteral("qso.write")}},
+            {QStringLiteral("events"), false},
+            {QStringLiteral("txControl"), false},
+            {QStringLiteral("perExtensionPermissions"), false},
+            {QStringLiteral("durableAtomicIdempotency"), false},
+        });
+    }
+
     if (path == QLatin1String("/api/v1/status")) {
         if (request.method != "GET")
             return HttpResponse::error(405, QStringLiteral("use GET"));
@@ -3834,7 +3852,7 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         return response;
     }
 
-    return HttpResponse::error(404, QStringLiteral("unknown path: see /api/v1/status, /worked, /qsos, /qso"));
+    return HttpResponse::error(404, QStringLiteral("unknown path: see /api/v1/capabilities, /status, /worked, /qsos, /qso"));
 }
 
 // ── Il VFO della barra in alto ────────────────────────────────────────────────
