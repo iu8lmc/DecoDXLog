@@ -259,7 +259,7 @@ GlassPanel {
                 visible:root.net.experimentalQsoPreview.complete === true
                 text:qsTr("Received %1 · UUID %2 · revision %3 · deleted %4").arg(root.net.experimentalQsoPreview.call || "—").arg(root.net.experimentalQsoPreview.uuid || "").arg(root.net.experimentalQsoPreview.revision).arg(root.net.experimentalQsoPreview.deleted ? qsTr("yes") : qsTr("no")) }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
-                text:qsTr("Transfer state expires after five minutes. If no fragment arrives, ask the sender to send again; repeat missing requests as needed. Closing this window clears the transfer.") }
+                text:qsTr("The receiver automatically requests the first or missing fragments every two seconds. Transfer state expires after five minutes of inactivity. If integrity verification fails, arm the receiver again. Closing this window clears the transfer.") }
             Item { Layout.fillHeight:true }
             GlassButton { text:qsTr("Close"); onClicked:qsoWireDialog.close() }
         }

@@ -7,6 +7,7 @@
 #include "core/ContestNetQsoTransfer.h"
 
 #include <QDateTime>
+#include <QElapsedTimer>
 #include <QHash>
 #include <QObject>
 #include <QSet>
@@ -158,6 +159,7 @@ private:
     void restart();
     void send(const QString& type, QJsonObject body);
     void onReceived(const QString& from, const QString& type, const QJsonObject& body);
+    QString requestExperimentalQsoMissingImpl(bool extendExpiry);
     void serveDurableSerialRequest(const QString& from, const QJsonObject& body);
     void acceptDurableSerialGrant(const QString& from, const QJsonObject& body);
     QString requestDurableSerialImpl(int minimum, const QString& expectedRequestId);
@@ -214,11 +216,12 @@ private:
     quint64 m_durableGeneration{0};
     bool m_durableBusy{false};
     QThreadPool m_qsoWirePool;
-    QTimer m_qsoWireTimer, m_qsoWireExpiry;
+    QTimer m_qsoWireTimer, m_qsoWireExpiry, m_qsoWireRetry;
+    QElapsedTimer m_wireServeLimit;
     std::shared_ptr<core::contestqso::Encoder> m_wireEncoder;
     std::shared_ptr<core::contestqso::Receiver> m_wireReceiver;
     QList<int> m_wireIndices;
-    QString m_wirePeer, m_wireSender, m_wireStatus;
+    QString m_wirePeer, m_wireSender, m_wireStatus, m_wireTransferIn, m_wireTransferOut;
     QVariantMap m_wirePreview;
     quint64 m_wireGeneration{0};
     bool m_wirePreparing{false};

@@ -2273,6 +2273,7 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>The receiver automatically requests the first or missing fragments every two seconds. Transfer state expires after five minutes of inactivity. If integrity verification fails, arm the receiver again. Closing this window clears the transfer.</source><translation>Il ricevitore richiede automaticamente il primo frammento o quelli mancanti ogni due secondi. Il trasferimento scade dopo cinque minuti di inattività. Se la verifica di integrità fallisce, prepara nuovamente la ricezione. La chiusura della finestra cancella il trasferimento.</translation></message>
     <message><source>QSO transfer experiment…</source><translation>Trasferimento QSO sperimentale…</translation></message>
     <message><source>Experimental QSO transfer</source><translation>Trasferimento QSO sperimentale</translation></message>
     <message><source>Experimental UDP broadcast: QSO data is not encrypted and any listener on the network may read it. Station IDs are not authenticated. Only share data with trusted stations and networks.</source><translation>Broadcast UDP sperimentale: i dati QSO non sono cifrati e chiunque ascolti sulla rete può leggerli. Gli ID delle stazioni non sono autenticati. Condividi dati solo con stazioni e reti attendibili.</translation></message>

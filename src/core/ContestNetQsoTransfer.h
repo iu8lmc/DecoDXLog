@@ -22,6 +22,7 @@ public:
     Receiver(const QString& sender, const QString& transfer) : m_sender(sender), m_transfer(transfer) {}
     bool accept(const QString& sender, const QJsonObject& frame);
     bool complete() const { return m_complete; }
+    bool failed() const { return m_failed; }
     QJsonObject missingRequest(int fromIndex) const;
     ContestNetInventoryRow row() const { return m_complete ? m_row : ContestNetInventoryRow{}; }
     QString sourceLog() const { return m_complete ? m_log : QString{}; }
