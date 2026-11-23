@@ -26,7 +26,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 26;
+constexpr int kSchemaVersion = 27;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -62,6 +62,85 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestSerialRequesterSurvivesLostReplyAndRestart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto authorityPath=dir.filePath("authority.sqlite"), clientPath=dir.filePath("client.sqlite");
+        { LogDatabase authority,client; QVERIFY(authority.open(authorityPath)); QVERIFY(client.open(clientPath));
+          const auto pending=client.beginContestSerialRequest("contest","node-a","request-1","server-a",10);
+          QVERIFY2(pending.ok,qPrintable(pending.error)); QCOMPARE(pending.state,QString("pending"));
+          const auto assigned=authority.reserveContestSerial("contest","node-a","request-1",10); QVERIFY2(assigned.ok,qPrintable(assigned.error)); QCOMPARE(assigned.serial,10);
+          QVERIFY(!client.beginContestSerialRequest("contest","node-a","request-2","server-a",10).ok);
+          QVERIFY(!client.acceptContestSerialGrant("contest","node-a","request-1","wrong-server",10).ok); }
+        { LogDatabase authority,client; QVERIFY(authority.open(authorityPath)); QVERIFY(client.open(clientPath));
+          const auto active=client.activeContestSerialRequest("contest","node-a"); QVERIFY(active.ok); QCOMPARE(active.requestId,QString("request-1")); QCOMPARE(active.authority,QString("server-a"));
+          const auto retry=client.beginContestSerialRequest("contest","node-a","request-1","server-a",10); QVERIFY(retry.ok); QVERIFY(retry.replayed); QCOMPARE(retry.state,QString("pending"));
+          const auto response=authority.reserveContestSerial("contest","node-a","request-1",10); QVERIFY(response.ok); QVERIFY(response.replayed);
+          const auto grant=client.acceptContestSerialGrant("contest","node-a","request-1","server-a",response.serial); QVERIFY2(grant.ok,qPrintable(grant.error)); QCOMPARE(grant.state,QString("granted"));
+          QVERIFY(client.acceptContestSerialGrant("contest","node-a","request-1","server-a",10).replayed);
+          QVERIFY(!client.acceptContestSerialGrant("contest","node-a","request-1","server-a",11).ok);
+          const auto used=client.consumeContestSerialGrant("contest","node-a","request-1","qso-intent-a"); QVERIFY2(used.ok,qPrintable(used.error)); QCOMPARE(used.serial,10);
+          QVERIFY(client.consumeContestSerialGrant("contest","node-a","request-1","qso-intent-a").replayed);
+          QVERIFY(!client.consumeContestSerialGrant("contest","node-a","request-1","qso-intent-b").ok);
+          QVERIFY(client.beginContestSerialRequest("contest","node-a","request-2","server-a",1).ok);
+          QVERIFY(!client.acceptContestSerialGrant("contest","node-a","request-2","server-a",10).ok);
+          QCOMPARE(client.activeContestSerialRequest("contest","node-a").state,QString("pending"));
+          QVERIFY(!client.beginContestSerialRequest("contest","node-a","request-2","other-server",1).ok); }
+        { LogDatabase client; QVERIFY(client.open(clientPath)); const auto resumed=client.activeContestSerialRequest("contest","node-a");
+          QVERIFY(resumed.ok); QCOMPARE(resumed.requestId,QString("request-2"));
+          QVERIFY(client.consumeContestSerialGrant("contest","node-a","request-1","qso-intent-a").replayed); }
+    }
+    void contestSerialThreeRequestersHandleReorderedAndDuplicateGrants()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase authority,a,b,c;
+        QVERIFY(authority.open(dir.filePath("authority.sqlite"))); QVERIFY(a.open(dir.filePath("a.sqlite")));
+        QVERIFY(b.open(dir.filePath("b.sqlite"))); QVERIFY(c.open(dir.filePath("c.sqlite")));
+        QVERIFY(a.beginContestSerialRequest("event","a","req","authority",1).ok);
+        QVERIFY(b.beginContestSerialRequest("event","b","req","authority",1).ok);
+        QVERIFY(c.beginContestSerialRequest("event","c","req","authority",1).ok);
+        const auto ra=authority.reserveContestSerial("event","a","req",1), rb=authority.reserveContestSerial("event","b","req",1), rc=authority.reserveContestSerial("event","c","req",1);
+        QVERIFY(ra.ok && rb.ok && rc.ok); QCOMPARE(ra.serial,1); QCOMPARE(rb.serial,2); QCOMPARE(rc.serial,3);
+        QVERIFY(c.acceptContestSerialGrant("event","c","req","authority",rc.serial).ok);
+        QVERIFY(b.acceptContestSerialGrant("event","b","req","authority",rb.serial).ok);
+        QVERIFY(b.acceptContestSerialGrant("event","b","req","authority",rb.serial).replayed);
+        QVERIFY(!a.acceptContestSerialGrant("event","a","req","other",ra.serial).ok);
+        QCOMPARE(a.activeContestSerialRequest("event","a").state,QString("pending"));
+        a.close(); QVERIFY(a.open(dir.filePath("a.sqlite"))); QCOMPARE(a.activeContestSerialRequest("event","a").state,QString("pending"));
+        const auto recovered=authority.reserveContestSerial("event","a","req",1); QVERIFY(recovered.replayed); QCOMPARE(recovered.serial,ra.serial);
+        QVERIFY(a.acceptContestSerialGrant("event","a","req","authority",recovered.serial).ok);
+        QVERIFY(a.consumeContestSerialGrant("event","a","req","a-qso").ok);
+        QVERIFY(b.consumeContestSerialGrant("event","b","req","b-qso").ok);
+        QVERIFY(c.consumeContestSerialGrant("event","c","req","c-qso").ok);
+    }
+    void contestSerialRequestMigrationAndFailedGrantAreAtomic()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("migration.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.reserveContestSerial("event","node","old",1).ok);
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1OLD"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE contest_serial_request")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=27")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),qint64(1));
+          QVERIFY(db.reserveContestSerial("event","node","old",1).replayed);
+          QVERIFY(db.beginContestSerialRequest("event","node","req","authority",1).ok);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("CREATE TRIGGER reject_grant BEFORE UPDATE ON contest_serial_request BEGIN SELECT RAISE(ABORT,'injected'); END"));
+          QVERIFY(!db.acceptContestSerialGrant("event","node","req","authority",1).ok); QCOMPARE(db.activeContestSerialRequest("event","node").state,QString("pending"));
+          QVERIFY(q.exec("DROP TRIGGER reject_grant")); QVERIFY(db.acceptContestSerialGrant("event","node","req","authority",1).ok); }
+    }
+    void contestSerialRequesterSerializesConcurrentAttempts()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("request-race.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); }
+        std::atomic<int> ready{0}; std::atomic<bool> go{false}; ContestSerialRequest a,b;
+        auto start=[&](const QString& id,ContestSerialRequest& result) {
+            LogDatabase db; if (!db.open(path)) { result.error=db.lastError(); ++ready; return; }
+            ++ready; while (!go.load()) std::this_thread::yield();
+            result=db.beginContestSerialRequest("event","node",id,"authority",1);
+        };
+        std::thread one(start,QStringLiteral("first"),std::ref(a)), two(start,QStringLiteral("second"),std::ref(b));
+        while (ready.load()<2) std::this_thread::yield(); go=true; one.join(); two.join();
+        QVERIFY(a.ok!=b.ok); LogDatabase db; QVERIFY(db.open(path));
+        const auto active=db.activeContestSerialRequest("event","node"); QVERIFY(active.ok);
+        QCOMPARE(active.requestId,a.ok?QString("first"):QString("second"));
+        QVERIFY(!db.consumeContestSerialGrant("event","node",active.requestId,"intent").ok);
+    }
     void openFileIdentityTracksReplacementAndReopen()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"), clone=dir.filePath("clone.sqlite");

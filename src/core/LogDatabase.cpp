@@ -515,6 +515,15 @@ bool LogDatabase::migrate()
               "contest TEXT NOT NULL, own_call TEXT NOT NULL, original BLOB NOT NULL, imported_at TEXT NOT NULL)")}, nullptr},
         {26, {QStringLiteral("CREATE TABLE IF NOT EXISTS log_identity (id INTEGER PRIMARY KEY CHECK(id=1), uuid TEXT NOT NULL)"),
               QStringLiteral("INSERT OR IGNORE INTO log_identity(id,uuid) VALUES(1,lower(hex(randomblob(16))))")}, nullptr},
+        {27, {QStringLiteral("CREATE TABLE IF NOT EXISTS contest_serial_request ("
+              "scope TEXT NOT NULL, requester TEXT NOT NULL, request_id TEXT NOT NULL, authority TEXT NOT NULL, "
+              "minimum INTEGER NOT NULL CHECK(minimum>0), serial INTEGER CHECK(serial>0), "
+              "state TEXT NOT NULL CHECK(state IN ('pending','granted','consumed')), use_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, "
+              "CHECK((state='pending' AND serial IS NULL AND use_id IS NULL) OR (state='granted' AND serial IS NOT NULL AND use_id IS NULL) OR (state='consumed' AND serial IS NOT NULL AND use_id IS NOT NULL)), "
+              "PRIMARY KEY(scope,requester,request_id))"),
+              QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_serial_request_active ON contest_serial_request(scope,requester) WHERE state IN ('pending','granted')"),
+              QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_serial_request_grant ON contest_serial_request(scope,authority,serial) WHERE serial IS NOT NULL"),
+              QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_serial_request_use ON contest_serial_request(scope,requester,use_id) WHERE use_id IS NOT NULL")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1375,6 +1384,111 @@ ContestSerialReservation LogDatabase::reserveContestSerial(const QString& scope,
     if (!db.commit()) return fail(db.lastError().text());
     result.ok = true;
     return result;
+}
+
+namespace {
+bool validSerialKey(const QString& s) { return !s.trimmed().isEmpty() && s.size()<=256; }
+ContestSerialRequest serialRequestRow(QSqlQuery& q)
+{
+    ContestSerialRequest r; r.ok=true; r.scope=q.value(0).toString(); r.requester=q.value(1).toString();
+    r.requestId=q.value(2).toString(); r.authority=q.value(3).toString(); r.minimum=q.value(4).toInt();
+    r.serial=q.value(5).toInt(); r.state=q.value(6).toString(); r.useId=q.value(7).toString(); return r;
+}
+constexpr auto serialRequestColumns="scope,requester,request_id,authority,minimum,serial,state,use_id";
+}
+
+ContestSerialRequest LogDatabase::activeContestSerialRequest(const QString& scope,const QString& requester) const
+{
+    ContestSerialRequest result;
+    if (!validSerialKey(scope) || !validSerialKey(requester)) { result.error=QStringLiteral("Invalid serial request scope or requester"); return result; }
+    QSqlQuery q(connection()); q.prepare(QStringLiteral("SELECT ")+QLatin1String(serialRequestColumns)+
+        QStringLiteral(" FROM contest_serial_request WHERE scope=? AND requester=? AND state IN ('pending','granted')"));
+    q.addBindValue(scope); q.addBindValue(requester);
+    if (!q.exec()) result.error=q.lastError().text();
+    else if (!q.next()) result.error=QStringLiteral("No active serial request");
+    else result=serialRequestRow(q);
+    return result;
+}
+
+ContestSerialRequest LogDatabase::beginContestSerialRequest(const QString& scope,const QString& requester,const QString& requestId,
+                                                             const QString& authority,int minimum)
+{
+    ContestSerialRequest result;
+    if (!validSerialKey(scope) || !validSerialKey(requester) || !validSerialKey(requestId) || !validSerialKey(authority) || minimum<1) {
+        result.error=QStringLiteral("Invalid serial request"); return result;
+    }
+    QSqlDatabase db=connection(); QSqlQuery q(db);
+    if (!q.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.error=q.lastError().text(); return result; }
+    const auto fail=[&](const QString& error) { db.rollback(); ContestSerialRequest r; r.error=error; return r; };
+    q.prepare(QStringLiteral("SELECT ")+QLatin1String(serialRequestColumns)+QStringLiteral(" FROM contest_serial_request WHERE scope=? AND requester=? AND request_id=?"));
+    q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+    if (!q.exec()) return fail(q.lastError().text());
+    if (q.next()) {
+        result=serialRequestRow(q); q.finish();
+        if (result.authority!=authority || result.minimum!=minimum) return fail(QStringLiteral("Serial request identity reused with different parameters"));
+        result.replayed=true;
+    } else {
+        q.finish(); q.prepare(QStringLiteral("INSERT INTO contest_serial_request(scope,requester,request_id,authority,minimum,state,created_at,updated_at) VALUES(?,?,?,?,?,'pending',?,?)"));
+        q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId); q.addBindValue(authority); q.addBindValue(minimum);
+        q.addBindValue(nowIso()); q.addBindValue(nowIso()); if (!q.exec()) return fail(q.lastError().text());
+        result.ok=true; result.scope=scope; result.requester=requester; result.requestId=requestId; result.authority=authority; result.minimum=minimum; result.state=QStringLiteral("pending");
+    }
+    if (!db.commit()) return fail(db.lastError().text()); return result;
+}
+
+ContestSerialRequest LogDatabase::acceptContestSerialGrant(const QString& scope,const QString& requester,const QString& requestId,
+                                                            const QString& authority,int serial)
+{
+    ContestSerialRequest result;
+    if (!validSerialKey(scope) || !validSerialKey(requester) || !validSerialKey(requestId) || !validSerialKey(authority) || serial<1) {
+        result.error=QStringLiteral("Invalid serial grant"); return result;
+    }
+    QSqlDatabase db=connection(); QSqlQuery q(db);
+    if (!q.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.error=q.lastError().text(); return result; }
+    const auto fail=[&](const QString& error) { db.rollback(); ContestSerialRequest r; r.error=error; return r; };
+    q.prepare(QStringLiteral("SELECT ")+QLatin1String(serialRequestColumns)+QStringLiteral(" FROM contest_serial_request WHERE scope=? AND requester=? AND request_id=?"));
+    q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+    if (!q.exec()) return fail(q.lastError().text());
+    if (!q.next()) return fail(QStringLiteral("Unknown serial request"));
+    result=serialRequestRow(q); q.finish();
+    if (result.authority!=authority || serial<result.minimum) return fail(QStringLiteral("Serial grant authority or minimum mismatch"));
+    if (result.state!=QLatin1String("pending")) {
+        if (result.serial!=serial) return fail(QStringLiteral("Conflicting serial grant"));
+        result.replayed=true;
+    } else {
+        q.prepare(QStringLiteral("UPDATE contest_serial_request SET serial=?,state='granted',updated_at=? WHERE scope=? AND requester=? AND request_id=? AND state='pending'"));
+        q.addBindValue(serial); q.addBindValue(nowIso()); q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+        if (!q.exec() || q.numRowsAffected()!=1) return fail(q.lastError().text().isEmpty()?QStringLiteral("Could not save serial grant"):q.lastError().text());
+        result.serial=serial; result.state=QStringLiteral("granted");
+    }
+    if (!db.commit()) return fail(db.lastError().text()); return result;
+}
+
+ContestSerialRequest LogDatabase::consumeContestSerialGrant(const QString& scope,const QString& requester,const QString& requestId,const QString& useId)
+{
+    ContestSerialRequest result;
+    if (!validSerialKey(scope) || !validSerialKey(requester) || !validSerialKey(requestId) || !validSerialKey(useId)) {
+        result.error=QStringLiteral("Invalid serial use identity"); return result;
+    }
+    QSqlDatabase db=connection(); QSqlQuery q(db);
+    if (!q.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.error=q.lastError().text(); return result; }
+    const auto fail=[&](const QString& error) { db.rollback(); ContestSerialRequest r; r.error=error; return r; };
+    q.prepare(QStringLiteral("SELECT ")+QLatin1String(serialRequestColumns)+QStringLiteral(" FROM contest_serial_request WHERE scope=? AND requester=? AND request_id=?"));
+    q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+    if (!q.exec()) return fail(q.lastError().text());
+    if (!q.next()) return fail(QStringLiteral("Unknown serial request"));
+    result=serialRequestRow(q); q.finish();
+    if (result.state==QLatin1String("pending")) return fail(QStringLiteral("Serial grant is not available"));
+    if (result.state==QLatin1String("consumed")) {
+        if (result.useId!=useId) return fail(QStringLiteral("Serial grant already bound to another use"));
+        result.replayed=true;
+    } else {
+        q.prepare(QStringLiteral("UPDATE contest_serial_request SET state='consumed',use_id=?,updated_at=? WHERE scope=? AND requester=? AND request_id=? AND state='granted'"));
+        q.addBindValue(useId); q.addBindValue(nowIso()); q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+        if (!q.exec() || q.numRowsAffected()!=1) return fail(q.lastError().text().isEmpty()?QStringLiteral("Could not consume serial grant"):q.lastError().text());
+        result.state=QStringLiteral("consumed"); result.useId=useId;
+    }
+    if (!db.commit()) return fail(db.lastError().text()); return result;
 }
 
 bool LogDatabase::softDeleteQso(qint64 id)

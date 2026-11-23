@@ -46,6 +46,14 @@ struct ContestSerialReservation {
     QString error;
 };
 
+struct ContestSerialRequest {
+    bool ok{false};
+    bool replayed{false};
+    QString scope, requester, requestId, authority, state, useId, error;
+    int minimum{0};
+    int serial{0};
+};
+
 struct ImportResult {
     bool cancelled{false};
     int read{0};
@@ -315,6 +323,13 @@ public:
     // must be agreed by the network protocol; this does not elect a server.
     ContestSerialReservation reserveContestSerial(const QString& scope, const QString& requester,
                                                    const QString& requestId, int minimum);
+    ContestSerialRequest beginContestSerialRequest(const QString& scope, const QString& requester, const QString& requestId,
+                                                   const QString& authority, int minimum);
+    ContestSerialRequest activeContestSerialRequest(const QString& scope, const QString& requester) const;
+    ContestSerialRequest acceptContestSerialGrant(const QString& scope, const QString& requester, const QString& requestId,
+                                                  const QString& authority, int serial);
+    ContestSerialRequest consumeContestSerialGrant(const QString& scope, const QString& requester, const QString& requestId,
+                                                   const QString& useId);
 
     // Cancellazione morbida: la riga resta, marcata deleted, e lo storico la
     // conserva.
