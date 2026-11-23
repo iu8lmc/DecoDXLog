@@ -15,6 +15,7 @@ RoundedWindow {
     id: root
 
     property int revision: 0
+    property int comparisonLogRevision: 0
     property bool reportProbe: false
     property bool reportProbeSave: false
     property bool reportProbeFind: false
@@ -23,6 +24,16 @@ RoundedWindow {
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
+    function probeContestComparison(stale) {
+        contestComparison.open()
+        comparisonContest.text="CQ-WW-CW"
+        comparisonA.setTexts(decolog.showDate("2024-11-23"),decolog.showDate("2024-11-23"))
+        comparisonB.setTexts(decolog.showDate("2025-11-22"),decolog.showDate("2025-11-22"))
+        comparisonButton.clicked()
+        contestComparison.probing=true
+        contestComparison.probingStale=!!stale
+        if (stale) comparisonContest.text="OTHER"
+    }
     function probeContestAudio(folder) {
         contestAudioDialog.open()
         contestAudioDialog.folder=folder
@@ -106,6 +117,19 @@ RoundedWindow {
     }
     Connections {
         target: decolog.activation
+        function onContestComparisonFinished(result) {
+            if (!result.error && (contestComparison.startLogRevision!==root.comparisonLogRevision || result.contest!==comparisonContest.text.trim() || result.fromA!==comparisonA.fromIso || result.toA!==comparisonA.toIso || result.fromB!==comparisonB.fromIso || result.toB!==comparisonB.toIso)) {
+                contestComparison.result=({}); contestComparison.errorText=qsTr("The selection changed; compare again.")
+                if (contestComparison.probingStale) { console.warn("PROBE contestComparison stale=true"); contestComparison.probingStale=false; contestComparison.probing=false }
+                return
+            }
+            contestComparison.result=result
+            contestComparison.errorText=result.error || ""
+            if (contestComparison.probing) {
+                console.warn("PROBE contestComparison a=" + result.totalA + " b=" + result.totalB + " rows=" + (result.rows || []).length + " error=" + contestComparison.errorText)
+                contestComparison.probing=false
+            }
+        }
         function onContestReportFinished(result) {
             reportReview.result = result
             reportReview.errorText = result.error || ""
@@ -208,7 +232,7 @@ RoundedWindow {
 
     Connections {
         target: decolog
-        function onLogChanged() { root.revision++ }
+        function onLogChanged() { root.revision++; root.comparisonLogRevision++; contestComparison.result=({}) }
     }
     Connections {
         target: decolog.activation
@@ -914,6 +938,9 @@ RoundedWindow {
                 enabled: !decolog.activation.contestReportBusy
                 onClicked: contestReportFile.open()
             }
+            GlassButton { text:qsTr("Compare periods…"); buttonHeight:26; fontPixelSize:12
+                enabled:!decolog.activation.contestReportBusy
+                onClicked: { comparisonContest.text=root.session.contestId || ""; contestComparison.open() } }
             GlassButton { text:qsTr("Report history…"); buttonHeight:26; fontPixelSize:12
                 enabled:!decolog.activation.contestReportBusy
                 onClicked:reportHistory.openHistory() }
@@ -929,9 +956,9 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !contestComparison.visible && !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !contestComparison.visible && !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !contestComparison.visible && !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
 
     FileDialog {
         id: contestReportExportFile
@@ -1059,6 +1086,47 @@ RoundedWindow {
                 GlassButton { text:qsTr("Save reviewed copy to log"); enabled:!!reportReview.result.archiveReady && !decolog.activation.contestReportBusy
                     onClicked:reportReview.saveSnapshot() }
                 GlassButton { text:qsTr("Close"); onClicked:reportReview.close() }
+            }
+        }
+    }
+
+    DialogFrame {
+        id:contestComparison; dialogKey:"contestComparison"; width:760; height:560
+        title:qsTr("Compare contest periods"); dotColor:Theme.primaryColor
+        property var result:({}); property string errorText:""; property bool probing:false; property bool probingStale:false; property int startLogRevision:0
+        Connections { target:comparisonA; function onFromIsoChanged() { contestComparison.result=({}) } function onToIsoChanged() { contestComparison.result=({}) } }
+        Connections { target:comparisonB; function onFromIsoChanged() { contestComparison.result=({}) } function onToIsoChanged() { contestComparison.result=({}) } }
+        ColumnLayout {
+            anchors.fill:parent; spacing:8
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Missing operator or own radio stays unknown. Overlapping dates count in both periods. These are logged activity counts, not scores, credit or eligibility.") }
+            RowLayout { Layout.fillWidth:true
+                Text { text:qsTr("Contest ID"); color:Theme.textSecondary }
+                StyledTextField { id:comparisonContest; Layout.fillWidth:true; placeholderText:qsTr("Recorded CONTEST_ID"); onTextChanged:contestComparison.result=({}) }
+            }
+            DatePeriodFields { id:comparisonA; fromLabel:qsTr("Period A from") }
+            DatePeriodFields { id:comparisonB; fromLabel:qsTr("Period B from") }
+            RowLayout {
+                GlassButton { id:comparisonButton; text:qsTr("Compare"); enabled:!decolog.activation.contestReportBusy
+                    onClicked: {
+                        contestComparison.result=({}); contestComparison.errorText=""
+                        if (!comparisonA.hasFrom || !comparisonA.hasTo || !comparisonB.hasFrom || !comparisonB.hasTo || !comparisonA.valid || !comparisonB.valid) { contestComparison.errorText=qsTr("Enter both dates for each period."); return }
+                        contestComparison.startLogRevision=root.comparisonLogRevision
+                        if (!decolog.activation.startContestComparison(comparisonContest.text.trim(),comparisonA.fromIso,comparisonA.toIso,comparisonB.fromIso,comparisonB.toIso)) contestComparison.errorText=qsTr("Cannot compare this log now.")
+                    }
+                }
+                Text { color:Theme.textPrimary; text:decolog.activation.contestReportBusy ? qsTr("Comparing…") : qsTr("A: %1 QSO · B: %2 QSO").arg(contestComparison.result.totalA || 0).arg(contestComparison.result.totalB || 0) }
+            }
+            Text { Layout.fillWidth:true; color:Theme.errorColor; wrapMode:Text.Wrap; visible:contestComparison.errorText.length>0; text:contestComparison.errorText }
+            Text { Layout.fillWidth:true; color:Theme.warningColor; wrapMode:Text.Wrap; visible:(contestComparison.result.invalidTimestamp || 0)>0
+                text:qsTr("%1 records have an invalid UTC timestamp and were excluded.").arg(contestComparison.result.invalidTimestamp) }
+            ListView {
+                id:comparisonRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:contestComparison.result.rows || []
+                ScrollBar.vertical:PanelScrollBar {}
+                delegate:RowLayout { required property var modelData; width:comparisonRows.width
+                    Text { Layout.fillWidth:true; color:Theme.textPrimary; text:(modelData.dimension === "radio" ? qsTr("Own radio") : modelData.dimension === "operator" ? qsTr("Operator") : modelData.dimension === "hour" ? qsTr("UTC hour") : qsTr("Band")) + ": " + (modelData.value || qsTr("unknown")) }
+                    Text { color:Theme.textSecondary; text:qsTr("A %1 · B %2 · Δ %3").arg(modelData.a).arg(modelData.b).arg(modelData.delta) }
+                }
             }
         }
     }

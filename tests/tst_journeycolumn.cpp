@@ -159,6 +159,19 @@ private slots:
         QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("01020304"));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
+    void contestComparisonShowsTwoPeriodsInActualApp()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log));
+          for (const auto &date:QStringList{"20241123","20241123","20251122"})
+            QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE",date},{"TIME_ON","120000"},
+                {"BAND","20m"},{"MODE","CW"},{"CONTEST_ID","CQ-WW-CW"},{"OPERATOR","K1OP"}},"fixture",{},true,0,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"contestcomparisonprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE contestComparison a=2 b=1 rows=4 error=") && !output.contains("TypeError"),output.constData());
+        QByteArray stale; QVERIFY2(launch(dir,"contestcomparisonstaleprobe",stale,4500),stale.constData());
+        QVERIFY2(stale.contains("PROBE contestComparison stale=true") && !stale.contains("TypeError"),stale.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(3));
+    }
     void contestReportFindsCandidateInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

@@ -35,6 +35,21 @@ private slots:
         QCOMPARE(QDateTime::fromString(row.value("utc").toString(),Qt::ISODate).toSecsSinceEpoch(),at.toSecsSinceEpoch());
         QVERIFY(row.value("utc").toString().endsWith('Z'));
     }
+    void contestComparisonUsesCurrentLogAndRejectsLogSwitch()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20241123"},{"TIME_ON","120000"},
+            {"BAND","20m"},{"MODE","CW"},{"CONTEST_ID","CQ-WW-CW"}},"fixture",{},true).id>0);
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy done(&act,&ActivationController::contestComparisonFinished);
+        QVERIFY(act.startContestComparison("CQ-WW-CW","2024-11-23","2024-11-23","2025-11-22","2025-11-22"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); auto result=done.first().at(0).toMap();
+        QVERIFY2(result.value("error").toString().isEmpty(),qPrintable(result.value("error").toString()));
+        QCOMPARE(result.value("totalA").toInt(),1); QCOMPARE(result.value("totalB").toInt(),0);
+        QVERIFY(act.startContestComparison("CQ-WW-CW","2024-11-23","2024-11-23","2025-11-22","2025-11-22"));
+        QVERIFY(db.open(dir.filePath("other.sqlite"))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
+        QVERIFY(!done.last().at(0).toMap().value("error").toString().isEmpty());
+    }
     void contestReportCandidateSearchIsReadOnlyAndBoundToLog()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

@@ -5,6 +5,7 @@
 #include "core/Cabrillo.h"
 #include "core/ContestRules.h"
 #include "core/ContestReport.h"
+#include "core/ContestComparison.h"
 #include "core/Contests.h"
 #include "core/LogDatabase.h"
 #include "core/Spots.h"
@@ -947,6 +948,39 @@ static QVariantMap contestReportResult(const core::contestreport::Report& report
     result.insert(QStringLiteral("nil"), nil); result.insert(QStringLiteral("incorrectCall"), calls);
     result.insert(QStringLiteral("incorrectExchange"), exchanges);
     return result;
+}
+
+bool ActivationController::startContestComparison(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB)
+{
+    if (m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
+        m_ctx.db->path()==QLatin1String(":memory:") || contest.size()>64 || fromA.size()>10 || toA.size()>10 || fromB.size()>10 || toB.size()>10) return false;
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity(); const quint64 generation=m_ctx.db->openGeneration();
+    if (identity.isEmpty()) return false;
+    m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self,path,identity,generation,contest,fromA,toA,fromB,toB] {
+        QVariantMap result{{QStringLiteral("contest"),contest},{QStringLiteral("fromA"),fromA},{QStringLiteral("toA"),toA},
+                           {QStringLiteral("fromB"),fromB},{QStringLiteral("toB"),toB}};
+        LogDatabase db;
+        if (!db.openReadOnly(path)) result.insert(QStringLiteral("error"),db.lastError());
+        else if (db.identity()!=identity) result.insert(QStringLiteral("error"),tr("The reviewed log identity changed."));
+        else {
+            const auto compared=core::contestcomparison::compare(db.connection(),contest,QDate::fromString(fromA,Qt::ISODate),QDate::fromString(toA,Qt::ISODate),
+                                                                 QDate::fromString(fromB,Qt::ISODate),QDate::fromString(toB,Qt::ISODate));
+            result.insert(QStringLiteral("error"),compared.error); result.insert(QStringLiteral("totalA"),compared.totalA);
+            result.insert(QStringLiteral("totalB"),compared.totalB); result.insert(QStringLiteral("invalidTimestamp"),compared.invalidTimestamp);
+            result.insert(QStringLiteral("rows"),compared.rows);
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,generation,result] {
+            if (!self) return;
+            QVariantMap delivered=result;
+            if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=path ||
+                self->m_ctx.db->openGeneration()!=generation || self->m_ctx.db->identity()!=identity)
+                delivered={{QStringLiteral("error"),tr("The log changed; compare again.")}};
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged(); emit self->contestComparisonFinished(delivered);
+        },Qt::QueuedConnection);
+    });
+    return true;
 }
 
 bool ActivationController::startContestReportCandidates(const QVariantMap& row, int toleranceMinutes)
