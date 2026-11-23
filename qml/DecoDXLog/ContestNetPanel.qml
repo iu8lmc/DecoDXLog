@@ -11,7 +11,16 @@ GlassPanel {
     id: root
 
     readonly property var net: decolog.net
-    function probeExperimentalWire() { qsoWireDialog.open(); return {visible:qsoWireDialog.visible,title:qsoWireDialog.title,warning:qsoWireWarning.text} }
+    function probeExperimentalWire(secure) {
+        qsoWireDialog.open()
+        let expiryGuard=true
+        if (secure) {
+            wireKey.text="a".repeat(64); let error=root.net.setExperimentalQsoKey(wireKey.text); qsoWireDialog.keyReady=!error
+            root.net.clearExperimentalQso(); expiryGuard=!qsoWireDialog.keyConsistent
+            error=root.net.setExperimentalQsoKey(wireKey.text); qsoWireDialog.keyReady=!error
+        }
+        return {visible:qsoWireDialog.visible,title:qsoWireDialog.title,warning:qsoWireWarning.text,secure:root.net.experimentalQsoSecure,expiryGuard:expiryGuard}
+    }
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
     function probeReview() { const rows=root.net.qsoComparisonRows; if (!rows.length || !root.net.reviewQsoComparison(rows[0].uuid)) return false; qsoDetailsDialog.open(); return true }
     function probeApply(accept) { if (!root.net.qsoReview.canApply) return false; qsoApplyDialog.open(); if (accept) qsoApplyDialog.confirmApply(); else qsoApplyDialog.close(); return true }
@@ -233,15 +242,27 @@ GlassPanel {
         id:qsoWireDialog
         transientParent:root.Window.window
         title:qsTr("Experimental QSO transfer")
-        width:700; height:600
+        width:700; height:730
         property string localError:""
-        onClosed:root.net.clearExperimentalQso()
+        property bool keyReady:true
+        readonly property bool keyConsistent:keyReady && ((wireKey.text.trim().length === 0) === !root.net.experimentalQsoSecure)
+        onClosed: { root.net.clearExperimentalQso(); wireKey.text=""; keyReady=true }
         body:ColumnLayout {
             spacing:8
             Text { id:qsoWireWarning; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Experimental UDP broadcast: QSO data is not encrypted and any listener on the network may read it. Station IDs are not authenticated. Only share data with trusted stations and networks.") }
+                text:root.net.experimentalQsoSecure
+                    ? qsTr("Shared-key mode encrypts only this experimental transfer. Group and station IDs remain visible; anyone with the key can impersonate a station. Legacy QSO and other network messages remain unencrypted. Use a new random key and transfer ID, and share the key separately.")
+                    : qsTr("Experimental UDP broadcast: QSO data is not encrypted and any listener on the network may read it. Station IDs are not authenticated. Only share data with trusted stations and networks.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
                 text:qsTr("Your station ID: %1. Both stations must enter the same transfer ID. The receiver arms first; the sender then sends one QSO. Received data is not added to the log.").arg(root.net.nodeId) }
+            LabeledField { label:qsTr("Shared key (64 hexadecimal characters; optional)"); RowLayout { Layout.fillWidth:true
+                StyledTextField { id:wireKey; Layout.fillWidth:true; echoMode:wireKeyShow.checked ? TextInput.Normal : TextInput.Password; onTextChanged:qsoWireDialog.keyReady=false }
+                CheckBox { id:wireKeyShow; text:qsTr("Show") }
+                GlassButton { text:qsTr("Generate"); onClicked:wireKey.text=root.net.generateExperimentalQsoKey() }
+                GlassButton { text:qsTr("Use key"); onClicked: { const error=root.net.setExperimentalQsoKey(wireKey.text); qsoWireDialog.localError=error; qsoWireDialog.keyReady=!error } }
+            } }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                text:qsTr("Set the same random key on both stations before arming or sending. Leave it empty and choose Use key for unencrypted mode. Keys are not saved and are removed from this session when this window closes.") }
             LabeledField { label:qsTr("Other station ID"); StyledTextField { id:wirePeer; Layout.fillWidth:true } }
             LabeledField { label:qsTr("Transfer ID"); RowLayout { Layout.fillWidth:true
                 StyledTextField { id:wireTransfer; Layout.fillWidth:true }
@@ -249,9 +270,9 @@ GlassPanel {
             } }
             LabeledField { label:qsTr("QSO UUID to send"); StyledTextField { id:wireUuid; Layout.fillWidth:true } }
             RowLayout {
-                GlassButton { text:qsTr("Arm receiver"); enabled:root.net.running; onClicked:qsoWireDialog.localError=root.net.armExperimentalQsoReceiver(wirePeer.text,wireTransfer.text) }
-                GlassButton { text:qsTr("Send QSO"); enabled:root.net.running && !root.net.experimentalQsoSending; onClicked:qsoWireDialog.localError=root.net.sendExperimentalQso(wirePeer.text,wireUuid.text,wireTransfer.text) }
-                GlassButton { text:qsTr("Request missing"); enabled:root.net.running; onClicked:qsoWireDialog.localError=root.net.requestExperimentalQsoMissing() }
+                GlassButton { text:qsTr("Arm receiver"); enabled:root.net.running && qsoWireDialog.keyConsistent; onClicked:qsoWireDialog.localError=root.net.armExperimentalQsoReceiver(wirePeer.text,wireTransfer.text) }
+                GlassButton { text:qsTr("Send QSO"); enabled:root.net.running && qsoWireDialog.keyConsistent && !root.net.experimentalQsoSending; onClicked:qsoWireDialog.localError=root.net.sendExperimentalQso(wirePeer.text,wireUuid.text,wireTransfer.text) }
+                GlassButton { text:qsTr("Request missing"); enabled:root.net.running && qsoWireDialog.keyConsistent; onClicked:qsoWireDialog.localError=root.net.requestExperimentalQsoMissing() }
             }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textSecondary
                 text:qsoWireDialog.localError || root.net.experimentalQsoStatus }

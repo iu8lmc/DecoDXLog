@@ -3,16 +3,19 @@
 #include "core/Adif.h"
 #include "core/ContestSerialProtocol.h"
 #include "core/ContestNetReconcile.h"
+#include "core/ContestNetSecure.h"
 #include "core/FileIdentity.h"
 #include "core/LogDatabase.h"
 
 #include <QHostInfo>
 #include <QPointer>
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QRegularExpression>
 #include <QSqlQuery>
 #include <QUuid>
 #include <algorithm>
+#include <limits>
 
 namespace decolog::app {
 
@@ -40,11 +43,12 @@ NetController::NetController(Context context, QObject* parent)
     m_qsoWireTimer.setInterval(20);
     connect(&m_qsoWireTimer,&QTimer::timeout,this,[this] {
         if (!m_net.running() || !m_wireEncoder) { clearExperimentalQso(); return; }
+        bool failed=false;
         for (int i=0;i<8 && !m_wireIndices.isEmpty();++i) {
             auto body=m_wireEncoder->frame(m_wireIndices.takeFirst()); body.insert(QStringLiteral("to"),m_wirePeer);
-            emit experimentalQsoFrameSent(QStringLiteral("qso_chunk_v1"),body); send(QStringLiteral("qso_chunk_v1"),body);
+            if (!sendExperimentalWireFrame(QStringLiteral("qso_chunk_v1"),body)) { m_qsoWireTimer.stop(); m_wireIndices.clear(); failed=true; break; }
         }
-        if (m_wireIndices.isEmpty()) { m_qsoWireTimer.stop(); m_wireStatus=tr("Fragments sent; missing fragments can be requested."); emit experimentalQsoChanged(); }
+        if (m_wireIndices.isEmpty()) { m_qsoWireTimer.stop(); if (!failed) m_wireStatus=tr("Fragments sent; missing fragments can be requested."); emit experimentalQsoChanged(); }
     });
     m_qsoComparisonPool.setMaxThreadCount(1);
     m_qsoComparisonTimer.setInterval(750);
@@ -383,8 +387,37 @@ QString NetController::applyReviewedExistingQso()
 void NetController::clearExperimentalQso()
 {
     ++m_wireGeneration; m_qsoWireTimer.stop(); m_qsoWireExpiry.stop(); m_qsoWireRetry.stop(); m_wireServeLimit.invalidate(); m_wireIndices.clear(); m_wireEncoder.reset(); m_wireReceiver.reset();
-    m_wirePeer.clear(); m_wireSender.clear(); m_wireTransferIn.clear(); m_wireTransferOut.clear(); m_wirePreview.clear(); m_wirePreparing=false; m_wireStatus.clear(); emit experimentalQsoChanged();
+    m_wirePeer.clear(); m_wireSender.clear(); m_wireTransferIn.clear(); m_wireTransferOut.clear(); m_wirePreview.clear();
+    m_wireKey.fill('\0'); m_wireKey.clear(); m_wireSeenNonces.clear(); m_wirePreparing=false; m_wireStatus.clear(); emit experimentalQsoChanged();
 }
+QString NetController::generateExperimentalQsoKey() const
+{
+    QByteArray key(32,Qt::Uninitialized); for (char& byte:key) byte=char(QRandomGenerator::system()->bounded(256));
+    const auto hex=QString::fromLatin1(key.toHex()); key.fill('\0'); return hex;
+}
+QString NetController::setExperimentalQsoKey(const QString& hexKey)
+{
+    const QString clean=hexKey.trimmed();
+    static const QRegularExpression valid(QStringLiteral("^[0-9a-fA-F]{64}$"));
+    if (!clean.isEmpty() && !valid.match(clean).hasMatch()) return tr("Use a random 64-character hexadecimal key, or leave it empty for unencrypted transfer.");
+    clearExperimentalQso();
+    if (!clean.isEmpty()) m_wireKey=QByteArray::fromHex(clean.toLatin1());
+    m_wireStatus=m_wireKey.isEmpty()?tr("Unencrypted transfer selected."):tr("Shared-key protection selected for this session.");
+    emit experimentalQsoChanged(); return {};
+}
+bool NetController::sendExperimentalWireFrame(const QString& type,const QJsonObject& body)
+{
+    if (m_wireKey.isEmpty()) { emit experimentalQsoFrameSent(type,body); send(type,body); return true; }
+    const auto sealed=contestsecure::seal(m_wireKey,m_group,m_id,body.value(QStringLiteral("to")).toString(),type,body);
+    if (!sealed.ok) { m_wireStatus=sealed.error; emit experimentalQsoChanged(); return false; }
+    auto envelope=sealed.frame; envelope.insert(QStringLiteral("seq"),std::numeric_limits<qint64>::max()); envelope.insert(QStringLiteral("session"),m_sessionId);
+    envelope.insert(QStringLiteral("protocol"),2); envelope.insert(QStringLiteral("name"),m_name);
+    if (ContestNet::pack(m_group,m_id,QStringLiteral("qso_secure_v1"),envelope).size()>1472) {
+        m_wireStatus=tr("Protected datagram too large; shorten station or network identifiers."); emit experimentalQsoChanged(); return false;
+    }
+    emit experimentalQsoFrameSent(QStringLiteral("qso_secure_v1"),sealed.frame); send(QStringLiteral("qso_secure_v1"),sealed.frame); return true;
+}
+
 QString NetController::armExperimentalQsoReceiver(const QString& sender,const QString& transfer)
 {
     static const QRegularExpression identifier(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$"));
@@ -402,16 +435,17 @@ QString NetController::sendExperimentalQso(const QString& receiver,const QString
     if (experimentalQsoSending()) return tr("A QSO transfer is already being prepared or sent.");
     const QString path=m_ctx.db->path(), identity=m_ctx.db->identity(), stamp=m_ctx.db->changeStamp(); const auto file=m_ctx.db->openFileIdentity(); const auto dbGeneration=m_ctx.db->openGeneration();
     if (identity.isEmpty() || stamp.isEmpty()) return tr("Cannot identify the source log.");
+    const int fragmentSize=m_wireKey.isEmpty()?512:256;
     const quint64 generation=++m_wireGeneration; m_wirePreparing=true; m_wireEncoder.reset(); m_wireIndices.clear(); m_wirePeer=receiver; m_wireTransferOut=transfer; m_wireServeLimit.invalidate();
     m_wireStatus=tr("Preparing the selected QSO…"); emit experimentalQsoChanged(); QPointer<NetController> self(this);
-    m_qsoWirePool.start([self,path,identity,stamp,file,dbGeneration,generation,uuid,transfer,receiver] {
+    m_qsoWirePool.start([self,path,identity,stamp,file,dbGeneration,generation,uuid,transfer,receiver,fragmentSize] {
         QString error; std::shared_ptr<contestqso::Encoder> encoder; ContestNetInventory inv;
         if (!inv.begin(path) || inv.logIdentity()!=identity || inv.fileIdentity()!=file) error=QStringLiteral("Source log changed or could not be opened");
         else {
             const auto page=inv.findUuid(uuid,4*1024*1024);
             if (!page.ok) error=page.error;
             else if (page.rows.size()!=1) error=QStringLiteral("QSO not found");
-            else { encoder=std::make_shared<contestqso::Encoder>(transfer,identity,page.rows.first()); if (!encoder->ok()) { error=encoder->error(); encoder.reset(); } }
+            else { encoder=std::make_shared<contestqso::Encoder>(transfer,identity,page.rows.first(),fragmentSize); if (!encoder->ok()) { error=encoder->error(); encoder.reset(); } }
             if (!inv.fileIdentityCurrent()) { error=QStringLiteral("Source log changed"); encoder.reset(); }
         }
         if (!self) return;
@@ -441,7 +475,7 @@ QString NetController::requestExperimentalQsoMissingImpl(bool extendExpiry)
     auto body=m_wireReceiver->missingRequest(0);
     const QString type=body.isEmpty()?QStringLiteral("qso_first_v1"):QStringLiteral("qso_missing_v1");
     if (body.isEmpty()) body={{QStringLiteral("version"),1},{QStringLiteral("transfer"),m_wireTransferIn}};
-    body.insert(QStringLiteral("to"),m_wireSender); emit experimentalQsoFrameSent(type,body); send(type,body);
+    body.insert(QStringLiteral("to"),m_wireSender); if (!sendExperimentalWireFrame(type,body)) return m_wireStatus;
     if (extendExpiry) m_qsoWireExpiry.start(); return {};
 }
 
@@ -1018,34 +1052,18 @@ void NetController::onReceived(const QString& from, const QString& type, const Q
             if (m_ctx.insertRemote && m_ctx.insertRemote(r, name))
                 ++p.qsos;
         }
-    } else if (type == QLatin1String("qso_chunk_v1")) {
-        if (body.value(QStringLiteral("to")).toString()==m_id && m_wireReceiver && from==m_wireSender) {
-            if (!m_wireReceiver->accept(from,body)) { m_wireStatus=m_wireReceiver->error(); if (m_wireReceiver->failed()) m_qsoWireRetry.stop(); emit experimentalQsoChanged(); }
-            else if (m_wireReceiver->complete()) {
-                m_qsoWireRetry.stop();
-                const auto row=m_wireReceiver->row(); const auto doc=adif::parse(row.adifPayload);
-                m_wirePreview={{QStringLiteral("complete"),true},{QStringLiteral("uuid"),row.uuid},{QStringLiteral("revision"),row.revision},
-                    {QStringLiteral("deleted"),row.deleted},{QStringLiteral("sourceLog"),m_wireReceiver->sourceLog()},
-                    {QStringLiteral("call"),doc.records.size()==1?doc.records.first().value(QStringLiteral("CALL")):QString()}};
-                m_wireStatus=tr("QSO received for inspection; nothing was added to the log.");
-            } else m_wireStatus=tr("Receiving QSO fragments…");
-            m_qsoWireExpiry.start(); emit experimentalQsoChanged();
-        }
-    } else if (type == QLatin1String("qso_first_v1") || type == QLatin1String("qso_missing_v1")) {
-        if (body.value(QStringLiteral("to")).toString()==m_id && m_wireEncoder && from==m_wirePeer) {
-            QList<int> requested;
-            if (type==QLatin1String("qso_first_v1")) {
-                if (body.value(QStringLiteral("version"))==QJsonValue(1) && body.value(QStringLiteral("transfer")).toString()==m_wireTransferOut) requested.append(0);
-            } else {
-                const auto frames=m_wireEncoder->framesForRequest(body);
-                for (const auto& frame:frames) requested.append(frame.value(QStringLiteral("index")).toInt(-1));
-            }
-            if (!requested.isEmpty() && (!m_wireServeLimit.isValid() || m_wireServeLimit.elapsed()>=1000)) {
-                m_wireServeLimit.start();
-                for (const auto index:requested) if (index>=0 && !m_wireIndices.contains(index)) m_wireIndices.append(index);
-                if (!m_wireIndices.isEmpty()) { m_qsoWireExpiry.start(); m_qsoWireTimer.start(); emit experimentalQsoChanged(); }
+    } else if (type == QLatin1String("qso_secure_v1")) {
+        if (!m_wireKey.isEmpty() && body.value(QStringLiteral("to")).toString()==m_id
+            && ((m_wireReceiver && from==m_wireSender) || (m_wireEncoder && from==m_wirePeer))) {
+            const auto opened=contestsecure::open(m_wireKey,m_group,from,m_id,body);
+            const auto nonce=body.value(QStringLiteral("nonce")).toString().toLatin1();
+            if (opened.ok && !m_wireSeenNonces.contains(nonce)) {
+                if (m_wireSeenNonces.size()>=32768) { m_qsoWireRetry.stop(); m_wireStatus=tr("Replay limit reached; start a new transfer with a new key."); emit experimentalQsoChanged(); }
+                else { m_wireSeenNonces.insert(nonce); handleExperimentalWireFrame(from,opened.type,opened.body); }
             }
         }
+    } else if (type == QLatin1String("qso_chunk_v1") || type == QLatin1String("qso_first_v1") || type == QLatin1String("qso_missing_v1")) {
+        if (m_wireKey.isEmpty()) handleExperimentalWireFrame(from,type,body);
     } else if (type == QLatin1String("serial_request_v3")) {
         serveDurableSerialRequest(from, body);
     } else if (type == QLatin1String("serial_grant_v3")) {
@@ -1095,6 +1113,39 @@ void NetController::onReceived(const QString& from, const QString& type, const Q
     }
     emit peersChanged();
     emit stateChanged();
+}
+
+void NetController::handleExperimentalWireFrame(const QString& from,const QString& type,const QJsonObject& body)
+{
+    if (type == QLatin1String("qso_chunk_v1")) {
+        if (body.value(QStringLiteral("to")).toString()==m_id && m_wireReceiver && from==m_wireSender) {
+            if (!m_wireReceiver->accept(from,body)) { m_wireStatus=m_wireReceiver->error(); if (m_wireReceiver->failed()) m_qsoWireRetry.stop(); emit experimentalQsoChanged(); }
+            else if (m_wireReceiver->complete()) {
+                m_qsoWireRetry.stop();
+                const auto row=m_wireReceiver->row(); const auto doc=adif::parse(row.adifPayload);
+                m_wirePreview={{QStringLiteral("complete"),true},{QStringLiteral("uuid"),row.uuid},{QStringLiteral("revision"),row.revision},
+                    {QStringLiteral("deleted"),row.deleted},{QStringLiteral("sourceLog"),m_wireReceiver->sourceLog()},
+                    {QStringLiteral("call"),doc.records.size()==1?doc.records.first().value(QStringLiteral("CALL")):QString()}};
+                m_wireStatus=tr("QSO received for inspection; nothing was added to the log.");
+            } else m_wireStatus=tr("Receiving QSO fragments…");
+            m_qsoWireExpiry.start(); emit experimentalQsoChanged();
+        }
+    } else if (type == QLatin1String("qso_first_v1") || type == QLatin1String("qso_missing_v1")) {
+        if (body.value(QStringLiteral("to")).toString()==m_id && m_wireEncoder && from==m_wirePeer) {
+            QList<int> requested;
+            if (type==QLatin1String("qso_first_v1")) {
+                if (body.value(QStringLiteral("version"))==QJsonValue(1) && body.value(QStringLiteral("transfer")).toString()==m_wireTransferOut) requested.append(0);
+            } else {
+                const auto frames=m_wireEncoder->framesForRequest(body);
+                for (const auto& frame:frames) requested.append(frame.value(QStringLiteral("index")).toInt(-1));
+            }
+            if (!requested.isEmpty() && (!m_wireServeLimit.isValid() || m_wireServeLimit.elapsed()>=1000)) {
+                m_wireServeLimit.start();
+                for (const auto index:requested) if (index>=0 && !m_wireIndices.contains(index)) m_wireIndices.append(index);
+                if (!m_wireIndices.isEmpty()) { m_qsoWireExpiry.start(); m_qsoWireTimer.start(); emit experimentalQsoChanged(); }
+            }
+        }
+    }
 }
 
 QString NetController::frameKey(const QString& session, qint64 seq)

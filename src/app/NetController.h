@@ -51,6 +51,7 @@ class NetController : public QObject {
     Q_PROPERTY(QVariantMap experimentalQsoPreview READ experimentalQsoPreview NOTIFY experimentalQsoChanged)
     Q_PROPERTY(QString experimentalQsoStatus READ experimentalQsoStatus NOTIFY experimentalQsoChanged)
     Q_PROPERTY(bool experimentalQsoSending READ experimentalQsoSending NOTIFY experimentalQsoChanged)
+    Q_PROPERTY(bool experimentalQsoSecure READ experimentalQsoSecure NOTIFY experimentalQsoChanged)
 
 public:
     struct Context {
@@ -113,6 +114,9 @@ public:
     Q_INVOKABLE bool reviewQsoComparison(const QString& uuid);
     Q_INVOKABLE QString applyReviewedMissingQso();
     Q_INVOKABLE QString applyReviewedExistingQso();
+    Q_INVOKABLE QString setExperimentalQsoKey(const QString& hexKey);
+    Q_INVOKABLE QString generateExperimentalQsoKey() const;
+    bool experimentalQsoSecure() const { return !m_wireKey.isEmpty(); }
     Q_INVOKABLE QString armExperimentalQsoReceiver(const QString& sender, const QString& transfer);
     Q_INVOKABLE QString sendExperimentalQso(const QString& receiver, const QString& uuid, const QString& transfer);
     Q_INVOKABLE QString requestExperimentalQsoMissing();
@@ -160,6 +164,8 @@ private:
     void send(const QString& type, QJsonObject body);
     void onReceived(const QString& from, const QString& type, const QJsonObject& body);
     QString requestExperimentalQsoMissingImpl(bool extendExpiry);
+    bool sendExperimentalWireFrame(const QString& type, const QJsonObject& body);
+    void handleExperimentalWireFrame(const QString& from, const QString& type, const QJsonObject& body);
     void serveDurableSerialRequest(const QString& from, const QJsonObject& body);
     void acceptDurableSerialGrant(const QString& from, const QJsonObject& body);
     QString requestDurableSerialImpl(int minimum, const QString& expectedRequestId);
@@ -223,6 +229,8 @@ private:
     QList<int> m_wireIndices;
     QString m_wirePeer, m_wireSender, m_wireStatus, m_wireTransferIn, m_wireTransferOut;
     QVariantMap m_wirePreview;
+    QByteArray m_wireKey;
+    QSet<QByteArray> m_wireSeenNonces;
     quint64 m_wireGeneration{0};
     bool m_wirePreparing{false};
     QThreadPool m_qsoComparisonPool;

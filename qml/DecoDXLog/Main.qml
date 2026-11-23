@@ -1286,7 +1286,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
-        else if (what[0] === "netwireprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netWireProbe.start() }
+        else if ((what[0] === "netwireprobe" || what[0] === "netwiresecureprobe")) { window.openContestDesk(); contestLayout.setShown("net",true); netWireProbe.start() }
         else if (what[0] === "netcompareprobe" || what[0] === "netimportprobe" || what[0] === "netimportcancelprobe" || what[0] === "netapplyprobe" || what[0] === "netapplycancelprobe" || what[0] === "netlongprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netCompareProbe.start() }
         else if (what[0] === "contestserialpanelprobe" || what[0] === "contestserialwindowprobe") {
             decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
@@ -1778,7 +1778,7 @@ RoundedWindow {
         onTriggered: {
             const container=contestLayout.panelFor("net"), panel=container ? container.item : null
             if (!panel) { if (++tries>15) { console.warn("PROBE netwire missing panel"); stop() } return }
-            console.warn("PROBE netwire " + JSON.stringify(panel.probeExperimentalWire())); stop()
+            console.warn("PROBE netwire " + JSON.stringify(panel.probeExperimentalWire(startupShow === "netwiresecureprobe"))); stop()
         }
     }
     Timer { id:netCompareProbe; interval:300; repeat:true; property int tries:0; property bool started:false; property bool reviewing:false

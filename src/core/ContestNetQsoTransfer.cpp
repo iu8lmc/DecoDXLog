@@ -11,7 +11,7 @@
 
 namespace decolog::core::contestqso {
 namespace {
-constexpr int chunkSize=512, maxBytes=4*1024*1024;
+constexpr int defaultChunkSize=512, secureChunkSize=256, maxBytes=4*1024*1024;
 bool id(const QString& s) { static const QRegularExpression re(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$")); return re.match(s).hasMatch(); }
 bool hashText(const QString& s) { static const QRegularExpression re(QStringLiteral("^[0-9a-f]{64}$")); return re.match(s).hasMatch(); }
 bool number(const QJsonValue& v, int min, int max, int* out) {
@@ -69,20 +69,22 @@ QByteArray localStateFingerprint(const QSqlDatabase& db,qint64 id) {
     return hash.result();
 }
 }
-Encoder::Encoder(const QString& transfer,const QString& log,const ContestNetInventoryRow& row)
-    : m_transfer(transfer),m_log(log),m_row(row) {
-    if (!id(transfer)||!id(log)||!id(row.uuid)||row.revision<0 || row.adifPayload.isEmpty() || row.adifPayload.size()>maxBytes || row.contentHash.size()!=32 || !validPayload(row.adifPayload,row.contentHash)) {
+Encoder::Encoder(const QString& transfer,const QString& log,const ContestNetInventoryRow& row,int chunkSize)
+    : m_transfer(transfer),m_log(log),m_row(row),m_chunkSize(chunkSize) {
+    if ((chunkSize!=defaultChunkSize && chunkSize!=secureChunkSize) || !id(transfer)||!id(log)||!id(row.uuid)||row.revision<0 || row.adifPayload.isEmpty() || row.adifPayload.size()>maxBytes || row.contentHash.size()!=32 || !validPayload(row.adifPayload,row.contentHash)) {
         m_error=QStringLiteral("Invalid transfer metadata, size or ADIF fingerprint"); return;
     }
     m_payloadHash=QCryptographicHash::hash(row.adifPayload,QCryptographicHash::Sha256);
 }
-int Encoder::count() const { return ok() ? int((m_row.adifPayload.size()+chunkSize-1)/chunkSize) : 0; }
+int Encoder::count() const { return ok() ? int((m_row.adifPayload.size()+m_chunkSize-1)/m_chunkSize) : 0; }
 QJsonObject Encoder::frame(int index) const {
     if (!ok() || index<0 || index>=count()) return {};
-    return {{"version",1},{"transfer",m_transfer},{"log",m_log},{"uuid",m_row.uuid},{"revision",m_row.revision},{"deleted",m_row.deleted},
+    QJsonObject result{{"version",1},{"transfer",m_transfer},{"log",m_log},{"uuid",m_row.uuid},{"revision",m_row.revision},{"deleted",m_row.deleted},
             {"fingerprint",QString::fromLatin1(m_row.contentHash.toHex())},{"sha256",QString::fromLatin1(m_payloadHash.toHex())},
             {"size",int(m_row.adifPayload.size())},{"count",count()},{"index",index},
-            {"data",QString::fromLatin1(m_row.adifPayload.mid(index*chunkSize,chunkSize).toBase64())}};
+            {"data",QString::fromLatin1(m_row.adifPayload.mid(index*m_chunkSize,m_chunkSize).toBase64())}};
+    if (m_chunkSize!=defaultChunkSize) result.insert(QStringLiteral("chunkSize"),m_chunkSize);
+    return result;
 }
 QList<QJsonObject> Encoder::framesForRequest(const QJsonObject& request) const {
     if (!ok() || request.value("version")!=QJsonValue(1) || request.value("transfer").toString()!=m_transfer
@@ -106,7 +108,9 @@ QJsonObject Receiver::missingRequest(int fromIndex) const {
 bool Receiver::accept(const QString& sender,const QJsonObject& f) {
     auto reject=[this](const char* why) { m_error=QString::fromLatin1(why); return false; };
     if (m_failed) return reject("Transfer has failed; restart required");
-    int version,total,count,index,revision;
+    int version,total,count,index,revision,chunkSize=defaultChunkSize;
+    if (f.contains(QStringLiteral("chunkSize")) && (!number(f.value(QStringLiteral("chunkSize")),secureChunkSize,defaultChunkSize,&chunkSize)
+        || (chunkSize!=secureChunkSize && chunkSize!=defaultChunkSize))) return reject("Invalid fragment size");
     const QString transfer=f.value("transfer").toString(),log=f.value("log").toString(),uuid=f.value("uuid").toString();
     const QString fp=f.value("fingerprint").toString(),sha=f.value("sha256").toString();
     if (!id(m_sender)||!id(m_transfer)||sender!=m_sender||transfer!=m_transfer||!id(log)||!id(uuid)||!hashText(fp)||!hashText(sha)
@@ -120,9 +124,9 @@ bool Receiver::accept(const QString& sender,const QJsonObject& f) {
     if (!decoded || decoded.decoded.toBase64()!=encoded || decoded.decoded.size()!=qMin(chunkSize,total-index*chunkSize)) return reject("Invalid fragment data");
     const QByteArray contentHash=QByteArray::fromHex(fp.toLatin1()),payloadHash=QByteArray::fromHex(sha.toLatin1());
     if (m_chunks.isEmpty()) {
-        m_total=total; m_log=log; m_row.uuid=uuid; m_row.revision=revision; m_row.deleted=f.value("deleted").toBool();
+        m_total=total; m_chunkSize=chunkSize; m_log=log; m_row.uuid=uuid; m_row.revision=revision; m_row.deleted=f.value("deleted").toBool();
         m_row.contentHash=contentHash; m_payloadHash=payloadHash; m_chunks.resize(count);
-    } else if (m_total!=total || m_chunks.size()!=count || m_log!=log || m_row.uuid!=uuid || m_row.revision!=revision
+    } else if (m_total!=total || m_chunkSize!=chunkSize || m_chunks.size()!=count || m_log!=log || m_row.uuid!=uuid || m_row.revision!=revision
                || m_row.deleted!=f.value("deleted").toBool() || m_row.contentHash!=contentHash || m_payloadHash!=payloadHash) return reject("Fragment metadata changed");
     if (!m_chunks[index].isEmpty()) {
         if (m_chunks[index]!=decoded.decoded) return reject("Conflicting duplicate fragment");

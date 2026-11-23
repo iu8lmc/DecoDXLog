@@ -71,16 +71,18 @@ private:
 private slots:
     void stationNetworkExperimentalQsoDialog_data()
     {
-        QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("warning");
-        QTest::newRow("English") << QStringLiteral("en") << QByteArray("QSO data is not encrypted");
-        QTest::newRow("Italian") << QStringLiteral("it") << QByteArray("i dati QSO non sono cifrati");
+        QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("warning"); QTest::addColumn<bool>("secure");
+        QTest::newRow("English clear") << QStringLiteral("en") << QByteArray("QSO data is not encrypted") << false;
+        QTest::newRow("Italian clear") << QStringLiteral("it") << QByteArray("i dati QSO non sono cifrati") << false;
+        QTest::newRow("English protected") << QStringLiteral("en") << QByteArray("Legacy QSO and other network messages remain unencrypted") << true;
+        QTest::newRow("Italian protected") << QStringLiteral("it") << QByteArray("gli altri messaggi di rete rimangono non cifrati") << true;
     }
     void stationNetworkExperimentalQsoDialog()
     {
-        QFETCH(QString,language); QFETCH(QByteArray,warning); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        QFETCH(QString,language); QFETCH(QByteArray,warning); QFETCH(bool,secure); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
-        QByteArray output; QVERIFY2(launch(dir,"netwireprobe",output,3500),output.constData());
-        QVERIFY2(output.contains("PROBE netwire") && output.contains("\"visible\":true") && output.contains(warning) && !output.contains("TypeError"),output.constData());
+        QByteArray output; QVERIFY2(launch(dir,secure?"netwiresecureprobe":"netwireprobe",output,3500),output.constData());
+        QVERIFY2(output.contains("PROBE netwire") && output.contains("\"visible\":true") && output.contains(warning) && output.contains(secure?"\"secure\":true":"\"secure\":false") && output.contains("\"expiryGuard\":true") && !output.contains(QByteArray(64,'a')) && !output.contains("TypeError"),output.constData());
     }
     void stationNetworkComparisonDialogShowsOfflineResult_data()
     {

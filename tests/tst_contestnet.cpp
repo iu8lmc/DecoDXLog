@@ -1,5 +1,7 @@
 // La rete multi-operatore: messaggi impacchettati e ricevuti.
 #include "core/ContestNet.h"
+#include "core/ContestNetSecure.h"
+#include "../libs/monocypher/monocypher.h"
 #include "core/ContestNetQsoTransfer.h"
 #include "core/ContestSerialProtocol.h"
 #include "core/LogDatabase.h"
@@ -7,6 +9,7 @@
 #include <QSignalSpy>
 #include <QSqlQuery>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QTest>
 #include <QUdpSocket>
 #include <QTemporaryDir>
@@ -145,6 +148,18 @@ private slots:
         QTRY_COMPARE(accepted,encoder.count()-1); QVERIFY(!receiver.complete());
         QVERIFY(send(1)); QTRY_COMPARE(accepted,encoder.count()); QVERIFY(!receiver.complete());
         QVERIFY(send(0)); QTRY_VERIFY(receiver.complete()); QCOMPARE(receiver.row().adifPayload,row.adifPayload);
+    }
+    void qsoTransferSupportsCompactChunksWithoutChangingLegacyFrames()
+    {
+        AdifRecord record{{"CALL","K1AAA"},{"COMMENT",QString(900,'x')}}; ContestNetInventoryRow row; row.uuid="qso"; row.revision=1;
+        row.adifPayload=adif::writeRecord(record).toUtf8(); row.contentHash=ContestNetInventory::fingerprint(record);
+        contestqso::Encoder legacy("transfer","log",row),compact("transfer","log",row,256),invalid("transfer","log",row,255);
+        QVERIFY(legacy.ok() && compact.ok()); QVERIFY(!invalid.ok()); QVERIFY(!legacy.frame(0).contains("chunkSize")); QCOMPARE(compact.frame(0).value("chunkSize").toInt(),256);
+        contestqso::Receiver receiver("sender","transfer"); QVERIFY(receiver.accept("sender",compact.frame(0)));
+        auto altered=compact.frame(1); altered.insert("chunkSize",512); QVERIFY(!receiver.accept("sender",altered));
+        altered=compact.frame(1); altered.insert("chunkSize",256.5); QVERIFY(!receiver.accept("sender",altered));
+        for (int i=1;i<compact.count();++i) QVERIFY(receiver.accept("sender",compact.frame(i)));
+        QVERIFY(receiver.complete()); QCOMPARE(receiver.row().adifPayload,row.adifPayload);
     }
     void qsoTransferRequestsMissingFragments()
     {
@@ -342,6 +357,38 @@ private slots:
         QVERIFY(r.accept("node",encoder.frame(0))); f=encoder.frame(0); auto bytes=QByteArray::fromBase64(f.value("data").toString().toLatin1()); bytes[0]='z'; f.insert("data",QString::fromLatin1(bytes.toBase64()));
         QVERIFY(!r.accept("node",f)); QVERIFY(!r.complete()); QVERIFY(r.accept("node",encoder.frame(1))); QVERIFY(r.complete());
         row.adifPayload=QByteArray(4*1024*1024+1,'x'); contestqso::Encoder large("transfer","log",row); QVERIFY(!large.ok()); QCOMPARE(large.count(),0);
+    }
+    void monocypherXchachaMatchesPublishedVector()
+    {
+        // IRTF XChaCha draft-03, section A.3.1 (expired Internet-Draft).
+        const auto key=QByteArray::fromHex("808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f");
+        const auto nonce=QByteArray::fromHex("404142434445464748494a4b4c4d4e4f5051525354555657");
+        const auto aad=QByteArray::fromHex("50515253c0c1c2c3c4c5c6c7");
+        const auto cipher=QByteArray::fromHex("bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da9768812f615c68b13b52e");
+        const auto tag=QByteArray::fromHex("c0875924c1c7987947deafd8780acf49");
+        const auto expected=QByteArray::fromHex("4c616469657320616e642047656e746c656d656e206f662074686520636c617373206f66202739393a204966204920636f756c64206f6666657220796f75206f6e6c79206f6e652074697020666f7220746865206675747572652c2073756e73637265656e20776f756c642062652069742e");
+        QByteArray output(cipher.size(),Qt::Uninitialized);
+        const auto p=[](const QByteArray& b){ return reinterpret_cast<const uint8_t*>(b.constData()); };
+        QCOMPARE(crypto_aead_unlock(reinterpret_cast<uint8_t*>(output.data()),p(tag),p(key),p(nonce),p(aad),size_t(aad.size()),p(cipher),size_t(cipher.size())),0);
+        QCOMPARE(output,expected);
+    }
+    void secureQsoFrameAuthenticatesRoutingAndContent()
+    {
+        const QByteArray key(32,'k'), wrong(32,'w'); const QJsonObject body{{"to","receiver"},{"transfer","t1"},{"data","private-qso"}};
+        const auto sealed=contestsecure::seal(key,"FIELD","sender","receiver","qso_chunk_v1",body); QVERIFY2(sealed.ok,qPrintable(sealed.error));
+        QVERIFY(!QJsonDocument(sealed.frame).toJson().contains("private-qso"));
+        auto opened=contestsecure::open(key,"field","sender","receiver",sealed.frame); QVERIFY2(opened.ok,qPrintable(opened.error));
+        QCOMPARE(opened.type,QString("qso_chunk_v1")); QCOMPARE(opened.body,body);
+        QVERIFY(!contestsecure::open(wrong,"FIELD","sender","receiver",sealed.frame).ok);
+        QVERIFY(!contestsecure::open(key,"OTHER","sender","receiver",sealed.frame).ok);
+        QVERIFY(!contestsecure::open(key,"FIELD","impostor","receiver",sealed.frame).ok);
+        QVERIFY(!contestsecure::open(key,"FIELD","sender","other",sealed.frame).ok);
+        auto altered=sealed.frame; auto box=QByteArray::fromBase64(altered.value("box").toString().toLatin1()); box[0]=char(box[0]^1); altered.insert("box",QString::fromLatin1(box.toBase64()));
+        QVERIFY(!contestsecure::open(key,"FIELD","sender","receiver",altered).ok);
+        altered=sealed.frame; altered.insert("tag","!!!!"); QVERIFY(!contestsecure::open(key,"FIELD","sender","receiver",altered).ok);
+        QVERIFY(!contestsecure::seal(QByteArray(31,'k'),"FIELD","sender","receiver","qso_chunk_v1",body).ok);
+        QVERIFY(!contestsecure::seal(key,"FIELD","sender","other","qso_chunk_v1",body).ok);
+        const auto again=contestsecure::seal(key,"FIELD","sender","receiver","qso_chunk_v1",body); QVERIFY(again.ok); QVERIFY(again.frame.value("nonce")!=sealed.frame.value("nonce"));
     }
     void packUnpack()
     {

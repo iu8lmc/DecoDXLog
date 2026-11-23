@@ -6,7 +6,7 @@ namespace decolog::core::contestqso {
 // Experimental framing only: sender identifiers are not authentication.
 class Encoder {
 public:
-    Encoder(const QString& transfer, const QString& log, const ContestNetInventoryRow& row);
+    Encoder(const QString& transfer, const QString& log, const ContestNetInventoryRow& row, int chunkSize = 512);
     bool ok() const { return m_error.isEmpty(); }
     QString error() const { return m_error; }
     int count() const;
@@ -16,6 +16,7 @@ private:
     QString m_transfer, m_log, m_error;
     ContestNetInventoryRow m_row;
     QByteArray m_payloadHash;
+    int m_chunkSize{512};
 };
 class Receiver {
 public:
@@ -32,7 +33,7 @@ private:
     ContestNetInventoryRow m_row;
     QByteArray m_payloadHash;
     QList<QByteArray> m_chunks;
-    int m_total{0}, m_received{0};
+    int m_total{0}, m_received{0}, m_chunkSize{0};
     bool m_complete{false}, m_failed{false};
 };
 struct ApplyResult { bool ok{false}; bool inserted{false}; qint64 id{0}; QString error; };

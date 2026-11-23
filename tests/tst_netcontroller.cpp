@@ -1,5 +1,6 @@
 #include "app/NetController.h"
 #include "core/ContestSerialProtocol.h"
+#include "core/ContestNetSecure.h"
 #include "core/LogDatabase.h"
 
 #include <QTest>
@@ -7,6 +8,7 @@
 #include <QTemporaryDir>
 #include <QSettings>
 #include <QSqlQuery>
+#include <QJsonDocument>
 #include <QSqlError>
 #include <QFile>
 #include <QUdpSocket>
@@ -71,6 +73,62 @@ private slots:
         QTest::qWait(1100); const int before=retryFrames; for (int i=0;i<5;++i) forward("receiver","qso_first_v1",QJsonObject{{"version",1},{"transfer","transfer"},{"to","sender"}},senderPort);
         QTRY_VERIFY_WITH_TIMEOUT(retryFrames>before,3000); QTest::qWait(500); QCOMPARE(retryFrames-before,1);
         a.setEnabled(false); b.setEnabled(false);
+    }
+    void experimentalSecureQsoTransferRecoversInitialLoss()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoNetTransferTest"); QCoreApplication::setApplicationName("SecureRetry"); QSettings().setValue("net/enabled",false);
+        LogDatabase source,destination; QVERIFY(source.open(dir.filePath("source.sqlite"))); QVERIFY(destination.open(dir.filePath("dest.sqlite")));
+        const auto q=source.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(1800,'x')}},"fixture"); QVERIFY(q.id>0);
+        QUdpSocket p1,p2; QVERIFY(p1.bind(QHostAddress::LocalHost,0)); QVERIFY(p2.bind(QHostAddress::LocalHost,0)); const auto senderPort=p1.localPort(),receiverPort=p2.localPort(); p1.close(); p2.close();
+        NetController::Context aCtx; aCtx.db=&source; NetController a(aCtx); NetController::Context bCtx; bCtx.db=&destination; NetController b(bCtx);
+        a.setIdForTests("sender"); b.setIdForTests("receiver"); a.setGroup("FIELD"); b.setGroup("FIELD"); a.setPort(senderPort); b.setPort(receiverPort); a.setTarget(QHostAddress::LocalHost); b.setTarget(QHostAddress::LocalHost); a.setEnabled(true); b.setEnabled(true);
+        const QString key(64,'a'); QVERIFY(a.setExperimentalQsoKey(key).isEmpty()); QVERIFY(b.setExperimentalQsoKey(key).isEmpty());
+        QUdpSocket relay; int seq=0,requests=0,retryFrames=0; bool dropInitial=true;
+        auto forward=[&](const QString& from,const QString& type,QJsonObject body,quint16 port) { body.insert("seq",++seq); body.insert("session","secure-auto-relay"); const auto bytes=ContestNet::pack("FIELD",from,type,body); relay.writeDatagram(bytes,QHostAddress::LocalHost,port); };
+        connect(&a,&NetController::experimentalQsoFrameSent,&relay,[&](const QString& type,const QJsonObject& frame) { if (type!="qso_secure_v1" || dropInitial) return; ++retryFrames; forward("sender",type,frame,receiverPort); });
+        connect(&b,&NetController::experimentalQsoFrameSent,&relay,[&](const QString& type,const QJsonObject& frame) { if (type!="qso_secure_v1") return; ++requests; forward("receiver",type,frame,senderPort); });
+        QVERIFY(b.armExperimentalQsoReceiver("sender","transfer").isEmpty()); QVERIFY(a.sendExperimentalQso("receiver",source.meta(q.id)->uuid,"transfer").isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(!a.experimentalQsoSending(),10000); QVERIFY(!b.experimentalQsoPreview().value("complete").toBool()); dropInitial=false;
+        QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),9000); QVERIFY(requests>=2 && retryFrames>=4); QCOMPARE(destination.qsoCount(),qint64(0));
+        QTest::qWait(1100); const int before=retryFrames; const auto rawKey=QByteArray::fromHex(key.toLatin1());
+        for (int i=0;i<5;++i) { const auto protectedRequest=contestsecure::seal(rawKey,"FIELD","receiver","sender","qso_first_v1",QJsonObject{{"version",1},{"transfer","transfer"},{"to","sender"}}); QVERIFY(protectedRequest.ok); forward("receiver","qso_secure_v1",protectedRequest.frame,senderPort); }
+        QTRY_VERIFY_WITH_TIMEOUT(retryFrames>before,3000); QTest::qWait(500); QCOMPARE(retryFrames-before,1);
+        a.setEnabled(false); b.setEnabled(false); QVERIFY(!a.experimentalQsoSecure() && !b.experimentalQsoSecure());
+    }
+    void experimentalSecureQsoTransferRejectsWrongKeyAndReplay()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoNetTransferTest"); QCoreApplication::setApplicationName("SecurePair"); QSettings().setValue("net/enabled",false);
+        LogDatabase source,destination; QVERIFY(source.open(dir.filePath("source.sqlite"))); QVERIFY(destination.open(dir.filePath("dest.sqlite")));
+        const auto q=source.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(1800,'x')}},"fixture"); QVERIFY(q.id>0);
+        QUdpSocket p1,p2; QVERIFY(p1.bind(QHostAddress::LocalHost,0)); QVERIFY(p2.bind(QHostAddress::LocalHost,0)); const auto senderPort=p1.localPort(),receiverPort=p2.localPort(); p1.close(); p2.close();
+        NetController::Context aCtx; aCtx.db=&source; NetController a(aCtx); NetController::Context bCtx; bCtx.db=&destination; NetController b(bCtx);
+        a.setIdForTests("sender"); b.setIdForTests("receiver"); a.setGroup("FIELD"); b.setGroup("FIELD"); a.setPort(senderPort); b.setPort(receiverPort); a.setTarget(QHostAddress::LocalHost); b.setTarget(QHostAddress::LocalHost); a.setEnabled(true); b.setEnabled(true);
+        const QString key(64,'a'),wrong(64,'b'); QCOMPARE(a.generateExperimentalQsoKey().size(),64); QVERIFY(!a.setExperimentalQsoKey("invalid").isEmpty());
+        QVERIFY(a.setExperimentalQsoKey(key).isEmpty()); QVERIFY(b.setExperimentalQsoKey(wrong).isEmpty()); QVERIFY(a.experimentalQsoSecure() && b.experimentalQsoSecure()); QVERIFY(b.armExperimentalQsoReceiver("sender","transfer").isEmpty());
+        QSignalSpy sent(&a,&NetController::experimentalQsoFrameSent); QUdpSocket relay; int seq=0; QList<QJsonObject> frames;
+        auto forward=[&](const QString& from,const QString& type,QJsonObject body,quint16 port) { body.insert("seq",++seq); body.insert("session","secure-relay"); const auto bytes=ContestNet::pack("FIELD",from,type,body); relay.writeDatagram(bytes,QHostAddress::LocalHost,port); };
+        QVERIFY(a.sendExperimentalQso("receiver",source.meta(q.id)->uuid,"transfer").isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(!a.experimentalQsoSending(),10000); QVERIFY(sent.size()>=4);
+        int largestDatagram=0;
+        for (const auto& item:sent) { QCOMPARE(item.at(0).toString(),QString("qso_secure_v1")); const auto frame=item.at(1).toJsonObject(); QVERIFY(!QJsonDocument(frame).toJson().contains("K1AAA"));
+            auto envelope=frame; envelope.insert("seq",1); envelope.insert("session",QString(36,'s')); envelope.insert("protocol",2); envelope.insert("name","station");
+            largestDatagram=qMax(largestDatagram,int(ContestNet::pack("FIELD","sender","qso_secure_v1",envelope).size())); frames.append(frame); forward("sender","qso_secure_v1",frame,receiverPort); }
+        qInfo("Synthetic protected QSO largest datagram: %d bytes",largestDatagram); QVERIFY(largestDatagram<=1472);
+        QTest::qWait(200); QVERIFY(!b.experimentalQsoPreview().value("complete").toBool());
+        QVERIFY(b.setExperimentalQsoKey(key).isEmpty()); QVERIFY(b.armExperimentalQsoReceiver("sender","transfer").isEmpty());
+        ContestNetInventory inventory; QVERIFY(inventory.begin(dir.filePath("source.sqlite"))); const auto page=inventory.findUuid(source.meta(q.id)->uuid); QVERIFY(page.ok && page.rows.size()==1);
+        contestqso::Encoder plain("transfer",inventory.logIdentity(),page.rows.first()); QVERIFY(plain.ok());
+        for (int i=0;i<plain.count();++i) { auto body=plain.frame(i); body.insert("to","receiver"); forward("sender","qso_chunk_v1",body,receiverPort); }
+        QTest::qWait(120); QVERIFY(!b.experimentalQsoPreview().value("complete").toBool());
+        for (const auto& frame:frames) forward("sender","qso_secure_v1",frame,receiverPort);
+        QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),5000); QCOMPARE(b.experimentalQsoPreview().value("call").toString(),QString("K1AAA"));
+        QSignalSpy changed(&b,&NetController::experimentalQsoChanged); forward("sender","qso_secure_v1",frames.first(),receiverPort); QTest::qWait(200); QCOMPARE(changed.size(),0);
+        a.setStationName(QString(1000,'n')); const int beforeOversize=sent.size(); QVERIFY(a.sendExperimentalQso("receiver",source.meta(q.id)->uuid,"oversized").isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(!a.experimentalQsoSending(),10000); QVERIFY(a.experimentalQsoStatus().contains("too large")); QCOMPARE(sent.size(),beforeOversize);
+        QCOMPARE(destination.qsoCount(),qint64(0)); a.setEnabled(false); b.setEnabled(false);
     }
     void offlineQsoComparisonShowsDifferencesAndExpiresOnLocalEdit()
     {
