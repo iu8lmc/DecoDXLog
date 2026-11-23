@@ -507,6 +507,27 @@ private slots:
         const auto retryAfterFault = request("POST", QStringLiteral("/api/v1/qso"), faultBody, "fault-1");
         QCOMPARE(retryAfterFault.first, 409);
         QCOMPARE(countCall(QStringLiteral("W8ERR")), 1);
+        // A failed lookup must not be treated as an unused key.
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
+            db.setDatabaseName(m_db); QVERIFY(db.open()); QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("ALTER TABLE api_idempotency RENAME TO api_idempotency_unavailable")));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        const QByteArray lookupBody = "<CALL:6>W8LOOK<QSO_DATE:8>20260917<TIME_ON:4>0930<BAND:3>20m<MODE:3>FT8<EOR>";
+        const auto lookupFailed = request("POST", QStringLiteral("/api/v1/qso"), lookupBody, "lookup-1");
+        const int countAfterFailedLookup = countCall(QStringLiteral("W8LOOK"));
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
+            db.setDatabaseName(m_db); QVERIFY(db.open()); QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("ALTER TABLE api_idempotency_unavailable RENAME TO api_idempotency")));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        QCOMPARE(lookupFailed.first, 503);
+        QCOMPARE(countAfterFailedLookup, 0);
+        const auto afterLookupRecovery = request("POST", QStringLiteral("/api/v1/qso"), lookupBody, "lookup-1");
+        QCOMPARE(afterLookupRecovery.first, 201);
+        QCOMPARE(countCall(QStringLiteral("W8LOOK")), 1);
         const auto diagnostic = request("POST", QStringLiteral("/api/v1/qso"),
                                        "<CALL:9>DIAG-TEST<QSO_DATE:8>20000101<TIME_ON:6>000000<BAND:2>2m<MODE:4>TEST"
                                        "<APP_DECOLOG_DIAGNOSTIC:1>1<EOR>");

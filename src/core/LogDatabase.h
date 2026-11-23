@@ -304,7 +304,7 @@ public:
 
     QSqlDatabase connection() const;
 
-    std::optional<ApiIdempotencyRecord> apiIdempotency(const QString& key) const;
+    std::optional<ApiIdempotencyRecord> apiIdempotency(const QString& key, QString* error = nullptr) const;
     bool saveApiIdempotency(const QString& key, const ApiIdempotencyRecord& record);
 
     // Finestra dei duplicati, in secondi: per i QSO dai programmi digitali e per

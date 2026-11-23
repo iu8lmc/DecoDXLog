@@ -686,21 +686,33 @@ bool LogDatabase::migrate()
     return true;
 }
 
-std::optional<ApiIdempotencyRecord> LogDatabase::apiIdempotency(const QString& key) const
+std::optional<ApiIdempotencyRecord> LogDatabase::apiIdempotency(const QString& key, QString* error) const
 {
-    if (key.isEmpty() || !isOpen())
+    if (error) error->clear();
+    if (key.isEmpty() || !isOpen()) {
+        if (error) *error = QStringLiteral("idempotency key or database unavailable");
         return std::nullopt;
+    }
     QSqlQuery cleanup(connection());
     cleanup.prepare(QStringLiteral("DELETE FROM api_idempotency WHERE created_at < ?"));
     cleanup.addBindValue(QDateTime::currentDateTimeUtc().addDays(-30).toString(Qt::ISODate));
-    cleanup.exec();
+    if (!cleanup.exec()) {
+        if (error) *error = cleanup.lastError().text().isEmpty() ? QStringLiteral("idempotency cleanup failed") : cleanup.lastError().text();
+        return std::nullopt;
+    }
 
     QSqlQuery q(connection());
     q.prepare(QStringLiteral("SELECT request_body, status, content_type, response_body, created_at "
                              " , request_format, request_app FROM api_idempotency WHERE key = ?"));
     q.addBindValue(key);
-    if (!q.exec() || !q.next())
+    if (!q.exec()) {
+        if (error) *error = q.lastError().text().isEmpty() ? QStringLiteral("idempotency lookup failed") : q.lastError().text();
         return std::nullopt;
+    }
+    if (!q.next()) {
+        if (error && q.lastError().isValid()) *error = q.lastError().text().isEmpty() ? QStringLiteral("idempotency lookup failed") : q.lastError().text();
+        return std::nullopt;
+    }
     return ApiIdempotencyRecord{q.value(0).toByteArray(), q.value(1).toInt(), q.value(2).toByteArray(),
                                 q.value(3).toByteArray(), q.value(4).toString(),
                                 q.value(5).isNull() ? std::nullopt : std::optional<QByteArray>(q.value(5).toByteArray()),

@@ -4079,7 +4079,10 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const QString app = QString::fromUtf8(request.headers.value("x-app")).trimmed();
         const QByteArray requestApp = (app.isEmpty() ? QStringLiteral("API") : app.left(60)).toUtf8();
         if (!idempotencyKey.isEmpty()) {
-            const auto previous = m_db.apiIdempotency(idempotencyKey);
+            QString lookupError;
+            const auto previous = m_db.apiIdempotency(idempotencyKey, &lookupError);
+            if (!lookupError.isEmpty())
+                return HttpResponse::error(503, QStringLiteral("idempotency lookup unavailable; request was not processed"));
             if (previous) {
                 if (previous->requestBody != request.body ||
                     (previous->requestFormat && *previous->requestFormat != requestFormat) ||
