@@ -947,8 +947,15 @@ private slots:
         QSettings settings(iniPath(dir),QSettings::IniFormat); const auto defs=decolog::core::newqso::decodeCustomFields(settings.value("ui/newQso/customFields").toString());
         QVERIFY(std::any_of(defs.cbegin(),defs.cend(),[](const QVariant& v) { const auto d=v.toMap(); return d.value("name")=="APP_TYPED_DOUBLE" && d.value("formula")=="{APP_TYPED_POWER} * 2"; }));
     }
+    void externalWriteDiscardsPendingGoalAlertInActualApp_data()
+    {
+        QTest::addColumn<bool>("satisfiesGoal");
+        QTest::newRow("goal-satisfied") << true;
+        QTest::newRow("unrelated-write") << false;
+    }
     void externalWriteDiscardsPendingGoalAlertInActualApp()
     {
+        QFETCH(bool, satisfiesGoal);
         using namespace decolog::core;
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         const QString path=dir.filePath("test.sqlite");
@@ -974,14 +981,14 @@ private slots:
         QVERIFY2(output.contains("PROBE dxgoalrace worker needed=1"), output.constData());
         QVERIFY2(!output.contains("PROBE dxgoalrace resumed"), output.constData());
         { LogDatabase writer; QVERIFY(writer.open(path)); const auto now=QDateTime::currentDateTimeUtc();
-          const auto qso=writer.insertQso({{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
+          const auto qso=writer.insertQso({{"CALL",satisfiesGoal ? "3Y0J" : "K1OTHER"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
           QCOMPARE(qso.status,InsertResult::Status::Inserted); }
         output += app.readAll();
         QVERIFY2(!output.contains("PROBE dxgoalrace resumed"), output.constData());
         QVERIFY(app.waitForFinished(20000)); output+=app.readAll();
         QVERIFY2(output.contains("PROBE dxgoalrace resumed"),output.constData());
         QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
-        QCOMPARE(output.count("[activity] DXCAMPAIGN|highlight|"),0);
+        QVERIFY2(output.count("[activity] DXCAMPAIGN|highlight|")== (satisfiesGoal ? 0 : 1),output.constData());
     }
 
     void watchedCampaignCanAlertOnlyForOpenGoals()

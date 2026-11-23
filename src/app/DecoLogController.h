@@ -1051,6 +1051,7 @@ private:
     void awardFilterChanged();
     void reloadDxCampaignWatches();
     void noteDxCampaignSpot(const core::EnrichedSpot& spot);
+    void noteDxCampaignSpotImpl(const core::EnrichedSpot& spot, const QString& onlyCampaign, bool retried);
     void emitDxCampaignAlert(const core::dxcampaign::Campaign& campaign, const core::EnrichedSpot& spot);
     QJsonObject decoLinkAward() const;
     QJsonArray decoLinkQuery(const QJsonObject& query) const;

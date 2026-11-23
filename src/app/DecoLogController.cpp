@@ -2418,10 +2418,16 @@ void DecoLogController::reloadDxCampaignWatches()
 
 void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
 {
+    noteDxCampaignSpotImpl(spot, {}, false);
+}
+
+void DecoLogController::noteDxCampaignSpotImpl(const EnrichedSpot& spot, const QString& onlyCampaign, bool retried)
+{
     if (m_shuttingDown || m_dxWatchPath!=m_db.path() || m_dxWatchedCampaigns.isEmpty()) return;
     const QDateTime now=QDateTime::currentDateTimeUtc();
     const qint64 profile=m_profiles ? m_profiles->activeProfileId() : 0;
     for (const auto& campaign : std::as_const(m_dxWatchedCampaigns)) {
+        if (!onlyCampaign.isEmpty() && campaign.id != onlyCampaign) continue;
         if (!dxcampaign::watchMatches(campaign,spot,now,profile)) continue;
         // Another process may have edited or disabled this campaign. Never
         // emit using a stale cached revision; refresh and wait for a new spot.
@@ -2443,19 +2449,26 @@ void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
         m_dxWatchPending.insert(pendingKey);
         const QString path=m_db.path(); const quint64 logVersion=m_logVersion;
         QPointer<DecoLogController> self(this);
-        m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey] {
+        m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey,retried] {
             LogDatabase db; QString error; bool needed=false;
-            if (db.open(path)) { const auto result=dxcampaign::goalNeeded(db,campaign,spot,&error); needed=result && *result; }
+            if (db.openReadOnly(path)) { const auto result=dxcampaign::goalNeeded(db,campaign,spot,&error); needed=result && *result; }
             if (qEnvironmentVariableIsSet("DECOLOG_TEST_DX_WATCH_TRACE"))
                 qWarning("PROBE dxgoalrace worker needed=%d", needed ? 1 : 0);
             if (!self) return;
-            QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey,needed] {
+            QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey,needed,retried] {
                 if (!self) return; self->m_dxWatchPending.remove(pendingKey);
-                if (!needed || self->m_shuttingDown || self->m_db.path()!=path || self->m_logVersion!=logVersion ||
-                    !dxcampaign::watchSnapshotCurrent(self->m_db,generation,dataVersion) ||
+                if (self->m_shuttingDown || self->m_db.path()!=path || self->m_logVersion!=logVersion ||
                     !self->m_cluster || !self->m_cluster->acceptsSpot(spot) ||
                     (self->m_profiles ? self->m_profiles->activeProfileId() : 0)!=profile ||
                     !dxcampaign::watchMatches(campaign,spot,QDateTime::currentDateTimeUtc(),profile)) return;
+                if (!dxcampaign::watchSnapshotCurrent(self->m_db,generation,dataVersion)) {
+                    const qint64 latest=self->m_db.dataVersion();
+                    if (!retried && latest>=0 && latest!=dataVersion && self->m_db.openGeneration()==generation &&
+                        self->m_db.fileIdentityMatchesOpen())
+                        self->noteDxCampaignSpotImpl(spot,campaign.id,true);
+                    return;
+                }
+                if (!needed) return;
                 const auto current=dxcampaign::load(self->m_db,campaign.id);
                 if (!current || current->revision!=campaign.revision) { self->reloadDxCampaignWatches(); return; }
                 self->emitDxCampaignAlert(campaign,spot);
