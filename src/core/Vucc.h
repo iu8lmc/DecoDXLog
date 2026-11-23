@@ -18,6 +18,7 @@ struct Entry {
     QString grids;
     QString myGrids;
     QString myGrid;
+    QString otherEvidence; // recorded confirmations not accepted by this candidate filter
 };
 
 struct Rules {

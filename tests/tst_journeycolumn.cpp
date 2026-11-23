@@ -68,6 +68,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void vuccReviewShowsAllowedAndUnsupportedEvidence()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM10<EQSL_QSL_RCVD:1>Y<EOR>"
+              "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1201<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EQSL_QSL_RCVD:1>Y<EOR>";
+          QCOMPARE(db.importAdif(data).inserted,2); }
+        QByteArray output; QVERIFY2(launch(dir,"vuccreviewprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE vuccReview open=true row=EM11") && output.contains("local confirmation: card") && output.contains("other recorded: eqsl") && output.contains("unsupported confirmation sources: eqsl") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void importPreviewCanCancelAndRestart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto path=dir.filePath("source.adi"); QFile input(path);

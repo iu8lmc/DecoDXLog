@@ -150,13 +150,26 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             result.exclusions << QStringLiteral("QSO %1: confirmation evidence required").arg(entry.qsoId);
             continue;
         }
+        QStringList accepted, other;
+        for (const auto& item : entry.evidence.split(QLatin1Char(','),Qt::SkipEmptyParts)) {
+            const QString service=item.trimmed().toLower();
+            if (service.isEmpty()) continue;
+            QStringList& target=(service==QLatin1String("lotw") || service==QLatin1String("card")) ? accepted : other;
+            if (!target.contains(service)) target.append(service);
+        }
+        accepted.sort(); other.sort();
+        if (accepted.isEmpty()) {
+            result.exclusions << QStringLiteral("QSO %1: unsupported confirmation sources: %2").arg(entry.qsoId).arg(other.join(QStringLiteral(", ")));
+            continue;
+        }
         for (const QString& grid : candidates) {
             if (grids.contains(grid)) {
-                result.exclusions << QStringLiteral("QSO %1: GRID4 %2 already credited").arg(entry.qsoId).arg(grid);
+                result.exclusions << QStringLiteral("QSO %1: GRID4 %2 already selected").arg(entry.qsoId).arg(grid);
                 continue;
             }
             Entry credited = entry;
             credited.grid = grid;
+            credited.evidence=accepted.join(QLatin1Char(',')); credited.otherEvidence=other.join(QLatin1Char(','));
             result.eligible << credited;
             grids.insert(grid);
         }
@@ -229,7 +242,8 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("reportedVuccGrids"), entry.grids},
                                 {QStringLiteral("reportedMyVuccGrids"), entry.myGrids},
                                 {QStringLiteral("reportedMyGrid"), entry.myGrid},
-                                {QStringLiteral("evidence"), entry.evidence}});
+                                {QStringLiteral("evidence"), entry.evidence},
+                                {QStringLiteral("otherEvidence"), entry.otherEvidence}});
     }
     QJsonArray exclusions;
     for (const auto& value : this->exclusions) exclusions.append(value);

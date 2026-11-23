@@ -11,6 +11,23 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void excludesUnsupportedElectronicConfirmationSources()
+    {
+        decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM10<EQSL_QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1201<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1CCC<QSO_DATE:8>20260101<TIME_ON:4>1202<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM12<LOTW_QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1DDD<QSO_DATE:8>20260101<TIME_ON:4>1203<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM13<QSL_RCVD:1>Y<EQSL_QSL_RCVD:1>Y<EOR>";
+        QCOMPARE(db.importAdif(data).inserted,4); QString error; const auto entries=loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error));
+        const auto result=select(entries,Rules{{},{},"6m",100}); QCOMPARE(result.eligible.size(),3); QVERIFY(result.exclusions.join('\n').contains("unsupported"));
+        QCOMPARE(result.eligible[0].grid,QString("EM11")); QCOMPARE(result.eligible[0].evidence,QString("card"));
+        QCOMPARE(result.eligible[1].grid,QString("EM12")); QCOMPARE(result.eligible[1].evidence,QString("lotw"));
+        QCOMPARE(result.eligible[2].grid,QString("EM13")); QCOMPARE(result.eligible[2].evidence,QString("card")); QCOMPARE(result.eligible[2].otherEvidence,QString("eqsl"));
+        const Entry fake{99,"EM14","6m",{},{},true,"lotw-fake,eqsl"}; QVERIFY(select({fake},Rules{{},{},"6m",100}).eligible.isEmpty());
+        const Entry mixed{100,"EM15","6m",{},{},true,"LoTW, EQSL"}; const auto selected=select({mixed},Rules{{},{},"6m",100});
+        QCOMPARE(selected.eligible.size(),1); QCOMPARE(selected.eligible.first().evidence,QString("lotw")); QCOMPARE(selected.eligible.first().otherEvidence,QString("eqsl"));
+        QVERIFY(!result.officialRulesVerified); QCOMPARE(db.qsoCount(),qint64(4));
+    }
     void boundaryQsoLoadsAndCreditsEachAdjacentGrid()
     {
         decolog::core::LogDatabase db;
@@ -114,7 +131,7 @@ private slots:
         const Result result = select(entries, Rules{QStringLiteral("home"), QStringLiteral("JM67"), QStringLiteral("6m"), 100});
         QCOMPARE(result.eligible.size(), 2);
         QCOMPARE(result.eligible.at(0).grid, QStringLiteral("JN52"));
-        QVERIFY(result.exclusions.join('\n').contains(QStringLiteral("already credited")));
+        QVERIFY(result.exclusions.join('\n').contains(QStringLiteral("already selected")));
         QVERIFY(result.exclusions.join('\n').contains(QStringLiteral("evidence")));
         QVERIFY(result.exclusions.join('\n').contains(QStringLiteral("site mismatch")));
         QCOMPARE(result.toJson().object().value(QStringLiteral("format")).toString(), QStringLiteral("decodxlog-vucc-1"));

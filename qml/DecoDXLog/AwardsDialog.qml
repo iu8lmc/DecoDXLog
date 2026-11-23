@@ -46,6 +46,10 @@ DialogFrame {
     property string vuccSite: ""
     property int vuccTarget: 100
     property var vuccResult: ({})
+    onVuccBandChanged: vuccResult=({})
+    onVuccAccountChanged: vuccResult=({})
+    onVuccSiteChanged: vuccResult=({})
+    onVuccTargetChanged: vuccResult=({})
     property var plannerGoals: ["dxcc"]
     property bool plannerSelectionDirty: false
     Settings { id: plannerSettings; category: "qslPlanner"; property string goalsJson: '["dxcc"]' }
@@ -491,6 +495,31 @@ DialogFrame {
     function refreshVucc() {
         vuccResult = decolog.vuccPreview(vuccBand, vuccAccount, vuccSite, vuccTarget)
     }
+    Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close() } }
+    function probeVuccReview() {
+        openAt("dxcc"); vuccBand="6m"; refreshVucc(); vuccReview.open()
+        Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")) })
+    }
+
+    DialogFrame {
+        id:vuccReview; title:qsTr("VUCC candidate review"); dialogKey:"vuccReview"; width:720; height:600; dotColor:Theme.secondaryColor
+        body:ColumnLayout { anchors.margins:12; spacing:6
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Local LoTW or paper confirmation status only. Verify the confirmation, grids, location, band and account with ARRL; these candidates are not award credit. Other recorded services do not qualify this preview.") }
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Candidate grids and recorded evidence") }
+            ListView { id:vuccCandidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.eligible || []
+                ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:vuccCandidateRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
+                    text:qsTr("%1 · QSO %2 · local confirmation: %3%4").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "") }
+            }
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Excluded or duplicate candidates") }
+            ListView { id:vuccExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.exclusions || []
+                ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:vuccExcludedRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary; text:modelData }
+            }
+            GlassButton { text:qsTr("Close"); onClicked:vuccReview.close() }
+        }
+    }
 
     FileDialog {
         id: marathonFileDialog
@@ -927,6 +956,7 @@ DialogFrame {
                         StyledTextField { Layout.preferredWidth: 120; Accessible.name: qsTr("VUCC operating site"); placeholderText: qsTr("Operating site"); text: root.vuccSite; onEditingFinished: root.vuccSite = text }
                         StyledTextField { Layout.preferredWidth: 55; Accessible.name: qsTr("VUCC target"); text: String(root.vuccTarget); inputMethodHints: Qt.ImhDigitsOnly; onEditingFinished: root.vuccTarget = Math.max(1, parseInt(text) || 1) }
                         GlassButton { Accessible.name: qsTr("Preview VUCC selection"); text: qsTr("Preview"); onClicked: root.refreshVucc() }
+                        GlassButton { Accessible.name:qsTr("Review VUCC candidates"); text:qsTr("Review"); enabled:root.vuccResult.valid === true; onClicked:vuccReview.open() }
                     }
                     Text {
                         Layout.fillWidth: true
