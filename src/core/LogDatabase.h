@@ -412,6 +412,7 @@ public:
     std::optional<AdifRecord> recordChecked(qint64 id, QString* error) const;
     std::optional<QsoMeta> meta(qint64 id) const;
     QList<QslState> qslStatus(qint64 id) const;
+    bool readQslStatus(qint64 id, QList<QslState>* rows, QString* error = nullptr) const;
     QList<HistoryEntry> history(qint64 id) const;
     // Rimette in vigore una versione dello storico (diventa una nuova revisione).
     InsertResult restoreRevision(qint64 id, qint64 historyId);

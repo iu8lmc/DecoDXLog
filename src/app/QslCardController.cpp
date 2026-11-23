@@ -133,7 +133,12 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
             }
         }
         QslState card; card.service = QStringLiteral("card");
-        for (const QslState& existing : db.qslStatus(id)) {
+        QList<QslState> existingStates; QString readError;
+        if (!db.readQslStatus(id,&existingStates,&readError)) {
+            connection.rollback(); result.failed += inBlock + 1 + int(ids.size()) - done;
+            result.error=QObject::tr("Cannot read current QSL status: %1").arg(readError); return result;
+        }
+        for (const QslState& existing : std::as_const(existingStates)) {
             if (existing.service == QLatin1String("card")) { card = existing; break; }
         }
         if (onlyUnsent) {

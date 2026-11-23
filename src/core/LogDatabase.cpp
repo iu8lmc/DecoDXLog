@@ -2512,14 +2512,24 @@ std::optional<QsoMeta> LogDatabase::meta(qint64 id) const
 QList<QslState> LogDatabase::qslStatus(qint64 id) const
 {
     QList<QslState> out;
-    QSqlQuery q(connection());
-    q.prepare(QStringLiteral("SELECT %1 FROM qsl_status WHERE qso_id = ?").arg(QLatin1String(kQslColumns)));
-    q.addBindValue(id);
-    if (!q.exec())
-        return out;
-    while (q.next())
-        out << qslFromQuery(q, 0);
+    readQslStatus(id,&out);
     return out;
+}
+
+bool LogDatabase::readQslStatus(qint64 id, QList<QslState>* rows, QString* error) const
+{
+    if (!rows) { if (error) *error=QStringLiteral("Missing QSL status output"); return false; }
+    rows->clear();
+    QSqlQuery q(connection());
+    if (!q.prepare(QStringLiteral("SELECT %1 FROM qsl_status WHERE qso_id = ?").arg(QLatin1String(kQslColumns)))) {
+        if (error) *error=q.lastError().text(); return false;
+    }
+    q.addBindValue(id);
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
+    while (q.next())
+        rows->append(qslFromQuery(q, 0));
+    if (q.lastError().isValid()) { rows->clear(); if (error) *error=q.lastError().text(); return false; }
+    if (error) error->clear(); return true;
 }
 
 QList<HistoryEntry> LogDatabase::history(qint64 id) const

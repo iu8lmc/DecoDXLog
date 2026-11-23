@@ -22,6 +22,9 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QFile>
+#include <QLibrary>
+#include <QSqlDriver>
+#include <cstring>
 
 using namespace decolog;
 using namespace decolog::app;
@@ -110,6 +113,44 @@ private:
     QTemporaryDir m_dir;
 
 private slots:
+    void plannerQueueRefusesQslReadFailure()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("System SQLite authorizer test is opt-in");
+        core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto added=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(added.id>0);
+        core::QslState state; state.service="card"; state.sent="Y"; state.rcvd="Y"; state.via="D"; QVERIFY(db.setCardState(added.id,state));
+        const auto meta=db.meta(added.id); QVERIFY(meta);
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int(*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int(*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); QVariant handle=db.connection().driver()->handle();
+        if (!setAuthorizer || QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native authorizer unavailable");
+        void* nativeDb=*static_cast<void**>(handle.data()); QVERIFY(nativeDb);
+        const auto deny=+[](void*,int action,const char* table,const char* column,const char*,const char*) { return action==20 && table && column && std::strcmp(table,"qsl_status")==0 && std::strcmp(column,"last_error")==0 ? 1 : 0; };
+        QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx);
+        QCOMPARE(setAuthorizer(nativeDb,deny,nullptr),0); const bool queued=cards.enqueueIfUnsent(added.id,meta->uuid,meta->revision,"B",db.path()); QCOMPARE(setAuthorizer(nativeDb,nullptr,nullptr),0);
+        QVERIFY(!queued); const auto rows=db.qslStatus(added.id); QCOMPARE(rows.size(),1); QCOMPARE(rows.first().sent,QString("Y")); QCOMPARE(rows.first().rcvd,QString("Y")); QCOMPARE(rows.first().via,QString("D"));
+    }
+    void paperBatchRollsBackCurrentBlockOnQslReadFailure()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("System SQLite authorizer test is opt-in");
+        core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto first=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
+        const auto second=db.insertQso({{"CALL","K1BBB"},{"QSO_DATE","20261001"},{"TIME_ON","1201"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(first.id>0 && second.id>0);
+        core::QslState state; state.service="card"; state.sent="N"; state.rcvd="Y"; state.via="D"; QVERIFY(db.setCardState(first.id,state)); QVERIFY(db.setCardState(second.id,state));
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int(*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int(*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); QVariant handle=db.connection().driver()->handle();
+        if (!setAuthorizer || QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native authorizer unavailable");
+        void* nativeDb=*static_cast<void**>(handle.data()); QVERIFY(nativeDb); int reads=0;
+        const auto denySecond=+[](void* data,int action,const char* table,const char* column,const char*,const char*) { if (action==20 && table && column && std::strcmp(table,"qsl_status")==0 && std::strcmp(column,"last_error")==0) return ++*static_cast<int*>(data)>=2 ? 1 : 0; return 0; };
+        QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx); QCOMPARE(setAuthorizer(nativeDb,denySecond,&reads),0);
+        cards.enqueue({first.id,second.id},"B"); QCOMPARE(setAuthorizer(nativeDb,nullptr,nullptr),0); QVERIFY(reads>=2);
+        for (const auto id : {first.id,second.id}) { const auto rows=db.qslStatus(id); QCOMPARE(rows.size(),1); QCOMPARE(rows.first().sent,QString("N")); QCOMPARE(rows.first().rcvd,QString("Y")); QCOMPARE(rows.first().via,QString("D")); }
+    }
     void plannerQueuePreservesExistingOrChangedState()
     {
         core::LogDatabase db; QVERIFY(db.open(":memory:"));
