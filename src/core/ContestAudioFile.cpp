@@ -1,0 +1,101 @@
+#include "core/ContestAudioFile.h"
+#include <QDir>
+#include <QFileInfo>
+#include <QRegularExpression>
+#include <QUuid>
+#include <QtEndian>
+#include <limits>
+
+namespace decolog::core {
+namespace {
+constexpr qint64 maximumDataBytes = 1024LL * 1024 * 1024;
+QByteArray header(quint32 size)
+{
+    QByteArray h;
+    auto u16=[&](quint16 v) { char b[2]; qToLittleEndian(v,b); h.append(b,2); };
+    auto u32=[&](quint32 v) { char b[4]; qToLittleEndian(v,b); h.append(b,4); };
+    h.append("RIFF",4); u32(36+size); h.append("WAVEfmt ",8); u32(16); u16(1); u16(1);
+    u32(16000); u32(32000); u16(2); u16(16); h.append("data",4); u32(size);
+    return h;
+}
+bool finalize(QFile &file, const QString &path, QString *output, QString *error)
+{
+    const qint64 size=file.size()-44;
+    if (size < 0 || size > maximumDataBytes || size % 2) {
+        if (error) *error=QStringLiteral("Invalid or incomplete PCM data size"); return false;
+    }
+    if (!file.seek(0) || file.write(header(quint32(size))) != 44 || !file.flush()) {
+        if (error) *error=file.errorString(); return false;
+    }
+    file.close();
+    const QString destination=path.left(path.size()-5); // remove .part
+    if (QFile::exists(destination) || !QFile::rename(path,destination)) {
+        if (error) *error=QStringLiteral("Cannot move recovered recording to WAV"); return false;
+    }
+    if (output) *output=destination;
+    return true;
+}
+}
+bool ContestAudioFile::start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc)
+{
+    if (m_file.isOpen() || maxDataBytes < 2 || maxDataBytes > maximumDataBytes || !startUtc.isValid() || !QDir(directory).exists()) {
+        m_error=QStringLiteral("Invalid recording directory, time or size limit"); return false;
+    }
+    const QString name=QStringLiteral("contest-audio-%1-%2.wav.part")
+        .arg(startUtc.toUTC().toString(QStringLiteral("yyyyMMdd'T'HHmmsszzz'Z'")),QUuid::createUuid().toString(QUuid::WithoutBraces));
+    m_path=QDir(directory).filePath(name); m_file.setFileName(m_path);
+    if (!m_file.open(QIODevice::ReadWrite | QIODevice::NewOnly) || m_file.write(header(0)) != 44 || !m_file.flush()) {
+        m_error=m_file.errorString(); m_file.close(); return false;
+    }
+    m_pending.clear(); m_error.clear(); m_bytes=0; m_limit=maxDataBytes-(maxDataBytes%2);
+    return true;
+}
+ContestAudioFile::WriteResult ContestAudioFile::append(const QByteArray &data)
+{
+    WriteResult result;
+    if (!m_file.isOpen() || !m_error.isEmpty()) { result.error=QStringLiteral("Recording is not writable"); return result; }
+    const QByteArray buffer=m_pending+data;
+    const qint64 remaining=m_limit-m_bytes;
+    const qint64 n=qMin(remaining, qint64(buffer.size()-(buffer.size()%2)));
+    if (n > 0) {
+        const qint64 written=m_file.write(buffer.constData(),n);
+        if (written != n) {
+            m_error=m_file.errorString(); result.error=m_error;
+            if (written > 0) { m_bytes+=written; result.written=written; }
+            return result;
+        }
+        m_bytes+=written; result.written=written;
+    }
+    result.limitReached=m_bytes >= m_limit;
+    m_pending=result.limitReached ? QByteArray() : buffer.mid(n);
+    return result;
+}
+bool ContestAudioFile::checkpoint()
+{
+    if (!m_file.isOpen() || !m_error.isEmpty()) return false;
+    if (!m_file.flush()) { m_error=m_file.errorString(); return false; }
+    return true;
+}
+bool ContestAudioFile::finish(QString *outputPath)
+{
+    if (!m_file.isOpen() || !m_error.isEmpty() || !m_pending.isEmpty()) {
+        m_error=QStringLiteral("Recording has an incomplete sample or write error"); return false;
+    }
+    return finalize(m_file,m_path,outputPath,&m_error);
+}
+bool ContestAudioFile::recover(const QString &path, QString *outputPath, QString *error)
+{
+    static const QRegularExpression expected(QStringLiteral("^contest-audio-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.wav\\.part$"));
+    const QFileInfo info(path);
+    if (info.isSymLink() || !info.isFile() || !expected.match(info.fileName()).hasMatch()) {
+        if (error) *error=QStringLiteral("Not a contest audio partial file"); return false;
+    }
+    QFile f(path);
+    if (!f.open(QIODevice::ReadWrite)) { if (error) *error=f.errorString(); return false; }
+    QByteArray actual=f.read(44), expectedHeader=header(0);
+    if (actual.size()!=44) { if (error) *error=QStringLiteral("Incomplete WAV header"); return false; }
+    actual.replace(4,4,expectedHeader.mid(4,4)); actual.replace(40,4,expectedHeader.mid(40,4));
+    if (actual != expectedHeader) { if (error) *error=QStringLiteral("Unexpected WAV format"); return false; }
+    return finalize(f,path,outputPath,error);
+}
+}
