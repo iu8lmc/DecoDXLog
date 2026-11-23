@@ -4113,11 +4113,16 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         }
         const HttpResponse response = HttpResponse::json(saved > 0 ? 201 : 409,
                                                           QJsonObject{{QStringLiteral("results"), results}});
-        if (!idempotencyKey.isEmpty())
-            m_db.saveApiIdempotency(idempotencyKey,
-                                    ApiIdempotencyRecord{request.body, response.status, response.contentType,
-                                                         response.body, QDateTime::currentDateTimeUtc().toString(Qt::ISODate),
-                                                         requestFormat, requestApp});
+        if (!idempotencyKey.isEmpty() &&
+            !m_db.saveApiIdempotency(idempotencyKey,
+                                     ApiIdempotencyRecord{request.body, response.status, response.contentType,
+                                                          response.body, QDateTime::currentDateTimeUtc().toString(Qt::ISODate),
+                                                          requestFormat, requestApp})) {
+            return HttpResponse::json(503, QJsonObject{
+                {QStringLiteral("error"), QStringLiteral("idempotency response could not be saved; QSO may have been saved; reconcile before retry")},
+                {QStringLiteral("results"), results},
+                {QStringLiteral("retrySafe"), false}});
+        }
         return response;
     }
 

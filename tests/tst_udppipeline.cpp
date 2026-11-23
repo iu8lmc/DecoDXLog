@@ -483,6 +483,30 @@ private slots:
         QCOMPARE(request("POST", QStringLiteral("/api/v1/qso"),
                          "<CALL:5>W8DIFF<QSO_DATE:8>20260917<TIME_ON:4>0911<BAND:3>20m<MODE:3>FT8<EOR>",
                          "retry-1").first, 409);
+        // Simulate a journal write failure after a successful QSO insert.
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
+            db.setDatabaseName(m_db);
+            QVERIFY(db.open());
+            QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER api_fault BEFORE INSERT ON api_idempotency BEGIN SELECT RAISE(FAIL, 'injected fault'); END")));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        const QByteArray faultBody = "<CALL:5>W8ERR<QSO_DATE:8>20260917<TIME_ON:4>0920<BAND:3>20m<MODE:3>FT8<EOR>";
+        const auto failedJournal = request("POST", QStringLiteral("/api/v1/qso"), faultBody, "fault-1");
+        QCOMPARE(failedJournal.first, 503);
+        QVERIFY(failedJournal.second.value(QStringLiteral("error")).toString().contains(QStringLiteral("may have been saved")));
+        QCOMPARE(failedJournal.second.value(QStringLiteral("results")).toArray().at(0).toObject().value(QStringLiteral("status")).toString(), QStringLiteral("logged"));
+        QCOMPARE(countCall(QStringLiteral("W8ERR")), 1);
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
+            db.setDatabaseName(m_db); QVERIFY(db.open()); QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP TRIGGER api_fault")));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        const auto retryAfterFault = request("POST", QStringLiteral("/api/v1/qso"), faultBody, "fault-1");
+        QCOMPARE(retryAfterFault.first, 409);
+        QCOMPARE(countCall(QStringLiteral("W8ERR")), 1);
         const auto diagnostic = request("POST", QStringLiteral("/api/v1/qso"),
                                        "<CALL:9>DIAG-TEST<QSO_DATE:8>20000101<TIME_ON:6>000000<BAND:2>2m<MODE:4>TEST"
                                        "<APP_DECOLOG_DIAGNOSTIC:1>1<EOR>");

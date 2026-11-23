@@ -114,7 +114,7 @@ del QSO e quella del risultato. Dopo un riavvio, lo stesso retry restituisce qui
 originale senza creare un secondo QSO, se la registrazione della risposta è riuscita.
 Il QSO e la risposta di idempotenza non sono ancora salvati nella stessa transazione:
 un arresto o errore tra le due scritture può impedire il replay della risposta
-originale. Non usare questo meccanismo come garanzia esattamente-una-volta.
+originale. Se la registrazione della risposta fallisce dopo l'elaborazione, l'API restituisce `503` con `retrySafe: false`, un messaggio di errore e i risultati disponibili: uno o più QSO possono già essere stati salvati e vanno verificati prima di riprovare. Un arresto prima della risposta può comunque lasciare l'esito incerto. Non usare questo meccanismo come garanzia esattamente-una-volta.
 L'API resta spenta per impostazione predefinita e, quando attiva, ascolta solo su
 `127.0.0.1`.
 
