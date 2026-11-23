@@ -13,6 +13,7 @@
 #include "core/LogDatabase.h"
 #include "core/Activation.h"
 #include "core/QslPlanner.h"
+#include "core/DxCampaign.h"
 #include "core/WsjtxProtocol.h"
 #include <QUdpSocket>
 #include <QElapsedTimer>
@@ -60,6 +61,26 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void dxCampaignCalendarCreatesEditablePersistentMatrix()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const auto a=db.insertQso(AdifRecord{{"CALL","ZZ1AAA"},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import"); QVERIFY(a.id>0);
+          const auto b=db.insertQso(AdifRecord{{"CALL","ZZ1BBB"},{"QSO_DATE","20260103"},{"TIME_ON","1200"},{"BAND","40m"},{"MODE","FT8"}},"import"); QVERIFY(b.id>0);
+          QslState card; card.service="card"; card.rcvd="Y"; QVERIFY(db.setCardState(b.id,card)); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignprobe",output,7000),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign saved") && output.contains("ZZ1AAA") && output.contains("ZZ1BBB"),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign matrix") && output.contains("\"confirmed\":1") && output.contains("\"worked\":1"),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign archived true") && output.contains("PROBE dxcampaign reopened true"),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign new confirmation"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+        QByteArray restored; QVERIFY2(launch(dir,"dxcampaignrestoreprobe",restored,5000),restored.constData());
+        QVERIFY2(restored.contains("PROBE dxcampaign restored matrix") && restored.contains("PROBE dxcampaign rendered 20m · CW · confirmed (1/1)"),restored.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QString error; const auto campaigns=dxcampaign::list(db,&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(campaigns.size(),1); QCOMPARE(campaigns.first().calls.size(),2);
+        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,3); QVERIFY(!campaigns.first().archived);
+    }
     void qslAlternativesDesktopPagesAndInvalidates()
     {
         using namespace decolog::core;

@@ -219,6 +219,11 @@ DecoLogController::DecoLogController(QObject* parent)
 {
     m_activityModel = new ActivityModel(kMaxActivity, this);
     m_qslPlanPool.setMaxThreadCount(1);
+    m_dxCampaignPool.setMaxThreadCount(1);
+    connect(this, &DecoLogController::logChanged, this, [this] {
+        if (!m_shuttingDown && !m_dxCampaign.isEmpty()) refreshDxCampaign();
+        else if (!m_shuttingDown) emit dxCampaignChanged();
+    });
     auto invalidateQslPlan = [this] {
         if (!m_qslPlanBusy && m_qslPlan.isEmpty()) return;
         ++m_qslPlanGeneration;
@@ -709,7 +714,8 @@ void DecoLogController::shutdown()
     ++m_logVersion;
     m_statsLatest->fetch_add(1);
     ++m_qslPlanGeneration;
-    for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool, &m_qslPlanPool,
+    ++m_dxCampaignGeneration;
+    for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool, &m_qslPlanPool, &m_dxCampaignPool,
                               &m_countsPool, &m_backupPool, &m_linkPool,
                               &m_statsViewPool, &m_callInfoPool})
         pool->clear();
@@ -720,6 +726,7 @@ void DecoLogController::shutdown()
         m_importPool.clear();
     m_importPool.waitForDone();
     m_qslPlanPool.waitForDone();
+    m_dxCampaignPool.waitForDone();
     // ADIF exports use QSaveFile and must also finish once accepted.
     m_exportPool.waitForDone();
 }
@@ -2256,6 +2263,83 @@ AwardCalculator DecoLogController::awardCalculator(const QHash<int, QString>& na
         calc.setDxccRules(rules);
     }
     return calc;
+}
+
+namespace {
+QVariantMap campaignMap(const dxcampaign::Campaign& c)
+{
+    return {{QStringLiteral("id"),c.id},{QStringLiteral("title"),c.title},{QStringLiteral("calls"),c.calls},
+        {QStringLiteral("start"),c.start.toString(Qt::ISODate)},{QStringLiteral("end"),c.end.toString(Qt::ISODate)},
+        {QStringLiteral("source"),c.source},{QStringLiteral("observedAt"),c.verifiedAt.toUTC().toString(Qt::ISODate)},
+        {QStringLiteral("bands"),c.bands},{QStringLiteral("modes"),c.modes},{QStringLiteral("profileId"),c.stationProfileId},
+        {QStringLiteral("archived"),c.archived},{QStringLiteral("revision"),c.revision}};
+}
+}
+
+QVariantList DecoLogController::dxCampaigns() const
+{
+    QVariantList out; QString error;
+    for (const auto& c : dxcampaign::list(m_db,&error)) out << campaignMap(c);
+    return out;
+}
+
+bool DecoLogController::saveDxCampaign(const QVariantMap& values)
+{
+    dxcampaign::Campaign c;
+    c.id=values.value(QStringLiteral("id")).toString(); c.title=values.value(QStringLiteral("title")).toString().trimmed();
+    c.calls=values.value(QStringLiteral("calls")).toStringList();
+    for (QString& call : c.calls) call=call.trimmed().toUpper();
+    c.start=QDate::fromString(values.value(QStringLiteral("start")).toString(),Qt::ISODate);
+    c.end=QDate::fromString(values.value(QStringLiteral("end")).toString(),Qt::ISODate);
+    c.source=values.value(QStringLiteral("source")).toString().trimmed();
+    c.verifiedAt=QDateTime::fromString(values.value(QStringLiteral("observedAt")).toString(),Qt::ISODate);
+    c.bands=values.value(QStringLiteral("bands")).toStringList(); for (QString& band : c.bands) band=band.trimmed().toLower();
+    c.modes=values.value(QStringLiteral("modes")).toStringList(); for (QString& mode : c.modes) mode=mode.trimmed().toUpper();
+    c.stationProfileId=values.value(QStringLiteral("profileId")).toLongLong(); c.archived=values.value(QStringLiteral("archived")).toBool();
+    c.revision=values.value(QStringLiteral("revision")).toInt();
+    if (!dxcampaign::save(m_db,c,&m_dxCampaignError)) { emit dxCampaignChanged(); return false; }
+    m_dxCampaign=campaignMap(c); m_dxCampaignPath=m_db.path(); m_dxCampaignError.clear(); emit dxCampaignChanged(); refreshDxCampaign(); return true;
+}
+
+bool DecoLogController::selectDxCampaign(const QString& id)
+{
+    const auto c=dxcampaign::load(m_db,id,&m_dxCampaignError);
+    if (!c) { emit dxCampaignChanged(); return false; }
+    m_dxCampaign=campaignMap(*c); m_dxCampaignPath=m_db.path(); m_dxCampaignError.clear(); emit dxCampaignChanged(); refreshDxCampaign(); return true;
+}
+
+void DecoLogController::refreshDxCampaign()
+{
+    if (m_shuttingDown || m_dxCampaign.isEmpty()) return;
+    if (m_dxCampaignPath!=m_db.path()) {
+        ++m_dxCampaignGeneration; m_dxCampaignPool.clear(); m_dxCampaign.clear(); m_dxCampaignMatrix.clear();
+        m_dxCampaignBusy=false; m_dxCampaignError=tr("Log changed"); emit dxCampaignChanged(); return;
+    }
+    const QString id=m_dxCampaign.value(QStringLiteral("id")).toString(), path=m_db.path();
+    const quint64 generation=++m_dxCampaignGeneration; m_dxCampaignPool.clear();
+    m_dxCampaignMatrix.clear(); m_dxCampaignBusy=true; m_dxCampaignError.clear(); emit dxCampaignChanged();
+    QPointer<DecoLogController> self(this);
+    m_dxCampaignPool.start([self,path,id,generation] {
+        LogDatabase db; QString error; QVariantList rows; QVariantMap campaign;
+        if (!db.open(path)) error=db.lastError();
+        else {
+            const auto c=dxcampaign::load(db,id,&error);
+            if (c) {
+                campaign=campaignMap(*c);
+                const auto matrix=dxcampaign::matrix(db,*c,&error);
+                for (const auto& cell : matrix) rows << QVariantMap{{QStringLiteral("band"),cell.band},
+                    {QStringLiteral("mode"),cell.mode},{QStringLiteral("worked"),cell.worked},{QStringLiteral("confirmed"),cell.confirmed}};
+            }
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,generation,campaign,rows,error] {
+            if (!self || generation!=self->m_dxCampaignGeneration) return;
+            self->m_dxCampaignBusy=false;
+            if (self->m_db.path()!=path) { self->m_dxCampaign.clear(); self->m_dxCampaignMatrix.clear(); self->m_dxCampaignError=self->tr("Log changed"); }
+            else { if (!campaign.isEmpty()) self->m_dxCampaign=campaign; self->m_dxCampaignMatrix=rows; self->m_dxCampaignError=error; }
+            emit self->dxCampaignChanged();
+        },Qt::QueuedConnection);
+    });
 }
 
 void DecoLogController::buildQslPlan(const QStringList& requested)

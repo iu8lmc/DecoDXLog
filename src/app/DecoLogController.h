@@ -38,6 +38,7 @@
 #include "core/PredictTracker.h"
 #include "core/PredictPassPlanner.h"
 #include "core/QslPlanner.h"
+#include "core/DxCampaign.h"
 #include "core/Callbook.h"
 #include "core/CallbookProfileVerifier.h"
 #include "core/Countries.h"
@@ -230,6 +231,11 @@ class DecoLogController : public QObject {
     Q_PROPERTY(bool awardCount60m READ awardCount60m WRITE setAwardCount60m NOTIFY awardsChanged)
     Q_PROPERTY(int awardProfile READ awardProfile WRITE setAwardProfile NOTIFY awardsChanged)
     Q_PROPERTY(QString awardTag READ awardTag WRITE setAwardTag NOTIFY awardsChanged)
+    Q_PROPERTY(QVariantList dxCampaigns READ dxCampaigns NOTIFY dxCampaignChanged)
+    Q_PROPERTY(QVariantMap dxCampaign READ dxCampaign NOTIFY dxCampaignChanged)
+    Q_PROPERTY(QVariantList dxCampaignMatrix READ dxCampaignMatrix NOTIFY dxCampaignChanged)
+    Q_PROPERTY(bool dxCampaignBusy READ dxCampaignBusy NOTIFY dxCampaignChanged)
+    Q_PROPERTY(QString dxCampaignError READ dxCampaignError NOTIFY dxCampaignChanged)
     Q_PROPERTY(QVariantMap qslPlan READ qslPlan NOTIFY qslPlanChanged)
     Q_PROPERTY(bool qslPlanBusy READ qslPlanBusy NOTIFY qslPlanChanged)
 
@@ -521,6 +527,14 @@ public:
     void setAwardProfile(int profileId);
     QString awardTag() const { return m_awardFilter.tag; }
     void setAwardTag(const QString& tag);
+    QVariantList dxCampaigns() const;
+    QVariantMap dxCampaign() const { return m_dxCampaign; }
+    QVariantList dxCampaignMatrix() const { return m_dxCampaignMatrix; }
+    bool dxCampaignBusy() const { return m_dxCampaignBusy; }
+    QString dxCampaignError() const { return m_dxCampaignError; }
+    Q_INVOKABLE bool saveDxCampaign(const QVariantMap& values);
+    Q_INVOKABLE bool selectDxCampaign(const QString& id);
+    Q_INVOKABLE void refreshDxCampaign();
     QVariantMap qslPlan() const { return m_qslPlan; }
     bool qslPlanBusy() const { return m_qslPlanBusy; }
     Q_INVOKABLE void buildQslPlan(const QStringList& goals);
@@ -871,6 +885,7 @@ signals:
     void damagedFieldCountChanged();
     void dxccBatchFinished(bool historical, int changed, int failed);
     void awardsChanged();
+    void dxCampaignChanged();
     void qslPlanChanged();
     void decoLinkChanged();
     void hamHubLinkChanged();
@@ -1001,6 +1016,13 @@ private:
     core::CallbookProfileVerifier m_hamqthProfile{core::CallbookClient::Provider::HamQth};
     QSet<QString> m_primaryProfileAttempted;
     core::AwardFilter m_awardFilter;
+    QVariantMap m_dxCampaign;
+    QString m_dxCampaignPath;
+    QVariantList m_dxCampaignMatrix;
+    QString m_dxCampaignError;
+    bool m_dxCampaignBusy{false};
+    quint64 m_dxCampaignGeneration{0};
+    QThreadPool m_dxCampaignPool;
     QVariantMap m_qslPlan;
     std::shared_ptr<const core::qslplanner::Plan> m_qslPlanSnapshot;
     bool m_qslPlanBusy{false};

@@ -13,6 +13,8 @@ GlassPanel {
     property var requestFactory: null
     property bool persistenceEnabled: true
     property var cacheBackend: typeof dxCalendarCache === "undefined" ? null : dxCalendarCache
+    readonly property var campaignBackend: typeof decolog === "undefined" ? null : decolog
+    property string calendarObserved: ""
     property var visibleEntries: []
     property int parseSerial: 0
     property int filterSerial: 0
@@ -62,6 +64,8 @@ GlassPanel {
                 return
             }
             root.entries = message.entries
+            const stamp = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d) UTC$/.exec(message.updated || "")
+            root.calendarObserved = stamp ? stamp[1] + "T" + stamp[2] + ":00Z" : ""
             if (message.fromCache) root.statusText = qsTr("Saved calendar: %1").arg(message.updated)
             else {
                 root.statusText = qsTr("Updated: %1").arg(message.updated)
@@ -151,6 +155,140 @@ GlassPanel {
         }
     }
     Component.onCompleted: restore()
+    function beginCampaignFromEvent(event) {
+        campaignDialog.edit({title:event.entity || event.title || "", calls:event.call ? [event.call] : [],
+                             start:event.start || "", end:event.end || "", source:root.feedUrl,
+                             observedAt:root.calendarObserved, bands:["20m","40m","15m","10m"], modes:["CW","SSB","FT8"], profileId:0, archived:false, revision:0})
+    }
+    function probeCampaign() {
+        calendarObserved="2026-01-01T10:00:00Z"
+        visibleEntries=[{entity:"Fixture expedition",title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-07",description:"Synthetic announcement"}]
+        Qt.callLater(function() {
+            const row=list.itemAtIndex(0)
+            if (!row) { console.warn("PROBE dxcampaign missing calendar row"); return }
+            row.probePlan(); callsField.text="ZZ1AAA, ZZ1BBB"; bandsField.text="20m, 40m"; modesField.text="CW, FT8"
+            saveCampaign.clicked(); campaignProbeResult.start()
+        })
+    }
+    function probeCampaignRestore() {
+        campaignDialog.edit({bands:["20m"],modes:["CW"]})
+        const campaigns=root.campaignBackend.dxCampaigns
+        console.warn("PROBE dxcampaign restored " + JSON.stringify(campaigns))
+        if (campaigns.length) { root.campaignBackend.selectDxCampaign(campaigns[0].id); campaignDialog.edit(root.campaignBackend.dxCampaign); campaignProbeRestored.start() }
+    }
+    Timer {
+        id:campaignProbeRestored; interval:200; repeat:true; property int tries:0
+        onTriggered: {
+            if ((root.campaignBackend.dxCampaignBusy || root.campaignBackend.dxCampaignMatrix.length<4) && ++tries<25) return
+            stop(); const row=campaignMatrix.itemAtIndex(0)
+            console.warn("PROBE dxcampaign restored matrix " + JSON.stringify(root.campaignBackend.dxCampaignMatrix))
+            console.warn("PROBE dxcampaign rendered " + (row ? row.text : "missing"))
+        }
+    }
+    Timer {
+        id:campaignProbeResult; interval:200; repeat:true; property int tries:0
+        onTriggered: {
+            if ((root.campaignBackend.dxCampaignBusy || root.campaignBackend.dxCampaignMatrix.length<4) && ++tries<25) return
+            stop(); console.warn("PROBE dxcampaign saved " + JSON.stringify(root.campaignBackend.dxCampaign))
+            console.warn("PROBE dxcampaign matrix " + JSON.stringify(root.campaignBackend.dxCampaignMatrix))
+            archivedField.checked=true; saveCampaign.clicked(); console.warn("PROBE dxcampaign archived " + root.campaignBackend.dxCampaign.archived)
+            archivedField.checked=false; saveCampaign.clicked(); console.warn("PROBE dxcampaign reopened " + !root.campaignBackend.dxCampaign.archived)
+            root.campaignBackend.cards.markReceived(1,true); campaignProbeConfirmation.start()
+        }
+    }
+    Timer {
+        id:campaignProbeConfirmation; interval:200; repeat:true; property int tries:0
+        onTriggered: {
+            const rows=root.campaignBackend.dxCampaignMatrix
+            if ((root.campaignBackend.dxCampaignBusy || !rows.length || rows[0].confirmed!==1) && ++tries<20) return
+            stop(); console.warn("PROBE dxcampaign new confirmation " + JSON.stringify(rows))
+        }
+    }
+
+    DialogFrame {
+        id: campaignDialog
+        objectName: "dxCampaignDialog"
+        transientParent: root.Window.window
+        title: qsTr("DX campaigns")
+        info: qsTr("Local log · source data requires review")
+        width: 1000; height: 760
+        property var draft: ({})
+        property string logPath: ""
+        property string editorError: ""
+        function edit(c) {
+            draft=c || ({}); logPath=root.campaignBackend.currentLogInfo().path || ""
+            titleField.text=draft.title || ""; callsField.text=(draft.calls || []).join(", ")
+            startField.text=draft.start || ""; endField.text=draft.end || ""; sourceField.text=draft.source || ""
+            observedField.text=draft.observedAt || ""; bandsField.text=(draft.bands || []).join(", "); modesField.text=(draft.modes || []).join(", ")
+            profileField.currentIndex=Math.max(0,profileField.ids.indexOf(draft.profileId || 0)); archivedField.checked=!!draft.archived
+            editorError=""; open()
+        }
+        function splitValues(text) { return text.split(",").map(s => s.trim()).filter(s => s.length) }
+        function save() {
+            if (!logPath || logPath !== root.campaignBackend.currentLogInfo().path) { editorError=qsTr("The open log changed; reopen the campaign."); return }
+            const data={id:draft.id || "", revision:draft.revision || 0, title:titleField.text, calls:splitValues(callsField.text),
+                start:startField.text, end:endField.text, source:sourceField.text, observedAt:observedField.text,
+                bands:splitValues(bandsField.text), modes:splitValues(modesField.text), profileId:profileField.ids[profileField.currentIndex] || 0,
+                archived:archivedField.checked}
+            if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; editorError="" }
+            else editorError=root.campaignBackend.dxCampaignError
+        }
+        body: RowLayout {
+            spacing: 12
+            ColumnLayout {
+                Layout.preferredWidth: 205; Layout.fillHeight: true
+                Text { text: qsTr("Saved campaigns"); color: root.textColor; font.bold: true }
+                ListView {
+                    id: campaignList; objectName: "dxCampaignList"; Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                    model: root.campaignBackend ? root.campaignBackend.dxCampaigns : []
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: ListView.view.width; height: 46; color: Qt.rgba(1,1,1,0.05)
+                        Text { anchors.fill: parent; anchors.margins: 4; color: root.textColor; elide: Text.ElideRight
+                            text: modelData.title + (modelData.archived ? " · " + qsTr("archived") : "") + "\n" + modelData.start }
+                        MouseArea { anchors.fill: parent; onClicked: { if (root.campaignBackend.selectDxCampaign(modelData.id)) campaignDialog.edit(root.campaignBackend.dxCampaign) } }
+                    }
+                }
+                CalendarButton { text: qsTr("New campaign"); onClicked: campaignDialog.edit({bands:["20m","40m","15m","10m"],modes:["CW","SSB","FT8"]}) }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true; Layout.fillHeight: true; spacing: 5
+                Text { text: qsTr("Review the announcement and operating period before saving."); color: root.mutedColor; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                StyledTextField { id: titleField; objectName:"dxCampaignTitle"; Layout.fillWidth:true; placeholderText:qsTr("Campaign name") }
+                StyledTextField { id: callsField; objectName:"dxCampaignCalls"; Layout.fillWidth:true; placeholderText:qsTr("Callsigns, comma separated") }
+                RowLayout {
+                    StyledTextField { id:startField; objectName:"dxCampaignStart"; Layout.fillWidth:true; placeholderText:qsTr("Start YYYY-MM-DD UTC") }
+                    StyledTextField { id:endField; objectName:"dxCampaignEnd"; Layout.fillWidth:true; placeholderText:qsTr("End YYYY-MM-DD UTC, inclusive") }
+                }
+                StyledTextField { id:sourceField; Layout.fillWidth:true; placeholderText:qsTr("Source") }
+                StyledTextField { id:observedField; Layout.fillWidth:true; placeholderText:qsTr("Source observed at YYYY-MM-DDTHH:MM:SSZ") }
+                RowLayout {
+                    StyledTextField { id:bandsField; Layout.fillWidth:true; placeholderText:qsTr("Bands, comma separated") }
+                    StyledTextField { id:modesField; Layout.fillWidth:true; placeholderText:qsTr("Modes, comma separated") }
+                }
+                RowLayout {
+                    StyledComboBox {
+                        id:profileField; Layout.preferredWidth:220
+                        readonly property var ids: { const out=[0]; if (root.campaignBackend) for (let i=0;i<root.campaignBackend.stationProfiles.count;++i) { const p=root.campaignBackend.stationProfiles.get(i); if (!p.deleted) out.push(p.id) }; return out }
+                        model: ids.map(id => id===0 ? qsTr("All station profiles") : root.campaignBackend.stationProfiles.byId(id).name)
+                    }
+                    CheckBox { id:archivedField; text:qsTr("Archived") }
+                    CalendarButton { id:saveCampaign; objectName:"saveDxCampaign"; text:qsTr("Save"); onClicked:campaignDialog.save() }
+                    CalendarButton { text:qsTr("Refresh matrix"); enabled:!!campaignDialog.draft.id && !root.campaignBackend.dxCampaignBusy; onClicked:root.campaignBackend.refreshDxCampaign() }
+                }
+                Text { id:errorText; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:campaignDialog.editorError || (root.campaignBackend ? root.campaignBackend.dxCampaignError : "") }
+                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor; text:qsTr("Matrix: exact calls and inclusive UTC dates; local LoTW/card states only. This is not an award eligibility decision.") }
+                ListView {
+                    id:campaignMatrix; objectName:"dxCampaignMatrix"; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                    model: root.campaignBackend && root.campaignBackend.dxCampaign.id === campaignDialog.draft.id ? root.campaignBackend.dxCampaignMatrix : []
+                    delegate: Text {
+                        required property var modelData; width:ListView.view.width; color:root.textColor
+                        text: modelData.band + " · " + modelData.mode + " · " + (modelData.confirmed > 0 ? qsTr("confirmed") : modelData.worked > 0 ? qsTr("worked") : qsTr("missing")) + " (" + modelData.worked + "/" + modelData.confirmed + ")"
+                    }
+                }
+            }
+        }
+    }
     Component.onDestruction: {
         if (pendingRequest) {
             var request = pendingRequest;
@@ -166,6 +304,7 @@ GlassPanel {
         spacing: 8
         RowLayout {
             Layout.fillWidth: true
+            CalendarButton { objectName:"dxCampaignsButton"; visible:!!root.campaignBackend; text:qsTr("Campaigns"); onClicked:campaignDialog.edit({bands:["20m","40m","15m","10m"],modes:["CW","SSB","FT8"]}) }
             Item { Layout.fillWidth: true }
             CalendarButton {
                 objectName: "dxCalendarRefresh"
@@ -237,8 +376,9 @@ GlassPanel {
             model: root.visibleEntries
             delegate: Rectangle {
                 required property var modelData
+                function probePlan() { planButton.clicked() }
                 width: list.width
-                height: details.implicitHeight + 44
+                height: details.implicitHeight + 76
                 radius: 4
                 color: Qt.rgba(1, 1, 1, 0.04)
                 border.color: Qt.rgba(1, 1, 1, 0.12)
@@ -268,6 +408,7 @@ GlassPanel {
                         maximumLineCount: 4
                         elide: Text.ElideRight
                     }
+                    CalendarButton { id:planButton; visible:!!root.campaignBackend; text:qsTr("Plan campaign"); onClicked:root.beginCampaignFromEvent(modelData) }
                 }
             }
             ScrollBar.vertical: ScrollBar {}
