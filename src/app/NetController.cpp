@@ -5,6 +5,7 @@
 
 #include <QHostInfo>
 #include <QSettings>
+#include <QRegularExpression>
 #include <QSqlQuery>
 #include <QUuid>
 #include <algorithm>
@@ -200,6 +201,47 @@ QJsonObject NetController::qsoMessage(qint64 id) const
     if (!record)
         return {};
     return QJsonObject{{QStringLiteral("adif"), adif::writeRecord(*record)}};
+}
+
+QString NetController::queueCall(const QString& input)
+{
+    const QString call = input.trimmed().toUpper();
+    static const QRegularExpression pattern(QStringLiteral("^[A-Z0-9/?]{1,32}$"));
+    if (!pattern.match(call).hasMatch())
+        return tr("Enter up to 32 letters, digits, / or ? without spaces.");
+    if (m_queuedCalls.contains(call))
+        return tr("This callsign is already queued.");
+    if (m_queuedCalls.size() >= 100)
+        return tr("The callsign queue is full (100 entries).");
+    m_queuedCalls.append(call);
+    emit queuedCallsChanged();
+    return {};
+}
+
+bool NetController::moveQueuedCall(int index, int delta)
+{
+    const int target = index + delta;
+    if (index < 0 || index >= m_queuedCalls.size() || (delta != -1 && delta != 1) ||
+        target < 0 || target >= m_queuedCalls.size()) return false;
+    m_queuedCalls.swapItemsAt(index, target);
+    emit queuedCallsChanged();
+    return true;
+}
+
+bool NetController::removeQueuedCall(int index)
+{
+    if (index < 0 || index >= m_queuedCalls.size()) return false;
+    m_queuedCalls.removeAt(index);
+    emit queuedCallsChanged();
+    return true;
+}
+
+QString NetController::takeQueuedCall()
+{
+    if (m_queuedCalls.isEmpty()) return {};
+    const QString call = m_queuedCalls.takeFirst();
+    emit queuedCallsChanged();
+    return call;
 }
 
 void NetController::qsoLogged(qint64 id)

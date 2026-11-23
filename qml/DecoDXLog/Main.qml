@@ -1645,6 +1645,7 @@ RoundedWindow {
         else if (what[0] === "call") decolog.lookupCall = what[1]
         else if (what[0] === "newqsofields") newQsoFieldsTimer.start()
         else if (what[0] === "typedfieldsprobe") typedFieldsProbe.start()
+        else if (what[0] === "callqueueprobe") callQueueProbe.start()
         else if (what[0] === "awards") {
             // awards:<id>[:map|:missing|:unconfirmed]
             if (what[2] === "map") awardsDialog.showMap = true
@@ -1727,6 +1728,7 @@ RoundedWindow {
         id:activityReportProbe; interval:1000
         onTriggered: { if (statsWindow.item) { const name=startupShow.split(":")[0]; if (name==="namedreportprobe") statsWindow.item.probeNamedReports(); else if (name==="namedrestoreprobe") statsWindow.item.probeNamedRestore(); else if (name==="customrestoreprobe") statsWindow.item.probeCustomRestore(); else statsWindow.item.probeReport("file://" + startupShow.split(":")[1],name==="customreportprobe" || name==="custompdfprobe" ? "custom" : name==="clubreportprobe" || name==="clubpdfprobe" ? "club" : name==="confirmationreportprobe" || name==="confirmationpdfprobe" ? "confirmation" : "activity",name.indexOf("pdfprobe")>=0) } else console.warn("PROBE activityreport missing window") }
     }
+    Timer { id:callQueueProbe; interval:1000; onTriggered: { const p=window.panelItem("newqso"); if (p && p.item) p.item.probeCallQueue(); else console.warn("PROBE callqueue missing panel") } }
     Timer {
         id:typedFieldsProbe; interval:1000
         onTriggered: {

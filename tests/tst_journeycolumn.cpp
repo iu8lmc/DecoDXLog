@@ -67,6 +67,13 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void callQueueDoesNotOverwriteCurrentQso()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        QByteArray output; QVERIFY2(launch(dir,"callqueueprobe",output,3500),output.constData());
+        QVERIFY2(output.contains("PROBE callqueue blocked=true current=K1BUSY count=2 duplicate=true"),output.constData());
+        QVERIFY2(output.contains("PROBE callqueue loaded=true current=DL1XYZ/P next=K1ABC qsos=0"),output.constData());
+    }
     void qsoEditorWarnsWhenDerivedInputsChange()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString originalTrace;

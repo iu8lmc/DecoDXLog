@@ -36,6 +36,28 @@ GlassPanel {
         }
     }
     // Entry point shared by the header button and the isolated UI smoke test.
+    function loadNextQueuedCall() {
+        if (callField.text.trim().length) {
+            queueError.text = qsTr("Clear the current callsign before loading the queue.")
+            return false
+        }
+        const next = decolog.net.takeQueuedCall()
+        if (!next) return false
+        callField.text = next
+        callField.forceActiveFocus()
+        queueError.text = ""
+        return true
+    }
+    function probeCallQueue() {
+        callField.text = "K1BUSY"
+        const a=decolog.net.queueCall("K1ABC"), b=decolog.net.queueCall("DL1XYZ/P")
+        const duplicate=decolog.net.queueCall("k1abc")
+        const blocked=!root.loadNextQueuedCall()
+        console.warn("PROBE callqueue blocked=" + blocked + " current=" + callField.text + " count=" + decolog.net.queuedCalls.length + " duplicate=" + (duplicate.length>0))
+        decolog.net.moveQueuedCall(1,-1); callField.text=""
+        const loaded=root.loadNextQueuedCall()
+        console.warn("PROBE callqueue loaded=" + loaded + " current=" + callField.text + " next=" + decolog.net.queuedCalls.join(",") + " qsos=" + decolog.currentLogInfo().qsos)
+    }
     function showFieldSettings() { fieldsDialog.open() }
     function probeTypedSetup() { fieldsDialog.open(); fieldsDialog.probeTyped() }
 
@@ -409,6 +431,30 @@ GlassPanel {
                         }
                     }
                 }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 6
+                    StyledTextField { id: queueInput; Layout.fillWidth: true; uppercase: true; placeholderText: qsTr("Call for local queue (not saved)")
+                        onAccepted: { queueError.text=decolog.net.queueCall(text); if (!queueError.text) text="" } }
+                    GlassButton { text: qsTr("Queue"); enabled: queueInput.text.trim().length>0
+                        onClicked: { queueError.text=decolog.net.queueCall(queueInput.text); if (!queueError.text) queueInput.text="" } }
+                }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 6
+                    visible: decolog.net.queuedCalls.length>0
+                    StyledComboBox { id: queueChoice; Layout.fillWidth: true; model: decolog.net.queuedCalls }
+                    GlassButton { text: qsTr("Remove"); enabled: queueChoice.currentIndex>=0; onClicked: decolog.net.removeQueuedCall(queueChoice.currentIndex) }
+                }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 6
+                    visible: decolog.net.queuedCalls.length>0
+                    GlassButton { text: "↑"; Accessible.name: qsTr("Move queued call up"); enabled: queueChoice.currentIndex>0
+                        onClicked: { const i=queueChoice.currentIndex; if (decolog.net.moveQueuedCall(i,-1)) queueChoice.currentIndex=i-1 } }
+                    GlassButton { text: "↓"; Accessible.name: qsTr("Move queued call down"); enabled: queueChoice.currentIndex>=0 && queueChoice.currentIndex<decolog.net.queuedCalls.length-1
+                        onClicked: { const i=queueChoice.currentIndex; if (decolog.net.moveQueuedCall(i,1)) queueChoice.currentIndex=i+1 } }
+                    Item { Layout.fillWidth: true }
+                    GlassButton { text: qsTr("Load next"); onClicked: root.loadNextQueuedCall() }
+                }
+                Text { id: queueError; Layout.fillWidth: true; visible: text.length>0; color: Theme.warningColor; wrapMode: Text.WordWrap; font.pixelSize: 11 }
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8

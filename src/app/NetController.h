@@ -34,6 +34,7 @@ class NetController : public QObject {
     Q_PROPERTY(QVariantList messages READ messages NOTIFY messagesChanged)
     Q_PROPERTY(int received READ received NOTIFY stateChanged)
     Q_PROPERTY(int sent READ sent NOTIFY stateChanged)
+    Q_PROPERTY(QStringList queuedCalls READ queuedCalls NOTIFY queuedCallsChanged)
 
 public:
     struct Context {
@@ -66,6 +67,12 @@ public:
     int received() const { return m_received; }
     int sent() const { return m_sent; }
 
+    QStringList queuedCalls() const { return m_queuedCalls; }
+    Q_INVOKABLE QString queueCall(const QString& call);
+    Q_INVOKABLE bool moveQueuedCall(int index, int delta);
+    Q_INVOKABLE bool removeQueuedCall(int index);
+    Q_INVOKABLE QString takeQueuedCall();
+
     // Un QSO appena fatto qui: agli altri.
     void qsoLogged(qint64 id);
 
@@ -95,6 +102,7 @@ signals:
     void stateChanged();
     void peersChanged();
     void messagesChanged();
+    void queuedCallsChanged();
     void gabReceived(const QString& from, const QString& text);
 
 private:
@@ -131,6 +139,7 @@ private:
     qint64 m_seq{0};
     const QString m_sessionId{QUuid::createUuid().toString(QUuid::WithoutBraces)};
     QVariantList m_messages;
+    QStringList m_queuedCalls;
     int m_received{0};
     int m_sent{0};
     QTimer m_hello;
