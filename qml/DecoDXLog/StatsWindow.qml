@@ -25,6 +25,33 @@ RoundedWindow {
     property bool reportProbePdf:false
     property bool reportPdfBusy:false
     property bool customRestoreProbe:false
+    property var savedReports:[]
+    property string savedReportsPath:""
+    property var loadedReport:({})
+    property bool namedRestoreProbe:false
+    function refreshNamedReports() {
+        const result=decolog.savedReportDefinitions(); savedReportsPath=result.path || ""; savedReports=result.rows || []
+        if (result.error) reportMessage=result.error
+    }
+    function applyNamedReport(row) {
+        if (!row || !row.id) return
+        loadedReport=row; reportName.text=row.name; reportYear.text=row.year ? String(row.year) : ""; reportBand.text=row.band || ""
+        reportKind.currentIndex=row.kind==="custom" ? 3 : row.kind==="club" ? 2 : row.kind==="confirmation" ? 1 : 0
+        reportStation.text=row.station || ""; if (row.kind==="custom") { root.loadDimensions(row.dimensions); reportAggregate.currentIndex=row.aggregate==="calls" ? 1 : 0 }
+        reportMessage=qsTr("Loaded report: %1").arg(row.name)
+    }
+    function saveNamedReport(update) {
+        const value=reportYear.text.trim()
+        if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }
+        if (update && !loadedReport.id) { reportMessage=qsTr("Load a saved report before updating it."); return }
+        const definition={id:update ? loadedReport.id : "", revision:update ? loadedReport.revision : 0, name:reportName.text,
+            kind:root.chosenReportKind(),year:value.length ? Number(value) : 0,band:reportBand.text,station:reportStation.text,
+            dimensions:root.chosenDimensions(),aggregate:reportAggregate.currentIndex===1 ? "calls" : "qsos"}
+        const result=decolog.saveReportDefinition(definition,savedReportsPath)
+        if (result.error) { reportMessage=result.error; return }
+        loadedReport=result.definition; root.refreshNamedReports(); savedPicker.currentIndex=savedReports.findIndex(x => x.id===loadedReport.id)
+        reportMessage=qsTr("Saved report: %1").arg(loadedReport.name)
+    }
     property var restoredDimensions:[]
     readonly property var dimensionKeys: {
         let keys=["","year","band","mode","station","operator","grid","antenna"]
@@ -66,6 +93,19 @@ RoundedWindow {
         root.loadDimensions(s.dimensions)
         Qt.callLater(function() { console.warn("PROBE custom restored " + JSON.stringify(root.chosenDimensions())); root.customRestoreProbe=true; root.runActivityReport() })
     }
+    function probeNamedReports() {
+        page=2; reportKind.currentIndex=3; reportYear.text="2026"; reportBand.text="20m"; reportName.text="A band mode"
+        dimension0.currentIndex=root.dimensionKeys.indexOf("band"); dimension1.currentIndex=root.dimensionKeys.indexOf("mode"); dimension2.currentIndex=0; reportAggregate.currentIndex=0
+        saveNamedNew.clicked()
+        reportKind.currentIndex=2; reportStation.text="9H1SR"; reportName.text="B club"; saveNamedNew.clicked()
+        console.warn("PROBE named saved " + JSON.stringify(root.savedReports.map(x => x.name)))
+    }
+    function probeNamedRestore() {
+        page=2; root.refreshNamedReports(); console.warn("PROBE named restored " + JSON.stringify(root.savedReports.map(x => x.name)))
+        const row=root.savedReports.find(x => x.name==="A band mode"); if (!row) return
+        root.applyNamedReport(row)
+        Qt.callLater(function() { console.warn("PROBE named dimensions " + JSON.stringify(root.chosenDimensions())); root.namedRestoreProbe=true; root.runActivityReport() })
+    }
 
     // Le statistiche si contano su un altro filo e arrivano tutte insieme: su
     // un log grande sono secondi, e la finestra intanto resta viva.
@@ -88,7 +128,7 @@ RoundedWindow {
     onModeChanged: refresh()
     onYearChanged: refresh()
     onRevisionChanged: refresh()
-    Component.onCompleted: refresh()
+    Component.onCompleted: { refresh(); refreshNamedReports() }
 
     width: 1180
     height: 780
@@ -125,7 +165,7 @@ RoundedWindow {
 
     Connections {
         target: decolog
-        function onLogChanged() { root.revision++ }
+        function onLogChanged() { root.revision++; if ((decolog.currentLogInfo().path || "")!==root.savedReportsPath) { root.loadedReport=({}); root.refreshNamedReports() } }
         function onStatsReady(result) {
             if (result.mode !== root.mode || result.year !== root.year)
                 return
@@ -136,6 +176,11 @@ RoundedWindow {
             root.activityBusy=false; root.activityReport=result
             root.reportMessage=result.error || ""
             if (root.customRestoreProbe) { console.warn("PROBE custom restored result " + JSON.stringify(result.rows || [])); root.customRestoreProbe=false }
+            if (root.namedRestoreProbe) {
+                console.warn("PROBE named result " + JSON.stringify(result.rows || [])); root.namedRestoreProbe=false
+                const other=root.savedReports.find(x => x.name==="B club")
+                if (other) { removeNamedReport.target=other; removeNamedReport.logPath=root.savedReportsPath; removeNamedReport.open(); Qt.callLater(function() { confirmRemoveNamed.clicked(); console.warn("PROBE named after remove " + JSON.stringify(root.savedReports.map(x => x.name))) }) }
+            }
             if (String(root.reportProbePath).length) {
                 console.warn("PROBE activityreport result " + JSON.stringify(result))
                 if (root.reportProbePdf) { console.warn("PROBE activityreport pdf protected " + decolog.exportActivityReportPdf("file://" + decolog.currentLogInfo().path)); root.beginReportPdf(root.reportProbePath) }
@@ -157,6 +202,19 @@ RoundedWindow {
         onAccepted: { const error=decolog.exportActivityReport(selectedFile); root.reportMessage=error || qsTr("CSV exported.") }
     }
     FileDialog { id:reportPdfFile; title:qsTr("Export report PDF"); fileMode:FileDialog.SaveFile; nameFilters:[qsTr("PDF files (*.pdf)")]; onAccepted:root.beginReportPdf(selectedFile) }
+    Popup {
+        id:removeNamedReport; anchors.centerIn:Overlay.overlay; modal:true; padding:16
+        property var target:({}); property string logPath:""
+        background:Rectangle { color:Theme.panelColor; border.color:Theme.warningColor; radius:6 }
+        contentItem:ColumnLayout {
+            width:440
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary; text:qsTr("Remove saved report '%1' from this log?").arg(removeNamedReport.target.name || "") }
+            RowLayout { Layout.alignment:Qt.AlignRight
+                GlassButton { text:qsTr("Cancel"); onClicked:removeNamedReport.close() }
+                GlassButton { id:confirmRemoveNamed; text:qsTr("Remove"); onClicked:{ const id=removeNamedReport.target.id; const error=decolog.removeReportDefinition(id,Number(removeNamedReport.target.revision),removeNamedReport.logPath); removeNamedReport.close(); root.reportMessage=error || qsTr("Saved report removed."); if (!error) { if (root.loadedReport.id===id) root.loadedReport=({}); root.refreshNamedReports() } } }
+            }
+        }
+    }
 
     function maxOf(list) {
         let m = 0
@@ -528,6 +586,19 @@ RoundedWindow {
                 GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; reportKind.currentIndex=s.kind==="custom" ? 3 : s.kind==="club" ? 2 : s.kind==="confirmation" ? 1 : 0; reportStation.text=s.station || ""; if (s.kind==="custom") { root.loadDimensions(s.dimensions); reportAggregate.currentIndex=s.aggregate==="calls" ? 1 : 0 }; root.reportMessage=qsTr("Filters loaded from this log.") } }
                 GlassButton { text:qsTr("Export CSV…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportFile.open() }
                 GlassButton { text:qsTr("Export PDF…"); enabled:!root.activityBusy && !root.reportPdfBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportPdfFile.open() }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                StyledComboBox { id:savedPicker; Layout.fillWidth:true; model:root.savedReports.map(x => x.name + " · " + x.kind + " · " + x.id.substring(0,8)); Accessible.name:qsTr("Saved reports") }
+                GlassButton { text:qsTr("Reload list"); onClicked:root.refreshNamedReports() }
+                GlassButton { text:qsTr("Load report"); enabled:savedPicker.currentIndex>=0 && savedPicker.currentIndex<root.savedReports.length; onClicked:root.applyNamedReport(root.savedReports[savedPicker.currentIndex]) }
+                GlassButton { text:qsTr("Remove…"); enabled:savedPicker.currentIndex>=0 && savedPicker.currentIndex<root.savedReports.length; onClicked:{ removeNamedReport.target=root.savedReports[savedPicker.currentIndex]; removeNamedReport.logPath=root.savedReportsPath; removeNamedReport.open() } }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                StyledTextField { id:reportName; Layout.fillWidth:true; placeholderText:qsTr("Saved report name"); Accessible.name:qsTr("Saved report name") }
+                GlassButton { id:saveNamedNew; text:qsTr("Save as new"); enabled:!root.activityBusy; onClicked:root.saveNamedReport(false) }
+                GlassButton { text:qsTr("Update loaded report"); enabled:!root.activityBusy && !!root.loadedReport.id; onClicked:root.saveNamedReport(true) }
             }
             StyledTextField { id:reportStation; Layout.fillWidth:true; visible:reportKind.currentIndex===2; placeholderText:qsTr("Recorded club station callsign (all if blank)"); Accessible.name:qsTr("Recorded club station callsign") }
             RowLayout {

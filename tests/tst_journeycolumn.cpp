@@ -16,6 +16,7 @@
 #include "core/Activation.h"
 #include "core/QslPlanner.h"
 #include "core/DxCampaign.h"
+#include "core/ActivityReport.h"
 #include "core/WsjtxProtocol.h"
 #include <QUdpSocket>
 #include <QElapsedTimer>
@@ -64,6 +65,21 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void namedReportsSurviveRestartAndSupportExplicitRemoval()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString& call : {QString("K1AAA"),QString("K1BBB")}) QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id>0);
+          db.setSetting("activity_report_v1",R"({"year":2024,"band":"40m"})"); }
+        QByteArray created; QVERIFY2(launch(dir,"namedreportprobe",created,5000),created.constData());
+        QVERIFY2(created.contains("PROBE named saved [\"A band mode\",\"B club\"]"),created.constData());
+        QByteArray restored; QVERIFY2(launch(dir,"namedrestoreprobe",restored,5000),restored.constData());
+        QVERIFY2(restored.contains("PROBE named restored [\"A band mode\",\"B club\"]") && restored.contains("PROBE named dimensions [\"band\",\"mode\"]"),restored.constData());
+        QVERIFY2(restored.contains("PROBE named result") && restored.contains("\"value\":2") && restored.contains("PROBE named after remove [\"A band mode\"]"),restored.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QString error;
+        const auto reports=decolog::core::activityreport::listDefinitions(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(reports.size(),1); QCOMPARE(reports.first().name,QString("A band mode"));
+        QVERIFY(db.setting("activity_report_v1").contains("2024")); QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void customReportGroupsAdifFieldsAndExports()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

@@ -583,6 +583,9 @@ public:
     Q_INVOKABLE QVariantMap activityReportSettings() const;
     Q_INVOKABLE QString exportActivityReport(const QUrl& file);
     Q_INVOKABLE QString exportActivityReportPdf(const QUrl& file);
+    Q_INVOKABLE QVariantMap savedReportDefinitions() const;
+    Q_INVOKABLE QVariantMap saveReportDefinition(const QVariantMap& values, const QString& expectedLogPath);
+    Q_INVOKABLE QString removeReportDefinition(const QString& id, int revision, const QString& expectedLogPath);
     Q_INVOKABLE QStringList statsYears() const;
     Q_INVOKABLE QVariantMap statsSummary(const QString& mode = {}, int year = 0) const;
     Q_INVOKABLE QVariantList statsByYear(const QString& mode = {}) const;

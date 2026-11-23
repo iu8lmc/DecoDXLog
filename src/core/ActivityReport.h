@@ -3,10 +3,21 @@
 #include <QSqlDatabase>
 #include <QString>
 #include <QVariantList>
+#include <optional>
 class QIODevice;
+namespace decolog::core { class LogDatabase; }
 
 namespace decolog::core::activityreport {
 struct Result { QVariantList rows; bool truncated{false}; QString error; };
+struct Definition {
+    QString id, name, kind, band, station, aggregate;
+    QStringList dimensions;
+    int year{0}, revision{0};
+};
+bool saveDefinition(LogDatabase& db, Definition& definition, QString* error = nullptr);
+std::optional<Definition> loadDefinition(const LogDatabase& db, const QString& id, QString* error = nullptr);
+QList<Definition> listDefinitions(const LogDatabase& db, QString* error = nullptr);
+bool removeDefinition(LogDatabase& db, const Definition& definition, QString* error = nullptr);
 // Counts recorded QSO by their own reported antenna, band and own grid.
 // A single SELECT supplies one SQLite read snapshot. Missing values remain empty.
 Result run(const QSqlDatabase& db, int utcYear, const QString& band);

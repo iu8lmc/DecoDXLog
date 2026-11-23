@@ -3,11 +3,38 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QTemporaryDir>
+#include <QJsonDocument>
 #include <QTest>
 using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void savedDefinitionsAreIndependentAndRejectStaleChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("reports.sqlite");
+        LogDatabase first; QVERIFY(first.open(path)); first.setSetting("activity_report_v1",R"({"year":2024,"band":"20m"})");
+        activityreport::Definition a; a.name="Band by mode"; a.kind="custom"; a.year=2026; a.band="20m"; a.dimensions={"band","mode"}; a.aggregate="calls";
+        activityreport::Definition b; b.name="Club"; b.kind="club"; b.station="9H1SR"; QString error;
+        QVERIFY2(activityreport::saveDefinition(first,a,&error),qPrintable(error)); QVERIFY2(activityreport::saveDefinition(first,b,&error),qPrintable(error)); QVERIFY(a.id!=b.id);
+        LogDatabase second; QVERIFY(second.open(path)); auto stale=activityreport::loadDefinition(second,a.id,&error); QVERIFY(stale);
+        auto changed=a; changed.name="Band by year"; changed.dimensions={"band","year"}; QVERIFY(activityreport::saveDefinition(first,changed,&error));
+        stale->name="stale"; QVERIFY(!activityreport::saveDefinition(second,*stale,&error)); QVERIFY(!activityreport::removeDefinition(second,*stale,&error));
+        const auto items=activityreport::listDefinitions(first,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(items.size(),2);
+        QCOMPARE(activityreport::loadDefinition(first,a.id)->name,QString("Band by year"));
+        QVERIFY(activityreport::removeDefinition(first,b,&error)); QCOMPARE(activityreport::listDefinitions(first).size(),1);
+        QVERIFY(first.setting("activity_report_v1").contains("2024"));
+        changed.dimensions={"band","band"}; QVERIFY(!activityreport::saveDefinition(first,changed,&error)); QCOMPARE(activityreport::listDefinitions(first).size(),1);
+        first.setSetting("saved_report.invalid","not json"); QVERIFY(activityreport::listDefinitions(first,&error).isEmpty()); QVERIFY(!error.isEmpty());
+        QSqlQuery q(first.connection()); QVERIFY(q.exec("DELETE FROM app_setting WHERE key='saved_report.invalid'")); QCOMPARE(activityreport::listDefinitions(first).size(),1);
+    }
+    void savedDefinitionLimitDoesNotCreateAnUnreadableLibrary()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<1000) INSERT INTO app_setting(key,value) SELECT printf('saved_report.fixture%04d',x),'{}' FROM n"));
+        activityreport::Definition d; d.name="Beyond limit"; d.kind="activity"; QString error;
+        QVERIFY(!activityreport::saveDefinition(db,d,&error)); QVERIFY(d.id.isEmpty());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM app_setting WHERE key LIKE 'saved_report.%'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1000);
+    }
     void configurableDimensionsAndAggregatesAreBoundedAndSafe()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

@@ -1,5 +1,6 @@
 #include "core/ActivityReport.h"
 #include "core/NewQsoFields.h"
+#include "core/LogDatabase.h"
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariantMap>
@@ -12,8 +13,95 @@
 #include <QPageSize>
 #include <QIODevice>
 #include <QSet>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QRegularExpression>
+#include <QUuid>
+#include <limits>
+#include <algorithm>
 
 namespace decolog::core::activityreport {
+namespace {
+const QString reportPrefix=QStringLiteral("saved_report.");
+bool definitionFailure(QString* error,const QString& message) { if (error) *error=message; return false; }
+bool validDefinition(const Definition& d)
+{
+    static const QRegularExpression uuid(QStringLiteral("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"));
+    if ((!d.id.isEmpty() && !uuid.match(d.id).hasMatch()) || d.name.isEmpty() || d.name.size()>120 || d.name!=d.name.trimmed() ||
+        d.band.size()>24 || d.band!=d.band.trimmed().toLower() || d.station.size()>24 || d.station!=d.station.trimmed().toUpper() || d.year<0 || d.year>9999) return false;
+    if (d.kind==QLatin1String("custom")) return d.station.isEmpty() && validateCustomSpec(d.dimensions,d.aggregate).isEmpty();
+    if (d.kind!=QLatin1String("activity") && d.kind!=QLatin1String("confirmation") && d.kind!=QLatin1String("club")) return false;
+    return d.dimensions.isEmpty() && d.aggregate.isEmpty() && (d.kind==QLatin1String("club") || d.station.isEmpty());
+}
+QString encodeDefinition(const Definition& d)
+{
+    return QString::fromUtf8(QJsonDocument(QJsonObject{{"format",1},{"id",d.id},{"name",d.name},{"kind",d.kind},{"year",d.year},
+        {"band",d.band},{"station",d.station},{"dimensions",QJsonArray::fromStringList(d.dimensions)},{"aggregate",d.aggregate},{"revision",d.revision}}).toJson(QJsonDocument::Compact));
+}
+std::optional<Definition> decodeDefinition(const QString& text)
+{
+    QJsonParseError e; const auto doc=QJsonDocument::fromJson(text.toUtf8(),&e); if (e.error!=QJsonParseError::NoError || !doc.isObject()) return {};
+    const auto o=doc.object(); if (o.value("format").toInt()!=1 || !o.value("dimensions").isArray() || !o.value("year").isDouble() || !o.value("revision").isDouble()) return {};
+    Definition d; d.id=o.value("id").toString(); d.name=o.value("name").toString(); d.kind=o.value("kind").toString(); d.band=o.value("band").toString(); d.station=o.value("station").toString();
+    d.aggregate=o.value("aggregate").toString(); d.year=o.value("year").toInt(-1); d.revision=o.value("revision").toInt(-1);
+    for (const auto& value : o.value("dimensions").toArray()) { if (!value.isString()) return {}; d.dimensions << value.toString(); }
+    if (d.id.isEmpty() || d.revision<1 || !validDefinition(d)) return {}; return d;
+}
+}
+bool saveDefinition(LogDatabase& db,Definition& d,QString* error)
+{
+    if (!db.isOpen()) return definitionFailure(error,QStringLiteral("Log is not open"));
+    if (!validDefinition(d)) return definitionFailure(error,QStringLiteral("Invalid report definition"));
+    const bool creating=d.id.isEmpty(); Definition next=d; QSqlQuery q(db.connection());
+    if (creating) {
+        next.id=QUuid::createUuid().toString(QUuid::WithoutBraces); next.revision=1;
+        q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) SELECT ?,? WHERE (SELECT COUNT(*) FROM app_setting WHERE substr(key,1,?)=?)<1000"));
+        q.addBindValue(reportPrefix+next.id); q.addBindValue(encodeDefinition(next)); q.addBindValue(reportPrefix.size()); q.addBindValue(reportPrefix);
+    }
+    else {
+        if (d.revision<1 || d.revision==std::numeric_limits<int>::max()) return definitionFailure(error,QStringLiteral("Invalid report revision"));
+        q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); q.addBindValue(reportPrefix+d.id);
+        if (!q.exec() || !q.next()) return definitionFailure(error,QStringLiteral("Report unavailable"));
+        const QString old=q.value(0).toString(); const auto current=decodeDefinition(old);
+        if (!current || current->id!=d.id || current->revision!=d.revision) return definitionFailure(error,QStringLiteral("Report changed; reload before saving"));
+        ++next.revision; q.prepare(QStringLiteral("UPDATE app_setting SET value=? WHERE key=? AND value=?"));
+        q.addBindValue(encodeDefinition(next)); q.addBindValue(reportPrefix+d.id); q.addBindValue(old);
+    }
+    if (!q.exec()) return definitionFailure(error,QStringLiteral("Cannot save report"));
+    if (q.numRowsAffected()!=1) return definitionFailure(error,creating ? QStringLiteral("Saved report limit of 1000 reached") : QStringLiteral("Report changed; reload before saving"));
+    d=next; if (error) error->clear(); return true;
+}
+std::optional<Definition> loadDefinition(const LogDatabase& db,const QString& id,QString* error)
+{
+    if (!db.isOpen()) { definitionFailure(error,QStringLiteral("Log is not open")); return {}; }
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); q.addBindValue(reportPrefix+id);
+    if (!q.exec() || !q.next()) { definitionFailure(error,QStringLiteral("Report unavailable")); return {}; }
+    auto d=decodeDefinition(q.value(0).toString()); if (!d || d->id!=id) { definitionFailure(error,QStringLiteral("Invalid saved report")); return {}; }
+    if (error) error->clear(); return d;
+}
+QList<Definition> listDefinitions(const LogDatabase& db,QString* error)
+{
+    QList<Definition> out; if (!db.isOpen()) { definitionFailure(error,QStringLiteral("Log is not open")); return out; }
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT key,value FROM app_setting WHERE substr(key,1,?)=? ORDER BY key LIMIT 1001")); q.addBindValue(reportPrefix.size()); q.addBindValue(reportPrefix);
+    if (!q.exec()) { definitionFailure(error,QStringLiteral("Cannot read saved reports")); return {}; }
+    while (q.next()) { if (out.size()>=1000) { definitionFailure(error,QStringLiteral("Too many saved reports")); return {}; }
+        auto d=decodeDefinition(q.value(1).toString()); if (!d || reportPrefix+d->id!=q.value(0).toString()) { definitionFailure(error,QStringLiteral("Invalid saved report")); return {}; } out << *d; }
+    if (q.lastError().isValid()) { definitionFailure(error,QStringLiteral("Cannot read saved reports")); return {}; }
+    std::sort(out.begin(),out.end(),[](const Definition& a,const Definition& b) { const int c=QString::compare(a.name,b.name,Qt::CaseInsensitive); return c==0 ? a.id<b.id : c<0; });
+    if (error) error->clear(); return out;
+}
+bool removeDefinition(LogDatabase& db,const Definition& d,QString* error)
+{
+    if (!db.isOpen() || d.id.isEmpty() || d.revision<1) return definitionFailure(error,QStringLiteral("Invalid saved report"));
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); q.addBindValue(reportPrefix+d.id);
+    if (!q.exec() || !q.next()) return definitionFailure(error,QStringLiteral("Report unavailable"));
+    const QString old=q.value(0).toString(); const auto current=decodeDefinition(old);
+    if (!current || current->id!=d.id || current->revision!=d.revision) return definitionFailure(error,QStringLiteral("Report changed; reload before removing"));
+    q.prepare(QStringLiteral("DELETE FROM app_setting WHERE key=? AND value=?")); q.addBindValue(reportPrefix+d.id); q.addBindValue(old);
+    if (!q.exec() || q.numRowsAffected()!=1) return definitionFailure(error,QStringLiteral("Cannot remove report or report changed"));
+    if (error) error->clear(); return true;
+}
 Result run(const QSqlDatabase& db,int utcYear,const QString& band)
 {
     Result out;

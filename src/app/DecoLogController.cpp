@@ -7812,6 +7812,39 @@ QString DecoLogController::exportActivityReportPdf(const QUrl& file)
     });
     return {};
 }
+namespace {
+QVariantMap reportDefinitionMap(const activityreport::Definition& d)
+{
+    return {{QStringLiteral("id"),d.id},{QStringLiteral("name"),d.name},{QStringLiteral("kind"),d.kind},
+        {QStringLiteral("year"),d.year},{QStringLiteral("band"),d.band},{QStringLiteral("station"),d.station},
+        {QStringLiteral("dimensions"),d.dimensions},{QStringLiteral("aggregate"),d.aggregate},{QStringLiteral("revision"),d.revision}};
+}
+}
+QVariantMap DecoLogController::savedReportDefinitions() const
+{
+    QString error; QVariantList rows; const auto definitions=activityreport::listDefinitions(m_db,&error);
+    for (const auto& d : definitions) rows << reportDefinitionMap(d);
+    return {{QStringLiteral("path"),m_db.path()},{QStringLiteral("rows"),rows},{QStringLiteral("error"),error}};
+}
+QVariantMap DecoLogController::saveReportDefinition(const QVariantMap& values,const QString& expectedLogPath)
+{
+    if (!m_db.isOpen() || expectedLogPath.isEmpty() || expectedLogPath!=m_db.path()) return {{QStringLiteral("error"),tr("The open log changed; reload the report list")}};
+    activityreport::Definition d; d.id=values.value(QStringLiteral("id")).toString(); d.revision=values.value(QStringLiteral("revision")).toInt();
+    d.name=values.value(QStringLiteral("name")).toString().trimmed(); d.kind=values.value(QStringLiteral("kind")).toString();
+    bool yearOk=false; d.year=values.value(QStringLiteral("year")).toInt(&yearOk);
+    if (!yearOk) return {{QStringLiteral("error"),tr("Invalid report year")}};
+    d.band=values.value(QStringLiteral("band")).toString().trimmed().toLower();
+    if (d.kind==QLatin1String("club")) d.station=values.value(QStringLiteral("station")).toString().trimmed().toUpper();
+    if (d.kind==QLatin1String("custom")) { d.dimensions=values.value(QStringLiteral("dimensions")).toStringList(); d.aggregate=values.value(QStringLiteral("aggregate")).toString(); }
+    QString error; if (!activityreport::saveDefinition(m_db,d,&error)) return {{QStringLiteral("error"),error}};
+    return {{QStringLiteral("definition"),reportDefinitionMap(d)}};
+}
+QString DecoLogController::removeReportDefinition(const QString& id,int revision,const QString& expectedLogPath)
+{
+    if (!m_db.isOpen() || expectedLogPath.isEmpty() || expectedLogPath!=m_db.path()) return tr("The open log changed; reload the report list");
+    activityreport::Definition d; d.id=id; d.revision=revision; QString error;
+    return activityreport::removeDefinition(m_db,d,&error) ? QString() : error;
+}
 
 void DecoLogController::requestStats(const QString& mode, int year)
 {
