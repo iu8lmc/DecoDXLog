@@ -1286,6 +1286,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
+        else if (what[0] === "netcompareprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netCompareProbe.start() }
         else if (what[0] === "contestserialpanelprobe" || what[0] === "contestserialwindowprobe") {
             decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
             decolog.net.configureDurableSerialAuthority("event","authority")
@@ -1772,6 +1773,15 @@ RoundedWindow {
     Timer { id:cqwwHistoryProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportHistoryProbe=true; contestWindow.item.reportExportProbePath=startupShow.split(":")[0] === "cqwwexportprobe" ? startupShow.split(":").slice(1).join(":") : ""; contestWindow.item.probeReportHistory() } else console.warn("PROBE lcr history missing window") } }
     Timer { id:cqwwReportProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportProbeSave = startupShow.split(":")[0] === "cqwwarchiveprobe"; contestWindow.item.reportProbeFind = startupShow.split(":")[0] === "cqwwfindprobe" || startupShow.split(":")[0] === "cqwwopenprobe" || startupShow.split(":")[0] === "cqwwwindowprobe"; contestWindow.item.reportProbeWindow = startupShow.split(":")[0] === "cqwwwindowprobe"; contestWindow.item.reportProbeOpen = startupShow.split(":")[0] === "cqwwopenprobe"; contestWindow.item.inspectContestReport("file://" + startupShow.split(":").slice(1).join(":"), true) } else console.warn("PROBE lcr missing window") } }
     Timer { id:callQueueProbe; interval:1000; onTriggered: { const p=window.panelItem("newqso"); if (p && p.item) p.item.probeCallQueue(); else console.warn("PROBE callqueue missing panel") } }
+    Timer { id:netCompareProbe; interval:300; repeat:true; property int tries:0; property bool started:false
+        onTriggered: {
+            const container=contestLayout.panelFor("net"), panel=container ? container.item : null
+            if (!panel) { if (++tries>15) { console.warn("PROBE netcompare missing panel"); stop() } return }
+            if (!started) { started=true; const path=startupShow.split(":").slice(1).join(":"); if (!panel.probeComparison("file://"+path)) { console.warn("PROBE netcompare start failed"); stop() } return }
+            if (decolog.net.qsoComparisonBusy) { if (++tries>20) { console.warn("PROBE netcompare timed out"); stop() } return }
+            console.warn("PROBE netcompare " + JSON.stringify(panel.probeComparisonState())); stop()
+        }
+    }
     Timer { id:contestSerialProbe; interval:1000; onTriggered: {
         const panel = startupShow === "contestserialpanelprobe" ? contestLayout.panelFor("contest").item : contestWindow.item
         if (panel) console.warn("PROBE contestSerial " + JSON.stringify(panel.probeExperimentalSerial()))

@@ -3,6 +3,7 @@
 // viaggiano da soli: fatto qui, arriva negli altri log, e viceversa.
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import Decodium.UI
 
@@ -10,6 +11,8 @@ GlassPanel {
     id: root
 
     readonly property var net: decolog.net
+    function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
+    function probeComparisonState() { return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:root.net.qsoComparisonRows.length} }
 
     title: qsTr("Station network")
     dotColor: root.net.running ? Theme.accentColor : Theme.textSecondary
@@ -55,11 +58,6 @@ GlassPanel {
             Item { Layout.fillWidth: true }
             GlassButton {
                 Layout.alignment: Qt.AlignBottom
-                text: qsTr("Serial experiment…")
-                onClicked: serialAuthorityDialog.open()
-            }
-            GlassButton {
-                Layout.alignment: Qt.AlignBottom
                 text: qsTr("Sync")
                 enabled: root.net.running
                 onClicked: root.net.requestSync()
@@ -72,6 +70,12 @@ GlassPanel {
             color: Theme.textSecondary
             font.family: Theme.monoFamily
             font.pixelSize: 11
+        }
+        RowLayout {
+            Layout.fillWidth:true
+            GlassButton { text:qsTr("Serial experiment…"); onClicked:serialAuthorityDialog.open() }
+            GlassButton { text:qsTr("Compare logs…"); onClicked:qsoComparisonDialog.open() }
+            Item { Layout.fillWidth:true }
         }
 
         // ── Chi c'e' ────────────────────────────────────────────────────────
@@ -205,6 +209,71 @@ GlassPanel {
                 } }
                 GlassButton { text: qsTr("Close"); onClicked: serialAuthorityDialog.close() }
             }
+        }
+    }
+
+    FileDialog {
+        id:qsoComparisonFile
+        title:qsTr("Choose another DecoDXLog log")
+        fileMode:FileDialog.OpenFile
+        nameFilters:[qsTr("DecoDXLog logs (*.sqlite *.db)"),qsTr("All files (*)")]
+        onAccepted: {
+            qsoComparisonDialog.localError = root.net.startQsoComparison(selectedFile) ? "" : qsTr("Cannot start comparison; choose an existing log and reopen the current log if necessary.")
+        }
+    }
+
+    DialogFrame {
+        id:qsoComparisonDialog
+        transientParent:root.Window.window
+        title:qsTr("Compare station logs")
+        info:qsTr("Read-only snapshot · no changes applied")
+        width:880; height:580
+        property string localError:""
+        onOpened:localError=""
+        function label(kind) {
+            switch (kind) {
+            case "localOnly": return qsTr("Only current log")
+            case "remoteOnly": return qsTr("Only selected log")
+            case "revisionDifference": return qsTr("Revision differs")
+            case "contentConflict": return qsTr("Content differs")
+            case "deletionConflict": return qsTr("Deletion differs")
+            }
+            return kind
+        }
+        onClosed:root.net.cancelQsoComparison()
+        body:ColumnLayout {
+            spacing:8
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                text:qsTr("Compare the open log with a local copy from another station. This does not contact the station, merge records or prove the logs remain unchanged. Matching covers ADIF fields only; attachments and local metadata are excluded.") }
+            RowLayout {
+                GlassButton { text:qsTr("Choose log…"); enabled:!root.net.qsoComparisonBusy; onClicked:qsoComparisonFile.open() }
+                GlassButton { text:qsTr("Cancel comparison"); visible:root.net.qsoComparisonBusy; onClicked:root.net.cancelQsoComparison() }
+                Text { Layout.fillWidth:true; elide:Text.ElideMiddle; textFormat:Text.PlainText; color:Theme.textSecondary; text:root.net.qsoComparisonSummary.remotePath || "" }
+            }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.warningColor
+                text:qsoComparisonDialog.localError || root.net.qsoComparisonSummary.error || (root.net.qsoComparisonBusy ? qsTr("Comparing snapshots…") : root.net.qsoComparisonSummary.stale ? qsTr("The open log changed or a file was replaced; compare again.") : "") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
+                visible:root.net.qsoComparisonSummary.differences !== undefined
+                text:qsTr("Matching %1 · only current %2 · only selected %3 · revision %4 · content %5 · deletion %6")
+                    .arg(root.net.qsoComparisonSummary.matching || 0).arg(root.net.qsoComparisonSummary.localOnly || 0).arg(root.net.qsoComparisonSummary.remoteOnly || 0)
+                    .arg(root.net.qsoComparisonSummary.revisionDifference || 0).arg(root.net.qsoComparisonSummary.contentConflict || 0).arg(root.net.qsoComparisonSummary.deletionConflict || 0) }
+            Text { Layout.fillWidth:true; color:Theme.warningColor; visible:root.net.qsoComparisonSummary.truncated === true
+                text:qsTr("Showing the first 200 differences; counts include all records.") }
+            Rectangle {
+                Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:120; color:Theme.bgDeep; radius:4; border.color:Theme.borderSoft
+                ListView {
+                    anchors.fill:parent; anchors.margins:6; clip:true; spacing:8; model:root.net.qsoComparisonRows
+                    ScrollBar.vertical:PanelScrollBar {}
+                    delegate:Text {
+                        required property var modelData
+                        width:ListView.view.width-12; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textPrimary; font.pixelSize:12
+                        text:qsoComparisonDialog.label(modelData.kind) + " · " + modelData.uuid + "\n" +
+                             qsTr("Current: %1 %2 %3 %4 · rev %5").arg(modelData.localCall || "—").arg(modelData.localDate || "").arg(modelData.localBand || "").arg(modelData.localMode || "").arg(modelData.localRevision === null || modelData.localRevision === undefined ? "—" : modelData.localRevision) + "\n" +
+                             qsTr("Selected: %1 %2 %3 %4 · rev %5").arg(modelData.remoteCall || "—").arg(modelData.remoteDate || "").arg(modelData.remoteBand || "").arg(modelData.remoteMode || "").arg(modelData.remoteRevision === null || modelData.remoteRevision === undefined ? "—" : modelData.remoteRevision)
+                    }
+                }
+            }
+            GlassButton { text:qsTr("Close"); onClicked:qsoComparisonDialog.close() }
         }
     }
 }

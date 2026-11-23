@@ -2,6 +2,8 @@
 
 #include "core/Adif.h"
 #include "core/ContestSerialProtocol.h"
+#include "core/ContestNetReconcile.h"
+#include "core/FileIdentity.h"
 #include "core/LogDatabase.h"
 
 #include <QHostInfo>
@@ -27,6 +29,17 @@ NetController::NetController(Context context, QObject* parent)
     , m_ctx(std::move(context))
 {
     m_durablePool.setMaxThreadCount(1);
+    m_qsoComparisonPool.setMaxThreadCount(1);
+    m_qsoComparisonTimer.setInterval(750);
+    connect(&m_qsoComparisonTimer,&QTimer::timeout,this,[this] {
+        if (!m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path()!=m_qsoComparisonPath ||
+            m_ctx.db->identity()!=m_qsoComparisonIdentity || m_ctx.db->openGeneration()!=m_qsoComparisonOpenGeneration ||
+            m_ctx.db->openFileIdentity()!=m_qsoComparisonFileIdentity || !m_ctx.db->fileIdentityMatchesOpen() ||
+            m_ctx.db->changeStamp()!=m_qsoComparisonStamp ||
+            fileidentity::read(m_qsoComparisonRemotePath)!=m_qsoComparisonRemoteFileIdentity) {
+            m_qsoComparisonTimer.stop(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true); emit qsoComparisonChanged();
+        }
+    });
     m_durableRetry.setInterval(2000);
     connect(&m_durableRetry, &QTimer::timeout, this, [this] {
         if (!m_net.running() || !m_ctx.db || m_ctx.db->openGeneration()!=m_durableRetryDbGeneration ||
@@ -74,8 +87,98 @@ NetController::NetController(Context context, QObject* parent)
 
 NetController::~NetController()
 {
+    if (m_qsoComparisonCancel) m_qsoComparisonCancel->store(true);
+    m_qsoComparisonPool.clear(); m_qsoComparisonPool.waitForDone();
     m_durablePool.clear();
     m_durablePool.waitForDone();
+}
+
+bool NetController::startQsoComparison(const QUrl& remoteFile)
+{
+    if (m_qsoComparisonBusy || !remoteFile.isLocalFile() || remoteFile.toLocalFile().isEmpty() || !m_ctx.db ||
+        !m_ctx.db->isOpen() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) return false;
+    const QString localPath=m_ctx.db->path(), remotePath=remoteFile.toLocalFile(), identity=m_ctx.db->identity(), stamp=m_ctx.db->changeStamp();
+    const QByteArray localFileIdentity=m_ctx.db->openFileIdentity(), remoteFileIdentity=fileidentity::read(remotePath);
+    if (identity.isEmpty() || stamp.isEmpty() || remoteFileIdentity.isEmpty()) return false;
+    const quint64 dbGeneration=m_ctx.db->openGeneration(), generation=++m_qsoComparisonGeneration;
+    auto cancelled=std::make_shared<std::atomic_bool>(false); m_qsoComparisonCancel=cancelled;
+    m_qsoComparisonTimer.stop(); m_qsoComparisonBusy=true; m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear(); emit qsoComparisonChanged();
+    QPointer<NetController> self(this);
+    m_qsoComparisonPool.start([self,cancelled,localPath,remotePath,identity,stamp,localFileIdentity,remoteFileIdentity,dbGeneration,generation] {
+        ContestNetReconcile comparison; QVariantMap counts{{QStringLiteral("matching"),0},{QStringLiteral("localOnly"),0},{QStringLiteral("remoteOnly"),0},
+            {QStringLiteral("revisionDifference"),0},{QStringLiteral("contentConflict"),0},{QStringLiteral("deletionConflict"),0}};
+        QVariantList rows; QString error; qint64 localWatermark=0,remoteWatermark=0; QString remoteIdentity;
+        if (!comparison.begin(localPath,remotePath)) error=comparison.error();
+        else if (comparison.localIdentity()!=identity || comparison.localFileIdentity()!=localFileIdentity || comparison.remoteFileIdentity()!=remoteFileIdentity)
+            error=QStringLiteral("A log file changed before comparison started");
+        else {
+            localWatermark=comparison.localWatermark(); remoteWatermark=comparison.remoteWatermark(); remoteIdentity=comparison.remoteIdentity();
+            bool more=true;
+            while (more && !cancelled->load()) {
+                const auto page=comparison.next(128);
+                if (!page.ok) { error=page.error; break; }
+                for (const auto& difference:page.rows) {
+                    QString kind;
+                    switch (difference.kind) {
+                    case ContestNetDifference::Kind::MatchingFingerprint: kind=QStringLiteral("matching"); break;
+                    case ContestNetDifference::Kind::LocalOnly: kind=QStringLiteral("localOnly"); break;
+                    case ContestNetDifference::Kind::RemoteOnly: kind=QStringLiteral("remoteOnly"); break;
+                    case ContestNetDifference::Kind::RevisionDifference: kind=QStringLiteral("revisionDifference"); break;
+                    case ContestNetDifference::Kind::ContentConflict: kind=QStringLiteral("contentConflict"); break;
+                    case ContestNetDifference::Kind::DeletionConflict: kind=QStringLiteral("deletionConflict"); break;
+                    }
+                    counts[kind]=counts.value(kind).toLongLong()+1;
+                    if (kind!=QLatin1String("matching") && rows.size()<200)
+                        rows.append(QVariantMap{{QStringLiteral("uuid"),difference.uuid},{QStringLiteral("kind"),kind},
+                            {QStringLiteral("localCall"),difference.local.call},{QStringLiteral("localBand"),difference.local.band},
+                            {QStringLiteral("localMode"),difference.local.mode},{QStringLiteral("localDate"),difference.local.date},
+                            {QStringLiteral("localRevision"),difference.local.present?QVariant(difference.local.revision):QVariant()},
+                            {QStringLiteral("remoteCall"),difference.remote.call},{QStringLiteral("remoteBand"),difference.remote.band},
+                            {QStringLiteral("remoteMode"),difference.remote.mode},{QStringLiteral("remoteDate"),difference.remote.date},
+                            {QStringLiteral("remoteRevision"),difference.remote.present?QVariant(difference.remote.revision):QVariant()}});
+                }
+                more=page.hasMore;
+            }
+        }
+        if (cancelled->load()) error=QStringLiteral("Comparison cancelled");
+        if (!self) return;
+        QMetaObject::invokeMethod(self,[self,cancelled,localPath,remotePath,identity,stamp,localFileIdentity,remoteFileIdentity,dbGeneration,generation,counts,rows,error,localWatermark,remoteWatermark,remoteIdentity] {
+            if (!self || self->m_qsoComparisonGeneration!=generation) return;
+            self->m_qsoComparisonBusy=false; self->m_qsoComparisonCancel.reset();
+            if (cancelled->load() || !error.isEmpty()) {
+                self->m_qsoComparisonRows.clear(); self->m_qsoComparisonSummary={{QStringLiteral("error"),cancelled->load()?self->tr("Comparison cancelled"):error}};
+            } else if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=localPath ||
+                self->m_ctx.db->identity()!=identity || self->m_ctx.db->openGeneration()!=dbGeneration ||
+                self->m_ctx.db->openFileIdentity()!=localFileIdentity || !self->m_ctx.db->fileIdentityMatchesOpen() ||
+                fileidentity::read(remotePath)!=remoteFileIdentity) {
+                self->m_qsoComparisonRows.clear(); self->m_qsoComparisonSummary={{QStringLiteral("error"),self->tr("A log changed; compare again.")}};
+            } else {
+                self->m_qsoComparisonPath=localPath; self->m_qsoComparisonIdentity=identity; self->m_qsoComparisonStamp=stamp;
+                self->m_qsoComparisonOpenGeneration=dbGeneration; self->m_qsoComparisonFileIdentity=localFileIdentity;
+                self->m_qsoComparisonRemotePath=remotePath; self->m_qsoComparisonRemoteFileIdentity=remoteFileIdentity;
+                self->m_qsoComparisonRows=rows; self->m_qsoComparisonSummary=counts;
+                const qint64 differences=counts.value(QStringLiteral("localOnly")).toLongLong()+counts.value(QStringLiteral("remoteOnly")).toLongLong()+
+                    counts.value(QStringLiteral("revisionDifference")).toLongLong()+counts.value(QStringLiteral("contentConflict")).toLongLong()+counts.value(QStringLiteral("deletionConflict")).toLongLong();
+                self->m_qsoComparisonSummary.insert(QStringLiteral("differences"),differences);
+                self->m_qsoComparisonSummary.insert(QStringLiteral("truncated"),differences>rows.size());
+                self->m_qsoComparisonSummary.insert(QStringLiteral("localWatermark"),localWatermark); self->m_qsoComparisonSummary.insert(QStringLiteral("remoteWatermark"),remoteWatermark);
+                self->m_qsoComparisonSummary.insert(QStringLiteral("remoteIdentity"),remoteIdentity); self->m_qsoComparisonSummary.insert(QStringLiteral("remotePath"),remotePath);
+                const bool stale=self->m_ctx.db->changeStamp()!=stamp; self->m_qsoComparisonSummary.insert(QStringLiteral("stale"),stale);
+                if (!stale) self->m_qsoComparisonTimer.start();
+            }
+            emit self->qsoComparisonChanged();
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
+
+void NetController::cancelQsoComparison()
+{
+    if (m_qsoComparisonCancel) m_qsoComparisonCancel->store(true);
+    if (!m_qsoComparisonBusy) {
+        m_qsoComparisonTimer.stop(); m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear();
+        emit qsoComparisonChanged();
+    }
 }
 
 QString NetController::configureDurableSerialAuthority(const QString& scope, const QString& authority)

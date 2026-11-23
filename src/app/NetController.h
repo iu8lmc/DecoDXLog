@@ -12,9 +12,12 @@
 #include <QTimer>
 #include <QThreadPool>
 #include <QUuid>
+#include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
 #include <functional>
+#include <atomic>
+#include <memory>
 
 namespace decolog::core {
 class AdifRecord;
@@ -38,6 +41,9 @@ class NetController : public QObject {
     Q_PROPERTY(QStringList queuedCalls READ queuedCalls NOTIFY queuedCallsChanged)
     Q_PROPERTY(QString nodeId READ id CONSTANT)
     Q_PROPERTY(QString durableSerialStatus READ durableSerialStatus NOTIFY durableSerialStatusChanged)
+    Q_PROPERTY(bool qsoComparisonBusy READ qsoComparisonBusy NOTIFY qsoComparisonChanged)
+    Q_PROPERTY(QVariantMap qsoComparisonSummary READ qsoComparisonSummary NOTIFY qsoComparisonChanged)
+    Q_PROPERTY(QVariantList qsoComparisonRows READ qsoComparisonRows NOTIFY qsoComparisonChanged)
 
 public:
     struct Context {
@@ -93,6 +99,11 @@ public:
     Q_INVOKABLE QVariantMap durableSerialGrantForQso() const;
     void durableSerialQsoSaved();
     QString durableSerialStatus() const { return m_durableStatus; }
+    Q_INVOKABLE bool startQsoComparison(const QUrl& remoteFile);
+    Q_INVOKABLE void cancelQsoComparison();
+    bool qsoComparisonBusy() const { return m_qsoComparisonBusy; }
+    QVariantMap qsoComparisonSummary() const { return m_qsoComparisonSummary; }
+    QVariantList qsoComparisonRows() const { return m_qsoComparisonRows; }
 
     // Chiave wire-level usata per deduplicare un datagramma. La sessione fa
     // parte della chiave: dopo un riavvio il contatore puo' ricominciare da 1.
@@ -117,6 +128,7 @@ signals:
     void durableSerialGrantAccepted(const QJsonObject& grant);
     void durableSerialRequestSent(const QJsonObject& request);
     void durableSerialStatusChanged();
+    void qsoComparisonChanged();
 
 private:
     void restart();
@@ -177,6 +189,16 @@ private:
     int m_durableRetryMinimum{0};
     quint64 m_durableGeneration{0};
     bool m_durableBusy{false};
+    QThreadPool m_qsoComparisonPool;
+    QTimer m_qsoComparisonTimer;
+    std::shared_ptr<std::atomic_bool> m_qsoComparisonCancel;
+    quint64 m_qsoComparisonGeneration{0};
+    bool m_qsoComparisonBusy{false};
+    QVariantMap m_qsoComparisonSummary;
+    QVariantList m_qsoComparisonRows;
+    QString m_qsoComparisonPath, m_qsoComparisonIdentity, m_qsoComparisonStamp, m_qsoComparisonRemotePath;
+    QByteArray m_qsoComparisonFileIdentity, m_qsoComparisonRemoteFileIdentity;
+    quint64 m_qsoComparisonOpenGeneration{0};
     void requestSerial();
     void noteSerial(const QString& stx);
 };

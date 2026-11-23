@@ -2324,6 +2324,98 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <source>Spot %1</source>
         <translation>Spot %1</translation>
     </message>
+    <message>
+        <source>Serial experiment…</source>
+        <translation>Progressivi sperimentali…</translation>
+    </message>
+    <message>
+        <source>Compare logs…</source>
+        <translation>Confronta log…</translation>
+    </message>
+    <message>
+        <source>Choose another DecoDXLog log</source>
+        <translation>Scegli un altro log DecoDXLog</translation>
+    </message>
+    <message>
+        <source>DecoDXLog logs (*.sqlite *.db)</source>
+        <translation>Log DecoDXLog (*.sqlite *.db)</translation>
+    </message>
+    <message>
+        <source>All files (*)</source>
+        <translation>Tutti i file (*)</translation>
+    </message>
+    <message>
+        <source>Compare station logs</source>
+        <translation>Confronta i log di stazione</translation>
+    </message>
+    <message>
+        <source>Read-only snapshot · no changes applied</source>
+        <translation>Istantanee in sola lettura · nessuna modifica applicata</translation>
+    </message>
+    <message>
+        <source>Only current log</source>
+        <translation>Solo nel log attuale</translation>
+    </message>
+    <message>
+        <source>Only selected log</source>
+        <translation>Solo nel log selezionato</translation>
+    </message>
+    <message>
+        <source>Revision differs</source>
+        <translation>Revisione diversa</translation>
+    </message>
+    <message>
+        <source>Content differs</source>
+        <translation>Contenuto diverso</translation>
+    </message>
+    <message>
+        <source>Deletion differs</source>
+        <translation>Cancellazione diversa</translation>
+    </message>
+    <message>
+        <source>Compare the open log with a local copy from another station. This does not contact the station, merge records or prove the logs remain unchanged. Matching covers ADIF fields only; attachments and local metadata are excluded.</source>
+        <translation>Confronta il log aperto con una copia locale di un’altra stazione. Il confronto non contatta la stazione, non unisce i record e non garantisce che i log restino invariati. La corrispondenza riguarda solo i campi ADIF; allegati e metadati locali sono esclusi.</translation>
+    </message>
+    <message>
+        <source>Choose log…</source>
+        <translation>Scegli log…</translation>
+    </message>
+    <message>
+        <source>Cancel comparison</source>
+        <translation>Annulla confronto</translation>
+    </message>
+    <message>
+        <source>Cannot start comparison; choose an existing log and reopen the current log if necessary.</source>
+        <translation>Impossibile avviare il confronto; scegli un log esistente e, se necessario, riapri il log attuale.</translation>
+    </message>
+    <message>
+        <source>Comparing snapshots…</source>
+        <translation>Confronto delle istantanee…</translation>
+    </message>
+    <message>
+        <source>The open log changed or a file was replaced; compare again.</source>
+        <translation>Il log aperto è cambiato oppure un file è stato sostituito; ripeti il confronto.</translation>
+    </message>
+    <message>
+        <source>Matching %1 · only current %2 · only selected %3 · revision %4 · content %5 · deletion %6</source>
+        <translation>Corrispondenti %1 · solo attuale %2 · solo selezionato %3 · revisione %4 · contenuto %5 · cancellazione %6</translation>
+    </message>
+    <message>
+        <source>Showing the first 200 differences; counts include all records.</source>
+        <translation>Sono mostrate le prime 200 differenze; i conteggi includono tutti i record.</translation>
+    </message>
+    <message>
+        <source>Current: %1 %2 %3 %4 · rev %5</source>
+        <translation>Attuale: %1 %2 %3 %4 · rev %5</translation>
+    </message>
+    <message>
+        <source>Selected: %1 %2 %3 %4 · rev %5</source>
+        <translation>Selezionato: %1 %2 %3 %4 · rev %5</translation>
+    </message>
+    <message>
+        <source>Close</source>
+        <translation>Chiudi</translation>
+    </message>
 </context>
 <context>
     <name>ContestRatePanel</name>
@@ -12557,6 +12649,14 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Serial collision detected: %1 was already assigned locally; verify the contest log</source>
         <translation>Collisione di numero progressivo: %1 era già stato assegnato in locale; controlla il log del contest</translation>
+    </message>
+    <message>
+        <source>Comparison cancelled</source>
+        <translation>Confronto annullato</translation>
+    </message>
+    <message>
+        <source>A log changed; compare again.</source>
+        <translation>Un log è cambiato; ripeti il confronto.</translation>
     </message>
 </context>
 <context>

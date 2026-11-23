@@ -6,7 +6,10 @@ namespace decolog::core {
 
 struct ContestNetDifference {
     enum class Kind { MatchingFingerprint, LocalOnly, RemoteOnly, RevisionDifference, ContentConflict, DeletionConflict };
-    struct Side { bool present{false}; int revision{0}; bool deleted{false}; QByteArray contentHash; };
+    struct Side {
+        bool present{false}; int revision{0}; bool deleted{false}; QByteArray contentHash;
+        QString call, band, mode, date, time;
+    };
     QString uuid;
     Kind kind{Kind::MatchingFingerprint};
     Side local;
@@ -32,6 +35,8 @@ public:
     qint64 remoteWatermark() const { return m_remote.inventory.journalWatermark(); }
     QString localIdentity() const { return m_local.inventory.logIdentity(); }
     QString remoteIdentity() const { return m_remote.inventory.logIdentity(); }
+    QByteArray localFileIdentity() const { return m_local.inventory.fileIdentity(); }
+    QByteArray remoteFileIdentity() const { return m_remote.inventory.fileIdentity(); }
 
 private:
     struct Source { ContestNetInventory inventory; QList<ContestNetInventoryRow> rows; qsizetype index{0}; bool exhausted{false}; };

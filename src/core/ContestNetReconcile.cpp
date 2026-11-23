@@ -31,7 +31,13 @@ ContestNetDifferencePage ContestNetReconcile::next(int limit)
         page.error=QStringLiteral("A log file changed during comparison"); close(); return page;
     }
     auto fail=[&] { page.rows.clear(); page.error=m_error; close(); return page; };
-    auto side=[](const ContestNetInventoryRow& row) { return ContestNetDifference::Side{true,row.revision,row.deleted,row.contentHash}; };
+    auto side=[](const ContestNetInventoryRow& row) {
+        ContestNetDifference::Side s; s.present=true; s.revision=row.revision; s.deleted=row.deleted; s.contentHash=row.contentHash;
+        const auto doc=adif::parse(row.adifPayload);
+        if (doc.records.size()==1) { const auto& r=doc.records.first(); s.call=r.value(QStringLiteral("CALL")); s.band=r.value(QStringLiteral("BAND"));
+            s.mode=r.value(QStringLiteral("MODE")); s.date=r.value(QStringLiteral("QSO_DATE")); s.time=r.value(QStringLiteral("TIME_ON")); }
+        return s;
+    };
     while (page.rows.size()<limit) {
         if (!fill(m_local) || !fill(m_remote)) return fail();
         const bool left=m_local.index<m_local.rows.size(), right=m_remote.index<m_remote.rows.size();

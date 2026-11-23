@@ -6,12 +6,71 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QSettings>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QFile>
 #include <QUdpSocket>
 #include <memory>
 
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void offlineQsoComparisonShowsDifferencesAndExpiresOnLocalEdit()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("Preview"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"),remotePath=dir.filePath("remote.sqlite");
+        LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        auto insert=[](LogDatabase& db,const QString& call,const QString& name,const QString& uuid) {
+            const auto qso=db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME",name}},"fixture",{},false,0,false);
+            return qso.id>0 && db.adoptUuid(qso.id,uuid) ? qso.id : qint64(0);
+        };
+        const auto localId=insert(local,"K1AAA","Local","shared"), remoteId=insert(remote,"K1AAA","Remote","shared"); QVERIFY(localId>0 && remoteId>0);
+        QVERIFY(insert(local,"K1BBB","Only here","local-only")>0); QVERIFY(insert(remote,"K1CCC","Only there","remote-only")>0);
+        NetController::Context ctx; ctx.db=&local; NetController net(ctx); QSignalSpy changes(&net,&NetController::qsoComparisonChanged);
+        QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        const auto summary=net.qsoComparisonSummary(); QCOMPARE(summary.value("contentConflict").toInt(),1); QCOMPARE(summary.value("localOnly").toInt(),1); QCOMPARE(summary.value("remoteOnly").toInt(),1);
+        const auto rows=net.qsoComparisonRows(); QCOMPARE(rows.size(),3); bool hasCall=false; for (const auto& item:rows) if (item.toMap().value("localCall").toString()=="K1AAA") hasCall=true; QVERIFY(hasCall);
+        QCOMPARE(local.record(localId)->value("NAME"),QString("Local")); QCOMPARE(remote.record(remoteId)->value("NAME"),QString("Remote"));
+        auto changed=*local.record(localId); changed.set("NAME","After comparison"); QVERIFY(local.updateQso(localId,changed).status==InsertResult::Status::Inserted);
+        QTRY_VERIFY_WITH_TIMEOUT(net.qsoComparisonSummary().value("stale").toBool(),4000); QVERIFY(changes.size()>0);
+        net.cancelQsoComparison(); QVERIFY(net.qsoComparisonSummary().isEmpty()); QVERIFY(net.qsoComparisonRows().isEmpty());
+    }
+    void offlineQsoComparisonCancelsWithoutPublishingPartialRows()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("Cancel"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"),remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        for (int i=0;i<200;++i) QVERIFY(local.insertQso(AdifRecord{{"CALL",QString("K%1TEST").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false).id>0);
+        NetController::Context ctx; ctx.db=&local; NetController net(ctx); QVERIFY(!net.startQsoComparison(QUrl::fromLocalFile(dir.filePath("missing.sqlite"))));
+        QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); net.cancelQsoComparison(); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QVERIFY(net.qsoComparisonRows().isEmpty()); QVERIFY(net.qsoComparisonSummary().value("error").toString().contains("cancelled")); QCOMPARE(local.qsoCount(),200); QCOMPARE(remote.qsoCount(),0);
+    }
+    void offlineQsoComparisonDetectsSelectedFileReplacement()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("Replacement"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"),remotePath=dir.filePath("remote.sqlite"),clone=dir.filePath("clone.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        QSqlQuery q(remote.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
+        NetController::Context ctx; ctx.db=&local; NetController net(ctx); QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QVERIFY(!net.qsoComparisonSummary().contains("error"));
+        if (!QFile::rename(remotePath,remotePath+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,remotePath)); QTRY_VERIFY_WITH_TIMEOUT(net.qsoComparisonSummary().value("stale").toBool(),4000);
+    }
+    void offlineQsoComparisonCountsBeyondPreviewLimit()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("Limit"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"),remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        for (int i=0;i<201;++i) QVERIFY(local.insertQso(AdifRecord{{"CALL",QString("K%1TEST").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false).id>0);
+        NetController::Context ctx; ctx.db=&local; NetController net(ctx); QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QCOMPARE(net.qsoComparisonSummary().value("localOnly").toInt(),201); QCOMPARE(net.qsoComparisonSummary().value("differences").toInt(),201);
+        QVERIFY(net.qsoComparisonSummary().value("truncated").toBool()); QCOMPARE(net.qsoComparisonRows().size(),200);
+    }
     void delayedConsumedGrantDoesNotReplaceCurrentStatus()
     {
         using namespace decolog::core; using decolog::app::NetController;
