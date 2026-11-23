@@ -3164,6 +3164,36 @@ bool DecoLogController::saveCqMarathonExport(const QUrl& file, int year, const Q
     return output.write(data) == data.size() && output.commit();
 }
 
+QString DecoLogController::exportCqMarathonReviewAdif(const QUrl& file,int year,qint64 stationProfileId)
+{
+    if (m_marathonAdifBusy) return tr("A Marathon export is already running");
+    if (!m_db.isOpen() || m_db.path().isEmpty() || m_db.path()==QLatin1String(":memory:") || m_db.identity().isEmpty() || year<1900 || year>2200 || stationProfileId<=0 || !m_db.stationProfile(stationProfileId))
+        return tr("Choose a file-backed log, valid year and station profile");
+    if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local ADIF file");
+    const QString dbPath=m_db.path(), identity=m_db.identity(), path=file.toLocalFile(); const QFileInfo target(path), source(dbPath);
+    const QString targetPath=target.absoluteFilePath(), sourcePath=source.absoluteFilePath(), canonical=target.canonicalFilePath();
+    for (const QString& suffix:QStringList{QString(),QStringLiteral("-wal"),QStringLiteral("-shm"),QStringLiteral("-journal")}) {
+        const QFileInfo protectedFile(sourcePath+suffix);
+        if (targetPath==protectedFile.absoluteFilePath() || (!canonical.isEmpty() && canonical==protectedFile.canonicalFilePath())) return tr("Choose a file other than the log database");
+    }
+    m_marathonAdifBusy=true; ++m_exportsPending; emit exportBusyChanged(); QPointer<DecoLogController> self(this);
+    m_exportPool.start([self,dbPath,identity,path,year,stationProfileId] {
+        core::cqmarathon::ReviewAdif report; LogDatabase db;
+        if (!db.openReadOnly(dbPath)) report.error=db.lastError();
+        else report=core::cqmarathon::reviewAdif(db,year,stationProfileId,identity);
+        if (report.error.isEmpty()) {
+            QSaveFile output(path);
+            if (!output.open(QIODevice::WriteOnly) || output.write(report.bytes)!=report.bytes.size() || !output.commit()) report.error=output.errorString();
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,report] {
+            if (!self) return; self->m_marathonAdifBusy=false; --self->m_exportsPending; emit self->exportBusyChanged();
+            emit self->cqMarathonAdifFinished(report.error.isEmpty(),report.count,report.invalidTimestamp,report.error);
+        },Qt::QueuedConnection);
+    });
+    return {};
+}
+
 int DecoLogController::vuccInitialThreshold(const QString& scope,const QString& band) const
 {
     return core::vucc::initialThreshold(scope,band);

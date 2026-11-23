@@ -41,6 +41,10 @@ DialogFrame {
     property string marathonCategory: "mixed"
     property int marathonMaxPerEntity: 1
     property var marathonPreview: ({})
+    property string marathonAdifMessage: ""
+    property int marathonAdifYear: 0
+    property double marathonAdifProfile: 0
+    property bool marathonAdifProbe: false
     property string vuccBand: "6m"
     property string vuccAccount: ""
     property string vuccSite: ""
@@ -494,6 +498,17 @@ DialogFrame {
         marathonPreview = decolog.cqMarathonPreview(marathonYear, marathonCategory,
                                                      marathonMaxPerEntity, decolog.awardProfile)
     }
+    function beginMarathonAdif(file,year,profile) {
+        marathonAdifMessage=decolog.exportCqMarathonReviewAdif(file,year,profile)
+        if (marathonAdifProbe && marathonAdifMessage.length) console.warn("PROBE marathonAdif start="+marathonAdifMessage)
+    }
+    function probeMarathonAdif(path,profile) { openAt("dxcc"); marathonAdifProbe=true; beginMarathonAdif("file://"+path,2026,Number(profile)) }
+    Connections { target:decolog
+        function onCqMarathonAdifFinished(success,count,invalidTimestamp,error) {
+            root.marathonAdifMessage=success ? qsTr("Exported %1 QSO; %2 invalid UTC timestamps skipped. Review before uploading.").arg(count).arg(invalidTimestamp) : qsTr("Export failed: %1").arg(error)
+            if (root.marathonAdifProbe) console.warn("PROBE marathonAdif success="+success+" count="+count+" invalid="+invalidTimestamp+" error="+error)
+        }
+    }
 
     function refreshVucc() {
         vuccResult = decolog.vuccPreview(vuccBand, vuccAccount, vuccSite, vuccTarget, vuccScope)
@@ -540,6 +555,10 @@ DialogFrame {
         onAccepted: decolog.saveCqMarathonExport(selectedFile, root.marathonPreview.edition,
                                                    root.marathonPreview.category, root.marathonPreview.maxPerEntity,
                                                    root.marathonPreview.stationProfileId)
+    }
+    FileDialog { id:marathonAdifDialog; title:qsTr("Export CQ DX Marathon review ADIF"); fileMode:FileDialog.SaveFile
+        defaultSuffix:"adi"; nameFilters:[qsTr("ADIF files (*.adi *.adif)")]
+        onAccepted: { if (root.marathonAdifYear!==root.marathonYear || root.marathonAdifProfile!==decolog.awardProfile) root.marathonAdifMessage=qsTr("Year or profile changed; select the file again."); else root.beginMarathonAdif(selectedFile,root.marathonAdifYear,root.marathonAdifProfile) }
     }
 
     title: qsTr("Awards")
@@ -914,6 +933,8 @@ DialogFrame {
                             text: qsTr("Export JSON")
                             onClicked: marathonFileDialog.open()
                         }
+                        GlassButton { text:qsTr("Export review ADIF"); enabled:decolog.awardProfile>0 && !decolog.exportBusy
+                            onClicked: { root.marathonAdifYear=root.marathonYear; root.marathonAdifProfile=decolog.awardProfile; marathonAdifDialog.open() } }
                     }
                     Text {
                         Layout.fillWidth: true
@@ -922,6 +943,9 @@ DialogFrame {
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
                     }
+                    Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; font.pixelSize:11
+                        text:qsTr("Review ADIF contains all QSO for the selected profile and year, including alternatives and stored fields. Inspect it and review eligibility in the official submission tool; exporting does not submit an entry.") }
+                    Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; visible:root.marathonAdifMessage.length>0; text:root.marathonAdifMessage }
                     Text {
                         Layout.fillWidth: true
                         text: root.marathonPreview.valid === undefined

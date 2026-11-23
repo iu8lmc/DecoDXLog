@@ -1311,6 +1311,7 @@ RoundedWindow {
         else if (what[0] === "vuccboundary") Qt.callLater(() => console.warn("PROBE vuccBoundary " + JSON.stringify(decolog.vuccPreview("6m", "", "", 100))))
         else if (what[0] === "vuccreviewprobe" || what[0] === "vuccsatelliteprobe") Qt.callLater(() => awardsDialog.probeVuccReview(what[0] === "vuccsatelliteprobe"))
         else if (what[0] === "vuccthresholdprobe") Qt.callLater(() => awardsDialog.probeVuccThreshold())
+        else if (what[0] === "marathonadifprobe") Qt.callLater(() => awardsDialog.probeMarathonAdif(what[1],what[2]))
         else if (what[0] === "qslocr") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1])) }
         else if (what[0] === "qslocrmatches") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true)) }
         else if (what[0] === "qslocrfiltered") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true, false, true)) }

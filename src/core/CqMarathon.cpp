@@ -10,6 +10,47 @@
 
 namespace decolog::core::cqmarathon {
 
+ReviewAdif reviewAdif(const LogDatabase& database,int year,qint64 stationProfileId,const QString& expectedIdentity)
+{
+    ReviewAdif out;
+    if (!database.isOpen() || year<1900 || year>2200 || stationProfileId<=0) { out.error=QStringLiteral("Choose a valid year and station profile"); return out; }
+    QSqlDatabase db=database.connection();
+    if (!db.transaction()) { out.error=db.lastError().text(); return out; }
+    if (!expectedIdentity.isEmpty() && database.identity()!=expectedIdentity) { db.rollback(); out.error=QStringLiteral("Log identity changed"); return out; }
+    if (!database.stationProfile(stationProfileId)) { db.rollback(); out.error=QStringLiteral("Station profile unavailable"); return out; }
+    QSqlQuery q(db); q.setForwardOnly(true);
+    q.prepare(QStringLiteral("SELECT id,qso_datetime_on,qso_datetime_off FROM qso WHERE deleted=0 AND station_profile_id=? ORDER BY id")); q.addBindValue(stationProfileId);
+    if (!q.exec()) { out.error=q.lastError().text(); db.rollback(); return out; }
+    QList<qint64> ids; QList<QDateTime> starts,ends;
+    while (q.next()) {
+        const auto timestamp=QDateTime::fromString(q.value(1).toString(),Qt::ISODateWithMs);
+        if (!timestamp.isValid() || timestamp.timeSpec()==Qt::LocalTime) { ++out.invalidTimestamp; continue; }
+        if (timestamp.toUTC().date().year()==year) {
+            const QString rawEnd=q.value(2).toString(); QDateTime end;
+            if (!rawEnd.isEmpty()) {
+                end=QDateTime::fromString(rawEnd,Qt::ISODateWithMs);
+                if (!end.isValid() || end.timeSpec()==Qt::LocalTime) { q.finish(); db.rollback(); out.error=QStringLiteral("A selected QSO has an invalid end timestamp"); return out; }
+            }
+            ids.append(q.value(0).toLongLong()); starts.append(timestamp.toUTC()); ends.append(end.isValid()?end.toUTC():QDateTime());
+        }
+    }
+    if (q.lastError().isValid()) { out.error=q.lastError().text(); q.finish(); db.rollback(); return out; }
+    q.finish();
+    if (ids.isEmpty()) { db.rollback(); out.error=QStringLiteral("No QSO found for this profile and year"); return out; }
+    const QByteArray bytes=database.exportAdif(ids);
+    auto parsed=adif::parse(bytes);
+    if (parsed.records.size()!=ids.size()) { db.rollback(); out.error=QStringLiteral("Could not export all selected QSO"); return out; }
+    for (qsizetype i=0;i<parsed.records.size();++i) {
+        auto& record=parsed.records[i];
+        record.set(QStringLiteral("QSO_DATE"),starts[i].toString(QStringLiteral("yyyyMMdd"))); record.set(QStringLiteral("TIME_ON"),starts[i].toString(QStringLiteral("HHmmss")));
+        if (ends[i].isValid()) { record.set(QStringLiteral("QSO_DATE_OFF"),ends[i].toString(QStringLiteral("yyyyMMdd"))); record.set(QStringLiteral("TIME_OFF"),ends[i].toString(QStringLiteral("HHmmss"))); }
+        for (const char* field:{"QSO_DATE","TIME_ON","CALL","BAND","MODE"})
+            if (record.value(QLatin1String(field)).trimmed().isEmpty()) { db.rollback(); out.error=QStringLiteral("A selected QSO is missing an ADIF field required by the submission tool"); return out; }
+    }
+    if (!db.rollback()) { out.error=db.lastError().text(); return out; }
+    out.bytes=adif::writeDocument(parsed); out.count=ids.size(); return out;
+}
+
 namespace {
 QString normalizedCategory(const QString& value)
 {
@@ -70,7 +111,7 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             result.exclusions << QStringLiteral("QSO %1: outside edition year").arg(entry.qsoId);
             continue;
         }
-        if (entry.qsoId <= 0 || entry.call.trimmed().isEmpty() || entry.dxcc <= 0) {
+        if (entry.qsoId <= 0 || entry.call.trimmed().isEmpty()) {
             result.exclusions << QStringLiteral("QSO %1: missing required identity").arg(entry.qsoId);
             continue;
         }
@@ -86,6 +127,10 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         if (newZone) {
             result.zoneCandidates << entry;
             zones.insert(entry.cqZone);
+        }
+        if (entry.dxcc <= 0) {
+            if (!newZone) result.exclusions << QStringLiteral("QSO %1: no recorded entity or new valid zone").arg(entry.qsoId);
+            continue;
         }
         if (entityCount.value(entry.dxcc) >= rules.maxPerEntity) {
             if (!newZone)

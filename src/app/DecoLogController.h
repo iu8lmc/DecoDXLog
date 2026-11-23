@@ -564,6 +564,7 @@ public:
                                                int maxPerEntity = 1, qint64 stationProfileId = 0) const;
     Q_INVOKABLE bool saveCqMarathonExport(const QUrl& file, int year, const QString& category,
                                           int maxPerEntity = 1, qint64 stationProfileId = 0) const;
+    Q_INVOKABLE QString exportCqMarathonReviewAdif(const QUrl& file, int year, qint64 stationProfileId);
     // VUCC resta separato dal conteggio statistico dei locatori.
     Q_INVOKABLE QVariantMap vuccPreview(const QString& band, const QString& account = {},
                                          const QString& site = {}, int target = 100, const QString& scope = QStringLiteral("terrestrial")) const;
@@ -915,6 +916,7 @@ signals:
     void statsReady(const QVariantMap& stats);
     void activityReportReady(const QVariantMap& report);
     void activityReportPdfFinished(bool success, const QString& error);
+    void cqMarathonAdifFinished(bool success, int count, int invalidTimestamp, const QString& error);
     void cloudChanged();
     void countriesChanged();
     void callbookChanged();
@@ -1260,6 +1262,7 @@ private:
     // Accepted exports must finish even when the window closes.
     QThreadPool m_exportPool;
     int m_exportsPending{0};
+    bool m_marathonAdifBusy{false};
     quint64 m_importPreviewGeneration{0};
     QString m_importPreviewLogPath;
     QUrl m_importPreviewFile;

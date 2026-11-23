@@ -68,6 +68,22 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonReviewAdifExportsYearAndAlternatives()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile a; a.name="Marathon A"; a.stationCallsign="K1ABC"; profile=db.saveStationProfile(a); QVERIFY(profile>0);
+          StationProfile b; b.name="Marathon B"; b.stationCallsign="K2ABC"; const auto other=db.saveStationProfile(b); QVERIFY(other>0);
+          auto add=[&](const char* call,const char* date,qint64 p) { return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE",date},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"},{"APP_TEST","kept"}},"fixture",{},true,p,false).id; };
+          QVERIFY(add("K1AAA","20260101",profile)>0); QVERIFY(add("K1BBB","20260102",profile)>0); QVERIFY(add("K1CCC","20250101",profile)>0); QVERIFY(add("K1DDD","20260101",other)>0); }
+        const QString outputPath=dir.filePath("marathon.adi"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("marathonadifprobe:")+outputPath+":"+QString::number(profile),output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE marathonAdif success=true count=2 invalid=0 error=") && !output.contains("TypeError"),output.constData());
+        QFile file(outputPath); QVERIFY(file.open(QIODevice::ReadOnly)); const auto doc=adif::parse(file.readAll()); QCOMPARE(doc.records.size(),2);
+        QCOMPARE(doc.records[0].value("CALL"),QString("K1AAA")); QCOMPARE(doc.records[1].value("CALL"),QString("K1BBB")); QCOMPARE(doc.records[0].value("APP_TEST"),QString("kept"));
+        QByteArray guarded; QVERIFY2(launch(dir,QStringLiteral("marathonadifprobe:")+dir.filePath("test.sqlite")+":"+QString::number(profile),guarded,4000),guarded.constData());
+        QVERIFY2(guarded.contains("PROBE marathonAdif start=Choose a file other than the log database"),guarded.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(4));
+    }
     void vuccThresholdCanBeAppliedWithoutOverwritingCustomGoal()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;

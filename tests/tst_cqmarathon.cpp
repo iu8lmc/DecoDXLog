@@ -2,6 +2,7 @@
 
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QSqlQuery>
 #include <QTest>
 
 using namespace decolog::core::cqmarathon;
@@ -9,6 +10,35 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void reviewAdifIncludesAllAlternativesAndPreservesFields()
+    {
+        using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile p; p.name="A"; p.stationCallsign="K1ABC";
+        const auto profile=db.saveStationProfile(p); QVERIFY(profile>0); StationProfile p2; p2.name="B"; p2.stationCallsign="K2ABC"; const auto other=db.saveStationProfile(p2); QVERIFY(other>0);
+        auto add=[&](const char* call,const char* date,int dxcc,int zone,qint64 station) {
+            return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE",date},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},
+                {"DXCC",QString::number(dxcc)},{"CQZ",QString::number(zone)},{"APP_TEST","kept"}},"fixture",{},true,station,false).id; };
+        QVERIFY(add("K1AAA","20260101",291,5,profile)>0); QVERIFY(add("K1BBB","20260102",291,5,profile)>0);
+        QVERIFY(add("K1CCC","20260103",0,3,profile)>0); QVERIFY(add("K1DDD","20250101",291,5,profile)>0); QVERIFY(add("K1EEE","20260101",291,5,other)>0); QVERIFY(add("K1BAD","20260101",291,5,profile)>0);
+        QSqlQuery shift(db.connection()); QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2027-01-01T00:30:00+01:00',qso_datetime_off='2027-01-01T00:35:00+01:00' WHERE call='K1AAA'"));
+        QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2026-01-01T12:00:00' WHERE call='K1BAD'"));
+        const auto report=reviewAdif(db,2026,profile); QVERIFY2(report.error.isEmpty(),qPrintable(report.error)); QCOMPARE(report.count,3); QCOMPARE(report.invalidTimestamp,1);
+        const auto parsed=adif::parse(report.bytes); QCOMPARE(parsed.records.size(),3);
+        QSet<QString> calls; for (const auto &r:parsed.records) { calls.insert(r.value("CALL")); QCOMPARE(r.value("APP_TEST"),QString("kept")); }
+        QCOMPARE(parsed.records[0].value("QSO_DATE"),QString("20261231")); QCOMPARE(parsed.records[0].value("TIME_ON"),QString("233000")); QCOMPARE(parsed.records[0].value("TIME_OFF"),QString("233500"));
+        QVERIFY(calls.contains("K1AAA") && calls.contains("K1BBB") && calls.contains("K1CCC")); QCOMPARE(db.qsoCount(),qint64(6));
+        QVERIFY(!reviewAdif(db,2026,0).error.isEmpty());
+        QVERIFY(!reviewAdif(db,2026,profile,"wrong-identity").error.isEmpty()); QVERIFY(reviewAdif(db,2026,profile,db.identity()).error.isEmpty());
+        QVERIFY(shift.exec("UPDATE qso SET mode='' WHERE call='K1BBB'")); QVERIFY(!reviewAdif(db,2026,profile).error.isEmpty());
+    }
+    void zoneDoesNotRequireRecordedDxcc()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",0,5,"20m","CW",when}, {2,"K2BBB",291,5,"20m","CW",when},
+            {3,"K3CCC",0,0,"20m","CW",when}};
+        const auto result=select(entries,{2026,"mixed",1}); QCOMPARE(result.zoneCandidates.size(),1); QCOMPARE(result.zoneCandidates.first().qsoId,qint64(1));
+        QCOMPARE(result.selected.size(),1); QCOMPARE(result.selected.first().qsoId,qint64(2));
+        QVERIFY(result.exclusions.join('\n').contains("no recorded entity or new valid zone"));
+    }
     void modeCategoriesDistinguishPhoneCwAndDigital()
     {
         const QDateTime when(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::UTC);

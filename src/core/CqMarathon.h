@@ -34,6 +34,10 @@ struct Result {
     bool isValid(QString* error = nullptr) const;
     QJsonDocument toJson() const;
 };
+struct ReviewAdif { QByteArray bytes; int count{0}; int invalidTimestamp{0}; QString error; };
+// Exports all recorded alternatives for one explicit station profile and UTC
+// year from a consistent read transaction; this is not an official submission.
+ReviewAdif reviewAdif(const LogDatabase& db, int year, qint64 stationProfileId, const QString& expectedIdentity = {});
 
 Result select(const QList<Entry>& entries, const Rules& rules);
 QList<Entry> loadEntries(const LogDatabase& db, QString* error = nullptr);
