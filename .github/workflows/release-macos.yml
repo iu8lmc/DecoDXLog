@@ -125,19 +125,32 @@ jobs:
           # shipped in the final app, so use the native platform for the
           # mounted-bundle smoke test.
           QT_QPA_PLATFORM: cocoa
+          DECODXLOG_GRAB_MS: "12000"
         run: |
           version="${{ inputs.tag }}"
           version="${version#v}"
           dmg="release-assets/DecoDXLog-$version-macos-${{ matrix.arch }}.dmg"
           mount_point="$RUNNER_TEMP/decodxlog-dmg"
           probe="$RUNNER_TEMP/decodxlog-dmg.png"
-          mkdir -p "$mount_point"
-          trap 'hdiutil detach "$mount_point" >/dev/null 2>&1 || true; rm -f "$probe"' EXIT
+          smoke_dir="$RUNNER_TEMP/decodxlog-dmg-smoke"
+          mkdir -p "$mount_point" "$smoke_dir"
+          trap 'hdiutil detach "$mount_point" >/dev/null 2>&1 || true' EXIT
           hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mount_point"
           app="$mount_point/DecoDXLog.app/Contents/MacOS/DecoDXLog"
           test -x "$app"
-          "$app" --show badge --grab "$probe"
+          export DECODXLOG_DATA_ROOT="$smoke_dir/data"
+          "$app" --software-renderer --settings "$smoke_dir/settings" --db "$smoke_dir/log.sqlite" \
+            --port 0 --show typedfieldsprobe --grab "$probe" > "$smoke_dir/output.log" 2>&1 || { cat "$smoke_dir/output.log"; exit 1; }
+          cat "$smoke_dir/output.log"
           test -s "$probe"
+          grep -F 'PROBE typed editor number W' "$smoke_dir/output.log"
+          grep -F '"valid":""' "$smoke_dir/output.log"
+          python3 - "$smoke_dir/log.sqlite" <<'PYCODE'
+          import sqlite3, sys
+          with sqlite3.connect(sys.argv[1]) as db:
+              rows = db.execute("SELECT call, band, mode FROM qso WHERE deleted=0").fetchall()
+          assert rows == [("K1TYP", "20m", "CW")], rows
+          PYCODE
           hdiutil detach "$mount_point"
           trap - EXIT
 
