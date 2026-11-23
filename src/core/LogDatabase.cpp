@@ -2,6 +2,7 @@
 #include "../StartupTrace.h"
 
 #include "core/Modes.h"
+#include "core/FileIdentity.h"
 
 #include "core/Bands.h"
 #include "core/LogMigration.h"
@@ -248,6 +249,7 @@ bool LogDatabase::open(const QString& path)
         return false;
     }
     m_path = path;
+    m_openFileIdentity=(path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileidentity::read(path);
 
     {
         QSqlQuery q(db);
@@ -282,6 +284,7 @@ bool LogDatabase::openReadOnly(const QString& path)
     db.setDatabaseName(path);
     if (!db.open()) { m_lastError = db.lastError().text(); return false; }
     m_path = path;
+    m_openFileIdentity=(path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileidentity::read(path);
     return true;
 }
 
@@ -296,6 +299,7 @@ bool LogDatabase::openExistingReadWrite(const QString& path)
     db.setDatabaseName(uri.toString(QUrl::FullyEncoded));
     if (!db.open()) { m_lastError=db.lastError().text(); return false; }
     m_path=path;
+    m_openFileIdentity=(path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileidentity::read(path);
     QSqlQuery pragma(db);
     if (!pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"))) { m_lastError=pragma.lastError().text(); close(); return false; }
     return true;
@@ -306,6 +310,13 @@ QString LogDatabase::identity() const
     QSqlQuery q(connection());
     if (q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && q.next()) return q.value(0).toString();
     return {};
+}
+
+bool LogDatabase::fileIdentityMatchesOpen() const
+{
+    if (!isOpen()) return false;
+    if (m_path.isEmpty() || m_path==QLatin1String(":memory:")) return true;
+    return !m_openFileIdentity.isEmpty() && fileidentity::read(m_path)==m_openFileIdentity;
 }
 
 qint64 LogDatabase::dataVersion() const
@@ -319,6 +330,7 @@ qint64 LogDatabase::dataVersion() const
 
 void LogDatabase::close()
 {
+    m_openFileIdentity.clear();
     if (!QSqlDatabase::contains(m_connectionName))
         return;
     {

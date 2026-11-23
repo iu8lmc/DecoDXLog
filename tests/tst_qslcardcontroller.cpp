@@ -189,6 +189,19 @@ private slots:
         core::LogDatabase replacement; QVERIFY(replacement.open(path)); const auto status=replacement.qslStatus(b.id);
         QVERIFY(status.isEmpty() || status.first().sent!=QString("Q")); QVERIFY(cards.status().contains("file",Qt::CaseInsensitive));
     }
+    void plannerQueueRejectsCloneReplacedBeforeAcceptance()
+    {
+        core::LogDatabase db; const QString path=m_dir.filePath("paper-before-origin.sqlite"), clone=m_dir.filePath("paper-before-clone.sqlite");
+        QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+        const auto a=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        const auto meta=db.meta(a.id); QVERIFY(meta.has_value()); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY(q.exec());
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path)); QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx);
+        const bool accepted=cards.enqueueIfUnsent(a.id,meta->uuid,meta->revision,"B",path);
+        if (accepted) QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),10000);
+        core::LogDatabase replacement; QVERIFY(replacement.open(path)); const auto status=replacement.qslStatus(a.id);
+        QVERIFY(status.isEmpty() || status.first().sent!=QString("Q"));
+    }
     void initTestCase()
     {
         // Le impostazioni vanno in un temporaneo: una prova non tocca quelle di
@@ -724,6 +737,20 @@ private slots:
         QVERIFY(QFile::rename(clone,path));
         callback(QStringLiteral("test@example.invalid"),{}); QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),5000);
         QVERIFY(cloud.request.isEmpty()); QVERIFY(cards.mailStatus().contains("log changed",Qt::CaseInsensitive));
+    }
+    void emailRefusesCloneReplacedBeforeAcceptance()
+    {
+        core::LogDatabase db; const QString path=m_dir.filePath("mail-before-origin.sqlite"),clone=m_dir.filePath("mail-before-clone.sqlite");
+        QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+        const auto a=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        core::QslState state; state.service="card"; state.sent="Q"; state.via="E"; QVERIFY(db.setCardState(a.id,state));
+        q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY(q.exec());
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path)); FakeCloud cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        QslCardController::Context ctx; ctx.db=&db; ctx.cloudAccess=[&] { return QPair<QString,QString>{cloud.url(),"fake"}; };
+        ctx.emailFor=[](const QString&,auto done) { done(QStringLiteral("test@example.invalid"),{}); };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.sendCardsByEmail({QVariant(a.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),10000); QVERIFY(cloud.request.isEmpty());
     }
 
     void confirmedEmailIsRecordedOnlyInOriginalLog()

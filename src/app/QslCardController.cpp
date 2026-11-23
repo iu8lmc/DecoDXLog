@@ -3,6 +3,7 @@
 
 #include "core/CredentialStore.h"
 #include "core/LogDatabase.h"
+#include "core/FileIdentity.h"
 #include "core/QslCards.h"
 
 #include <QDateTime>
@@ -29,15 +30,6 @@
 #include <QSettings>
 #include <QSet>
 #include <QUrl>
-#ifdef Q_OS_UNIX
-#include <sys/stat.h>
-#endif
-#ifdef Q_OS_WIN
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
 
 namespace decolog::app {
 
@@ -47,20 +39,7 @@ namespace {
 
 QByteArray fileIdentity(const QString& path)
 {
-#ifdef Q_OS_UNIX
-    struct stat info {};
-    if (::stat(QFile::encodeName(path).constData(),&info)!=0 || !S_ISREG(info.st_mode)) return {};
-    return QByteArray::number(qulonglong(info.st_dev))+':'+QByteArray::number(qulonglong(info.st_ino));
-#elif defined(Q_OS_WIN)
-    const HANDLE handle=CreateFileW(reinterpret_cast<LPCWSTR>(QDir::toNativeSeparators(path).utf16()),FILE_READ_ATTRIBUTES,
-        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
-    if (handle==INVALID_HANDLE_VALUE) return {};
-    BY_HANDLE_FILE_INFORMATION info {}; const bool ok=GetFileInformationByHandle(handle,&info); CloseHandle(handle);
-    if (!ok || (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) return {};
-    return QByteArray::number(qulonglong(info.dwVolumeSerialNumber))+':'+QByteArray::number(qulonglong(info.nFileIndexHigh))+':'+QByteArray::number(qulonglong(info.nFileIndexLow));
-#else
-    Q_UNUSED(path); return {};
-#endif
+    return fileidentity::read(path);
 }
 
 QString today()
@@ -427,8 +406,8 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
     }
     const QString path = m_ctx.db->path();
     const QString identity = (path.isEmpty() || path==QLatin1String(":memory:")) ? QString() : m_ctx.db->identity();
-    const QByteArray fileToken=(path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileIdentity(path);
-    if (!path.isEmpty() && path!=QLatin1String(":memory:") && (identity.isEmpty() || fileToken.isEmpty())) {
+    const QByteArray fileToken=m_ctx.db->openFileIdentity();
+    if (!path.isEmpty() && path!=QLatin1String(":memory:") && (identity.isEmpty() || !m_ctx.db->fileIdentityMatchesOpen())) {
         m_status=tr("Cannot verify log or file identity"); note(m_status,QStringLiteral("warning")); emit changed(); return 0;
     }
     auto done = [this, sent, unanswered, received](const CardBatchResult& result) {
@@ -1262,8 +1241,8 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
     m_mailOriginPath = path;
     m_mailOriginIdentity = m_ctx.db->identity();
     m_mailOriginOpenGeneration = m_ctx.db->openGeneration();
-    m_mailOriginFileToken = (path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileIdentity(path);
-    if (m_mailOriginIdentity.isEmpty() || (!path.isEmpty() && path!=QLatin1String(":memory:") && m_mailOriginFileToken.isEmpty())) {
+    m_mailOriginFileToken = m_ctx.db->openFileIdentity();
+    if (m_mailOriginIdentity.isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) {
         m_mailStatus=tr("Cannot verify log identity"); note(m_mailStatus,QStringLiteral("warning")); emit mailChanged(); return;
     }
     if (path.isEmpty() || path == QLatin1String(":memory:")) {

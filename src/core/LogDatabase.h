@@ -271,6 +271,8 @@ public:
     void close();
     bool isOpen() const;
     QString path() const { return m_path; }
+    QByteArray openFileIdentity() const { return m_openFileIdentity; }
+    bool fileIdentityMatchesOpen() const;
     quint64 openGeneration() const { return m_openGeneration; }
     QString lastError() const { return m_lastError; }
     int schemaVersion() const;
@@ -625,6 +627,7 @@ private:
 
     QString m_connectionName;
     QString m_path;
+    QByteArray m_openFileIdentity;
     quint64 m_openGeneration{0};
     int m_dedupDigital{120};
     int m_dedupManual{600};

@@ -62,6 +62,17 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void openFileIdentityTracksReplacementAndReopen()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"), clone=dir.filePath("clone.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.fileIdentityMatchesOpen()); const auto original=db.openFileIdentity(); QVERIFY(!original.isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish(); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY(q.exec());
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path)); QVERIFY(!db.fileIdentityMatchesOpen());
+        db.close(); QVERIFY(!db.fileIdentityMatchesOpen()); QVERIFY(db.open(path)); QVERIFY(db.fileIdentityMatchesOpen()); QVERIFY(db.openFileIdentity()!=original);
+        db.close(); QVERIFY(db.openReadOnly(path)); QVERIFY(db.fileIdentityMatchesOpen()); db.close(); QVERIFY(db.openExistingReadWrite(path)); QVERIFY(db.fileIdentityMatchesOpen());
+        db.close(); QVERIFY(db.open(":memory:")); QVERIFY(db.fileIdentityMatchesOpen());
+    }
     void dataVersionDetectsOtherConnectionCommits()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase one,two; QVERIFY(one.open(dir.filePath("log.sqlite"))); QVERIFY(two.open(dir.filePath("log.sqlite")));
