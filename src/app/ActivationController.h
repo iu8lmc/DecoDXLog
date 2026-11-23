@@ -61,6 +61,7 @@ public:
         // Il progressivo da mandare quando e' condiviso sulla rete.
         std::function<int(int localNext)> takeSerial;
         std::function<void(bool on)> shareSerials;
+        QString sotaCataloguePath; // Optional override, e.g. for isolated logs/tests.
     };
 
     explicit ActivationController(Context context, QObject* parent = nullptr);

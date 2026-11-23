@@ -152,6 +152,13 @@ QString build(const QString& inputPath, const QString& outputPath, const std::sh
     if (!target.commit()) return tr("Cannot commit the catalogue file.");
     return {};
 }
+bool validMetadata(const QVariantMap& data)
+{
+    return QDate::fromString(data.value(QStringLiteral("version")).toString(), Qt::ISODate).isValid() &&
+        data.value(QStringLiteral("count")).toInt() > 0 &&
+        QRegularExpression(QStringLiteral("^[0-9a-f]{64}$")).match(data.value(QStringLiteral("sha256")).toString()).hasMatch() &&
+        data.value(QStringLiteral("source")).toString() == QLatin1String("local-file-unverified");
+}
 QVariantMap read(const QString& path, const QString& reference, const QDate& date, bool onlyInfo)
 {
     QVariantMap out;
@@ -166,11 +173,7 @@ QVariantMap read(const QString& path, const QString& reference, const QDate& dat
             if (!meta.exec(QStringLiteral("SELECT key,value FROM metadata"))) out[QStringLiteral("status")] = QStringLiteral("unavailable");
             else {
                 while (meta.next()) out[meta.value(0).toString()] = meta.value(1);
-                const bool metadataValid = !meta.lastError().isValid() &&
-                    QDate::fromString(out.value(QStringLiteral("version")).toString(), Qt::ISODate).isValid() &&
-                    out.value(QStringLiteral("count")).toInt() > 0 &&
-                    QRegularExpression(QStringLiteral("^[0-9a-f]{64}$")).match(out.value(QStringLiteral("sha256")).toString()).hasMatch() &&
-                    out.value(QStringLiteral("source")).toString() == QLatin1String("local-file-unverified");
+                const bool metadataValid = !meta.lastError().isValid() && validMetadata(out);
                 if (!metadataValid) { out.clear(); out[QStringLiteral("status")] = QStringLiteral("unavailable"); }
                 else if (onlyInfo) out[QStringLiteral("status")] = QStringLiteral("available");
                 else if (!date.isValid()) out[QStringLiteral("status")] = QStringLiteral("invalidDate");
@@ -193,6 +196,48 @@ QVariantMap read(const QString& path, const QString& reference, const QDate& dat
     QSqlDatabase::removeDatabase(connection); return out;
 }
 } // namespace
+QVariantMap SotaCatalogue::lookupBatch(const QString& path, const QVariantList& requests, const std::shared_ptr<std::atomic_bool>& cancelled)
+{
+    QVariantMap result{{QStringLiteral("status"), QStringLiteral("unavailable")}};
+    if (!QFileInfo::exists(path)) return result;
+    const QString connection = uniqueName();
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+        db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100")); db.setDatabaseName(path);
+        if (db.open() && db.transaction()) {
+            QSqlQuery app(db), meta(db);
+            const bool owned = app.exec(QStringLiteral("PRAGMA application_id")) && app.next() && app.value(0).toInt() == 1397707841;
+            QVariantMap metadata;
+            bool ok = owned && meta.exec(QStringLiteral("SELECT key,value FROM metadata"));
+            if (ok) { while (meta.next()) metadata[meta.value(0).toString()] = meta.value(1); ok = !meta.lastError().isValid() && validMetadata(metadata); }
+            QVariantList rows; QSqlQuery q(db);
+            if (ok) ok = q.prepare(QStringLiteral("SELECT name,valid_from,valid_to FROM summit WHERE reference=?"));
+            for (const auto& request : requests) {
+                if (!ok || (cancelled && cancelled->load())) { ok = false; break; }
+                const QVariantMap wanted = request.toMap();
+                const QDate date = QDate::fromString(wanted.value(QStringLiteral("day")).toString(), Qt::ISODate);
+                q.bindValue(0, wanted.value(QStringLiteral("reference")).toString().trimmed().toUpper());
+                if (!q.exec()) { ok = false; break; }
+                QVariantMap row;
+                if (!date.isValid()) row[QStringLiteral("status")] = QStringLiteral("invalidDate");
+                else if (!q.next()) { if (q.lastError().isValid()) { ok = false; break; } row[QStringLiteral("status")] = QStringLiteral("notFound"); }
+                else {
+                    const QDate from = QDate::fromString(q.value(1).toString(), Qt::ISODate), to = QDate::fromString(q.value(2).toString(), Qt::ISODate);
+                    if (!from.isValid() || !to.isValid() || from > to) { ok = false; break; }
+                    row[QStringLiteral("name")] = q.value(0); row[QStringLiteral("validFrom")] = q.value(1); row[QStringLiteral("validTo")] = q.value(2);
+                    row[QStringLiteral("status")] = date >= from && date <= to ? QStringLiteral("active") : QStringLiteral("outsideValidity");
+                }
+                rows << row;
+            }
+            if (ok && db.commit()) { result = metadata; result[QStringLiteral("status")] = QStringLiteral("available"); result[QStringLiteral("rows")] = rows; }
+            else { db.rollback(); if (cancelled && cancelled->load()) result[QStringLiteral("status")] = QStringLiteral("cancelled"); }
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connection);
+    return result;
+}
+
 SotaCatalogue::SotaCatalogue(const QString& path, QObject* parent) : QObject(parent), m_path(path) { m_pool.setMaxThreadCount(1); }
 SotaCatalogue::~SotaCatalogue() { if (m_cancel) m_cancel->store(true); m_pool.waitForDone(); }
 QVariantMap SotaCatalogue::info() const { return read(m_path, {}, {}, true); }

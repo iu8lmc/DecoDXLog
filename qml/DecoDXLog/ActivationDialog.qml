@@ -30,6 +30,7 @@ DialogFrame {
     property string sotaMessage: ""
     property var sotaLookup: ({})
     property bool probeSotaMode: false
+    property bool probeSotaGroup: false
 
     // `kind` apre gia' sul tipo giusto: "contest" quando si arriva dal contest.
     function openDialog(kind) {
@@ -128,6 +129,14 @@ DialogFrame {
             }
         }
         function onPreviewFinished(success) {
+            if (root.probeSotaGroup) {
+                root.probeSotaGroup = false
+                Qt.callLater(() => {
+                    const group = groupRepeater.itemAt(0)
+                    if (group) console.warn("PROBE sotaGroup status=" + group.modelData.catalogueStatus + " text=" + group.probeText() + " version=" + root.partitionPreview.sotaCatalogue.version)
+                })
+                return
+            }
             if (root.probeExclusionMode) {
                 root.probeExclusionMode = false
                 Qt.callLater(() => {
@@ -241,6 +250,8 @@ DialogFrame {
                 sotaSearchRef.text = "I/LM-001"; sotaSearchDate.text = "2026-11-23"
                 sotaCheckButton.clicked()
                 console.warn("PROBE sotaImport success=" + success + " status=" + root.sotaLookup.status + " name=" + root.sotaLookup.name + " version=" + root.sotaLookup.version + " error=" + message)
+                root.probeSotaGroup = true
+                Qt.callLater(() => { const row = historyRepeater.itemAt(0); if (row) row.probeClick() })
             }
         }
     }
@@ -663,6 +674,14 @@ DialogFrame {
             GlassButton { id: exclusionNext; text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < (root.partitionPreview.excluded || []).length; onClicked: root.excludedPage++ }
         }
         Note {
+            visible: root.previewShown && !!root.partitionPreview.sotaCatalogue
+            color: Theme.warningColor
+            text: root.partitionPreview.sotaCatalogue && root.partitionPreview.sotaCatalogue.status === "available"
+                ? qsTr("SOTA group checks use imported list %1 (SHA-256 %2); file origin is unverified. A listed date is not activation eligibility.")
+                    .arg(root.partitionPreview.sotaCatalogue.version).arg(root.partitionPreview.sotaCatalogue.sha256)
+                : qsTr("SOTA catalogue unavailable; references could not be checked against a list.")
+        }
+        Note {
             visible: root.previewShown && !root.partitionPreview.error
             text: qsTr("Review missing station and operator calls. POTA requires at least one; WWFF identifies the station and the individual operator separately. Counts do not validate callsigns or eligibility.")
             color: Theme.warningColor
@@ -682,6 +701,9 @@ DialogFrame {
                         + qsTr(" · missing station call: %1; missing operator: %2; missing both: %3")
                             .arg(modelData.missingStationCall || 0).arg(modelData.missingOperator || 0).arg(modelData.missingCallIdentity || 0)
                         + (modelData.referenceSyntaxWarning ? qsTr(" · reference does not match local syntax; verify it") : "")
+                        + (modelData.program === "SOTA" ? qsTr(" · SOTA list: %1%2")
+                            .arg(({active: qsTr("listed for this day"), outsideValidity: qsTr("outside listed dates"), notFound: qsTr("not in imported list"), unavailable: qsTr("unavailable")})[modelData.catalogueStatus] || qsTr("unavailable"))
+                            .arg(modelData.catalogueName ? " · " + modelData.catalogueName : "") : "")
                     color: modelData.referenceSyntaxWarning ? Theme.warningColor : Theme.textSecondary
                 }
                 GlassButton {

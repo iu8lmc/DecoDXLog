@@ -3,6 +3,7 @@
 #include "app/ActivationController.h"
 #include "core/Activation.h"
 #include "core/LogDatabase.h"
+#include "core/SotaCatalogue.h"
 
 #include <QSqlQuery>
 #include <QSignalSpy>
@@ -106,6 +107,41 @@ private slots:
         QVERIFY(db.connection().transaction());
         QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
         QVERIFY(db.connection().rollback());
+    }
+    void previewChecksSotaCatalogueForEachUtcDay()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString source = dir.filePath("summits.csv"); QFile file(source);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("SOTA Summits List (Date=22/11/2026)\nSummitCode,AssociationName,RegionName,SummitName,AltM,AltFt,GridRef1,GridRef2,Longitude,Latitude,Points,BonusPoints,ValidFrom,ValidTo,ActivationCount,ActivationDate,ActivationCall\nI/LM-001,Italy,Lombardy,Monte Test,100,328,0,0,9,45,2,0,01/01/2020,31/12/2026,0,,\n"); file.close();
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); ActivationController::Context ctx;
+        ctx.db = &db; ctx.sotaCataloguePath = dir.filePath("sota.sqlite"); ActivationController act(std::move(ctx));
+        auto* catalogue = qobject_cast<SotaCatalogue*>(act.sotaCatalogue()); QVERIFY(catalogue);
+        QSignalSpy imported(catalogue, &SotaCatalogue::finished); QVERIFY(catalogue->importFile(QUrl::fromLocalFile(source)));
+        QTRY_COMPARE_WITH_TIMEOUT(imported.size(), 1, 10000); QVERIFY(imported.at(0).at(0).toBool());
+        QVERIFY(act.start({{"kind", "sota"}, {"reference", "I/LM-001"}}).isEmpty());
+        for (const auto& day : {QString("20261231"), QString("20270101")}) {
+            AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", day}, {"TIME_ON", "235900"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            act.session().applyTo(record, 0); QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
+        AdifRecord unknown{{"CALL", "K1ZZZ"}, {"QSO_DATE", "20261231"}, {"TIME_ON", "235900"}, {"BAND", "20m"}, {"MODE", "CW"}, {"MY_SOTA_REF", "I/LM-999"}};
+        act.session().applyTo(unknown, 0); QCOMPARE(db.insertQso(unknown, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        const auto preview = act.partitionPreview(); const auto groups = preview.value("groups").toList(); QCOMPARE(groups.size(), 3);
+        QCOMPARE(preview.value("sotaCatalogue").toMap().value("version").toString(), QString("2026-11-22"));
+        QMap<QString, QString> status;
+        for (const auto& item : groups) { const auto g = item.toMap(); status[g.value("reference").toString()+"/"+g.value("day").toString()] = g.value("catalogueStatus").toString(); }
+        QCOMPARE(status.value("I/LM-001/2026-12-31"), QString("active"));
+        QCOMPARE(status.value("I/LM-001/2027-01-01"), QString("outsideValidity"));
+        QCOMPARE(status.value("I/LM-999/2026-12-31"), QString("notFound"));
+        QSignalSpy previewed(&act, &ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
+        QTRY_COMPARE_WITH_TIMEOUT(previewed.size(), 1, 5000); QVERIFY(previewed.at(0).at(0).toBool());
+        QCOMPARE(act.previewResult().value("sotaCatalogue").toMap().value("version").toString(), QString("2026-11-22"));
+        imported.clear(); QVERIFY(catalogue->importFile(QUrl::fromLocalFile(source)));
+        QVERIFY(act.previewResult().isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(imported.size(), 1, 10000); QVERIFY(imported.at(0).at(0).toBool());
+        QVERIFY(QFile::remove(dir.filePath("sota.sqlite")));
+        const auto missing = act.partitionPreview();
+        QCOMPARE(missing.value("sotaCatalogue").toMap().value("status").toString(), QString("unavailable"));
+        for (const auto& item : missing.value("groups").toList()) QCOMPARE(item.toMap().value("catalogueStatus").toString(), QString("unavailable"));
     }
     void previewWarnsAboutLocallyUnrecognizedOperatorReference()
     {

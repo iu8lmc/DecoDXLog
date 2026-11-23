@@ -17,6 +17,8 @@ public:
     explicit SotaCatalogue(const QString& path, QObject* parent = nullptr);
     ~SotaCatalogue() override;
     bool busy() const { return m_busy; }
+    QString path() const { return m_path; }
+    static QVariantMap lookupBatch(const QString& path, const QVariantList& requests, const std::shared_ptr<std::atomic_bool>& cancelled = {});
     QVariantMap info() const;
     Q_INVOKABLE bool importFile(const QUrl& source);
     Q_INVOKABLE void cancel();

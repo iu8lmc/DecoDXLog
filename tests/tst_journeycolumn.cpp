@@ -60,8 +60,20 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); QFile fixture(dir.filePath("test.sqlite.sota.csv"));
         QVERIFY(fixture.open(QIODevice::WriteOnly));
         fixture.write("SOTA Summits List (Date=22/11/2026)\nSummitCode,AssociationName,RegionName,SummitName,AltM,AltFt,GridRef1,GridRef2,Longitude,Latitude,Points,BonusPoints,ValidFrom,ValidTo,ActivationCount,ActivationDate,ActivationCall\nI/LM-001,Italy,Lombardy,Monte Test,100,328,0,0,9,45,2,0,01/01/2020,31/12/2030,0,,\n"); fixture.close();
+        {
+            using namespace decolog::core;
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('catalogue-fixture','2026-11-23T00:00:00Z','2026-11-23T23:59:00Z','{}','{\"title\":\"SOTA fixture\"}')"));
+            AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20261123"}, {"TIME_ON", "120000"}, {"BAND", "20m"}, {"MODE", "CW"},
+                              {"MY_SOTA_REF", "I/LM-001"}, {"APP_DECOLOG_ACTIVATION_UUID", "catalogue-fixture"}};
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
         QByteArray output; QVERIFY2(launch(dir, QStringLiteral("sotacatalogueprobe"), output), output.constData());
         QVERIFY2(output.contains("PROBE sotaImport success=true status=active name=Monte Test version=2026-11-22 error="), output.constData());
+        QVERIFY2(output.contains("PROBE sotaGroup status=active"), output.constData());
+        QVERIFY2(output.contains("SOTA list: listed for this day"), output.constData());
+        QVERIFY2(output.contains("version=2026-11-22"), output.constData());
         QVERIFY(QFileInfo::exists(dir.filePath("data/sota-catalogue.sqlite")));
     }
     void activationExclusionsAreShownAndPaged()

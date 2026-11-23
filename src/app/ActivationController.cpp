@@ -87,7 +87,9 @@ ActivationController::ActivationController(Context context, QObject* parent)
     connect(this, &ActivationController::changed, this, &ActivationController::invalidatePreview);
     const QString testRoot = qEnvironmentVariable("DECODXLOG_DATA_ROOT");
     const QString base = testRoot.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) : testRoot;
-    m_sotaCatalogue = new core::SotaCatalogue(QDir(base).filePath(QStringLiteral("sota-catalogue.sqlite")), this);
+    const QString cataloguePath = m_ctx.sotaCataloguePath.isEmpty() ? QDir(base).filePath(QStringLiteral("sota-catalogue.sqlite")) : m_ctx.sotaCataloguePath;
+    m_sotaCatalogue = new core::SotaCatalogue(cataloguePath, this);
+    connect(m_sotaCatalogue, &core::SotaCatalogue::changed, this, &ActivationController::invalidatePreview);
 }
 
 QObject* ActivationController::sotaCatalogue() const { return m_sotaCatalogue; }
@@ -670,7 +672,8 @@ QVariantList ActivationController::qsoIds() const
 
 namespace {
 QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled,
-                                 bool ownsTransaction = true, const QString& selectedKey = {}, QList<qint64>* selectedIds = nullptr)
+                                 bool ownsTransaction = true, const QString& selectedKey = {}, QList<qint64>* selectedIds = nullptr,
+                                 const QString& cataloguePath = {})
 {
     QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
     const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
@@ -736,6 +739,29 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     }
     if (q.lastError().isValid()) return fail(tr("Cannot read the session QSO."));
     if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
+    if (!cataloguePath.isEmpty() && !selectedIds) {
+        QVariantList requests; QStringList keys;
+        for (auto it = groups.cbegin(); it != groups.cend(); ++it) {
+            if (it.value().value(QStringLiteral("program")) == QLatin1String("SOTA")) {
+                requests << QVariantMap{{QStringLiteral("reference"), it.value().value(QStringLiteral("reference"))},
+                                        {QStringLiteral("day"), it.value().value(QStringLiteral("day"))}};
+                keys << it.key();
+            }
+        }
+        if (!requests.isEmpty()) {
+            QVariantMap catalogue = SotaCatalogue::lookupBatch(cataloguePath, requests, cancelled);
+            if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
+            const auto matches = catalogue.take(QStringLiteral("rows")).toList();
+            result[QStringLiteral("sotaCatalogue")] = catalogue;
+            for (qsizetype i = 0; i < keys.size(); ++i) {
+                const QVariantMap match = i < matches.size() ? matches.at(i).toMap() : QVariantMap{};
+                groups[keys.at(i)][QStringLiteral("catalogueStatus")] = match.value(QStringLiteral("status"), QStringLiteral("unavailable"));
+                groups[keys.at(i)][QStringLiteral("catalogueName")] = match.value(QStringLiteral("name"));
+                groups[keys.at(i)][QStringLiteral("catalogueValidFrom")] = match.value(QStringLiteral("validFrom"));
+                groups[keys.at(i)][QStringLiteral("catalogueValidTo")] = match.value(QStringLiteral("validTo"));
+            }
+        }
+    }
     QVariantList rows;
     for (auto it = groups.begin(); it != groups.end(); ++it) {
         it.value()[QStringLiteral("fingerprint")] = QString::fromLatin1(hashes.value(it.key()).toHex());
@@ -755,7 +781,7 @@ QVariantMap ActivationController::partitionPreview() const
     if (!m_session.active || m_session.sessionUuid.isEmpty())
         return {{QStringLiteral("error"), tr("This session has no tracked identity; its QSO cannot be attributed automatically.")}};
     if (!m_ctx.db || !m_ctx.db->isOpen()) return {{QStringLiteral("error"), tr("The log is not open.")}};
-    return scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {});
+    return scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {}, true, {}, nullptr, m_sotaCatalogue->path());
 }
 
 QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
@@ -794,13 +820,14 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
     const QString path = m_ctx.db->path();
     const QString connectionName = m_ctx.db->connection().connectionName();
     const QString uuid = requestedUuid;
+    const QString cataloguePath = m_sotaCatalogue->path();
     m_previewSessionUuid = uuid;
     const quint64 generation = m_previewGeneration;
     m_previewCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_previewCancel;
     m_previewBusy = true; emit previewChanged();
     QPointer<ActivationController> self(this);
-    m_previewPool.start([self, path, connectionName, uuid, generation, cancelled] {
+    m_previewPool.start([self, path, connectionName, uuid, cataloguePath, generation, cancelled] {
         QVariantMap result;
         const QString connection = QStringLiteral("activation-preview-") + QUuid::createUuid().toString();
         {
@@ -808,7 +835,7 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
             db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100"));
             db.setDatabaseName(path);
             if (!db.open()) result[QStringLiteral("error")] = tr("Cannot open the log for preview.");
-            else result = scanPartitionPreview(db, uuid, cancelled);
+            else result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath);
             db.close();
         }
         QSqlDatabase::removeDatabase(connection);
