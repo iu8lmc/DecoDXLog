@@ -139,6 +139,26 @@ class TestTesseractOcr : public QObject {
         QCOMPARE(search.matches().size(), 1);
         QCOMPARE(db.qsoCount(), 105);
     }
+    void searchesDateAndTimeBeforeApplyingResultLimit()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("dated.sqlite")));
+        for (int i=0;i<110;++i) {
+            const auto day= i==0 ? "20260304" : "20260403";
+            const auto time= i==0 ? "1430" : "1200";
+            QCOMPARE(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE",day},{"TIME_ON",time},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).status,InsertResult::Status::Inserted);
+        }
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(!search.startFiltered("K1ABC","2026-02-30",""));
+        QVERIFY(!search.startFiltered("K1ABC","","24:00"));
+        QVERIFY(search.startFiltered("k1abc","2026-03-04","14:30"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(done.at(0).first().toBool());
+        QCOMPARE(search.matches().size(),1); QVERIFY(!search.truncated());
+        QCOMPARE(search.matches().first().toMap().value("at").toString().left(16),QString("2026-03-04T14:30"));
+        QVERIFY(search.startFiltered("K1ABC","2026-04-03","12:00"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QCOMPARE(search.matches().size(),100); QVERIFY(search.truncated());
+        QVERIFY(search.startFiltered("K1ABC","2026-03-04","12:00"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),3,5000); QVERIFY(search.matches().isEmpty()); QCOMPARE(db.qsoCount(),qint64(110));
+    }
     void acquisitionIsAtomicAndKeepsExistingLinks()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

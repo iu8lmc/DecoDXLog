@@ -550,6 +550,20 @@ private slots:
         QVERIFY2(launch(dir, QStringLiteral("qslocrmatches:") + path, output), output.constData());
         QVERIFY2(output.contains("PROBE qslMatches success=true count=0 first= noMatchNotice=true"), output.constData());
     }
+    void qslOcrDialogFiltersBySelectedUtcDateAndTime()
+    {
+        decolog::core::TesseractOcr engine; if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("card.png");
+        QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"),path));
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString& date : {QString("20260923"),QString("20260924")})
+              QCOMPARE(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE",date},{"TIME_ON","143000"},{"BAND","20m"},{"MODE","SSB"}},"manual",{},true,0,false).status,decolog::core::InsertResult::Status::Inserted); }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("qslocrfiltered:")+path,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE qslFilters 2026-09-23 14:30") && output.contains("PROBE qslMatches success=true count=1 first=K1ABC"),output.constData());
+        QVERIFY2(output.contains("PROBE qslFilterResult K1ABC · 2026-09-23 · 14:30 2026-09-23") && output.contains("PROBE qslFilterResult K1ABC · 2026-09-24 · 14:30 2026-09-24"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2)); QVERIFY(db.qslAttachments(1).isEmpty());
+    }
     void qslOcrExplicitlyAttachesSnapshotToTwoQsos()
     {
         decolog::core::TesseractOcr engine;

@@ -21,7 +21,10 @@ DialogFrame {
     property bool probing: false
     property bool probeMatches: false
     property bool probeAcquire: false
+    property bool probeFiltered: false
+    property bool probeSecondSearch: false
     property string searchedCall: ""
+    property string searchedCriteria: ""
     property bool searchDone: false
     property var selectedQsos: []
     property bool saved: false
@@ -32,10 +35,12 @@ DialogFrame {
         root.selectedQsos = enabled ? remaining.concat([row]) : remaining
         root.saved = false
     }
-    function probe(url, match, acquire) {
+    function probe(url, match, acquire, filtered) {
         probing = true
         probeMatches = !!match
         probeAcquire = !!acquire
+        probeFiltered = !!filtered
+        probeSecondSearch = false
         selectedImage = url
         scan.clicked()
     }
@@ -48,7 +53,17 @@ DialogFrame {
             if (root.probing && root.probeMatches && success) {
                 const rows = root.ocr.suggestions.calls || []
                 const index = rows.findIndex(x => x.value === "K1ABC")
-                if (index >= 0) { callChoice.currentIndex = index; searchButton.clicked() }
+                if (index >= 0) {
+                    callChoice.currentIndex = index
+                    if (root.probeFiltered) {
+                        manualCall.text="K1ABC"
+                        const date=criteria.itemAt(0), time=criteria.itemAt(1)
+                        date.currentIndex=date.values.findIndex(x => x.value === "2026-09-23")+1
+                        time.currentIndex=time.values.findIndex(x => x.value === "14:30")+1
+                        console.warn("PROBE qslFilters " + date.chosenValue() + " " + time.chosenValue())
+                    }
+                    searchButton.clicked()
+                }
             }
         }
     }
@@ -60,6 +75,10 @@ DialogFrame {
                 console.warn("PROBE qslMatches success=" + success + " count=" + root.search.matches.length
                              + " first=" + (root.search.matches.length ? root.search.matches[0].call : "")
                              + " noMatchNotice=" + noMatchNotice.visible)
+            if (root.probing && root.probeFiltered && success) {
+                console.warn("PROBE qslFilterResult " + root.searchedCriteria + " " + (root.search.matches.length ? root.search.matches[0].at : "none"))
+                if (!root.probeSecondSearch) { root.probeSecondSearch=true; manualDate.text="2026-09-24"; searchButton.clicked() }
+            }
             if (root.probing && root.probeAcquire && success) {
                 for (const row of root.search.matches) root.toggleQso(row, true)
                 approveButton.clicked()
@@ -102,7 +121,7 @@ DialogFrame {
             Layout.fillWidth: true
             GlassButton { text: qsTr("Choose image…"); enabled: !root.ocr.busy && !root.acquisition.busy; onClicked: picker.open() }
             Text { Layout.fillWidth: true; text: String(root.selectedImage) || qsTr("No image selected"); textFormat: Text.PlainText; color: Theme.textPrimary; elide: Text.ElideMiddle }
-            GlassButton { id: scan; text: qsTr("Read image"); enabled: !root.ocr.busy && !root.search.busy && !root.acquisition.busy && String(root.selectedImage).length > 0; onClicked: { root.selectedQsos = []; root.saved = false; root.searchedCall = ""; root.searchDone = false; root.processedImage = root.selectedImage; root.ocr.start(root.selectedImage) } }
+            GlassButton { id: scan; text: qsTr("Read image"); enabled: !root.ocr.busy && !root.search.busy && !root.acquisition.busy && String(root.selectedImage).length > 0; onClicked: { root.selectedQsos = []; root.saved = false; root.searchedCall = ""; root.searchDone = false; manualCall.text=""; manualDate.text=""; manualTime.text=""; for (let i=0;i<criteria.count;++i) criteria.itemAt(i).currentIndex=0; root.processedImage = root.selectedImage; root.ocr.start(root.selectedImage) } }
             GlassButton { text: qsTr("Cancel"); enabled: root.ocr.busy; onClicked: root.ocr.cancel() }
         }
         Text {
@@ -135,7 +154,7 @@ DialogFrame {
                 selectByMouse: true
             }
         }
-        Text { Layout.fillWidth: true; text: qsTr("Unverified suggestions — select a callsign to search the current log."); color: Theme.warningColor; wrapMode: Text.Wrap }
+        Text { Layout.fillWidth: true; text: qsTr("Unverified suggestions — choose a callsign or enter one manually. Optional date and time filters use UTC and apply only when selected."); color: Theme.warningColor; wrapMode: Text.Wrap }
         Text { Layout.fillWidth: true; visible: root.showingResult && !!root.ocr.suggestions.truncated; text: qsTr("Some suggestions are omitted; review the complete OCR text."); color: Theme.warningColor; wrapMode: Text.Wrap }
         RowLayout {
             Layout.fillWidth: true
@@ -147,17 +166,25 @@ DialogFrame {
                 readonly property var rows: root.showingResult ? (root.ocr.suggestions.calls || []) : []
                 model: rows.map(x => x.value + (x.uncertain ? " ?" : ""))
             }
+            StyledTextField { id: manualCall; Layout.preferredWidth: 150; placeholderText: qsTr("Manual callsign"); enabled: !root.search.busy && !root.acquisition.busy; Accessible.name: qsTr("Manual callsign") }
             GlassButton {
                 id: searchButton
                 text: qsTr("Find exact callsign")
-                enabled: !root.ocr.busy && !root.search.busy && !root.acquisition.busy && callChoice.currentIndex >= 0 && callChoice.rows.length > 0
-                onClicked: { root.searchDone = false; root.searchedCall = callChoice.rows[callChoice.currentIndex].value; root.search.start(root.searchedCall) }
+                enabled: root.showingResult && !root.ocr.busy && !root.search.busy && !root.acquisition.busy && (manualCall.text.trim().length > 0 || (callChoice.currentIndex >= 0 && callChoice.rows.length > 0))
+                onClicked: {
+                    root.searchDone = false
+                    root.searchedCall = (manualCall.text.trim() || callChoice.rows[callChoice.currentIndex].value).toUpperCase()
+                    const date=manualDate.text.trim() || criteria.itemAt(0).chosenValue(), time=manualTime.text.trim() || criteria.itemAt(1).chosenValue()
+                    root.searchedCriteria = [root.searchedCall,date,time].filter(x => x.length).join(" · ")
+                    root.search.startFiltered(root.searchedCall,date,time)
+                }
             }
             GlassButton { text: qsTr("Cancel search"); enabled: root.search.busy; onClicked: root.search.cancel() }
         }
         RowLayout {
             Layout.fillWidth: true
             Repeater {
+                id: criteria
                 model: [qsTr("Date"), qsTr("Time"), qsTr("Band"), qsTr("Mode")]
                 StyledComboBox {
                     required property int index
@@ -165,17 +192,25 @@ DialogFrame {
                     Layout.fillWidth: true
                     Accessible.name: modelData
                     readonly property var values: root.showingResult ? (root.ocr.suggestions[["dates", "times", "bands", "modes"][index]] || []) : []
+                    function chosenValue() { return currentIndex > 0 && currentIndex <= values.length ? values[currentIndex-1].value : "" }
                     model: [modelData + " (" + values.length + "): —"].concat(values.map(x => x.value + (x.ambiguous ? " ? (" + x.raw + ")" : x.uncertain ? " ?" : "")))
                 }
             }
         }
+        RowLayout {
+            Layout.fillWidth:true
+            StyledTextField { id:manualDate; Layout.fillWidth:true; placeholderText:qsTr("Manual UTC date YYYY-MM-DD"); Accessible.name:qsTr("Manual UTC date"); enabled:!root.search.busy && !root.acquisition.busy }
+            StyledTextField { id:manualTime; Layout.fillWidth:true; placeholderText:qsTr("Manual UTC time HH:MM"); Accessible.name:qsTr("Manual UTC time"); enabled:!root.search.busy && !root.acquisition.busy }
+        }
+        Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap; text:qsTr("Manual date or time overrides its selected suggestion. Date and time filter the search; band and mode remain suggestions for review. Ambiguous dates require an explicit choice.") }
+        Text { Layout.fillWidth:true; color:Theme.textSecondary; visible:root.searchDone; text:qsTr("Results for: %1").arg(root.searchedCriteria) }
         Text { Layout.fillWidth: true; visible: root.search.error.length > 0; text: root.search.error; color: Theme.warningColor; wrapMode: Text.Wrap }
         Text { Layout.fillWidth: true; visible: root.search.truncated; text: qsTr("Showing the first 100 matches; refine the search separately."); color: Theme.warningColor; wrapMode: Text.Wrap }
         Text {
             id: noMatchNotice
             Layout.fillWidth: true
-            visible: root.searchDone && !root.search.busy && root.search.matches.length === 0 && callChoice.currentIndex >= 0 && callChoice.rows[callChoice.currentIndex].value === root.searchedCall
-            text: qsTr("No exact callsign matches in the current log.")
+            visible: root.searchDone && !root.search.busy && root.search.matches.length === 0
+            text: qsTr("No matches for the selected search criteria in the current log.")
             color: Theme.textSecondary
             wrapMode: Text.Wrap
         }
@@ -183,7 +218,7 @@ DialogFrame {
             Layout.fillWidth: true
             Layout.preferredHeight: 85
             clip: true
-            model: root.showingResult && callChoice.currentIndex >= 0 && callChoice.rows[callChoice.currentIndex].value === root.searchedCall ? root.search.matches : []
+            model: root.showingResult && root.searchDone ? root.search.matches : []
             ScrollBar.vertical: ScrollBar { }
             delegate: RowLayout {
                 required property var modelData

@@ -1,6 +1,7 @@
 #include "core/QslOcrSearch.h"
 #include "core/LogDatabase.h"
 #include <QPointer>
+#include <QDateTime>
 #include <QRegularExpression>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -12,9 +13,19 @@ QslOcrSearch::QslOcrSearch(LogDatabase *db, QObject *parent) : QObject(parent), 
 QslOcrSearch::~QslOcrSearch() { if (m_cancel) m_cancel->store(true); m_pool.waitForDone(); }
 bool QslOcrSearch::start(const QString &rawCall)
 {
+    return startFiltered(rawCall,{},{});
+}
+bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc, const QString &timeUtc)
+{
     if (m_busy) return false;
     m_matches.clear(); m_error.clear(); m_truncated = false;
     const QString call = rawCall.trimmed().toUpper();
+    const QDate date=QDate::fromString(dateUtc,Qt::ISODate);
+    const QTime time=QTime::fromString(timeUtc,QStringLiteral("HH:mm"));
+    if ((!dateUtc.isEmpty() && (!date.isValid() || date.toString(Qt::ISODate)!=dateUtc)) ||
+        (!timeUtc.isEmpty() && (!time.isValid() || time.toString(QStringLiteral("HH:mm"))!=timeUtc))) {
+        m_error=tr("Choose a valid UTC date and time"); emit changed(); return false;
+    }
     static const QRegularExpression valid(QStringLiteral("^(?=.{3,15}$)(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
     if (!m_db || !m_db->isOpen() || m_db->path().isEmpty() || m_db->path() == QLatin1String(":memory:") || !valid.match(call).hasMatch()) {
         m_error = tr("Choose a callsign and an open file-backed log"); emit changed(); return false;
@@ -24,7 +35,7 @@ bool QslOcrSearch::start(const QString &rawCall)
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrSearch> self(this);
-    m_pool.start([self, path, call, cancelled] {
+    m_pool.start([self, path, call, dateUtc, timeUtc, cancelled] {
         QVariantList matches;
         QString error;
         bool truncated = false;
@@ -37,9 +48,14 @@ bool QslOcrSearch::start(const QString &rawCall)
                 error = tr("Cannot open the log for searching");
             } else if (!cancelled->load()) {
                 QSqlQuery q(sql);
-                q.prepare(QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso "
-                                         "WHERE call=? AND deleted=0 ORDER BY id DESC LIMIT 101"));
+                QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call=? AND deleted=0");
+                if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
+                if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
+                query+=QStringLiteral(" ORDER BY id DESC LIMIT 101");
+                q.prepare(query);
                 q.addBindValue(call);
+                if (!dateUtc.isEmpty()) q.addBindValue(dateUtc);
+                if (!timeUtc.isEmpty()) q.addBindValue(timeUtc);
                 if (!q.exec()) {
                     error = tr("Cannot search the log");
                 } else {

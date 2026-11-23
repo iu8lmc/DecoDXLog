@@ -21,6 +21,7 @@ class QslOcrSearch : public QObject {
     bool truncated() const { return m_truncated; }
     QString error() const { return m_error; }
     Q_INVOKABLE bool start(const QString &call);
+    Q_INVOKABLE bool startFiltered(const QString &call, const QString &dateUtc, const QString &timeUtc);
     Q_INVOKABLE void cancel();
   signals:
     void changed();
