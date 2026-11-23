@@ -71,6 +71,7 @@ DialogFrame {
     property bool plannerLoading: false
     property string plannerScope: ""
     property string plannerSaveError: ""
+    property int accountListRevision: 0
     property bool plannerExternalProbe: false
     property bool plannerExternalSawStale: false
     Settings { id: plannerSettings; category: "qslPlanner"; property string goalsJson: '["dxcc"]' }
@@ -163,16 +164,18 @@ DialogFrame {
         console.warn("PROBE qslscopes " + JSON.stringify({first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError}))
     }
     function probeQslAccounts(restore) {
-        openAt("dxcc"); decolog.awardProfile=1; decolog.awardAccount="account-A"; qslPlanner.open(); loadPlannerScope(true)
+        openAt("dxcc"); decolog.awardProfile=1; accountPicker.activated(accountPicker.accountOptions.indexOf("account-A")); qslPlanner.open(); loadPlannerScope(true)
         const firstInitial=plannerGoals.slice()
         if (!restore) { plannerGoals=["waz"]; persistPlannerGoals() }
         const first=plannerGoals.slice()
-        decolog.awardAccount="account-B"; loadPlannerScope(false)
+        accountPicker.activated(accountPicker.accountOptions.indexOf("account-B")); loadPlannerScope(false)
         const secondInitial=plannerGoals.slice()
         if (!restore) { plannerGoals=["vucc"]; persistPlannerGoals() }
         const second=plannerGoals.slice()
-        decolog.awardAccount="account-A"; loadPlannerScope(false)
-        console.warn("PROBE qslaccounts " + JSON.stringify({firstInitial:firstInitial,first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError,label:plannerAccountLabel.text}))
+        accountInput.text="manual-X"; accountInput.editingFinished()
+        const manual=decolog.awardAccount
+        accountPicker.activated(accountPicker.accountOptions.indexOf("account-A")); loadPlannerScope(false)
+        console.warn("PROBE qslaccounts " + JSON.stringify({firstInitial:firstInitial,first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError,label:plannerAccountLabel.text,options:accountPicker.accountOptions,field:accountInput.text,manual:manual}))
     }
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
     function probeQslExternal() { openAt("dxcc"); plannerExternalStart.start() }
@@ -791,6 +794,10 @@ DialogFrame {
     height: 720
 
     Connections {
+        target: decolog.stationProfiles
+        function onProfilesChanged() { root.accountListRevision++ }
+    }
+    Connections {
         target: decolog
         function onAwardsChanged() { root.revision++; root.marathonPreview=({}); marathonReview.close(); if (qslPlanner.visible) root.loadPlannerScope(false) }
         function onLogChanged() { if (qslPlanner.visible) root.loadPlannerScope(false) }
@@ -969,9 +976,13 @@ DialogFrame {
                 ToggleSwitch { text: qsTr("Card"); checked: decolog.awardConfirmCard; onToggled: decolog.awardConfirmCard = checked }
                 ToggleSwitch { text: "eQSL"; checked: decolog.awardConfirmEqsl; onToggled: decolog.awardConfirmEqsl = checked }
                 Item { Layout.fillWidth: true }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
                 StyledComboBox {
                     id: profileBox
-                    Layout.preferredWidth: 150
+                    Layout.preferredWidth: 180
                     readonly property var ids: {
                         const list = [0]
                         for (let i = 0; i < decolog.stationProfiles.count; ++i) {
@@ -984,16 +995,40 @@ DialogFrame {
                     currentIndex: Math.max(0, ids.indexOf(decolog.awardProfile))
                     onActivated: decolog.awardProfile = ids[currentIndex]
                 }
+                StyledComboBox {
+                    id: accountPicker
+                    Layout.preferredWidth: 175
+                    popupMinimumWidth: 220
+                    Accessible.name: qsTr("Select recorded award account")
+                    readonly property var accountOptions: {
+                        root.accountListRevision
+                        const values=[""]
+                        for (let i=0; i<decolog.stationProfiles.count; ++i) {
+                            const profile=decolog.stationProfiles.get(i)
+                            const value=(profile.awardAccount || "").trim()
+                            if (!profile.deleted && value && values.indexOf(value)<0) values.push(value)
+                        }
+                        return [""].concat(values.slice(1).sort())
+                    }
+                    model: accountOptions.map(v => v || qsTr("All accounts"))
+                    displayText: qsTr("Choose account")
+                    onActivated: index => { if (index>=0 && index<accountOptions.length) decolog.awardAccount=accountOptions[index] }
+                }
                 StyledTextField {
-                    Layout.preferredWidth: 160
+                    id: accountInput
+                    Layout.preferredWidth: 200
                     Accessible.name: qsTr("Award account (exact)")
                     placeholderText: qsTr("Account (exact match)")
                     text: decolog.awardAccount
                     maximumLength: 256
                     onEditingFinished: decolog.awardAccount = text.trim()
+                    Connections {
+                        target: decolog
+                        function onAwardsChanged() { if (!accountInput.activeFocus) accountInput.text=decolog.awardAccount }
+                    }
                 }
                 StyledComboBox {
-                    Layout.preferredWidth: 130
+                    Layout.preferredWidth: 160
                     readonly property var tags: { root.revision; return [""].concat(decolog.qsoModel.tagsInLog().map(t => t.key)) }
                     model: tags.map(t => t.length ? "#" + t : qsTr("All tags"))
                     currentIndex: Math.max(0, tags.findIndex(t => t.toLowerCase() === decolog.awardTag.toLowerCase()))

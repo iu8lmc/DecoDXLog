@@ -1125,13 +1125,17 @@ private slots:
         using namespace decolog::core;
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
-          StationProfile p; p.name="Station"; p.stationCallsign="K1AAA"; QCOMPARE(db.saveStationProfile(p),qint64(1));
+          StationProfile p; p.name="Station"; p.stationCallsign="K1AAA"; p.awardAccount="account-A"; QCOMPARE(db.saveStationProfile(p),qint64(1));
+          StationProfile q; q.name="Second"; q.stationCallsign="K1BBB"; q.awardAccount="account-B"; QCOMPARE(db.saveStationProfile(q),qint64(2));
+          StationProfile r; r.name="Third"; r.stationCallsign="K1CCC"; r.awardAccount="account-A"; QCOMPARE(db.saveStationProfile(r),qint64(3));
+          StationProfile t; t.name="Case"; t.stationCallsign="K1DDD"; t.awardAccount="account-a"; QCOMPARE(db.saveStationProfile(t),qint64(4));
           QString error; QVERIFY(qslplanner::saveGoalSelection(db,1,{"dxcc"},&error)); }
         QByteArray output; QVERIFY2(launch(dir,"qslaccountsprobe",output,4500),output.constData());
         QVERIFY2(output.contains("\"firstInitial\":[\"dxcc\"]") && output.contains("\"first\":[\"waz\"]") &&
                  output.contains("\"secondInitial\":[\"dxcc\"]") && output.contains("\"second\":[\"vucc\"]") &&
                  output.contains("\"back\":[\"waz\"]") && output.contains("\"error\":\"\"") &&
-                 output.contains("account-A"),output.constData());
+                 output.contains("\"options\":[\"\",\"account-A\",\"account-B\",\"account-a\"]") &&
+                 output.contains("\"field\":\"account-A\"") && output.contains("\"manual\":\"manual-X\""),output.constData());
         QByteArray restored; QVERIFY2(launch(dir,"qslaccountsprobe:restore",restored,4500),restored.constData());
         QVERIFY2(restored.contains("\"firstInitial\":[\"waz\"]") && restored.contains("\"secondInitial\":[\"vucc\"]") &&
                  restored.contains("\"back\":[\"waz\"]"),restored.constData());

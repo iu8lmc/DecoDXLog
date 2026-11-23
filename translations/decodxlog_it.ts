@@ -446,6 +446,18 @@
 <context>
     <name>AwardsDialog</name>
     <message>
+        <source>Select recorded award account</source>
+        <translation>Seleziona account diploma registrato</translation>
+    </message>
+    <message>
+        <source>All accounts</source>
+        <translation>Tutti gli account</translation>
+    </message>
+    <message>
+        <source>Choose account</source>
+        <translation>Scegli account</translation>
+    </message>
+    <message>
         <source>Award account (exact)</source>
         <translation>Account diploma (corrispondenza esatta)</translation>
     </message>
