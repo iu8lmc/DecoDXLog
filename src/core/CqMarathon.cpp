@@ -150,6 +150,12 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             if (!supportedBands().contains(entry.band.trimmed().toLower())) {
                 result.exclusions << QStringLiteral("QSO %1: outside supported 2026 bands").arg(entry.qsoId); continue;
             }
+            const QString prop=entry.propMode.trimmed().toUpper();
+            static const QSet<QString> assisted{QStringLiteral("RPT"),QStringLiteral("ECH"),QStringLiteral("IRL"),QStringLiteral("INTERNET"),QStringLiteral("SAT")};
+            if (assisted.contains(prop)) {
+                result.exclusions << QStringLiteral("QSO %1: recorded propagation %2; relay or assisted path requires review").arg(entry.qsoId).arg(prop);
+                continue;
+            }
             const QString call=entry.call.trimmed().toUpper();
             if (call.endsWith(QLatin1String("/AM"))) {
                 result.exclusions << QStringLiteral("QSO %1: aeronautical mobile designation").arg(entry.qsoId); continue;
@@ -283,7 +289,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
     QSqlQuery query(db.connection());
     query.setForwardOnly(true);
     if (!query.exec(QStringLiteral(
-            "SELECT id, call, dxcc, cqz, band, mode, qso_datetime_on, station_profile_id, adif_extra "
+            "SELECT id, call, dxcc, cqz, band, mode, qso_datetime_on, station_profile_id, adif_extra, prop_mode, sat_name "
             "FROM qso WHERE deleted = 0 ORDER BY qso_datetime_on, id"))) {
         if (error) *error = query.lastError().text();
         return {};
@@ -299,6 +305,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         const auto timestamp=QDateTime::fromString(query.value(6).toString(),Qt::ISODateWithMs);
         if (timestamp.isValid() && timestamp.timeSpec()!=Qt::LocalTime) entry.timestamp=timestamp.toUTC();
         entry.stationProfileId = query.value(7).toLongLong();
+        entry.propMode=query.value(9).toString(); entry.satName=query.value(10).toString();
         const QByteArray extra=query.value(8).toByteArray();
         if (!extra.isEmpty()) {
             QJsonParseError parseError; const auto doc=QJsonDocument::fromJson(extra,&parseError);
@@ -319,7 +326,7 @@ QJsonDocument Result::toJson() const
 {
     QJsonArray qsos;
     const auto row = [](const Entry& entry) {
-        return QJsonObject{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
+        QJsonObject object{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
                                 {QStringLiteral("call"), entry.call},
                                 {QStringLiteral("dxcc"), entry.dxcc},
                                 {QStringLiteral("region"), entry.region},
@@ -330,6 +337,9 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("mode"), entry.mode},
                                 {QStringLiteral("timestamp"), entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
+        if (!entry.propMode.isEmpty()) object.insert(QStringLiteral("propMode"),entry.propMode);
+        if (!entry.satName.isEmpty()) object.insert(QStringLiteral("satName"),entry.satName);
+        return object;
     };
     for (const Entry& entry : selected) qsos.append(row(entry));
     QJsonArray zones;

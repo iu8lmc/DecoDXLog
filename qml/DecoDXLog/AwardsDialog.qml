@@ -665,7 +665,7 @@ DialogFrame {
     DialogFrame { id:marathonReview; title:qsTr("CQ DX Marathon candidate review"); dialogKey:"marathonReview"; width:740; height:650; dotColor:Theme.secondaryColor
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Preliminary data, not official credit. The 2026 list v1.1 is described as of 2023. JSON includes reviewed choices; review ADIF includes all alternatives. Review the entry in the official tool.") }
+                text:qsTr("Preliminary data, not official credit. The 2026 list v1.1 is described as of 2023. Missing propagation does not prove a direct contact. JSON includes reviewed choices; review ADIF includes all alternatives. Review the entry in the official tool.") }
             Text { id:marathonLocationSummary; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
                 text:qsTr("Recorded own grid squares: %1 · missing: %2 · invalid: %3. Different squares require review; matching squares do not prove a single location.")
                     .arg((root.marathonPreview.locationGrids || []).join(", ") || qsTr("none"))

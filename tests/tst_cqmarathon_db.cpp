@@ -11,6 +11,21 @@ using namespace decolog::core;
 class TestCqMarathonDb : public QObject {
     Q_OBJECT
 private slots:
+    void excludesRecordedRelayPropagationFor2026()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto& item : {qMakePair("K1AAA","RPT"),qMakePair("K2BBB","ECH"),qMakePair("K3CCC","IRL"),
+                                 qMakePair("K4DDD","INTERNET"),qMakePair("K5EEE","SAT"),qMakePair("K6FFF","EME"),qMakePair("K7GGG","")}) {
+            AdifRecord rec{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},
+                           {"DXCC","291"},{"CQZ",QString::number(1+db.qsoCount())},{"PROP_MODE",item.second}};
+            QCOMPARE(db.insertQso(rec,"test").status,InsertResult::Status::Inserted);
+        }
+        const auto result=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1});
+        QCOMPARE(result.zoneCandidates.size(),2); QCOMPARE(result.zoneCandidates.first().call,QString("K6FFF"));
+        QCOMPARE(result.zoneCandidates.last().call,QString("K7GGG"));
+        QVERIFY(result.exclusions.join('\n').contains("recorded propagation RPT"));
+        QVERIFY(result.exclusions.join('\n').contains("recorded propagation SAT"));
+    }
     void warnsWhenRecordedOperatingGridsDiffer()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

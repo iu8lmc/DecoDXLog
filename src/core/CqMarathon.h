@@ -22,6 +22,8 @@ struct Entry {
     QString entityBasis;
     QString myGrid; // per-QSO ADIF evidence, not the current station profile
     bool invalidExtra{false};
+    QString propMode;
+    QString satName;
 };
 
 struct Rules {

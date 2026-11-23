@@ -11,6 +11,17 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void propagationEvidenceIsEditionScoped()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        Entry repeater{1,"K1AAA",291,5,"20m","FM",when}; repeater.propMode="rpt";
+        Entry direct{2,"K2BBB",291,3,"20m","DIGITALVOICE",when}; direct.propMode="LOS";
+        const auto filtered=select({repeater,direct},{2026,"mixed",1});
+        QCOMPARE(filtered.zoneCandidates.size(),1); QCOMPARE(filtered.zoneCandidates.first().qsoId,qint64(2));
+        QCOMPARE(filtered.toJson().object().value("selected").toArray().first().toObject().value("propMode").toString(),QString("LOS"));
+        repeater.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
+        QCOMPARE(select({repeater},{2025,"mixed",1}).selected.size(),1);
+    }
     void edition2026RequiresOneCandidatePerEntity()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
