@@ -11,6 +11,21 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void reviewedChoicesAreValidatedAndExported()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","CW",when}, {2,"K2BBB",291,3,"20m","CW",when},
+                                   {3,"K3CCC",291,5,"40m","CW",when}, {4,"DL1AAA",230,14,"20m","CW",when}};
+        auto result=select(entries,{2026,"mixed",1}); QString error;
+        QVERIFY(applyReviewChoices(result,{2,4},{3,2,4},&error));
+        QCOMPARE(result.selected.at(0).qsoId,qint64(2)); QCOMPARE(result.zoneCandidates.at(0).qsoId,qint64(3));
+        QCOMPARE(result.toJson().object().value("selected").toArray().at(0).toObject().value("qsoId").toInt(),2);
+        const auto before=result.toJson().toJson();
+        QVERIFY(!applyReviewChoices(result,{2,2},{3,2,4},&error)); QCOMPARE(result.toJson().toJson(),before);
+        QVERIFY(!applyReviewChoices(result,{3,4},{2,2,4},&error)); QCOMPARE(result.toJson().toJson(),before);
+        QVERIFY(!applyReviewChoices(result,{3},{3,2,4},&error)); QCOMPARE(result.toJson().toJson(),before);
+        QVERIFY(!applyReviewChoices(result,{3,999},{3,2,4},&error)); QCOMPARE(result.toJson().toJson(),before);
+    }
     void replacementAlternativesPreserveIndependentEntityAndZoneScopes()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

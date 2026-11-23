@@ -68,6 +68,22 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonReviewedJsonExportsIndependentChoices()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","5"), qMakePair("K2BBB","3"), qMakePair("K3CCC","5")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ",item.second}},"fixture",{},true,profile,false).id>0); }
+        const QString path=dir.filePath("review.json"); QByteArray output;
+        QVERIFY2(launch(dir,"marathonexportreviewprobe:"+path+":"+QString::number(profile)+":"+dir.filePath("test.sqlite"),output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE marathonReviewedExport success= stale=The preview changed") && output.contains("protected=Choose a file other than the log database oldProtected=false changed=The preview changed") && !output.contains("TypeError"),output.constData());
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const auto json=QJsonDocument::fromJson(file.readAll()).object();
+        QCOMPARE(json.value("selectionKind").toString(),QString("reviewed"));
+        QCOMPARE(json.value("selected").toArray().at(0).toObject().value("qsoId").toInt(),2);
+        QCOMPARE(json.value("zoneCandidates").toArray().at(0).toObject().value("qsoId").toInt(),3);
+        QCOMPARE(json.value("zoneCandidates").toArray().at(1).toObject().value("qsoId").toInt(),2);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
+    }
     void marathonReplacementsRemainIndependent()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

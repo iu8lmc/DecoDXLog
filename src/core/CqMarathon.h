@@ -37,6 +37,7 @@ struct Result {
     QList<Entry> zoneAlternatives; // all eligible contacts with valid recorded zone
     QStringList exclusions;
     QStringList warnings; // potential data conflicts; candidate eligibility is unchanged
+    bool reviewed{false};
     bool isValid(QString* error = nullptr) const;
     QJsonDocument toJson() const;
 };
@@ -46,6 +47,8 @@ struct ReviewAdif { QByteArray bytes; int count{0}; int invalidTimestamp{0}; QSt
 ReviewAdif reviewAdif(const LogDatabase& db, int year, qint64 stationProfileId, const QString& expectedIdentity = {});
 
 Result select(const QList<Entry>& entries, const Rules& rules);
+// Replaces candidates atomically, preserving the same covered entity/zone counts.
+bool applyReviewChoices(Result& result, const QList<qint64>& entityIds, const QList<qint64>& zoneIds, QString* error = nullptr);
 QList<Entry> loadEntries(const LogDatabase& db, QString* error = nullptr);
 
 } // namespace decolog::core::cqmarathon

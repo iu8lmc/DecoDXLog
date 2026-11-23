@@ -195,6 +195,35 @@ Result select(const QList<Entry>& entries, const Rules& rules)
     return result;
 }
 
+bool applyReviewChoices(Result& result, const QList<qint64>& entityIds, const QList<qint64>& zoneIds, QString* error)
+{
+    const auto resolve = [](const QList<Entry>& original, const QList<Entry>& alternatives,
+                            const QList<qint64>& ids, bool entity, QList<Entry>& chosen) {
+        if (ids.size()!=original.size()) return false;
+        QHash<qint64,Entry> byId;
+        for (const auto& entry : alternatives) byId.insert(entry.qsoId,entry);
+        QHash<int,int> expected, actual;
+        for (const auto& entry : original) ++expected[entity ? entry.entityCode : entry.cqZone];
+        QSet<qint64> seen;
+        for (qint64 id : ids) {
+            if (id<=0 || seen.contains(id) || !byId.contains(id)) return false;
+            seen.insert(id);
+            const Entry entry=byId.value(id);
+            ++actual[entity ? entry.entityCode : entry.cqZone];
+            chosen << entry;
+        }
+        return expected==actual;
+    };
+    QList<Entry> entities,zones;
+    if (!resolve(result.selected,result.entityAlternatives,entityIds,true,entities) ||
+        !resolve(result.zoneCandidates,result.zoneAlternatives,zoneIds,false,zones)) {
+        if (error) *error=QStringLiteral("Reviewed choices are no longer eligible or do not preserve entity and zone coverage");
+        return false;
+    }
+    result.selected=entities; result.zoneCandidates=zones; result.reviewed=true;
+    return true;
+}
+
 QList<Entry> loadEntries(const LogDatabase& db, QString* error)
 {
     QList<Entry> entries;
@@ -241,17 +270,24 @@ QJsonDocument Result::toJson() const
     for (const Entry& entry : selected) qsos.append(row(entry));
     QJsonArray zones;
     for (const Entry& entry : zoneCandidates) zones.append(row(entry));
+    QJsonArray entityAlternativesJson, zoneAlternativesJson;
+    for (const Entry& entry : entityAlternatives) entityAlternativesJson.append(row(entry));
+    for (const Entry& entry : zoneAlternatives) zoneAlternativesJson.append(row(entry));
     QJsonArray exclusions;
     for (const QString& value : this->exclusions) exclusions.append(value);
     QJsonArray warnings;
     for (const QString& value : this->warnings) warnings.append(value);
     return QJsonDocument(QJsonObject{{QStringLiteral("format"), QStringLiteral("decodxlog-cq-marathon-1")},
                                      {QStringLiteral("edition"), rules.year},
+                                     {QStringLiteral("selectionKind"), reviewed ? QStringLiteral("reviewed") : QStringLiteral("automatic")},
+                                     {QStringLiteral("exclusionsScope"), QStringLiteral("automatic selection")},
                                      {QStringLiteral("category"), normalizedCategory(rules.category)},
                                      {QStringLiteral("maxPerEntity"), rules.maxPerEntity},
                                      {QStringLiteral("stationProfileId"), static_cast<double>(rules.stationProfileId)},
                                      {QStringLiteral("selected"), qsos},
                                      {QStringLiteral("zoneCandidates"), zones},
+                                     {QStringLiteral("entityAlternatives"), entityAlternativesJson},
+                                     {QStringLiteral("zoneAlternatives"), zoneAlternativesJson},
                                      {QStringLiteral("entityListVersion"), rules.year == 2026 ? QStringLiteral("DX Marathon v1.1; list as of 2023") : QString()},
                                      {QStringLiteral("officialRulesVerified"), false},
                                      {QStringLiteral("warnings"), warnings},

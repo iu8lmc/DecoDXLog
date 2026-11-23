@@ -43,6 +43,7 @@ DialogFrame {
     property var marathonPreview: ({})
     property var marathonWorkingEntities: []
     property var marathonWorkingZones: []
+    property string marathonExportMessage: ""
     onMarathonYearChanged: marathonPreview=({})
     onMarathonCategoryChanged: marathonPreview=({})
     onMarathonMaxPerEntityChanged: marathonPreview=({})
@@ -500,6 +501,7 @@ DialogFrame {
     }
 
     function refreshMarathon() {
+        marathonExportMessage = ""
         marathonPreview = decolog.cqMarathonPreview(marathonYear, marathonCategory,
                                                      marathonMaxPerEntity, decolog.awardProfile)
         marathonWorkingEntities = (marathonPreview.selected || []).slice()
@@ -534,6 +536,26 @@ DialogFrame {
         const zoneChanged=cycleMarathonCandidate("zone",0)
         Qt.callLater(function() { const e=marathonEntityRows.itemAtIndex(0), z=marathonZoneRows.itemAtIndex(0)
             console.warn("PROBE marathonAlternatives before="+beforeEntity+","+beforeZone+" entityChanged="+entityChanged+" zoneAfterEntity="+zoneAfterEntity+" zoneChanged="+zoneChanged+" entity="+(e?e.text:"missing")+" zone="+(z?z.text:"missing")) })
+    }
+    function saveMarathonReviewed(file, snapshot) {
+        if (marathonPreview.valid !== true || marathonPreview.stationProfileId !== decolog.awardProfile ||
+            marathonPreview.edition !== marathonYear || marathonPreview.category !== marathonCategory ||
+            marathonPreview.maxPerEntity !== marathonMaxPerEntity || !marathonPreview.snapshot)
+            return qsTr("The preview changed; refresh it before exporting")
+        return decolog.saveReviewedCqMarathonExport(file, marathonPreview.edition, marathonPreview.category,
+                 marathonPreview.maxPerEntity, marathonPreview.stationProfileId, snapshot,
+                 marathonWorkingEntities.map(x => x.qsoId), marathonWorkingZones.map(x => x.qsoId))
+    }
+    function probeMarathonReviewedExport(path,profile,dbPath) {
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
+        cycleMarathonCandidate("entity",0); cycleMarathonCandidate("zone",0)
+        const success=saveMarathonReviewed("file://"+path,marathonPreview.snapshot)
+        const stale=saveMarathonReviewed("file://"+path,"stale")
+        const protectedPath=saveMarathonReviewed("file://"+dbPath,marathonPreview.snapshot)
+        const oldProtected=decolog.saveCqMarathonExport("file://"+dbPath,marathonPreview.edition,marathonPreview.category,marathonPreview.maxPerEntity,marathonPreview.stationProfileId)
+        marathonYear=2025
+        const changed=saveMarathonReviewed("file://"+path,"")
+        console.warn("PROBE marathonReviewedExport success="+success+" stale="+stale+" protected="+protectedPath+" oldProtected="+oldProtected+" changed="+changed)
     }
     function beginMarathonAdif(file,year,profile) {
         marathonAdifMessage=decolog.exportCqMarathonReviewAdif(file,year,profile)
@@ -589,14 +611,13 @@ DialogFrame {
         fileMode: FileDialog.SaveFile
         currentFile: "decodxlog-cq-marathon-" + root.marathonPreview.edition + ".json"
         nameFilters: [qsTr("JSON files (*.json)"), qsTr("All files (*)")]
-        onAccepted: decolog.saveCqMarathonExport(selectedFile, root.marathonPreview.edition,
-                                                   root.marathonPreview.category, root.marathonPreview.maxPerEntity,
-                                                   root.marathonPreview.stationProfileId)
+        onAccepted: { const error=root.saveMarathonReviewed(selectedFile,root.marathonPreview.snapshot)
+            root.marathonExportMessage=error.length ? qsTr("Export failed: %1").arg(error) : qsTr("Reviewed JSON exported") }
     }
     DialogFrame { id:marathonReview; title:qsTr("CQ DX Marathon candidate review"); dialogKey:"marathonReview"; width:740; height:650; dotColor:Theme.secondaryColor
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Preliminary data, not official credit. The 2026 list v1.1 is described as of 2023. Replacements are temporary: JSON exports the automatic selection; review ADIF includes all alternatives. Review the entry in the official tool.") }
+                text:qsTr("Preliminary data, not official credit. The 2026 list v1.1 is described as of 2023. JSON includes reviewed choices; review ADIF includes all alternatives. Review the entry in the official tool.") }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
             ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonWorkingEntities; ScrollBar.vertical:PanelScrollBar {}
                 delegate:RowLayout { required property var modelData; required property int index; width:marathonEntityRows.width
@@ -1006,6 +1027,7 @@ DialogFrame {
                     Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; font.pixelSize:11
                         text:qsTr("Review ADIF contains all QSO for the selected profile and year, including alternatives and stored fields. Inspect it and review eligibility in the official submission tool; exporting does not submit an entry.") }
                     Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; visible:root.marathonAdifMessage.length>0; text:root.marathonAdifMessage }
+                    Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; visible:root.marathonExportMessage.length>0; text:root.marathonExportMessage }
                     Text {
                         Layout.fillWidth: true
                         text: root.marathonPreview.valid === undefined
