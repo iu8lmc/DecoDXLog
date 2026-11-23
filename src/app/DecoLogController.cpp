@@ -1366,6 +1366,11 @@ bool DecoLogController::openDatabase(const QString& path)
         emit logChanged();
         return true;
     };
+    netCtx.reviewedQsoInserted = [this](qint64 id) {
+        m_model->insertQso(id);
+        m_cloud->qsoLogged();
+        emit logChanged();
+    };
     netCtx.spot = [this](const QString& call, double khz, const QString& comment, const QString& station) {
         if (!m_cluster)
             return;

@@ -4,6 +4,7 @@
 
 #include "core/ContestNet.h"
 #include "core/SharedSerials.h"
+#include "core/ContestNetQsoTransfer.h"
 
 #include <QDateTime>
 #include <QHash>
@@ -53,6 +54,7 @@ public:
         std::function<void(const QString& category, const QString& text, const QString& level)> activity;
         // Un QSO di un altro PC da mettere nel log; torna vero se e' entrato.
         std::function<bool(const core::AdifRecord& record, const QString& station)> insertRemote;
+        std::function<void(qint64)> reviewedQsoInserted;
         // Uno spot interno: nel cluster, come gli altri.
         std::function<void(const QString& call, double khz, const QString& comment, const QString& station)> spot;
         // Dove sta questo PC: {band, mode, freqKhz, op}.
@@ -104,6 +106,7 @@ public:
     Q_INVOKABLE bool startQsoComparison(const QUrl& remoteFile);
     Q_INVOKABLE void cancelQsoComparison();
     Q_INVOKABLE bool reviewQsoComparison(const QString& uuid);
+    Q_INVOKABLE QString applyReviewedMissingQso();
     bool qsoReviewBusy() const { return m_qsoReviewBusy; }
     QVariantMap qsoReview() const { return m_qsoReview; }
     bool qsoComparisonBusy() const { return m_qsoComparisonBusy; }
@@ -203,6 +206,7 @@ private:
     quint64 m_qsoReviewGeneration{0};
     bool m_qsoReviewBusy{false};
     QVariantMap m_qsoReview;
+    std::shared_ptr<core::contestqso::Receiver> m_reviewedMissing;
     bool qsoComparisonCurrent() const;
     QVariantMap m_qsoComparisonSummary;
     QVariantList m_qsoComparisonRows;

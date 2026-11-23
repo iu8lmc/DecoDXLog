@@ -13,6 +13,7 @@ GlassPanel {
     readonly property var net: decolog.net
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
     function probeReview() { const rows=root.net.qsoComparisonRows; if (!rows.length || !root.net.reviewQsoComparison(rows[0].uuid)) return false; qsoDetailsDialog.open(); return true }
+    function probeImport(accept) { if (!root.net.qsoReview.canInsert) return false; qsoImportDialog.open(); if (accept) qsoImportDialog.confirmImport(); else qsoImportDialog.close(); return true }
     function probeReviewState() { return {visible:qsoDetailsDialog.visible,title:qsoDetailsDialog.title,fields:(root.net.qsoReview.fields || []).length,ok:root.net.qsoReview.ok || false} }
     function probeComparisonState() { const rows=root.net.qsoComparisonRows, first=qsoComparisonList.itemAtIndex(0); return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:rows.length,firstFields:rows.length ? (rows[0].fields || []).length : 0,fieldShown:first ? first.fieldTextAt(0) : ""} }
 
@@ -228,7 +229,7 @@ GlassPanel {
         id:qsoComparisonDialog
         transientParent:root.Window.window
         title:qsTr("Compare station logs")
-        info:qsTr("Read-only snapshot · no changes applied")
+        info:qsTr("Snapshot comparison · imports require confirmation")
         width:880; height:580
         property string localError:""
         onOpened:localError=""
@@ -246,7 +247,7 @@ GlassPanel {
         body:ColumnLayout {
             spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
-                text:qsTr("Compare the open log with a local copy from another station. This does not contact the station, merge records or prove the logs remain unchanged. Matching covers ADIF fields only; attachments and local metadata are excluded.") }
+                text:qsTr("Compare the open log with a local copy from another station. The comparison does not contact the station. Missing QSO can be imported after inspection and confirmation. Matching covers ADIF fields only; attachments and local metadata are excluded.") }
             RowLayout {
                 GlassButton { text:qsTr("Choose log…"); enabled:!root.net.qsoComparisonBusy; onClicked:qsoComparisonFile.open() }
                 GlassButton { text:qsTr("Cancel comparison"); visible:root.net.qsoComparisonBusy; onClicked:root.net.cancelQsoComparison() }
@@ -331,7 +332,35 @@ GlassPanel {
                     }
                 }
             }
-            GlassButton { text:qsTr("Close"); onClicked:qsoDetailsDialog.close() }
+            RowLayout {
+                GlassButton { text:qsTr("Import this missing QSO…"); visible:root.net.qsoReview.canInsert === true
+                    enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale; onClicked:qsoImportDialog.open() }
+                GlassButton { text:qsTr("Close"); onClicked:qsoDetailsDialog.close() }
+            }
+        }
+    }
+    DialogFrame {
+        id:qsoImportDialog
+        transientParent:root.Window.window
+        title:qsTr("Import reviewed QSO?")
+        width:620; height:300
+        function confirmImport() {
+            const error=root.net.applyReviewedMissingQso()
+            qsoComparisonDialog.localError=error || qsTr("QSO imported. Compare the logs again.")
+            if (!error) qsoDetailsDialog.close()
+            close()
+        }
+        body:ColumnLayout {
+            spacing:12
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
+                text:qsTr("Import this QSO into the current log? Its ADIF fields and QSL states will be copied. Attachments, local service metadata and station profile are not copied. The QSO may be included in the normal Cloud sync.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("The current log and selected log will be checked again. Existing or duplicate QSO are not overwritten.") }
+            Item { Layout.fillHeight:true }
+            RowLayout {
+                GlassButton { text:qsTr("Cancel"); onClicked:qsoImportDialog.close() }
+                GlassButton { text:qsTr("Import QSO"); onClicked:qsoImportDialog.confirmImport() }
+            }
         }
     }
 

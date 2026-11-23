@@ -87,6 +87,22 @@ private slots:
         QVERIFY2(output.contains(expectedField),output.constData());
         QVERIFY2(output.contains("PROBE netreview") && output.contains("\"ok\":true") && output.contains("\"fields\":") && !output.contains("TypeError"),output.constData());
     }
+    void stationNetworkImportConfirmation_data()
+    {
+        QTest::addColumn<QString>("language"); QTest::addColumn<bool>("accept");
+        QTest::newRow("reject English") << QStringLiteral("en") << false;
+        QTest::newRow("accept Italian") << QStringLiteral("it") << true;
+    }
+    void stationNetworkImportConfirmation()
+    {
+        using namespace decolog::core; QFETCH(QString,language); QFETCH(bool,accept); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
+        const auto localPath=dir.filePath("test.sqlite"), remotePath=dir.filePath("remote.sqlite"); QString uuid;
+        { LogDatabase remote; QVERIFY(remote.open(remotePath)); const auto q=remote.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME","Remote"}},"fixture"); QVERIFY(q.id>0); uuid=remote.meta(q.id)->uuid; }
+        QByteArray output; QVERIFY2(launch(dir,(accept?"netimportprobe:":"netimportcancelprobe:")+remotePath,output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE netimport true") && !output.contains("TypeError"),output.constData());
+        LogDatabase local; QVERIFY(local.open(localPath)); QCOMPARE(local.qsoCount(),qint64(accept?1:0)); if (accept) QVERIFY(local.idForUuid(uuid)>0);
+    }
     void contestSerialEntryUsesSelectedGrant_data()
     {
         QTest::addColumn<QString>("probe");

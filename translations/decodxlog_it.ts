@@ -2273,6 +2273,14 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Snapshot comparison · imports require confirmation</source><translation>Confronto delle istantanee · importazioni con conferma</translation></message>
+    <message><source>Compare the open log with a local copy from another station. The comparison does not contact the station. Missing QSO can be imported after inspection and confirmation. Matching covers ADIF fields only; attachments and local metadata are excluded.</source><translation>Confronta il log aperto con una copia locale di un’altra stazione. Il confronto non contatta la stazione. I QSO mancanti possono essere importati dopo esame e conferma. La corrispondenza riguarda solo i campi ADIF; allegati e metadati locali sono esclusi.</translation></message>
+    <message><source>Import this missing QSO…</source><translation>Importa questo QSO mancante…</translation></message>
+    <message><source>Import reviewed QSO?</source><translation>Importare il QSO esaminato?</translation></message>
+    <message><source>QSO imported. Compare the logs again.</source><translation>QSO importato. Ripeti il confronto dei log.</translation></message>
+    <message><source>Import this QSO into the current log? Its ADIF fields and QSL states will be copied. Attachments, local service metadata and station profile are not copied. The QSO may be included in the normal Cloud sync.</source><translation>Importare questo QSO nel log corrente? Verranno copiati i campi ADIF e gli stati QSL. Allegati, metadati locali dei servizi e profilo di stazione non vengono copiati. Il QSO può essere incluso nella normale sincronizzazione Cloud.</translation></message>
+    <message><source>The current log and selected log will be checked again. Existing or duplicate QSO are not overwritten.</source><translation>Il log corrente e quello selezionato saranno controllati nuovamente. I QSO esistenti o duplicati non vengono sovrascritti.</translation></message>
+    <message><source>Import QSO</source><translation>Importa QSO</translation></message>
     <message><source>Inspect all fields…</source><translation>Esamina tutti i campi…</translation></message>
     <message><source>A log changed; compare again.</source><translation>Un log è cambiato; ripeti il confronto.</translation></message>
     <message><source>Inspect QSO fields</source><translation>Esamina i campi del QSO</translation></message>

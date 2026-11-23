@@ -28,4 +28,4 @@ A separate experimental review token can guard a caller-selected edit or soft de
 
 A pinned inventory can also fetch an individual UUID without advancing its page cursor. The lookup returns the same snapshot content and uses the same payload and file-identity guards as pagination; it does not itself authorize or apply a change.
 
-The offline comparison UI can inspect all ADIF fields of a displayed difference using direct UUID lookup in fresh pinned snapshots, guarded against observed log changes. This remains read-only; long values are visually truncated and attachments/local-only metadata are not displayed.
+The offline comparison UI can inspect all ADIF fields of a displayed difference using direct UUID lookup in fresh pinned snapshots, guarded against observed log changes. The inspection is read-only; after a separate confirmation the operator can import a missing, non-deleted QSO into the open log. Long values are visually truncated and attachments/local-only metadata are not displayed or copied.

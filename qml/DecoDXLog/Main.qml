@@ -1286,7 +1286,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
-        else if (what[0] === "netcompareprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netCompareProbe.start() }
+        else if (what[0] === "netcompareprobe" || what[0] === "netimportprobe" || what[0] === "netimportcancelprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netCompareProbe.start() }
         else if (what[0] === "contestserialpanelprobe" || what[0] === "contestserialwindowprobe") {
             decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
             decolog.net.configureDurableSerialAuthority("event","authority")
@@ -1781,7 +1781,10 @@ RoundedWindow {
             if (decolog.net.qsoComparisonBusy) { if (++tries>20) { console.warn("PROBE netcompare timed out"); stop() } return }
             if (!reviewing) { console.warn("PROBE netcompare " + JSON.stringify(panel.probeComparisonState())); reviewing=true; if (!panel.probeReview()) { console.warn("PROBE netreview start failed"); stop() } return }
             if (decolog.net.qsoReviewBusy) { if (++tries>30) { console.warn("PROBE netreview timed out"); stop() } return }
-            console.warn("PROBE netreview " + JSON.stringify(panel.probeReviewState())); stop()
+            console.warn("PROBE netreview " + JSON.stringify(panel.probeReviewState()));
+            const action=startupShow.split(":")[0]
+            if (action === "netimportprobe" || action === "netimportcancelprobe") console.warn("PROBE netimport " + panel.probeImport(action === "netimportprobe"))
+            stop()
         }
     }
     Timer { id:contestSerialProbe; interval:1000; onTriggered: {
