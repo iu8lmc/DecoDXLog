@@ -10,6 +10,21 @@ using namespace decolog::core;
 class TestCqMarathonDb : public QObject {
     Q_OBJECT
 private slots:
+    void waeRegionsAreDistinctFromParentDxcc()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const QList<QPair<QString, QString>> cases{{"I1AAA", ""}, {"IT9AAA", "SY"}, {"IG9AAA", "AI"}};
+        for (const auto &item : cases) {
+            AdifRecord record{{"CALL", item.first}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                              {"BAND", "20m"}, {"MODE", "CW"}, {"DXCC", "248"}, {"REGION", item.second}};
+            QCOMPARE(db.insertQso(record, "test").status, InsertResult::Status::Inserted);
+        }
+        const auto result = cqmarathon::select(cqmarathon::loadEntries(db), {2026, "mixed", 1});
+        QCOMPARE(result.selected.size(), 3);
+        const auto rows = result.toJson().object().value("selected").toArray();
+        QCOMPARE(rows.at(1).toObject().value("entityCode").toInt(), 904);
+        QCOMPARE(rows.at(2).toObject().value("entityCode").toInt(), 903);
+    }
     void persistedProfilesKeepCandidatesSeparate()
     {
         LogDatabase db;

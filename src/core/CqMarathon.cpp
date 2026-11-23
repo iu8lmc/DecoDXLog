@@ -149,13 +149,33 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             if (!newZone) result.exclusions << QStringLiteral("QSO %1: no recorded entity or new valid zone").arg(entry.qsoId);
             continue;
         }
-        if (entityCount.value(entry.dxcc) >= rules.maxPerEntity) {
+        Entry candidate = entry;
+        candidate.entityCode = entry.dxcc;
+        candidate.entityBasis = QStringLiteral("recorded DXCC; special regions may require review");
+        if (rules.year == 2026) {
+            // CQ DX Marathon entity list v1.1, published 2025-11-18. REGION
+            // values are meaningful only in combination with their parent DXCC.
+            struct Special { int dxcc; const char* region; int code; };
+            static constexpr Special special[] = {{206,"IV",901},{279,"SI",902},{248,"AI",903},
+                                                   {248,"SY",904},{259,"BI",905},{390,"ET",906}};
+            const QString region = entry.region.trimmed().toUpper();
+            for (const auto& item : special) {
+                if (entry.dxcc == item.dxcc && region == QLatin1String(item.region)) {
+                    candidate.entityCode = item.code;
+                    candidate.entityBasis = QStringLiteral("recorded DXCC and REGION %1").arg(region);
+                    break;
+                }
+            }
+            if (entry.dxcc >= 901 && entry.dxcc <= 906)
+                candidate.entityBasis = QStringLiteral("recorded Marathon special code; verify source");
+        }
+        if (entityCount.value(candidate.entityCode) >= rules.maxPerEntity) {
             if (!newZone)
                 result.exclusions << QStringLiteral("QSO %1: entity limit reached and no new valid zone").arg(entry.qsoId);
             continue;
         }
-        result.selected << entry;
-        ++entityCount[entry.dxcc];
+        result.selected << candidate;
+        ++entityCount[candidate.entityCode];
     }
     return result;
 }
@@ -166,7 +186,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
     QSqlQuery query(db.connection());
     query.setForwardOnly(true);
     if (!query.exec(QStringLiteral(
-            "SELECT id, call, dxcc, cqz, band, mode, qso_datetime_on, station_profile_id "
+            "SELECT id, call, dxcc, cqz, band, mode, qso_datetime_on, station_profile_id, adif_extra "
             "FROM qso WHERE deleted = 0 ORDER BY qso_datetime_on, id"))) {
         if (error) *error = query.lastError().text();
         return {};
@@ -182,6 +202,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         const auto timestamp=QDateTime::fromString(query.value(6).toString(),Qt::ISODateWithMs);
         if (timestamp.isValid() && timestamp.timeSpec()!=Qt::LocalTime) entry.timestamp=timestamp.toUTC();
         entry.stationProfileId = query.value(7).toLongLong();
+        entry.region = QJsonDocument::fromJson(query.value(8).toByteArray()).object().value(QStringLiteral("REGION")).toString();
         entries << entry;
     }
     return entries;
@@ -194,6 +215,9 @@ QJsonDocument Result::toJson() const
         return QJsonObject{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
                                 {QStringLiteral("call"), entry.call},
                                 {QStringLiteral("dxcc"), entry.dxcc},
+                                {QStringLiteral("region"), entry.region},
+                                {QStringLiteral("entityCode"), entry.entityCode},
+                                {QStringLiteral("entityBasis"), entry.entityBasis},
                                 {QStringLiteral("cqZone"), entry.cqZone},
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("mode"), entry.mode},

@@ -11,6 +11,20 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void specialEntitiesRequireMatchingRecordedRegionAndDxcc()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        struct Case { int dxcc; const char* region; int code; };
+        for (const auto &c : {Case{206,"IV",901}, {279,"SI",902}, {248,"AI",903},
+                              {248,"SY",904}, {259,"BI",905}, {390,"ET",906}}) {
+            Entry e{1,"TEST",c.dxcc,15,"20m","CW",when}; e.region=QString::fromLatin1(c.region).toLower();
+            const auto result=select({e},{2026,"mixed",1}); QCOMPARE(result.selected.size(),1);
+            QCOMPARE(result.selected.first().entityCode,c.code); QCOMPARE(result.selected.first().dxcc,c.dxcc);
+            e.dxcc=291; QCOMPARE(select({e},{2026,"mixed",1}).selected.first().entityCode,291);
+            e.dxcc=c.dxcc; e.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
+            QCOMPARE(select({e},{2025,"mixed",1}).selected.first().entityCode,c.dxcc);
+        }
+    }
     void edition2026FiltersBandAndMobileDesignators()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

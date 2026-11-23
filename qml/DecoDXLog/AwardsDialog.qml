@@ -503,7 +503,7 @@ DialogFrame {
     }
     function probeMarathonReview(profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
-        Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")) })
+        Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); const c=marathonEntityRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")+" entity="+(c ? c.text : "missing")) })
     }
     function beginMarathonAdif(file,year,profile) {
         marathonAdifMessage=decolog.exportCqMarathonReviewAdif(file,year,profile)
@@ -570,7 +570,7 @@ DialogFrame {
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
             ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.selected || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:marathonEntityRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
-                    text:qsTr("QSO %1 · %2 · DXCC %3 · CQ zone %4 · %5 %6 · %7").arg(modelData.qsoId).arg(modelData.call).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
+                    text:qsTr("QSO %1 · %2 · Marathon entity %3 · DXCC %4 · REGION %5 · %6 · CQ zone %7 · %8 %9 · %10").arg(modelData.qsoId).arg(modelData.call).arg(modelData.entityCode).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.region || qsTr("not recorded")).arg(modelData.entityBasis).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Independent zone candidates") }
             ListView { id:marathonZoneRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.zoneCandidates || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:marathonZoneRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary

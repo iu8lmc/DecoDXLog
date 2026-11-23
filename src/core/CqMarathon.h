@@ -17,6 +17,9 @@ struct Entry {
     QString mode;
     QDateTime timestamp;
     qint64 stationProfileId{0};
+    QString region; // recorded ADIF REGION, never inferred from the callsign
+    int entityCode{0}; // preliminary Marathon entity; original DXCC remains unchanged
+    QString entityBasis;
 };
 
 struct Rules {

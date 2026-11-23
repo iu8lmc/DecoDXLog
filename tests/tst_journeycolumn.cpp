@@ -73,10 +73,11 @@ private slots:
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
           QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"CQZ","5"}},"fixture",{},true,profile,false).id>0);
-          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","2m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","4"}},"fixture",{},true,profile,false).id>0); }
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","2m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","4"}},"fixture",{},true,profile,false).id>0);
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","IT9AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1202"},{"BAND","20m"},{"MODE","CW"},{"DXCC","248"},{"REGION","SY"},{"CQZ","15"}},"fixture",{},true,profile,false).id>0); }
         QByteArray output; QVERIFY2(launch(dir,"marathonreviewprobe:"+QString::number(profile),output,4500),output.constData());
-        QVERIFY2(output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC unknown") && output.contains("outside supported 2026 bands") && !output.contains("TypeError"),output.constData());
-        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+        QVERIFY2(output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC unknown") && output.contains("outside supported 2026 bands") && output.contains("Marathon entity 904 · DXCC 248 · REGION SY") && !output.contains("TypeError"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
     }
     void marathonReviewAdifExportsYearAndAlternatives()
     {
