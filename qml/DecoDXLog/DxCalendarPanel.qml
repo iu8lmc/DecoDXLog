@@ -186,6 +186,7 @@ GlassPanel {
             row.probeReviewDates(); dateReview.choose(index)
             const changed=Object.assign({},dateReview.selected)
             delete changed.watched
+            delete changed.watchGoalsOnly
             root.campaignBackend.saveDxCampaign(changed)
             applyDates.clicked(); console.warn("PROBE dxdates stale " + dateReview.visible + " " + dateReview.reviewError)
             dateReview.choose(root.campaignBackend.dxCampaigns.findIndex(c => c.title === "Spring"))
@@ -206,7 +207,7 @@ GlassPanel {
         Qt.callLater(function() {
             const row=list.itemAtIndex(0)
             if (!row) { console.warn("PROBE dxcampaign missing calendar row"); return }
-            row.probePlan(); callsField.text="ZZ1AAA, ZZ1BBB"; bandsField.text="20m, 40m"; modesField.text="CW, FT8"; watchedField.checked=true
+            row.probePlan(); callsField.text="ZZ1AAA, ZZ1BBB"; bandsField.text="20m, 40m"; modesField.text="CW, FT8"; watchedField.checked=true; watchGoalsOnlyField.checked=true
             saveCampaign.clicked(); campaignProbeResult.start()
         })
     }
@@ -360,6 +361,7 @@ GlassPanel {
             observedField.text=draft.observedAt || ""; bandsField.text=(draft.bands || []).join(", "); modesField.text=(draft.modes || []).join(", ")
             profileField.currentIndex=Math.max(0,profileField.ids.indexOf(draft.profileId || 0)); archivedField.checked=!!draft.archived
             watchedField.checked=!!draft.watched
+            watchGoalsOnlyField.checked=!!draft.watchGoalsOnly
             editorError=""; open()
         }
         function splitValues(text) { return text.split(",").map(s => s.trim()).filter(s => s.length) }
@@ -377,7 +379,7 @@ GlassPanel {
             const data={id:draft.id || "", revision:draft.revision || 0, title:titleField.text, calls:splitValues(callsField.text),
                 start:startField.text, end:endField.text, source:sourceField.text, observedAt:observedField.text,
                 bands:splitValues(bandsField.text), modes:splitValues(modesField.text), goals:goalDraft, profileId:profileField.ids[profileField.currentIndex] || 0,
-                archived:archivedField.checked, watched:watchedField.checked}
+                archived:archivedField.checked, watched:watchedField.checked, watchGoalsOnly:watchGoalsOnlyField.checked}
             if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; goalsDirty=false; editorError="" }
             else editorError=root.campaignBackend.dxCampaignError
         }
@@ -427,8 +429,9 @@ GlassPanel {
                 }
                 Text { Layout.fillWidth:true; color:root.mutedColor; wrapMode:Text.Wrap
                     text:qsTr("Watched active campaigns add matching fresh spots to the activity log, respecting the cluster filter and active station profile. Repeated alerts are limited.") }
+                CheckBox { id:watchGoalsOnlyField; objectName:"dxWatchGoalsOnly"; enabled:watchedField.checked; text:qsTr("Alert only for open campaign goals") }
                 Text { id:errorText; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:campaignDialog.editorError || (root.campaignBackend ? root.campaignBackend.dxCampaignError : "") }
-                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor; text:qsTr("Matrix uses saved bands, modes and dates; goals are saved with the campaign. LoTW/card confirmations are local observations, not award credit. Watch alerts currently include all matching cells.") }
+                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor; text:qsTr("Matrix uses saved bands, modes and dates; goals are saved with the campaign. LoTW/card confirmations are local observations, not award credit. With goal-only alerts, cells without a selected goal are excluded.") }
                 RowLayout {
                     Text { color:root.mutedColor; text:qsTr("Goals: %1%2").arg(campaignDialog.goalDraft.length).arg(campaignDialog.goalsDirty ? qsTr(" · unsaved") : "") }
                     CalendarButton { text:qsTr("Clear goals"); enabled:campaignDialog.goalDraft.length>0; onClicked:{ campaignDialog.goalDraft=[]; campaignDialog.goalsDirty=true } }

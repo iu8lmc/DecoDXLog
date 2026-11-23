@@ -127,6 +127,7 @@ public:
     QVariantList presets() const;
     int onlineCount() const;
     QVariantMap filter() const { return m_filter.toMap(); }
+    bool acceptsSpot(const core::EnrichedSpot& spot) const { return m_model.filter().matches(spot,QDateTime::currentDateTimeUtc()); }
     void setFilter(const QVariantMap& map);
     bool followDecodiumBand() const { return m_followBand; }
     void setFollowDecodiumBand(bool on);

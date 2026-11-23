@@ -220,6 +220,7 @@ DecoLogController::DecoLogController(QObject* parent)
     m_activityModel = new ActivityModel(kMaxActivity, this);
     m_qslPlanPool.setMaxThreadCount(1);
     m_dxCampaignPool.setMaxThreadCount(1);
+    m_dxWatchPool.setMaxThreadCount(1);
     connect(this, &DecoLogController::logChanged, this, [this] {
         if (!m_shuttingDown && m_dxWatchPath!=m_db.path()) reloadDxCampaignWatches();
         if (!m_shuttingDown && !m_dxCampaign.isEmpty()) refreshDxCampaign();
@@ -716,7 +717,7 @@ void DecoLogController::shutdown()
     m_statsLatest->fetch_add(1);
     ++m_qslPlanGeneration;
     ++m_dxCampaignGeneration;
-    for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool, &m_qslPlanPool, &m_dxCampaignPool,
+    for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool, &m_qslPlanPool, &m_dxCampaignPool, &m_dxWatchPool,
                               &m_countsPool, &m_backupPool, &m_linkPool,
                               &m_statsViewPool, &m_callInfoPool})
         pool->clear();
@@ -728,6 +729,7 @@ void DecoLogController::shutdown()
     m_importPool.waitForDone();
     m_qslPlanPool.waitForDone();
     m_dxCampaignPool.waitForDone();
+    m_dxWatchPool.waitForDone();
     // ADIF exports use QSaveFile and must also finish once accepted.
     m_exportPool.waitForDone();
 }
@@ -2277,7 +2279,7 @@ QVariantMap campaignMap(const dxcampaign::Campaign& c)
         {QStringLiteral("start"),c.start.toString(Qt::ISODate)},{QStringLiteral("end"),c.end.toString(Qt::ISODate)},
         {QStringLiteral("source"),c.source},{QStringLiteral("observedAt"),c.verifiedAt.toUTC().toString(Qt::ISODate)},
         {QStringLiteral("bands"),c.bands},{QStringLiteral("modes"),c.modes},{QStringLiteral("goals"),goals},{QStringLiteral("profileId"),c.stationProfileId},
-        {QStringLiteral("archived"),c.archived},{QStringLiteral("watched"),c.watched},{QStringLiteral("revision"),c.revision}};
+        {QStringLiteral("archived"),c.archived},{QStringLiteral("watched"),c.watched},{QStringLiteral("watchGoalsOnly"),c.watchGoalsOnly},{QStringLiteral("revision"),c.revision}};
 }
 }
 
@@ -2309,20 +2311,50 @@ void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
         // emit using a stale cached revision; refresh and wait for a new spot.
         const auto current=dxcampaign::load(m_db,campaign.id);
         if (!current || current->revision!=campaign.revision) { reloadDxCampaignWatches(); return; }
-        const QString key=campaign.id+QLatin1Char('|')+spot.key();
-        const QDateTime last=m_dxWatchRecent.value(key);
+        if (!campaign.watchGoalsOnly) { emitDxCampaignAlert(campaign,spot); continue; }
+        const QString recentKey=campaign.id+QLatin1Char('|')+spot.key();
+        const QDateTime last=m_dxWatchRecent.value(recentKey);
         if (last.isValid() && last.secsTo(now)<600) continue;
-        if (m_dxWatchRecent.size()>=4096) {
-            for (auto it=m_dxWatchRecent.begin();it!=m_dxWatchRecent.end();) {
-                if (!it.value().isValid() || it.value().secsTo(now)>=600) it=m_dxWatchRecent.erase(it); else ++it;
-            }
-            if (m_dxWatchRecent.size()>=4096) continue;
-        }
-        m_dxWatchRecent.insert(key,now);
-        addActivity(QStringLiteral("DXCAMPAIGN"),tr("Watched %1: %2 · %3 · %4 (%5 kHz)")
-            .arg(campaign.title,spot.spot.dxCall,spot.spot.band,spot.spot.mode,QString::number(spot.spot.freqKhz,'f',1)),
-            QStringLiteral("highlight"));
+        const QString band=spot.spot.band.trimmed().toLower(), mode=dxcampaign::matrixMode(campaign,spot.spot.mode);
+        bool hasGoal=false;
+        for (const auto& goal : campaign.goals) if (goal.band==band && goal.mode==mode) { hasGoal=true; break; }
+        if (!hasGoal) continue;
+        const QString pendingKey=m_db.path()+QLatin1Char('|')+campaign.id+QLatin1Char('|')+QString::number(campaign.revision)+QLatin1Char('|')+spot.key();
+        if (m_dxWatchPending.contains(pendingKey) || m_dxWatchPending.size()>=128 || m_db.path().isEmpty() || m_db.path()==QLatin1String(":memory:")) continue;
+        m_dxWatchPending.insert(pendingKey);
+        const QString path=m_db.path(); const quint64 logVersion=m_logVersion;
+        QPointer<DecoLogController> self(this);
+        m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,pendingKey] {
+            LogDatabase db; QString error; bool needed=false;
+            if (db.open(path)) { const auto cells=dxcampaign::matrix(db,campaign,&error); needed=error.isEmpty() && dxcampaign::watchGoalNeeded(campaign,cells,spot); }
+            if (!self) return;
+            QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,pendingKey,needed] {
+                if (!self) return; self->m_dxWatchPending.remove(pendingKey);
+                if (!needed || self->m_shuttingDown || self->m_db.path()!=path || self->m_logVersion!=logVersion ||
+                    !self->m_cluster || !self->m_cluster->acceptsSpot(spot) ||
+                    (self->m_profiles ? self->m_profiles->activeProfileId() : 0)!=profile ||
+                    !dxcampaign::watchMatches(campaign,spot,QDateTime::currentDateTimeUtc(),profile)) return;
+                const auto current=dxcampaign::load(self->m_db,campaign.id);
+                if (!current || current->revision!=campaign.revision) { self->reloadDxCampaignWatches(); return; }
+                self->emitDxCampaignAlert(campaign,spot);
+            },Qt::QueuedConnection);
+        });
     }
+}
+
+void DecoLogController::emitDxCampaignAlert(const dxcampaign::Campaign& campaign,const EnrichedSpot& spot)
+{
+    const QDateTime now=QDateTime::currentDateTimeUtc(); const QString key=campaign.id+QLatin1Char('|')+spot.key();
+    const QDateTime last=m_dxWatchRecent.value(key); if (last.isValid() && last.secsTo(now)<600) return;
+    if (m_dxWatchRecent.size()>=4096) {
+        for (auto it=m_dxWatchRecent.begin();it!=m_dxWatchRecent.end();) {
+            if (!it.value().isValid() || it.value().secsTo(now)>=600) it=m_dxWatchRecent.erase(it); else ++it;
+        }
+        if (m_dxWatchRecent.size()>=4096) return;
+    }
+    m_dxWatchRecent.insert(key,now);
+    addActivity(QStringLiteral("DXCAMPAIGN"),tr("Watched %1: %2 · %3 · %4 (%5 kHz)")
+        .arg(campaign.title,spot.spot.dxCall,spot.spot.band,spot.spot.mode,QString::number(spot.spot.freqKhz,'f',1)),QStringLiteral("highlight"));
 }
 
 bool DecoLogController::saveDxCampaign(const QVariantMap& values)
@@ -2351,6 +2383,8 @@ bool DecoLogController::saveDxCampaign(const QVariantMap& values)
         const auto existing=dxcampaign::load(m_db,c.id);
         if (existing) c.watched=existing->watched;
     }
+    if (values.contains(QStringLiteral("watchGoalsOnly"))) c.watchGoalsOnly=values.value(QStringLiteral("watchGoalsOnly")).toBool();
+    else if (!c.id.isEmpty()) { const auto existing=dxcampaign::load(m_db,c.id); if (existing) c.watchGoalsOnly=existing->watchGoalsOnly; }
     c.revision=values.value(QStringLiteral("revision")).toInt();
     if (!dxcampaign::save(m_db,c,&m_dxCampaignError)) { emit dxCampaignChanged(); return false; }
     reloadDxCampaignWatches();

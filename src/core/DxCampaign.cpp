@@ -59,7 +59,7 @@ QJsonObject encode(const Campaign& c)
         {"start",c.start.toString(Qt::ISODate)},{"end",c.end.toString(Qt::ISODate)},{"source",c.source},
         {"verifiedAt",c.verifiedAt.toUTC().toString(Qt::ISODateWithMs)},{"bands",QJsonArray::fromStringList(c.bands)},
         {"modes",QJsonArray::fromStringList(c.modes)},{"stationProfileId",QString::number(c.stationProfileId)},
-        {"archived",c.archived},{"watched",c.watched},{"goals",goals},{"revision",c.revision}};
+        {"archived",c.archived},{"watched",c.watched},{"watchGoalsOnly",c.watchGoalsOnly},{"goals",goals},{"revision",c.revision}};
 }
 QStringList strings(const QJsonValue& v)
 {
@@ -82,7 +82,7 @@ std::optional<Campaign> decode(const QString& raw)
         }
     }
     bool ok=false; c.stationProfileId=o.value("stationProfileId").toString().toLongLong(&ok);
-    c.archived=o.value("archived").toBool(); c.watched=o.value("watched").toBool(false); c.revision=o.value("revision").toInt();
+    c.archived=o.value("archived").toBool(); c.watched=o.value("watched").toBool(false); c.watchGoalsOnly=o.value("watchGoalsOnly").toBool(false); c.revision=o.value("revision").toInt();
     if(!ok || c.id.isEmpty() || c.revision<1 || !valid(c,nullptr)) return {}; return c;
 }
 }
@@ -164,6 +164,13 @@ QString matrixMode(const Campaign& c,const QString& reportedMode)
     if (normal.isEmpty()) return {};
     for (const QString& mode : c.modes) if (campaignMode(mode)==normal) return mode;
     return {};
+}
+bool watchGoalNeeded(const Campaign& c,const QList<Cell>& cells,const EnrichedSpot& spot)
+{
+    const QString band=spot.spot.band.trimmed().toLower();
+    const QString mode=matrixMode(c,spot.spot.mode);
+    for (const Cell& cell : cells) if (cell.band==band && cell.mode==mode) return !cell.target.isEmpty() && cell.needed;
+    return false;
 }
 QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visible,
                                const QDateTime& now,int maxAgeMinutes)

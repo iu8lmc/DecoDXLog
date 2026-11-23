@@ -1006,6 +1006,7 @@ private:
     void awardFilterChanged();
     void reloadDxCampaignWatches();
     void noteDxCampaignSpot(const core::EnrichedSpot& spot);
+    void emitDxCampaignAlert(const core::dxcampaign::Campaign& campaign, const core::EnrichedSpot& spot);
     QJsonObject decoLinkAward() const;
     QJsonArray decoLinkQuery(const QJsonObject& query) const;
     void decoLinkQso(const core::AdifRecord& record, const QString& status, qint64 id,
@@ -1026,6 +1027,8 @@ private:
     bool m_dxCampaignBusy{false};
     quint64 m_dxCampaignGeneration{0};
     QThreadPool m_dxCampaignPool;
+    QThreadPool m_dxWatchPool;
+    QSet<QString> m_dxWatchPending;
     QList<core::dxcampaign::Campaign> m_dxWatchedCampaigns;
     QString m_dxWatchPath;
     QHash<QString,QDateTime> m_dxWatchRecent;

@@ -62,6 +62,22 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void watchedCampaignCanAlertOnlyForOpenGoals()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto now=QDateTime::currentDateTimeUtc();
+          dxcampaign::Campaign c; c.title="Goal watch"; c.calls={"3Y0J","3Y0K"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="synthetic"; c.verifiedAt=now; c.bands={"20m","40m","15m"}; c.modes={"CW"}; c.watched=true; c.watchGoalsOnly=true;
+          c.goals={{"20m","CW","worked"},{"40m","CW","confirmed"}}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+          for (const char* band : {"20m","40m"}) QVERIFY(db.insertQso(AdifRecord{{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND",band},{"MODE","CW"}},"import").id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"dxgoalwatchprobe",output,5500,true),output.constData());
+        QVERIFY2(output.contains("PROBE dxgoalwatch done"),output.constData());
+        QCOMPARE(output.count("[activity] DXCAMPAIGN|highlight|"),1);
+        QVERIFY2(output.contains("Goal watch: 3Y0J · 40m") && !output.contains("Goal watch: 3Y0J · 20m") && !output.contains("Goal watch: 3Y0J · 15m") && !output.contains("Goal watch: 3Y0K"),output.constData());
+        QByteArray reopened; QVERIFY2(launch(dir,"dxgoalwatchprobe",reopened,5500,true),reopened.constData());
+        QCOMPARE(reopened.count("[activity] DXCAMPAIGN|highlight|"),0);
+    }
     void watchedCampaignAlertsRespectFiltersProfileAndRestart()
     {
         using namespace decolog::core;
@@ -102,7 +118,7 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString firstId, secondId;
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           dxcampaign::Campaign c; c.title="Spring"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7);
-          c.source="original source"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.watched=true;
+          c.source="original source"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.watched=true; c.watchGoalsOnly=true;
           QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); firstId=c.id;
           c.id.clear(); c.revision=0; c.title="Autumn"; c.start=QDate(2026,10,1); c.end=QDate(2026,10,7); c.watched=false;
           QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); secondId=c.id;
@@ -114,7 +130,7 @@ private slots:
         QVERIFY2(!output.contains("TypeError"),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
         const auto first=dxcampaign::load(db,firstId), second=dxcampaign::load(db,secondId); QVERIFY(first && second);
-        QCOMPARE(first->end,QDate(2026,1,10)); QCOMPARE(first->revision,3); QCOMPARE(first->calls,QStringList({"ZZ1AAA"})); QVERIFY(first->watched);
+        QCOMPARE(first->end,QDate(2026,1,10)); QCOMPARE(first->revision,3); QCOMPARE(first->calls,QStringList({"ZZ1AAA"})); QVERIFY(first->watched); QVERIFY(first->watchGoalsOnly);
         QCOMPARE(first->source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(first->verifiedAt.toString(Qt::ISODate),QString("2026-01-09T10:00:00Z"));
         QCOMPARE(second->end,QDate(2026,10,7)); QCOMPARE(second->revision,1); QCOMPARE(second->source,QString("original source")); QCOMPARE(db.qsoCount(),1);
     }
@@ -137,7 +153,7 @@ private slots:
         QVERIFY2(restored.contains("PROBE dxcampaign restored matrix") && restored.contains("PROBE dxcampaign rendered 20m · CW · confirmed (1/1)"),restored.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QString error; const auto campaigns=dxcampaign::list(db,&error);
         QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(campaigns.size(),1); QCOMPARE(campaigns.first().calls.size(),2);
-        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,4); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched);
+        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,4); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched); QVERIFY(campaigns.first().watchGoalsOnly);
         QCOMPARE(campaigns.first().goals.size(),1); QCOMPARE(campaigns.first().goals.first().target,QString("confirmed"));
     }
     void qslAlternativesDesktopPagesAndInvalidates()

@@ -78,6 +78,21 @@ private slots:
         QCOMPARE(dxcampaign::matrixMode(c,"FM"),QString());
         c.modes={"USB","LSB"}; QCOMPARE(dxcampaign::matrixMode(c,"LSB"),QString("LSB"));
     }
+    void goalOnlyWatchUsesOpenCellAndKeepsLegacyDefault()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); const auto now=QDateTime::currentDateTimeUtc();
+        dxcampaign::Campaign c; c.title="Watch goals"; c.calls={"3Y0J"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+        c.source="fixture"; c.verifiedAt=now; c.bands={"20m","40m"}; c.modes={"SSB","USB"}; c.watched=true;
+        c.goals={{"20m","SSB","confirmed"},{"20m","USB","worked"}};
+        EnrichedSpot spot; spot.spot.dxCall="3Y0J"; spot.spot.time=now; spot.spot.band="20m"; spot.spot.mode="USB";
+        QString error; QVERIFY(dxcampaign::save(db,c,&error)); auto saved=dxcampaign::load(db,c.id); QVERIFY(saved); QVERIFY(!saved->watchGoalsOnly);
+        QVERIFY(dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","USB"}},"import").id>0);
+        QVERIFY(!dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        spot.spot.mode="LSB"; QVERIFY(dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        spot.spot.band="40m"; QVERIFY(!dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        c.watchGoalsOnly=true; QVERIFY(dxcampaign::save(db,c,&error)); saved=dxcampaign::load(db,c.id); QVERIFY(saved); QVERIFY(saved->watchGoalsOnly);
+    }
     void matrixRespectsProfileAndRejectsInvalidChanges()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile a; a.name="A"; a.stationCallsign="9H1AA"; const qint64 first=db.saveStationProfile(a);
