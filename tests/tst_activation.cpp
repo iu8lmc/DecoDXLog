@@ -23,6 +23,30 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void archivedContestReportExportIsExactAndProtectsLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");
+        const QByteArray bytes="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\r\nCall: K1ABC\r\n****** Not In Log ******\r\nunknown\r\n";
+        LogDatabase db; QVERIFY(db.open(path)); QString error; const qint64 id=db.archiveContestReport(bytes,"file.rpt",&error); QVERIFY(id>0);
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy history(&act,&ActivationController::contestReportHistoryFinished); QSignalSpy exported(&act,&ActivationController::contestReportExportFinished);
+        QVERIFY(act.startContestReportHistory()); QTRY_COMPARE_WITH_TIMEOUT(history.size(),1,5000);
+        const auto row=history.first().at(0).toMap().value("reports").toList().first().toMap(); const auto sha=row.value("sha256").toString();
+        QVERIFY(!act.startContestReportExport(id,sha,QUrl::fromLocalFile(path)));
+        QVERIFY(!act.startContestReportExport(id,sha,QUrl::fromLocalFile(path+"-wal")));
+        const QString alias=dir.filePath("alias.sqlite"); QVERIFY(QFile::link(path,alias));
+        QVERIFY(!act.startContestReportExport(id,sha,QUrl::fromLocalFile(alias)));
+        QVERIFY(!act.startContestReportExport(id,QStringLiteral("wrong"),QUrl::fromLocalFile(dir.filePath("wrong.rpt"))));
+        const QString output=dir.filePath("copy.rpt"); QVERIFY(act.startContestReportExport(id,sha,QUrl::fromLocalFile(output)));
+        QTRY_COMPARE_WITH_TIMEOUT(exported.size(),1,5000); QVERIFY2(exported.first().at(0).toBool(),qPrintable(exported.first().at(1).toString()));
+        QFile copy(output); QVERIFY(copy.open(QIODevice::ReadOnly)); QCOMPARE(copy.readAll(),bytes);
+        QCOMPARE(db.contestReportBytes(id),bytes); QCOMPARE(db.qsoCount(),qint64(0));
+        QSqlQuery corrupt(db.connection()); corrupt.prepare("UPDATE contest_report_archive SET original=? WHERE id=?");
+        corrupt.addBindValue(QByteArray("changed")); corrupt.addBindValue(id); QVERIFY(corrupt.exec());
+        const QString guarded=dir.filePath("existing.rpt"); QFile existing(guarded); QVERIFY(existing.open(QIODevice::WriteOnly)); existing.write("keep"); existing.close();
+        QVERIFY(act.startContestReportExport(id,sha,QUrl::fromLocalFile(guarded))); QTRY_COMPARE_WITH_TIMEOUT(exported.size(),2,5000);
+        QVERIFY(!exported.last().at(0).toBool()); QVERIFY(existing.open(QIODevice::ReadOnly)); QCOMPARE(existing.readAll(),QByteArray("keep"));
+    }
     void archivedContestReportHistoryReopensAndChecksIdentity()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString log=dir.filePath("log.sqlite");

@@ -1081,6 +1081,65 @@ bool ActivationController::startArchivedContestReportPreview(qint64 id, const QS
     return true;
 }
 
+static bool safeContestReportDestination(const QString& output, const QString& logPath)
+{
+    if (output.isEmpty() || logPath.isEmpty()) return false;
+    const QFileInfo outInfo(output);
+    const auto resolvedTarget=[](const QFileInfo& info) {
+        const QString parent=info.dir().canonicalPath();
+        return parent.isEmpty() ? info.absoluteFilePath() : QDir(parent).absoluteFilePath(info.fileName());
+    };
+    for (const QString& protectedPath : {logPath, logPath + QStringLiteral("-wal"),
+                                          logPath + QStringLiteral("-shm"), logPath + QStringLiteral("-journal")}) {
+        const QFileInfo protectedInfo(protectedPath);
+        std::error_code ec;
+        const bool same = std::filesystem::equivalent(std::filesystem::path(output.toStdString()),
+                                                       std::filesystem::path(protectedPath.toStdString()), ec);
+        if (outInfo.absoluteFilePath()==protectedInfo.absoluteFilePath() ||
+            resolvedTarget(outInfo)==resolvedTarget(protectedInfo) || (!ec && same)) return false;
+    }
+    return true;
+}
+
+bool ActivationController::startContestReportExport(qint64 id, const QString& sha256, const QUrl& destination)
+{
+    if (m_contestReportBusy || !destination.isLocalFile() || !m_ctx.db || !m_ctx.db->isOpen() || id<=0 ||
+        m_ctx.db->path()!=m_contestReportHistoryPath || m_ctx.db->openGeneration()!=m_contestReportHistoryGeneration ||
+        !m_contestReportHistoryIds.contains(id) || m_contestReportHistoryIds.value(id)!=sha256 ||
+        !safeContestReportDestination(destination.toLocalFile(),m_contestReportHistoryPath)) return false;
+    const QString path=m_contestReportHistoryPath, output=destination.toLocalFile();
+    m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self,path,output,id,sha256] {
+        QString error; QByteArray bytes; LogDatabase db;
+        if (!db.openReadOnly(path)) error=db.lastError();
+        else {
+            QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT sha256,length(original),CASE WHEN length(original)<=2097152 THEN original END FROM contest_report_archive WHERE id=?")); q.addBindValue(id);
+            if (!q.exec()) error=q.lastError().text();
+            else if (!q.next()) error=tr("The archived report is no longer available.");
+            else {
+                bytes=q.value(2).toByteArray();
+                const QString actual=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+                if (q.value(1).toLongLong()>2*1024*1024 || q.value(0).toString()!=sha256 || actual!=sha256)
+                    error=tr("The archived report changed or is damaged.");
+            }
+        }
+        if (error.isEmpty() && !safeContestReportDestination(output,path)) error=tr("Choose a file other than the log database and its SQLite files.");
+        if (error.isEmpty()) {
+            QSaveFile file(output); file.setDirectWriteFallback(false);
+            if (!file.open(QIODevice::WriteOnly)) error=file.errorString();
+            else if (file.write(bytes)!=bytes.size()) { error=file.errorString(); file.cancelWriting(); }
+            else if (!file.commit()) error=file.errorString();
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self,error,output] {
+            if (!self) return;
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged();
+            emit self->contestReportExportFinished(error.isEmpty(),error.isEmpty() ? tr("Exported to %1.").arg(output) : error);
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
+
 bool ActivationController::archiveContestReportPreview()
 {
     if (m_contestReportBusy || m_contestReportSnapshot.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||

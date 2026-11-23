@@ -67,6 +67,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void contestReportHistoryExportsOriginalBytes()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
+        const QByteArray source="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\r\nCall: K1ABC\r\n****** Not In Log ******\r\nunknown row\r\n";
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log)); QString error; QVERIFY2(db.archiveContestReport(source,"source.rpt",&error)>0,qPrintable(error)); }
+        const QString outputPath=dir.filePath("exported.rpt"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("cqwwexportprobe:")+outputPath,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE lcr exported true") && !output.contains("TypeError"),output.constData());
+        QFile file(outputPath); QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(),source);
+        decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(0)); QCOMPARE(db.contestReports().size(),1);
+    }
     void contestReportHistoryReopensAfterRestart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

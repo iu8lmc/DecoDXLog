@@ -85,6 +85,7 @@ public:
     Q_INVOKABLE bool archiveContestReportPreview();
     Q_INVOKABLE bool startContestReportHistory(qint64 beforeId = 0);
     Q_INVOKABLE bool startArchivedContestReportPreview(qint64 id, const QString& sha256);
+    Q_INVOKABLE bool startContestReportExport(qint64 id, const QString& sha256, const QUrl& destination);
     bool partitionExportBusy() const { return m_partitionExportBusy; }
     Q_INVOKABLE bool startPartitionExport(const QVariantMap& group, const QUrl& destination);
     Q_INVOKABLE void cancelPartitionExport();
@@ -200,6 +201,7 @@ signals:
     void contestReportFinished(const QVariantMap& result);
     void contestReportArchiveFinished(bool success, const QString& message);
     void contestReportHistoryFinished(const QVariantMap& result);
+    void contestReportExportFinished(bool success, const QString& message);
     void previewFinished(bool success);
     void partitionExportChanged();
     void partitionExportFinished(bool success, const QString& message);
