@@ -584,6 +584,12 @@ DialogFrame {
         marathonYear=2026; refreshMarathon()
         console.warn("PROBE marathonEntityLimit before="+before+" after="+marathonMaxPerEntity+","+marathonEntityLimit.enabled+" entities="+marathonWorkingEntities.length+" zones="+marathonWorkingZones.length)
     }
+    function probeMarathonUnknownMode(profile) {
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="digital"; refreshMarathon()
+        const digital=marathonWorkingZones.length, excluded=marathonPreview.exclusions.join("|")
+        marathonCategory="mixed"; refreshMarathon()
+        console.warn("PROBE marathonUnknownMode digital="+digital+" excluded="+excluded+" mixed="+marathonWorkingZones.length+" warnings="+marathonPreview.warnings.join("|"))
+    }
     function probeMarathonReviewedImport(path,profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
         const before=marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId

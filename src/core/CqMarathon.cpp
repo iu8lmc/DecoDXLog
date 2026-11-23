@@ -80,6 +80,22 @@ bool categoryMatches(const Entry& entry, const QString& category)
     if (c == QLatin1String("digital")) return group == QLatin1String("DATA");
     return false;
 }
+bool knownMarathonMode(const QString& value)
+{
+    static const QSet<QString> known=[] {
+        QSet<QString> result{QStringLiteral("SSB"),QStringLiteral("PHONE"),QStringLiteral("DSB"),QStringLiteral("CWR"),
+            QStringLiteral("DIGITALVOICE"),QStringLiteral("DSTAR"),QStringLiteral("C4FM"),QStringLiteral("DMR"),
+            QStringLiteral("ARDOP"),QStringLiteral("CHIP"),QStringLiteral("CLO"),QStringLiteral("DYNAMIC"),QStringLiteral("DOMINO"),
+            QStringLiteral("FAX"),QStringLiteral("FSK441"),QStringLiteral("ISCAT"),QStringLiteral("JT4"),QStringLiteral("JT6M"),
+            QStringLiteral("JT44"),QStringLiteral("MT63"),QStringLiteral("OPERA"),QStringLiteral("PAC"),QStringLiteral("PAX"),
+            QStringLiteral("PKT"),QStringLiteral("PSK"),QStringLiteral("PSK2K"),QStringLiteral("Q15"),QStringLiteral("QRA64"),
+            QStringLiteral("ROS"),QStringLiteral("RTTYM"),QStringLiteral("ATV"),QStringLiteral("T10"),QStringLiteral("THOR"),
+            QStringLiteral("THRB"),QStringLiteral("TOR"),QStringLiteral("V4"),QStringLiteral("WINMOR")};
+        for (const auto& mode : modes::all()) result.insert(mode.name.toUpper());
+        return result;
+    }();
+    return known.contains(value.trimmed().toUpper());
+}
 }
 
 bool Result::isValid(QString* error) const
@@ -139,6 +155,15 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         if (rules.stationProfileId > 0 && entry.stationProfileId != rules.stationProfileId) {
             result.exclusions << QStringLiteral("QSO %1: outside selected station profile").arg(entry.qsoId);
             continue;
+        }
+        if (rules.year==2026 && entry.mode.trimmed().isEmpty()) {
+            result.exclusions << QStringLiteral("QSO %1: missing recorded mode").arg(entry.qsoId); continue;
+        }
+        if (rules.year==2026 && !knownMarathonMode(entry.mode)) {
+            if (normalizedCategory(rules.category)!=QLatin1String("mixed")) {
+                result.exclusions << QStringLiteral("QSO %1: unrecognised mode classification; review before single-mode selection").arg(entry.qsoId); continue;
+            }
+            result.warnings << QStringLiteral("QSO %1: unrecognised mode %2; review classification and eligibility").arg(entry.qsoId).arg(entry.mode);
         }
         if (!categoryMatches(entry, rules.category)) {
             result.exclusions << QStringLiteral("QSO %1: category mismatch").arg(entry.qsoId);

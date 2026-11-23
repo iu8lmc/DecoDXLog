@@ -69,6 +69,15 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonUnknownModeRequiresClassification()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","MYSTERY"),qMakePair("K2BBB","FT8")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE",item.second},{"DXCC","291"},{"CQZ",item.first==QString("K1AAA")?"5":"3"}},"fixture",{},true,profile,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"marathonmodeprobe:"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("digital=1 excluded=QSO 1: unrecognised mode classification") && output.contains("mixed=2 warnings=QSO 1: unrecognised mode MYSTERY") && !output.contains("TypeError"),output.constData());
+    }
     void marathonPriorReviewRestoresWithFrequencyRecheck()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

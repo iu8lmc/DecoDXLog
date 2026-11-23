@@ -1319,6 +1319,7 @@ RoundedWindow {
         else if (what[0] === "marathonimportprobe") Qt.callLater(() => awardsDialog.probeMarathonReviewedImport(what[1],what[2]))
         else if (what[0] === "marathonbandprobe") Qt.callLater(() => awardsDialog.probeMarathonSingleBand(what[1],what[2]))
         else if (what[0] === "marathonlimitprobe") Qt.callLater(() => awardsDialog.probeMarathonEntityLimit(what[1]))
+        else if (what[0] === "marathonmodeprobe") Qt.callLater(() => awardsDialog.probeMarathonUnknownMode(what[1]))
         else if (what[0] === "qslocr") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1])) }
         else if (what[0] === "qslocrmatches") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true)) }
         else if (what[0] === "qslocrfiltered") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true, false, true)) }

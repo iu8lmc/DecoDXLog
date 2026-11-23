@@ -11,6 +11,18 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void unknownModeIsNotAssumedDigitalIn2026()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","MYSTERY",when}, {2,"K2BBB",291,3,"20m","FT8",when},
+                                   {3,"K3CCC",291,4,"20m","",when}};
+        const auto digital=select(entries,{2026,"digital",1});
+        QCOMPARE(digital.zoneCandidates.size(),1); QCOMPARE(digital.zoneCandidates.first().qsoId,qint64(2));
+        QVERIFY(digital.exclusions.join('\n').contains("unrecognised mode classification"));
+        const auto mixed=select(entries,{2026,"mixed",1}); QCOMPARE(mixed.zoneCandidates.size(),2);
+        QVERIFY(mixed.warnings.join('\n').contains("unrecognised mode"));
+        QVERIFY(mixed.exclusions.join('\n').contains("missing recorded mode"));
+    }
     void propagationEvidenceIsEditionScoped()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

@@ -11,6 +11,18 @@ using namespace decolog::core;
 class TestCqMarathonDb : public QObject {
     Q_OBJECT
 private slots:
+    void adifContainerModesKeepVoiceAndDataDistinct()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto& item : {qMakePair("MFSK","FT4"),qMakePair("DIGITALVOICE","DMR")}) {
+            AdifRecord rec{{"CALL",item.first==QString("MFSK")?"K1AAA":"K2BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},
+                           {"BAND","20m"},{"MODE",item.first},{"SUBMODE",item.second},{"DXCC","291"},{"CQZ",item.first==QString("MFSK")?"5":"3"}};
+            QCOMPARE(db.insertQso(rec,"test").status,InsertResult::Status::Inserted);
+        }
+        const auto entries=cqmarathon::loadEntries(db);
+        QCOMPARE(cqmarathon::select(entries,{2026,"digital",1}).selected.first().call,QString("K1AAA"));
+        QCOMPARE(cqmarathon::select(entries,{2026,"phone",1}).selected.first().call,QString("K2BBB"));
+    }
     void recordedFrequencyConflictsAreVisible()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
