@@ -147,9 +147,18 @@ TestCase {
         tracker.open()
         const mode = findChild(tracker, "manualMode")
         mode.currentIndex = mode.find("CW"); mode.activated(mode.currentIndex)
-        tracker.qsyTo("20m", "CW", true)
+        compare(findChild(tracker, "manualTxFrequency").text, "145.998596", "Changing mode must preserve the tracker TX snapshot")
+        const band = findChild(tracker, "manualBand")
+        band.currentIndex = band.find("20m"); band.activated(band.currentIndex)
+        compare(findChild(tracker, "manualTxFrequency").text, "145.998596", "Changing band must preserve the tracker TX snapshot")
+        compare(band.currentText, decolog.bandForFrequency("145.998596"), "Band must match the preserved TX frequency")
         compare(decolog.tuneCalls, 1, "Tracker draft must not tune the connected rig")
         compare(findChild(tracker, "manualRxFrequency").text, "435.004184")
+        tracker.close(); tracker.open()
+        compare(tracker.trackerPrepared, false, "Reopened ordinary draft must clear tracker state")
+        compare(findChild(tracker, "manualRxFrequency").text, "")
+        mode.currentIndex = mode.find("CW"); mode.activated(mode.currentIndex)
+        compare(decolog.tuneCalls, 2, "Ordinary tuning must work after reopening")
         decolog.rig.connected = false
     }
 

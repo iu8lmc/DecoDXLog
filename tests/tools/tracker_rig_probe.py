@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-tracker-rig-') as tmp, RigServe
     result=subprocess.run(args,env=env,capture_output=True,text=True,timeout=25); output=result.stdout+result.stderr
     rig.shutdown(); tracker.shutdown()
     expected=['GET_MODE','GET_TLE OSCAR-7','GET_SAT OSCAR-7','GET_DOPPLER OSCAR-7','GET_TLE OSCAR-7','GET_MODE']
-    if result.returncode or 'PROBE trackerRig selections=true tracker=true connected=true' not in output or tracker.commands != expected:
+    if result.returncode or 'PROBE trackerRig selections=true tracker=true connected=true tx=145.998596 rx=435.004184' not in output or tracker.commands != expected:
         raise SystemExit(f'Probe failed: {output}; rig={rig.commands}; tracker={tracker.commands}')
     with sqlite3.connect(root/'test.sqlite') as db: assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0]==0
     writes=[c for c in rig.commands if c.split(' ',1)[0] in {'F','I','S','T','M'}]

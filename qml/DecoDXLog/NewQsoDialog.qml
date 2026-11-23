@@ -67,6 +67,14 @@ DialogFrame {
     function qsyTo(band, mode, bandChanged) {
         if (root.historicalMode)
             return
+        if (root.trackerPrepared) {
+            if (bandChanged) {
+                const currentBand = decolog.bandForFrequency(freqField.text)
+                const index = bandBox.find(currentBand)
+                bandBox.currentIndex = index >= 0 ? index : 0
+            }
+            return
+        }
         if (!band || band === "—")
             return
         const m = String(mode || "").toUpperCase()
@@ -207,7 +215,8 @@ DialogFrame {
         modeBox.currentIndex = modeBox.find("CW")
         modeBox.activated(modeBox.currentIndex)
         root.qsyTo("20m", "CW", true)
-        console.warn("PROBE trackerRig selections=true tracker=" + root.trackerPrepared + " connected=" + decolog.rig.connected)
+        console.warn("PROBE trackerRig selections=true tracker=" + root.trackerPrepared + " connected=" + decolog.rig.connected
+                     + " tx=" + freqField.text + " rx=" + rxFreqField.text)
     }
     function probeTrackerDraftSave(mode) {
         callField.text = ""
@@ -398,7 +407,7 @@ DialogFrame {
         Text {
             Layout.fillWidth: true
             visible: root.trackerPrepared
-            text: qsTr("Tracker frequencies are a fixed snapshot; review them before saving. Band and mode changes in this draft do not tune the radio.")
+            text: qsTr("Tracker frequencies are a fixed snapshot; review them before saving. The band follows TX frequency; changing mode or band does not tune the radio or replace the frequencies.")
             color: Theme.warningColor
             wrapMode: Text.Wrap
         }
@@ -575,6 +584,7 @@ DialogFrame {
                     label: qsTr("Band")
                     StyledComboBox {
                         id: bandBox
+                        objectName: "manualBand"
                         Layout.fillWidth: true
                         model: ["—"].concat(decolog.bands)
                         onActivated: root.qsyTo(currentText, root.tuneMode(), true)

@@ -5537,6 +5537,10 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
         <source>Tracker frequencies are a fixed snapshot; review them before saving. Band and mode changes in this draft do not tune the radio.</source>
         <translation>Le frequenze del tracker sono un’istantanea; controllale prima di salvare. Le modifiche di banda e modo in questa bozza non sintonizzano la radio.</translation>
     </message>
+    <message>
+        <source>Tracker frequencies are a fixed snapshot; review them before saving. The band follows TX frequency; changing mode or band does not tune the radio or replace the frequencies.</source>
+        <translation>Le frequenze del tracker sono un’istantanea; controllale prima di salvare. La banda segue la frequenza TX; cambiarla o cambiare modo non sintonizza la radio né sostituisce le frequenze.</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
