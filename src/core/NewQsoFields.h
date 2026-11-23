@@ -62,6 +62,7 @@ DerivedValuesResult computeDerivedValues(const QVariantList& definitions, const 
 QString validateDerivedFormulas(const QVariantList& definitions, QString* invalidField = nullptr);
 QString makeDerivedTrace(const QVariantList& definitions, const QVariantMap& allValues, const QVariantMap& computed, const QLocale& locale);
 QVariantMap inspectDerivedTrace(const QVariantMap& values);
+QVariantMap previewDerivedRecalculation(const QVariantMap& values);
 
 QString encodeCustomFields(const QVariantList& fields);
 QVariantList decodeCustomFields(const QString& json, bool* legacyIota = nullptr);

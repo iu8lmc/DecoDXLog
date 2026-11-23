@@ -85,6 +85,17 @@ private slots:
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto record=db.record(1); QVERIFY(record);
         QCOMPARE(record->value("APP_A"),QString("6")); QCOMPARE(record->value("APP_B"),QString("10")); QCOMPARE(record->value("APP_C"),QString("11"));
         QCOMPARE(record->value("APP_DECOLOG_DERIVED_V1"),originalTrace); QCOMPARE(db.qsoCount(),qint64(1));
+        const QString previewImage=dir.filePath("derived-popup.png"); QByteArray previewOutput; QVERIFY2(launch(dir,QStringLiteral("derivedpreviewprobe:")+previewImage,previewOutput,3000),previewOutput.constData());
+        QVERIFY2(previewOutput.contains("PROBE derived visual preview true 2") && previewOutput.contains("PROBE derived image true") && !previewOutput.contains("TypeError"),previewOutput.constData());
+        const QString imageCopy=qEnvironmentVariable("DECO_DERIVED_PREVIEW_PNG"); if (!imageCopy.isEmpty()) QVERIFY(QFile::copy(previewImage,imageCopy));
+        QByteArray recalculated; QVERIFY2(launch(dir,"derivedrecalcprobe",recalculated,4000),recalculated.constData());
+        QVERIFY2(recalculated.contains("PROBE derived preview true") && recalculated.contains("db=10") && recalculated.contains("PROBE derived cancelled 10"),recalculated.constData());
+        QVERIFY2(recalculated.contains("PROBE derived stale preview The QSO or draft changed; review the calculation again. 10"),recalculated.constData());
+        QVERIFY2(recalculated.contains("PROBE derived changed QSO  The QSO or draft changed; review the calculation again. 10"),recalculated.constData());
+        QVERIFY2(recalculated.contains("PROBE derived draft 12 13 matches db=10") && recalculated.contains("PROBE derived recalculated matches 12 13"),recalculated.constData());
+        const auto after=db.record(1); QVERIFY(after); QCOMPARE(after->value("APP_A"),QString("6")); QCOMPARE(after->value("APP_B"),QString("12")); QCOMPARE(after->value("APP_C"),QString("13"));
+        QVERIFY(after->value("APP_DECOLOG_DERIVED_V1")!=originalTrace); QCOMPARE(after->value("COMMENT"),QString("external edit"));
+        const auto history=db.history(1); QVERIFY(std::any_of(history.cbegin(),history.cend(),[](const HistoryEntry& h) { return h.record.value("APP_A")=="6" && h.record.value("APP_B")=="10"; }));
     }
     void namedReportsSurviveRestartAndSupportExplicitRemoval()
     {

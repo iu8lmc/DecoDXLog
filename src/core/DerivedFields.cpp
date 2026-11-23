@@ -215,4 +215,39 @@ QVariantMap inspectDerivedTrace(const QVariantMap& values)
     QStringList affected(stale.cbegin(),stale.cend()); affected.sort();
     return result(affected.isEmpty()?QStringLiteral("matches"):QStringLiteral("stale"),affected);
 }
+QVariantMap previewDerivedRecalculation(const QVariantMap& values)
+{
+    auto fail=[](const QString& error) { return QVariantMap{{QStringLiteral("error"),error}}; };
+    const QString state=inspectDerivedTrace(values).value(QStringLiteral("state")).toString();
+    if (state!=QLatin1String("matches") && state!=QLatin1String("stale")) return fail(QStringLiteral("Recorded formula provenance cannot be checked"));
+    QVariantMap normalized; for (auto it=values.cbegin();it!=values.cend();++it) normalized.insert(normalizeAdifName(it.key()),it.value());
+    const QString traceText=normalized.value(QStringLiteral("APP_DECOLOG_DERIVED_V1")).toString();
+    const auto trace=QJsonDocument::fromJson(traceText.toUtf8()).object();
+    const QString localeName=trace.value(QStringLiteral("inputLocale")).toString(); const QLocale locale(localeName);
+    if (locale.name()!=localeName || trace.value(QStringLiteral("outputFormat")).toString()!=QLatin1String("C decimal, 15 significant digits"))
+        return fail(QStringLiteral("Recorded numeric locale or output format is unsupported"));
+    const QJsonObject recorded=trace.value(QStringLiteral("fields")).toObject();
+    QSet<QString> referenced; for (auto it=recorded.begin();it!=recorded.end();++it) {
+        const auto inputs=it.value().toObject().value(QStringLiteral("inputs")).toObject();
+        for (auto input=inputs.begin();input!=inputs.end();++input) referenced.insert(input.key());
+    }
+    QStringList sources; for (const QString& name : referenced) if (!recorded.contains(name)) sources << name; sources.sort();
+    QVariantList definitions; QVariantMap inputs;
+    for (const QString& name : sources) {
+        const QString raw=normalized.value(name).toString().trimmed(); if (raw.isEmpty()) return fail(QStringLiteral("%1: Input is missing").arg(name));
+        definitions << QVariantMap{{QStringLiteral("name"),name},{QStringLiteral("type"),QStringLiteral("number")}}; inputs.insert(name,raw);
+    }
+    for (auto it=recorded.begin();it!=recorded.end();++it) {
+        const auto entry=it.value().toObject(); definitions << QVariantMap{{QStringLiteral("name"),it.key()},{QStringLiteral("type"),QStringLiteral("number")},
+            {QStringLiteral("formula"),entry.value(QStringLiteral("expression")).toString()},{QStringLiteral("unit"),entry.value(QStringLiteral("unit")).toString()}};
+    }
+    const auto computed=computeDerivedValues(definitions,inputs,locale); if (!computed.error.isEmpty()) return fail(computed.error);
+    if (computed.values.size()!=recorded.size()) return fail(QStringLiteral("Some recorded results cannot be recalculated"));
+    QVariantMap all=inputs; for (auto it=computed.values.cbegin();it!=computed.values.cend();++it) all.insert(it.key(),it.value());
+    const QString newTrace=makeDerivedTrace(definitions,all,computed.values,locale); if (newTrace.isEmpty()) return fail(QStringLiteral("Cannot record recalculation provenance"));
+    QVariantList changes; for (auto it=recorded.begin();it!=recorded.end();++it) changes << QVariantMap{
+        {QStringLiteral("field"),it.key()},{QStringLiteral("before"),normalized.value(it.key()).toString()},
+        {QStringLiteral("after"),computed.values.value(it.key()).toString()},{QStringLiteral("formula"),it.value().toObject().value(QStringLiteral("expression")).toString()}};
+    return {{QStringLiteral("values"),computed.values},{QStringLiteral("trace"),newTrace},{QStringLiteral("changes"),changes},{QStringLiteral("inputLocale"),localeName}};
+}
 }

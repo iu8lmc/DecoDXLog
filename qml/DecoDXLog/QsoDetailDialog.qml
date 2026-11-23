@@ -59,6 +59,28 @@ DialogFrame {
         })
     }
     function probeDerivedRestore() { console.warn("PROBE derived restored " + root.derivedInspection.state + " " + derivedWarning.visible + " " + (root.derivedInspection.affected || []).join(",")) }
+    function previewDerived() {
+        const result=decolog.previewDerivedQso(root.fields)
+        if (result.error) { errorText.text=result.error; return }
+        derivedPreview.data=result; derivedPreview.editRevision=root.editRev; derivedPreview.formRevision=root.formRev; derivedPreview.qso=root.qsoId
+        errorText.text=""; derivedPreview.open()
+    }
+    function probeDerivedRecalculate() {
+        root.previewDerived()
+        console.warn("PROBE derived preview " + derivedPreview.visible + " " + JSON.stringify(derivedPreview.data.changes || []) + " db=" + decolog.qsoDetail(root.qsoId).fields.APP_B)
+        derivedPreview.close(); console.warn("PROBE derived cancelled " + root.field("APP_B"))
+        root.previewDerived(); root.setField("COMMENT","probe note"); applyDerivedPreview.clicked()
+        console.warn("PROBE derived stale preview " + errorText.text + " " + root.field("APP_B"))
+        root.previewDerived(); const edit=decolog.editQsoField(root.qsoId,"comment","external edit"); applyDerivedPreview.clicked()
+        console.warn("PROBE derived changed QSO " + edit + " " + errorText.text + " " + root.field("APP_B")); root.reload()
+        root.previewDerived(); applyDerivedPreview.clicked()
+        console.warn("PROBE derived draft " + root.field("APP_B") + " " + root.field("APP_C") + " " + root.derivedInspection.state + " db=" + decolog.qsoDetail(root.qsoId).fields.APP_B)
+        root.save(); console.warn("PROBE derived recalculated " + root.derivedInspection.state + " " + root.field("APP_B") + " " + root.field("APP_C") + " " + errorText.text)
+    }
+    function probeDerivedPreview(path) {
+        root.previewDerived(); console.warn("PROBE derived visual preview " + derivedPreview.visible + " " + (derivedPreview.data.changes || []).length)
+        Qt.callLater(function() { derivedPreview.contentItem.grabToImage(function(image) { console.warn("PROBE derived image " + image.saveToFile(path)) }) })
+    }
 
     function openFor(id) {
         qsoId = id
@@ -138,6 +160,40 @@ DialogFrame {
         nameFilters: [qsTr("ADIF files (*.adi)")]
         onAccepted: decolog.exportQsos([root.qsoId], selectedFile)
     }
+    Popup {
+        id:derivedPreview; anchors.centerIn:Overlay.overlay; modal:true; padding:16; width:620; height:420
+        property var data:({}); property int editRevision:0; property int formRevision:0; property var qso:0
+        background:Rectangle { color:Theme.panelColor; border.color:Theme.warningColor; radius:6 }
+        contentItem:ColumnLayout {
+            spacing:8
+            Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:qsTr("Review derived values") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Uses the formulas and numeric locale recorded with this QSO (%1). Review the proposed values; applying changes the draft only. Save the QSO separately.").arg(derivedPreview.data.inputLocale || "") }
+            ScrollView {
+                Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                ColumnLayout {
+                    width:parent.width
+                    Repeater {
+                        model:derivedPreview.data.changes || []
+                        Text { required property var modelData; Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textPrimary
+                            text:modelData.field + ": " + (modelData.before || "—") + " → " + modelData.after + "\n" + modelData.formula }
+                    }
+                }
+            }
+            RowLayout { Layout.alignment:Qt.AlignRight
+                GlassButton { text:qsTr("Cancel"); onClicked:derivedPreview.close() }
+                GlassButton { id:applyDerivedPreview; text:qsTr("Apply to draft"); onClicked:{
+                    const live=decolog.qsoDetail(root.qsoId)
+                    if (derivedPreview.qso!==root.qsoId || derivedPreview.editRevision!==root.editRev || derivedPreview.formRevision!==root.formRev || !live.uuid || live.revision!==root.detail.revision) {
+                        derivedPreview.close(); errorText.text=qsTr("The QSO or draft changed; review the calculation again."); return
+                    }
+                    const values=derivedPreview.data.values || ({})
+                    for (const key of Object.keys(values)) root.setField(key,String(values[key]))
+                    root.setField("APP_DECOLOG_DERIVED_V1",String(derivedPreview.data.trace)); root.formRev++; derivedPreview.close()
+                } }
+            }
+        }
+    }
 
     FileDialog {
         id: attachmentPicker
@@ -214,12 +270,16 @@ DialogFrame {
 
     body: ColumnLayout {
         spacing: 0
-        Text {
-            id:derivedWarning; objectName:"derivedProvenanceWarning"
+        RowLayout {
+            visible:root.derivedInspection.state !== "none"
             Layout.fillWidth:true; Layout.leftMargin:14; Layout.rightMargin:14; Layout.topMargin:6
-            visible:root.derivedInspection.state === "stale" || root.derivedInspection.state === "unknown"
-            wrapMode:Text.Wrap; color:Theme.warningColor
-            text:root.derivedInspection.state === "stale" ? qsTr("Derived values may be stale: %1. Recorded inputs or results changed; values are not recalculated automatically.").arg((root.derivedInspection.affected || []).join(", ")) : qsTr("Derived-field provenance cannot be checked for this QSO. Review the stored values and formula manually.")
+            Text {
+                id:derivedWarning; objectName:"derivedProvenanceWarning"
+                Layout.fillWidth:true; visible:root.derivedInspection.state === "stale" || root.derivedInspection.state === "unknown"
+                wrapMode:Text.Wrap; color:Theme.warningColor
+                text:root.derivedInspection.state === "stale" ? qsTr("Derived values may be stale: %1. Recorded inputs or results changed; values are not recalculated automatically.").arg((root.derivedInspection.affected || []).join(", ")) : qsTr("Derived-field provenance cannot be checked for this QSO. Review the stored values and formula manually.")
+            }
+            GlassButton { text:qsTr("Review calculation…"); visible:root.derivedInspection.state === "stale" || root.derivedInspection.state === "matches"; onClicked:root.previewDerived() }
         }
 
         // ── Intestazione: nominativo, dove, come ────────────────────────────

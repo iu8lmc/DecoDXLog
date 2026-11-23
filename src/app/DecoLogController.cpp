@@ -4294,6 +4294,10 @@ QVariantMap DecoLogController::inspectDerivedQso(const QVariantMap& fields) cons
 {
     return newqso::inspectDerivedTrace(fields);
 }
+QVariantMap DecoLogController::previewDerivedQso(const QVariantMap& fields) const
+{
+    return newqso::previewDerivedRecalculation(fields);
+}
 QVariantMap DecoLogController::qsoDetail(qint64 id) const
 {
     decolog::StartupSpan trace("QSO detail read");

@@ -184,6 +184,32 @@ private slots:
         values.insert("APP_DECOLOG_DERIVED_V1","not json"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("unknown"));
         values.remove("APP_DECOLOG_DERIVED_V1"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("none"));
     }
+    void explicitDerivedRecalculationUsesRecordedFormulaAndLocale()
+    {
+        const QVariantList defs{QVariantMap{{"name","APP_A"},{"type","number"}},QVariantMap{{"name","APP_B"},{"type","number"},{"formula","{APP_A} * 2"}},
+                                QVariantMap{{"name","APP_C"},{"type","number"},{"formula","{APP_B} + 1"}}};
+        QVariantMap values{{"APP_A","1,5"}}; const QLocale italian(QLocale::Italian,QLocale::Italy);
+        const auto computed=newqso::computeDerivedValues(defs,values,italian); QVERIFY(computed.error.isEmpty());
+        for (auto it=computed.values.cbegin();it!=computed.values.cend();++it) values.insert(it.key(),it.value());
+        values.insert("APP_DECOLOG_DERIVED_V1",newqso::makeDerivedTrace(defs,values,computed.values,italian));
+        values.insert("APP_A","2,5"); const auto preview=newqso::previewDerivedRecalculation(values);
+        QVERIFY2(preview.value("error").toString().isEmpty(),qPrintable(preview.value("error").toString()));
+        const auto updates=preview.value("values").toMap(); QCOMPARE(updates.value("APP_B").toString(),QString("5")); QCOMPARE(updates.value("APP_C").toString(),QString("6"));
+        QCOMPARE(values.value("APP_B").toString(),QString("3")); QCOMPARE(preview.value("inputLocale").toString(),italian.name());
+        for (auto it=updates.cbegin();it!=updates.cend();++it) values.insert(it.key(),it.value()); values.insert("APP_DECOLOG_DERIVED_V1",preview.value("trace"));
+        QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("matches"));
+        values.remove("APP_A"); QVERIFY(!newqso::previewDerivedRecalculation(values).value("error").toString().isEmpty());
+        values.insert("APP_DECOLOG_DERIVED_V1",R"({"version":1,"fields":{}})"); QVERIFY(!newqso::previewDerivedRecalculation(values).value("error").toString().isEmpty());
+        const QVariantList division{QVariantMap{{"name","APP_A"},{"type","number"}},QVariantMap{{"name","APP_D"},{"type","number"}},
+                                    QVariantMap{{"name","APP_Q"},{"type","number"},{"formula","{APP_A}/{APP_D}"}}};
+        QVariantMap divideValues{{"APP_A","4"},{"APP_D","2"}}; const auto initial=newqso::computeDerivedValues(division,divideValues,QLocale::c()); QVERIFY(initial.error.isEmpty());
+        for (auto it=initial.values.cbegin();it!=initial.values.cend();++it) divideValues.insert(it.key(),it.value());
+        divideValues.insert("APP_DECOLOG_DERIVED_V1",newqso::makeDerivedTrace(division,divideValues,initial.values,QLocale::c()));
+        divideValues.insert("APP_D","0"); QVERIFY(newqso::previewDerivedRecalculation(divideValues).value("error").toString().contains("Division by zero"));
+        auto invalidLocale=QJsonDocument::fromJson(divideValues.value("APP_DECOLOG_DERIVED_V1").toString().toUtf8()).object(); invalidLocale.insert("inputLocale","zz_ZZ");
+        divideValues.insert("APP_DECOLOG_DERIVED_V1",QString::fromUtf8(QJsonDocument(invalidLocale).toJson(QJsonDocument::Compact)));
+        QVERIFY(newqso::previewDerivedRecalculation(divideValues).value("error").toString().contains("locale"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestNewQsoFields)
