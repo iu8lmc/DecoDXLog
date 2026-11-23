@@ -15,6 +15,8 @@ DialogFrame {
     property var draft: ({})
     property var partitionPreview: ({})
     property bool previewShown: false
+    property bool probeAwaitPreview: false
+    property int previewPage: 0
 
     // `kind` apre gia' sul tipo giusto: "contest" quando si arriva dal contest.
     function openDialog(kind) {
@@ -59,13 +61,26 @@ DialogFrame {
         applySessionButton.clicked()
         const two = decolog.logManualQso({call: "K1BBB", date: decolog.showDate(now.date), time: now.time, band: "20m", mode: "CW"})
         console.warn("PROBE multiSaved count=" + decolog.currentLogInfo().qsos + " firstError=" + one + " secondError=" + two)
+        root.probeAwaitPreview = true
         previewButton.clicked()
-        console.warn("PROBE multiPreview reported=" + root.partitionPreview.reportedCount + " groups=" + root.partitionPreview.groups.length + " error=" + (root.partitionPreview.error || ""))
-        root.act.stop()
     }
     Connections {
         target: root.act
         function onChanged() { root.previewShown = false }
+        function onPreviewChanged() {
+            if (!root.act.previewBusy) {
+                root.partitionPreview = root.act.previewResult
+                root.previewShown = Object.keys(root.partitionPreview).length > 0
+                root.previewPage = 0
+            }
+        }
+        function onPreviewFinished(success) {
+            if (root.probeAwaitPreview) {
+                root.probeAwaitPreview = false
+                console.warn("PROBE multiPreview reported=" + root.partitionPreview.reportedCount + " groups=" + (root.partitionPreview.groups || []).length + " error=" + (root.partitionPreview.error || ""))
+                root.act.stop()
+            }
+        }
     }
     readonly property var kindLabels: ({ pota: "POTA", sota: "SOTA", wwff: "WWFF", iota: "IOTA",
                                          contest: qsTr("Contest"), free: qsTr("Free session") })
@@ -423,10 +438,10 @@ DialogFrame {
         GlassButton {
             id: previewButton
             visible: root.act.active
-            text: qsTr("Preview reported programme groups")
+            text: root.act.previewBusy ? qsTr("Cancel programme preview") : qsTr("Preview reported programme groups")
             onClicked: {
-                root.partitionPreview = root.act.partitionPreview()
-                root.previewShown = true
+                if (root.act.previewBusy) root.act.cancelPartitionPreview()
+                else root.act.startPartitionPreview()
             }
         }
         Note {
@@ -436,16 +451,22 @@ DialogFrame {
         }
         Note {
             visible: root.previewShown && !root.partitionPreview.error
-            text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. Showing at most the first 100 of %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
+            text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
         }
         Repeater {
-            model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.groups || []).slice(0, 100) : []
+            model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.groups || []).slice(root.previewPage * 100, (root.previewPage + 1) * 100) : []
             Note {
                 required property var modelData
                 text: qsTr("%1 · %2 · %3 UTC · operator %4 · grid %5: %6 QSO")
                     .arg(modelData.program).arg(modelData.reference).arg(modelData.day)
                     .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
             }
+        }
+        RowLayout {
+            visible: root.previewShown && (root.partitionPreview.groups || []).length > 100
+            GlassButton { text: qsTr("Previous groups"); enabled: root.previewPage > 0; onClicked: root.previewPage-- }
+            Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.previewPage + 1) }
+            GlassButton { text: qsTr("Next groups"); enabled: (root.previewPage + 1) * 100 < root.partitionPreview.groups.length; onClicked: root.previewPage++ }
         }
         Text {
             id: errorText

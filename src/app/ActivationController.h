@@ -15,6 +15,9 @@
 #include <QUrl>
 #include <QVariantList>
 #include <QSet>
+#include <QThreadPool>
+#include <atomic>
+#include <memory>
 #include <QVariantMap>
 #include <functional>
 
@@ -25,6 +28,8 @@ namespace decolog::app {
 class ActivationController : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool active READ active NOTIFY changed)
+    Q_PROPERTY(bool previewBusy READ previewBusy NOTIFY previewChanged)
+    Q_PROPERTY(QVariantMap previewResult READ previewResult NOTIFY previewChanged)
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
     Q_PROPERTY(QString title READ title NOTIFY changed)
     Q_PROPERTY(int qsoCount READ qsoCount NOTIFY changed)
@@ -57,6 +62,11 @@ public:
     };
 
     explicit ActivationController(Context context, QObject* parent = nullptr);
+    ~ActivationController() override;
+    bool previewBusy() const { return m_previewBusy; }
+    QVariantMap previewResult() const { return m_previewResult; }
+    Q_INVOKABLE bool startPartitionPreview();
+    Q_INVOKABLE void cancelPartitionPreview();
 
     // Da chiamare quando il log e' aperto: la sessione sopravvive a una chiusura
     // del programma (sta nel database, non nelle impostazioni: e' del log).
@@ -125,7 +135,7 @@ public:
     Q_INVOKABLE QVariantMap editionRules() const;
     // Il log e' cambiato fuori dalla sessione (un QSO corretto, cancellato,
     // importato): il punteggio in memoria non vale piu'.
-    void invalidateScore() { m_score.valid = false; }
+    void invalidateScore();
     // Scrive l'ADIF della sessione. Restituisce un messaggio d'errore, o "".
     Q_INVOKABLE QString exportAdif(const QUrl& file);
     // Scrive il Cabrillo del contest. `info` sono le righe della testata:
@@ -159,8 +169,16 @@ public:
 
 signals:
     void changed();
+    void previewChanged();
+    void previewFinished(bool success);
 
 private:
+    void invalidatePreview();
+    QThreadPool m_previewPool;
+    std::shared_ptr<std::atomic_bool> m_previewCancel;
+    quint64 m_previewGeneration{0};
+    bool m_previewBusy{false};
+    QVariantMap m_previewResult;
     // Il punteggio e i moltiplicatori gia' presi, calcolati una volta per QSO
     // e non una volta per ogni riquadro che li mostra: in gara li leggono
     // quattro finestre e ogni riga del cluster, e ricalcolarli ogni volta

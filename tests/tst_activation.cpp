@@ -5,6 +5,8 @@
 #include "core/LogDatabase.h"
 
 #include <QSqlQuery>
+#include <QSignalSpy>
+
 #include <QFile>
 #include <QTemporaryDir>
 #include <QTest>
@@ -93,9 +95,10 @@ private slots:
         QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
         QVERIFY(db.connection().rollback());
     }
-    void previewRefusesPartialResultsAboveLimit()
+    void previewScalesPastFormerLimit()
     {
-        LogDatabase db; QVERIFY(db.open(":memory:"));
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
         ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
         QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
         for (int n = 0; n < 1001; ++n) {
@@ -105,8 +108,39 @@ private slots:
             QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
         }
         const auto result = act.partitionPreview();
-        QVERIFY(!result.value("error").toString().isEmpty());
-        QVERIFY(result.value("groups").toList().isEmpty());
+        QVERIFY(result.value("error").toString().isEmpty());
+        QCOMPARE(result.value("reportedCount").toInt(), 1001);
+        QCOMPARE(result.value("groups").toList().at(0).toMap().value("count").toInt(), 1001);
+        QSignalSpy finished(&act, &ActivationController::previewFinished);
+        QVERIFY(act.startPartitionPreview());
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
+        QVERIFY(finished.at(0).at(0).toBool());
+        QCOMPARE(act.previewResult().value("reportedCount").toInt(), 1001);
+        QCOMPARE(act.previewResult().value("groups").toList(), result.value("groups").toList());
+    }
+    void asynchronousPreviewCanCompleteCancelAndInvalidate()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        AdifRecord r{{"CALL", "K1ABC"}, {"QSO_DATE", "20261231"}, {"TIME_ON", "235900"}, {"BAND", "20m"}, {"MODE", "CW"}};
+        act.session().applyTo(r, 0); QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        QSignalSpy finished(&act, &ActivationController::previewFinished);
+        QVERIFY(act.startPartitionPreview()); QVERIFY(act.previewBusy());
+        QVERIFY(!act.startPartitionPreview());
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
+        QVERIFY(finished.takeFirst().at(0).toBool());
+        QCOMPARE(act.previewResult().value("reportedCount").toInt(), 1);
+        QVERIFY(act.startPartitionPreview()); act.cancelPartitionPreview();
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
+        QVERIFY(!finished.takeFirst().at(0).toBool());
+        QVERIFY(!act.previewResult().value("error").toString().isEmpty());
+        QVERIFY(act.startPartitionPreview()); act.invalidateScore();
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(), 1, 5000);
+        QVERIFY(!finished.takeFirst().at(0).toBool());
+        QVERIFY(!act.previewResult().value("error").toString().isEmpty());
+        QVERIFY(act.previewResult().value("groups").toList().isEmpty());
     }
     void simultaneousProgramReferencesStayIndependent()
     {

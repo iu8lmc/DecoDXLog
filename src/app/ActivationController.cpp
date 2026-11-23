@@ -14,6 +14,8 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QPointer>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QTimeZone>
 #include <QUuid>
@@ -76,7 +78,33 @@ ActivationController::ActivationController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
 {
+    connect(this, &ActivationController::changed, this, &ActivationController::invalidatePreview);
 }
+
+ActivationController::~ActivationController()
+{
+    if (m_previewCancel) m_previewCancel->store(true);
+    m_previewPool.waitForDone();
+}
+
+void ActivationController::invalidatePreview()
+{
+    ++m_previewGeneration;
+    if (m_previewCancel) m_previewCancel->store(true);
+    if (!m_previewResult.isEmpty()) { m_previewResult.clear(); emit previewChanged(); }
+}
+
+void ActivationController::invalidateScore()
+{
+    m_score.valid = false;
+    invalidatePreview();
+}
+
+void ActivationController::cancelPartitionPreview()
+{
+    if (m_previewCancel) m_previewCancel->store(true);
+}
+
 
 void ActivationController::load()
 {
@@ -625,45 +653,42 @@ QVariantList ActivationController::qsoIds() const
     return ids;
 }
 
-QVariantMap ActivationController::partitionPreview() const
+namespace {
+QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled)
 {
     QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
     const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
-    if (!m_session.active || m_session.sessionUuid.isEmpty())
-        return fail(tr("This session has no tracked identity; its QSO cannot be attributed automatically."));
-    if (!m_ctx.db || !m_ctx.db->isOpen()) return fail(tr("The log is not open."));
-    auto db = m_ctx.db->connection();
+    const auto tr = [](const char* text) { return QCoreApplication::translate("ActivationController", text); };
     if (!db.transaction()) return fail(tr("Cannot open a consistent preview of the log."));
     struct ReadTransaction { QSqlDatabase db; bool committed{false}; ~ReadTransaction() { if (!committed) db.rollback(); } } transaction{db};
     QSqlQuery exists(db);
-    exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=? AND ended_at IS NULL"));
-    exists.addBindValue(m_session.sessionUuid);
+    exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=? AND ended_at IS NULL")); exists.addBindValue(uuid);
     if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
-    QSqlQuery q(m_ctx.db->connection());
-    q.prepare(QStringLiteral("SELECT id FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id LIMIT 1001"));
-    q.addBindValue(m_session.sessionUuid);
+    QSqlQuery q(db); q.setForwardOnly(true);
+    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
+    q.addBindValue(uuid);
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
-    QList<qint64> ids;
-    while (q.next()) ids << q.value(0).toLongLong();
-    if (ids.size() > 1000) return fail(tr("Preview is limited to 1000 reported QSO; no partial result is shown."));
-    result[QStringLiteral("reportedCount")] = ids.size();
     QMap<QString, QVariantMap> groups;
-    int missingDate = 0, missingReference = 0;
+    int count = 0, missingDate = 0, missingReference = 0;
     const QList<QPair<QString, QString>> fields{{QStringLiteral("POTA"), QStringLiteral("MY_POTA_REF")},
         {QStringLiteral("SOTA"), QStringLiteral("MY_SOTA_REF")}, {QStringLiteral("WWFF"), QStringLiteral("MY_WWFF_REF")},
         {QStringLiteral("IOTA"), QStringLiteral("MY_IOTA")}};
-    for (qint64 id : ids) {
-        const auto record = m_ctx.db->record(id);
-        if (!record) return fail(tr("A session QSO could not be read; retry the preview."));
-        const QDate date = QDate::fromString(record->value(QStringLiteral("QSO_DATE")), QStringLiteral("yyyyMMdd"));
+    while (q.next()) {
+        if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
+        ++count;
+        const auto extra = QJsonDocument::fromJson(q.value(1).toString().toUtf8()).object();
+        QDateTime timestamp = QDateTime::fromString(q.value(0).toString(), Qt::ISODate);
+        if (timestamp.isValid()) timestamp.setTimeZone(QTimeZone::UTC);
+        QDate date = timestamp.date();
+        if (extra.contains(QStringLiteral("QSO_DATE"))) date = QDate::fromString(extra.value(QStringLiteral("QSO_DATE")).toString(), QStringLiteral("yyyyMMdd"));
         if (!date.isValid()) { ++missingDate; continue; }
         const QString day = date.toString(Qt::ISODate);
-        const QString op = record->value(QStringLiteral("OPERATOR")).trimmed().toUpper();
-        const QString grid = record->value(QStringLiteral("MY_GRIDSQUARE")).trimmed().toUpper();
+        const QString op = extra.value(QStringLiteral("OPERATOR")).toString().trimmed().toUpper();
+        const QString grid = extra.value(QStringLiteral("MY_GRIDSQUARE")).toString().trimmed().toUpper();
         bool found = false;
         for (const auto& pair : fields) {
             QSet<QString> seen;
-            for (const QString& item : record->value(pair.second).split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+            for (const QString& item : extra.value(pair.second).toString().split(QLatin1Char(','), Qt::SkipEmptyParts)) {
                 const QString reference = item.trimmed().toUpper();
                 if (reference.isEmpty() || seen.contains(reference)) continue;
                 seen.insert(reference); found = true;
@@ -675,13 +700,68 @@ QVariantMap ActivationController::partitionPreview() const
         }
         if (!found) ++missingReference;
     }
+    if (q.lastError().isValid()) return fail(tr("Cannot read the session QSO."));
+    if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
     QVariantList rows; for (const auto& row : groups) rows << row;
-    result[QStringLiteral("groups")] = rows;
-    result[QStringLiteral("missingDate")] = missingDate;
-    result[QStringLiteral("missingReference")] = missingReference;
+    result[QStringLiteral("groups")] = rows; result[QStringLiteral("reportedCount")] = count;
+    result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
     if (!db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;
     return result;
+}
+} // namespace
+
+QVariantMap ActivationController::partitionPreview() const
+{
+    if (!m_session.active || m_session.sessionUuid.isEmpty())
+        return {{QStringLiteral("error"), tr("This session has no tracked identity; its QSO cannot be attributed automatically.")}};
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return {{QStringLiteral("error"), tr("The log is not open.")}};
+    return scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {});
+}
+
+bool ActivationController::startPartitionPreview()
+{
+    if (m_previewBusy) return false;
+    m_previewResult.clear();
+    if (!m_session.active || m_session.sessionUuid.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
+        m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:")) {
+        m_previewResult = {{QStringLiteral("error"), tr("A tracked session and an open file-backed log are required.")}};
+        emit previewChanged(); return false;
+    }
+    const QString path = m_ctx.db->path();
+    const QString connectionName = m_ctx.db->connection().connectionName();
+    const QString uuid = m_session.sessionUuid;
+    const quint64 generation = m_previewGeneration;
+    m_previewCancel = std::make_shared<std::atomic_bool>(false);
+    const auto cancelled = m_previewCancel;
+    m_previewBusy = true; emit previewChanged();
+    QPointer<ActivationController> self(this);
+    m_previewPool.start([self, path, connectionName, uuid, generation, cancelled] {
+        QVariantMap result;
+        const QString connection = QStringLiteral("activation-preview-") + QUuid::createUuid().toString();
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+            db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100"));
+            db.setDatabaseName(path);
+            if (!db.open()) result[QStringLiteral("error")] = tr("Cannot open the log for preview.");
+            else result = scanPartitionPreview(db, uuid, cancelled);
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connection);
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, path, connectionName, uuid, generation, cancelled, result] {
+            if (!self) return;
+            self->m_previewBusy = false; self->m_previewCancel.reset();
+            const bool same = self->m_ctx.db && self->m_ctx.db->isOpen() && self->m_ctx.db->path() == path &&
+                self->m_ctx.db->connection().connectionName() == connectionName && self->m_session.active &&
+                self->m_session.sessionUuid == uuid && self->m_previewGeneration == generation;
+            self->m_previewResult = !same ? QVariantMap{{QStringLiteral("error"), tr("The log or session changed; recalculate the preview.")}}
+                : cancelled->load() ? QVariantMap{{QStringLiteral("error"), tr("Preview cancelled.")}} : result;
+            const bool success = self->m_previewResult.value(QStringLiteral("error")).toString().isEmpty();
+            emit self->previewChanged(); emit self->previewFinished(success);
+        }, Qt::QueuedConnection);
+    });
+    return true;
 }
 
 QString ActivationController::suggestedFileName() const
