@@ -126,14 +126,16 @@ private slots:
         QByteArray output; QVERIFY2(launch(dir,"dxcampaignprobe",output,7000),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign saved") && output.contains("ZZ1AAA") && output.contains("ZZ1BBB"),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign matrix") && output.contains("\"confirmed\":1") && output.contains("\"worked\":1"),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign goal draft") && output.contains("PROBE dxcampaign goal open") && output.contains("\"needed\":true"),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign archived true") && output.contains("PROBE dxcampaign reopened true"),output.constData());
-        QVERIFY2(output.contains("PROBE dxcampaign new confirmation"),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign new confirmation") && output.contains("\"needed\":false"),output.constData());
         QVERIFY2(!output.contains("TypeError"),output.constData());
         QByteArray restored; QVERIFY2(launch(dir,"dxcampaignrestoreprobe",restored,5000),restored.constData());
         QVERIFY2(restored.contains("PROBE dxcampaign restored matrix") && restored.contains("PROBE dxcampaign rendered 20m · CW · confirmed (1/1)"),restored.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QString error; const auto campaigns=dxcampaign::list(db,&error);
         QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(campaigns.size(),1); QCOMPARE(campaigns.first().calls.size(),2);
-        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,3); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched);
+        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,4); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched);
+        QCOMPARE(campaigns.first().goals.size(),1); QCOMPARE(campaigns.first().goals.first().target,QString("confirmed"));
     }
     void qslAlternativesDesktopPagesAndInvalidates()
     {

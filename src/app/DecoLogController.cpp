@@ -2271,10 +2271,12 @@ AwardCalculator DecoLogController::awardCalculator(const QHash<int, QString>& na
 namespace {
 QVariantMap campaignMap(const dxcampaign::Campaign& c)
 {
+    QVariantList goals;
+    for (const auto& goal : c.goals) goals << QVariantMap{{QStringLiteral("band"),goal.band},{QStringLiteral("mode"),goal.mode},{QStringLiteral("target"),goal.target}};
     return {{QStringLiteral("id"),c.id},{QStringLiteral("title"),c.title},{QStringLiteral("calls"),c.calls},
         {QStringLiteral("start"),c.start.toString(Qt::ISODate)},{QStringLiteral("end"),c.end.toString(Qt::ISODate)},
         {QStringLiteral("source"),c.source},{QStringLiteral("observedAt"),c.verifiedAt.toUTC().toString(Qt::ISODate)},
-        {QStringLiteral("bands"),c.bands},{QStringLiteral("modes"),c.modes},{QStringLiteral("profileId"),c.stationProfileId},
+        {QStringLiteral("bands"),c.bands},{QStringLiteral("modes"),c.modes},{QStringLiteral("goals"),goals},{QStringLiteral("profileId"),c.stationProfileId},
         {QStringLiteral("archived"),c.archived},{QStringLiteral("watched"),c.watched},{QStringLiteral("revision"),c.revision}};
 }
 }
@@ -2335,6 +2337,14 @@ bool DecoLogController::saveDxCampaign(const QVariantMap& values)
     c.verifiedAt=QDateTime::fromString(values.value(QStringLiteral("observedAt")).toString(),Qt::ISODate);
     c.bands=values.value(QStringLiteral("bands")).toStringList(); for (QString& band : c.bands) band=band.trimmed().toLower();
     c.modes=values.value(QStringLiteral("modes")).toStringList(); for (QString& mode : c.modes) mode=mode.trimmed().toUpper();
+    if (values.contains(QStringLiteral("goals"))) {
+        for (const QVariant& value : values.value(QStringLiteral("goals")).toList()) {
+            const auto goal=value.toMap(); c.goals.append({goal.value(QStringLiteral("band")).toString().trimmed().toLower(),
+                goal.value(QStringLiteral("mode")).toString().trimmed().toUpper(),goal.value(QStringLiteral("target")).toString()});
+        }
+    } else if (!c.id.isEmpty()) {
+        const auto existing=dxcampaign::load(m_db,c.id); if (existing) c.goals=existing->goals;
+    }
     c.stationProfileId=values.value(QStringLiteral("profileId")).toLongLong(); c.archived=values.value(QStringLiteral("archived")).toBool();
     if (values.contains(QStringLiteral("watched"))) c.watched=values.value(QStringLiteral("watched")).toBool();
     else if (!c.id.isEmpty()) {
@@ -2374,7 +2384,8 @@ void DecoLogController::refreshDxCampaign()
                 campaign=campaignMap(*c);
                 const auto matrix=dxcampaign::matrix(db,*c,&error);
                 for (const auto& cell : matrix) rows << QVariantMap{{QStringLiteral("band"),cell.band},
-                    {QStringLiteral("mode"),cell.mode},{QStringLiteral("worked"),cell.worked},{QStringLiteral("confirmed"),cell.confirmed}};
+                    {QStringLiteral("mode"),cell.mode},{QStringLiteral("worked"),cell.worked},{QStringLiteral("confirmed"),cell.confirmed},
+                    {QStringLiteral("target"),cell.target},{QStringLiteral("needed"),cell.needed}};
             }
         }
         if (!self) return;

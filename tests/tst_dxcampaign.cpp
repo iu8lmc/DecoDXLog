@@ -11,6 +11,27 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void explicitGoalsTrackWorkedAndConfirmedSeparately()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("goals.sqlite"); QString id;
+        {
+            LogDatabase db; QVERIFY(db.open(path)); dxcampaign::Campaign c;
+            c.title="Goals"; c.calls={"ZZ1AAA","ZZ1BBB"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7);
+            c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate);
+            c.bands={"20m","40m"}; c.modes={"CW","FT8"}; c.goals={{"20m","CW","worked"},{"40m","FT8","confirmed"}};
+            QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); id=c.id;
+            auto cells=dxcampaign::matrix(db,c,&error); QCOMPARE(cells[0].target,QString("worked")); QVERIFY(cells[0].needed);
+            QVERIFY(cells[1].target.isEmpty()); QCOMPARE(cells[3].target,QString("confirmed")); QVERIFY(cells[3].needed);
+            const auto a=db.insertQso(AdifRecord{{"CALL","ZZ1AAA"},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import");
+            const auto b=db.insertQso(AdifRecord{{"CALL","ZZ1BBB"},{"QSO_DATE","20260103"},{"TIME_ON","1200"},{"BAND","40m"},{"MODE","FT8"}},"import"); QVERIFY(a.id>0 && b.id>0);
+            cells=dxcampaign::matrix(db,c,&error); QVERIFY(!cells[0].needed); QVERIFY(cells[3].needed);
+            QslState card; card.service="card"; card.rcvd="Y"; QVERIFY(db.setCardState(b.id,card));
+            cells=dxcampaign::matrix(db,c,&error); QVERIFY(!cells[3].needed);
+            auto bad=c; bad.goals << dxcampaign::Goal{"20m","CW","confirmed"}; QVERIFY(!dxcampaign::save(db,bad,&error));
+        }
+        LogDatabase db; QVERIFY(db.open(path)); const auto c=dxcampaign::load(db,id); QVERIFY(c); QCOMPARE(c->goals.size(),2);
+        QVERIFY(!dxcampaign::matrix(db,*c).first().needed);
+    }
     void watchRequiresOptInActivePeriodAndProfile()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); const auto now=QDateTime::currentDateTimeUtc();
@@ -24,9 +45,9 @@ private slots:
         c.end=now.date().addDays(1); e.spot.time=now.addSecs(-60);
         QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); const auto saved=dxcampaign::load(db,c.id); QVERIFY(saved); QVERIFY(saved->watched);
         QSqlQuery q(db.connection()); q.prepare("SELECT value FROM app_setting WHERE key=?"); q.addBindValue("dx_campaign."+c.id); QVERIFY(q.exec()); QVERIFY(q.next());
-        auto json=QJsonDocument::fromJson(q.value(0).toString().toUtf8()).object(); json.remove("watched");
+        auto json=QJsonDocument::fromJson(q.value(0).toString().toUtf8()).object(); json.remove("watched"); json.remove("goals");
         QSqlQuery update(db.connection()); update.prepare("UPDATE app_setting SET value=? WHERE key=?"); update.addBindValue(QString::fromUtf8(QJsonDocument(json).toJson(QJsonDocument::Compact))); update.addBindValue("dx_campaign."+c.id); QVERIFY(update.exec());
-        const auto old=dxcampaign::load(db,c.id); QVERIFY(old); QVERIFY(!old->watched);
+        const auto old=dxcampaign::load(db,c.id); QVERIFY(old); QVERIFY(!old->watched); QVERIFY(old->goals.isEmpty());
     }
     void spotsRequireExactCallCampaignPeriodAndFreshness()
     {

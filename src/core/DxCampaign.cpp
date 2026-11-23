@@ -41,15 +41,25 @@ bool valid(const Campaign& c,QString* error)
     }
     for (const QString& band : c.bands) if (band!=band.trimmed().toLower()) return fail(error,QStringLiteral("Bands must be lowercase"));
     for (const QString& mode : c.modes) if (mode!=mode.trimmed().toUpper()) return fail(error,QStringLiteral("Modes must be uppercase"));
+    if (c.goals.size()>900) return fail(error,QStringLiteral("Too many campaign goals"));
+    QSet<QPair<QString,QString>> goals;
+    for (const Goal& goal : c.goals) {
+        const QPair<QString,QString> key{goal.band,goal.mode};
+        if (goal.band.isEmpty() || goal.band.size()>24 || goal.band!=goal.band.trimmed().toLower() ||
+            goal.mode.isEmpty() || goal.mode.size()>24 || goal.mode!=goal.mode.trimmed().toUpper() || goals.contains(key) ||
+            (goal.target!=QLatin1String("worked") && goal.target!=QLatin1String("confirmed"))) return fail(error,QStringLiteral("Invalid or duplicate campaign goal"));
+        goals.insert(key);
+    }
     return true;
 }
 QJsonObject encode(const Campaign& c)
 {
+    QJsonArray goals; for (const Goal& goal : c.goals) goals.append(QJsonObject{{"band",goal.band},{"mode",goal.mode},{"target",goal.target}});
     return {{"format",1},{"id",c.id},{"title",c.title},{"calls",QJsonArray::fromStringList(c.calls)},
         {"start",c.start.toString(Qt::ISODate)},{"end",c.end.toString(Qt::ISODate)},{"source",c.source},
         {"verifiedAt",c.verifiedAt.toUTC().toString(Qt::ISODateWithMs)},{"bands",QJsonArray::fromStringList(c.bands)},
         {"modes",QJsonArray::fromStringList(c.modes)},{"stationProfileId",QString::number(c.stationProfileId)},
-        {"archived",c.archived},{"watched",c.watched},{"revision",c.revision}};
+        {"archived",c.archived},{"watched",c.watched},{"goals",goals},{"revision",c.revision}};
 }
 QStringList strings(const QJsonValue& v)
 {
@@ -64,6 +74,13 @@ std::optional<Campaign> decode(const QString& raw)
     c.start=QDate::fromString(o.value("start").toString(),Qt::ISODate); c.end=QDate::fromString(o.value("end").toString(),Qt::ISODate);
     c.source=o.value("source").toString(); c.verifiedAt=QDateTime::fromString(o.value("verifiedAt").toString(),Qt::ISODate);
     c.bands=strings(o.value("bands")); c.modes=strings(o.value("modes"));
+    if (o.contains("goals")) {
+        if (!o.value("goals").isArray()) return {};
+        for (const auto& value : o.value("goals").toArray()) {
+            if (!value.isObject()) return {}; const auto goal=value.toObject();
+            c.goals.append({goal.value("band").toString(),goal.value("mode").toString(),goal.value("target").toString()});
+        }
+    }
     bool ok=false; c.stationProfileId=o.value("stationProfileId").toString().toLongLong(&ok);
     c.archived=o.value("archived").toBool(); c.watched=o.value("watched").toBool(false); c.revision=o.value("revision").toInt();
     if(!ok || c.id.isEmpty() || c.revision<1 || !valid(c,nullptr)) return {}; return c;
@@ -114,7 +131,11 @@ QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)
 {
     QList<Cell> out; if(!db.isOpen()) { fail(error,QStringLiteral("Log is not open")); return out; }
     if(!valid(c,error)) return out;
-    for(const QString& band:c.bands) for(const QString& mode:c.modes) out << Cell{band,mode,0,0};
+    for(const QString& band:c.bands) for(const QString& mode:c.modes) {
+        Cell cell{band,mode,0,0,{},false};
+        for (const Goal& goal : c.goals) if (goal.band==band && goal.mode==mode) { cell.target=goal.target; break; }
+        out << cell;
+    }
     QStringList placeholders; for(int i=0;i<c.calls.size();++i) placeholders << QStringLiteral("?");
     const QString sql=QStringLiteral("SELECT band,mode,IFNULL(submode,''),qso_datetime_on,EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id=qso.id AND s.service IN ('lotw','card') AND s.rcvd='Y') FROM qso WHERE deleted=0 AND call IN (%1) AND qso_datetime_on>=? AND qso_datetime_on<? AND (?=0 OR station_profile_id=?)").arg(placeholders.join(','));
     QSqlQuery q(db.connection()); q.prepare(sql); for(const auto& call:c.calls) q.addBindValue(call);
@@ -130,7 +151,10 @@ QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)
         for(Cell& cell:out) if(!mode.isEmpty() && cell.band==band &&
             (c.modes.contains(rawMode) ? cell.mode==rawMode : campaignMode(cell.mode)==mode)) { ++cell.worked; if(q.value(4).toBool()) ++cell.confirmed; break; }
     }
-    if(q.lastError().isValid()) { fail(error,q.lastError().text()); return {}; } if(error) error->clear(); return out;
+    if(q.lastError().isValid()) { fail(error,q.lastError().text()); return {}; }
+    for (Cell& cell : out) cell.needed=(cell.target==QLatin1String("worked") && cell.worked==0) ||
+        (cell.target==QLatin1String("confirmed") && cell.confirmed==0);
+    if(error) error->clear(); return out;
 }
 QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visible,
                                const QDateTime& now,int maxAgeMinutes)

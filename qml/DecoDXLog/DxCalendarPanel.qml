@@ -251,6 +251,18 @@ GlassPanel {
             if ((root.campaignBackend.dxCampaignBusy || root.campaignBackend.dxCampaignMatrix.length<4) && ++tries<25) return
             stop(); console.warn("PROBE dxcampaign saved " + JSON.stringify(root.campaignBackend.dxCampaign))
             console.warn("PROBE dxcampaign matrix " + JSON.stringify(root.campaignBackend.dxCampaignMatrix))
+            const row=campaignMatrix.itemAtIndex(0)
+            if (!row) { console.warn("PROBE dxcampaign missing matrix row"); return }
+            row.probeGoal(2); console.warn("PROBE dxcampaign goal draft " + JSON.stringify(campaignDialog.goalDraft))
+            saveCampaign.clicked(); campaignProbeGoal.start()
+        }
+    }
+    Timer {
+        id:campaignProbeGoal; interval:200; repeat:true; property int tries:0
+        onTriggered: {
+            const rows=root.campaignBackend.dxCampaignMatrix
+            if ((root.campaignBackend.dxCampaignBusy || !rows.length || rows[0].target!=="confirmed") && ++tries<25) return
+            stop(); console.warn("PROBE dxcampaign goal open " + JSON.stringify(rows))
             archivedField.checked=true; saveCampaign.clicked(); console.warn("PROBE dxcampaign archived " + root.campaignBackend.dxCampaign.archived)
             archivedField.checked=false; saveCampaign.clicked(); console.warn("PROBE dxcampaign reopened " + !root.campaignBackend.dxCampaign.archived)
             root.campaignBackend.cards.markReceived(1,true); campaignProbeConfirmation.start()
@@ -332,10 +344,13 @@ GlassPanel {
         info: qsTr("Local log · source data requires review")
         width: 1000; height: 760
         property var draft: ({})
+        property var goalDraft: []
+        property bool goalsDirty: false
         property string logPath: ""
         property string editorError: ""
         function edit(c) {
             draft=c || ({}); logPath=root.campaignBackend.currentLogInfo().path || ""
+            goalDraft=(draft.goals || []).map(g => ({band:g.band,mode:g.mode,target:g.target})); goalsDirty=false
             titleField.text=draft.title || ""; callsField.text=(draft.calls || []).join(", ")
             startField.text=draft.start || ""; endField.text=draft.end || ""; sourceField.text=draft.source || ""
             observedField.text=draft.observedAt || ""; bandsField.text=(draft.bands || []).join(", "); modesField.text=(draft.modes || []).join(", ")
@@ -344,13 +359,22 @@ GlassPanel {
             editorError=""; open()
         }
         function splitValues(text) { return text.split(",").map(s => s.trim()).filter(s => s.length) }
+        function goalTarget(band,mode) {
+            const goal=goalDraft.find(g => g.band === band && g.mode === mode)
+            return goal ? goal.target : ""
+        }
+        function setGoal(band,mode,target) {
+            const next=goalDraft.filter(g => !(g.band === band && g.mode === mode))
+            if (target) next.push({band:band,mode:mode,target:target})
+            goalDraft=next; goalsDirty=true
+        }
         function save() {
             if (!logPath || logPath !== root.campaignBackend.currentLogInfo().path) { editorError=qsTr("The open log changed; reopen the campaign."); return }
             const data={id:draft.id || "", revision:draft.revision || 0, title:titleField.text, calls:splitValues(callsField.text),
                 start:startField.text, end:endField.text, source:sourceField.text, observedAt:observedField.text,
-                bands:splitValues(bandsField.text), modes:splitValues(modesField.text), profileId:profileField.ids[profileField.currentIndex] || 0,
+                bands:splitValues(bandsField.text), modes:splitValues(modesField.text), goals:goalDraft, profileId:profileField.ids[profileField.currentIndex] || 0,
                 archived:archivedField.checked, watched:watchedField.checked}
-            if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; editorError="" }
+            if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; goalsDirty=false; editorError="" }
             else editorError=root.campaignBackend.dxCampaignError
         }
         body: RowLayout {
@@ -400,13 +424,34 @@ GlassPanel {
                 Text { Layout.fillWidth:true; color:root.mutedColor; wrapMode:Text.Wrap
                     text:qsTr("Watched active campaigns add matching fresh spots to the activity log, respecting the cluster filter and active station profile. Repeated alerts are limited.") }
                 Text { id:errorText; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:campaignDialog.editorError || (root.campaignBackend ? root.campaignBackend.dxCampaignError : "") }
-                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor; text:qsTr("Matrix: exact calls and inclusive UTC dates; local LoTW/card states only. This is not an award eligibility decision.") }
+                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor; text:qsTr("Matrix uses saved bands, modes and dates; goals are saved with the campaign. LoTW/card confirmations are local observations, not award credit. Watch alerts currently include all matching cells.") }
+                RowLayout {
+                    Text { color:root.mutedColor; text:qsTr("Goals: %1%2").arg(campaignDialog.goalDraft.length).arg(campaignDialog.goalsDirty ? qsTr(" · unsaved") : "") }
+                    CalendarButton { text:qsTr("Clear goals"); enabled:campaignDialog.goalDraft.length>0; onClicked:{ campaignDialog.goalDraft=[]; campaignDialog.goalsDirty=true } }
+                }
+                Text {
+                    readonly property var bands:campaignDialog.splitValues(bandsField.text).map(v => v.toLowerCase())
+                    readonly property var modes:campaignDialog.splitValues(modesField.text).map(v => v.toUpperCase())
+                    readonly property int outside:campaignDialog.goalDraft.filter(g => bands.indexOf(g.band)<0 || modes.indexOf(g.mode)<0).length
+                    Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; visible:outside>0
+                    text:qsTr("%1 goal(s) are outside the entered matrix and remain saved until cleared.").arg(outside)
+                }
                 ListView {
                     id:campaignMatrix; objectName:"dxCampaignMatrix"; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
                     model: root.campaignBackend && root.campaignBackend.dxCampaign.id === campaignDialog.draft.id ? root.campaignBackend.dxCampaignMatrix : []
-                    delegate: Text {
-                        required property var modelData; width:ListView.view.width; color:root.textColor
-                        text: modelData.band + " · " + modelData.mode + " · " + (modelData.confirmed > 0 ? qsTr("confirmed") : modelData.worked > 0 ? qsTr("worked") : qsTr("missing")) + " (" + modelData.worked + "/" + modelData.confirmed + ")"
+                    delegate: RowLayout {
+                        required property var modelData; width:ListView.view.width
+                        readonly property string text:matrixLabel.text
+                        function probeGoal(index) { goalChoice.currentIndex=index; goalChoice.activated(index) }
+                        Text { id:matrixLabel; Layout.fillWidth:true; color:root.textColor
+                            text: modelData.band + " · " + modelData.mode + " · " + (modelData.confirmed > 0 ? qsTr("confirmed") : modelData.worked > 0 ? qsTr("worked") : qsTr("missing")) + " (" + modelData.worked + "/" + modelData.confirmed + ")" + (modelData.needed ? " · " + qsTr("goal open") : "") }
+                        StyledComboBox {
+                            id:goalChoice; Layout.preferredWidth:155
+                            readonly property var targets:["","worked","confirmed"]
+                            model:[qsTr("No goal"),qsTr("Work"),qsTr("Confirm")]
+                            currentIndex:Math.max(0,targets.indexOf(campaignDialog.goalTarget(modelData.band,modelData.mode)))
+                            onActivated:campaignDialog.setGoal(modelData.band,modelData.mode,targets[currentIndex])
+                        }
                     }
                 }
                 Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor

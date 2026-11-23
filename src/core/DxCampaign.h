@@ -7,6 +7,7 @@
 #include "core/Spots.h"
 namespace decolog::core { class LogDatabase;
 namespace dxcampaign {
+struct Goal { QString band, mode, target; }; // target: worked or confirmed
 struct Campaign {
     QString id, title;
     QStringList calls;
@@ -14,12 +15,13 @@ struct Campaign {
     QString source;
     QDateTime verifiedAt;
     QStringList bands, modes;
+    QList<Goal> goals; // preserved even if temporarily outside the matrix
     qint64 stationProfileId{0}; // zero = all profiles, not an award account
     bool archived{false};
     bool watched{false};
     int revision{0};
 };
-struct Cell { QString band, mode; int worked{0}, confirmed{0}; };
+struct Cell { QString band, mode; int worked{0}, confirmed{0}; QString target; bool needed{false}; };
 bool save(LogDatabase& db, Campaign& campaign, QString* error = nullptr);
 std::optional<Campaign> load(const LogDatabase& db, const QString& id, QString* error = nullptr);
 QList<Campaign> list(const LogDatabase& db, QString* error = nullptr);
