@@ -403,3 +403,12 @@ The grouping preview reports, for each programme/reference/day/operator/grid gro
 A/B: the previous grouping gave zero for the missing station-call field because it did not report it; the revised synthetic fixture reports one while recognizing the available operator. A second fixture compares records with neither identity, station only, and both, and verifies the counts separately. `tst_activation` passed 24 tests, and the focused offscreen desktop multiprogram/closed-session probe passed after rebuilding on macOS arm64/Qt 6.11.2. The test input and interactions were synthetic.
 
 These warnings do not replace field-format checks, duplicate and programme eligibility rules, catalogue validation, individual-QSO exclusion explanations, or importer acceptance. No external importer, physical UI, radio/RF or other platform was tested. The outstanding G06 and other desktop roadmap work remains open.
+
+
+## 2026-11-23 — G06 review of ungrouped reported QSO
+
+The grouping preview retains QSO ID, call, stored UTC timestamp and a reason for reported-session records omitted from all groups because the date is missing/invalid or no operator programme reference is available. The UI displays these rows in pages of 100. This explains the existing grouping exclusions; it does not infer untagged contacts, explain exclusions from an individual programme, or judge eligibility. A damaged date takes precedence in the displayed reason, consistent with the existing counters. Export scans do not retain the exclusion list.
+
+A/B: before this increment the preview returned the exclusion count but no individual rows. The synthetic fixture now identifies the reference-free K1DDD record and its reason, then deliberately corrupts another QSO's stored date and identifies K1EEE with the date reason. `tst_activation` passed 24 tests; the existing offscreen desktop multiprogram and closed-session probe passed after rebuilding on macOS arm64/Qt 6.11.2. That desktop probe has no excluded rows, so the rendered exclusion rows and their page buttons have not yet been exercised.
+
+The result retains excluded rows in memory; large exclusion sets and concurrent writes were not benchmarked. Programme-specific exclusion details, duplicate and eligibility rules, local catalogues, review of all included records, importer acceptance and physical/RF operation remain open, along with the other desktop roadmap work.

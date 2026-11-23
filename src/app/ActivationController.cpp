@@ -673,11 +673,16 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=?")); exists.addBindValue(uuid);
     if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
     QSqlQuery q(db); q.setForwardOnly(true);
-    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
+    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision,call FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
     q.addBindValue(uuid);
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
+    QVariantList excluded;
+    const auto exclude = [&](const QString& reason) {
+        if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
+            {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
+    };
     int count = 0, missingDate = 0, missingReference = 0;
     const QList<QPair<QString, QString>> fields{{QStringLiteral("POTA"), QStringLiteral("MY_POTA_REF")},
         {QStringLiteral("SOTA"), QStringLiteral("MY_SOTA_REF")}, {QStringLiteral("WWFF"), QStringLiteral("MY_WWFF_REF")},
@@ -690,7 +695,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         if (timestamp.isValid()) timestamp.setTimeZone(QTimeZone::UTC);
         QDate date = timestamp.date();
         if (extra.contains(QStringLiteral("QSO_DATE"))) date = QDate::fromString(extra.value(QStringLiteral("QSO_DATE")).toString(), QStringLiteral("yyyyMMdd"));
-        if (!date.isValid()) { ++missingDate; continue; }
+        if (!date.isValid()) { ++missingDate; exclude(QStringLiteral("missingDate")); continue; }
         const QString day = date.toString(Qt::ISODate);
         const QString op = extra.value(QStringLiteral("OPERATOR")).toString().trimmed().toUpper();
         const QString stationCall = extra.value(QStringLiteral("STATION_CALLSIGN")).toString().trimmed();
@@ -714,7 +719,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (selectedIds && key == selectedKey) selectedIds->append(q.value(2).toLongLong());
             }
         }
-        if (!found) ++missingReference;
+        if (!found) { ++missingReference; exclude(QStringLiteral("missingReference")); }
     }
     if (q.lastError().isValid()) return fail(tr("Cannot read the session QSO."));
     if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
@@ -725,6 +730,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     }
     result[QStringLiteral("groups")] = rows; result[QStringLiteral("reportedCount")] = count;
     result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
+    result[QStringLiteral("excluded")] = excluded;
     if (ownsTransaction && !db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;
     return result;

@@ -17,3 +17,5 @@ From a current grouping preview, POTA, WWFF, SOTA and IOTA groups can be exporte
 Closed tracked sessions are listed in pages and can be selected for the same grouping and partition export. Sessions predating tracking are not reconstructed or automatically attributed.
 
 The grouping also counts records with empty `STATION_CALLSIGN`, empty `OPERATOR`, and both empty. These are presence checks on the QSO itself, not callsign validation or eligibility decisions. The counts can overlap and the QSO are not excluded automatically.
+
+The preview lists reported-session QSO excluded from every programme group because their UTC date is unreadable or because no operator programme reference is present, with QSO ID, call and reason. These are grouping exclusions only; contacts with absent/incorrect session metadata cannot be identified this way, and programme eligibility is not assessed.

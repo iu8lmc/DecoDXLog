@@ -20,6 +20,7 @@ DialogFrame {
     property int probeExportStep: 0
     property bool probeClosedMode: false
     property int previewPage: 0
+    property int excludedPage: 0
     property var historyRows: []
     property var historyCursors: [0]
     property int historyPage: 0
@@ -85,6 +86,7 @@ DialogFrame {
                 root.partitionPreview = root.act.previewResult
                 root.previewShown = Object.keys(root.partitionPreview).length > 0
                 root.previewPage = 0
+                root.excludedPage = 0
             }
         }
         function onPartitionExportFinished(success, message) {
@@ -557,6 +559,21 @@ DialogFrame {
         Note {
             visible: root.previewShown && !root.partitionPreview.error
             text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
+        }
+        Repeater {
+            model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.excluded || []).slice(root.excludedPage * 100, (root.excludedPage + 1) * 100) : []
+            Note {
+                required property var modelData
+                text: qsTr("Excluded QSO #%1 · %2 · %3: %4")
+                    .arg(modelData.id).arg(modelData.call || "—").arg(modelData.at || "—")
+                    .arg(modelData.reason === "missingDate" ? qsTr("missing or invalid UTC date") : qsTr("no operator programme reference"))
+            }
+        }
+        RowLayout {
+            visible: root.previewShown && (root.partitionPreview.excluded || []).length > 100
+            GlassButton { text: qsTr("Previous exclusions"); enabled: root.excludedPage > 0; onClicked: root.excludedPage-- }
+            Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.excludedPage + 1) }
+            GlassButton { text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < root.partitionPreview.excluded.length; onClicked: root.excludedPage++ }
         }
         Note {
             visible: root.previewShown && !root.partitionPreview.error

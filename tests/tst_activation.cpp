@@ -91,6 +91,18 @@ private slots:
         QCOMPARE(db.insertQso(noRef, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
         const auto again = act.partitionPreview(); QCOMPARE(again.value("missingReference").toInt(), 1);
         QCOMPARE(again.value("reportedCount").toInt(), 3);
+        const auto excluded = again.value("excluded").toList(); QCOMPARE(excluded.size(), 1);
+        QCOMPARE(excluded.at(0).toMap().value("call").toString(), QString("K1DDD"));
+        QCOMPARE(excluded.at(0).toMap().value("reason").toString(), QString("missingReference"));
+        AdifRecord damaged{{"CALL","K1EEE"},{"QSO_DATE","20270101"},{"TIME_ON","000400"},{"BAND","20m"},{"MODE","CW"}};
+        act.session().applyTo(damaged, 0); const auto inserted = db.insertQso(damaged, "manual", {}, true, 0, false);
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        QSqlQuery corrupt(db.connection()); corrupt.prepare("UPDATE qso SET qso_datetime_on='invalid' WHERE id=?");
+        corrupt.addBindValue(inserted.id); QVERIFY(corrupt.exec());
+        const auto withBadDate = act.partitionPreview(); QCOMPARE(withBadDate.value("missingDate").toInt(), 1);
+        const auto badRows = withBadDate.value("excluded").toList(); QCOMPARE(badRows.size(), 2);
+        QCOMPARE(badRows.at(1).toMap().value("call").toString(), QString("K1EEE"));
+        QCOMPARE(badRows.at(1).toMap().value("reason").toString(), QString("missingDate"));
         QVERIFY(db.connection().transaction());
         QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
         QVERIFY(db.connection().rollback());
