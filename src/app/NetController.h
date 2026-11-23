@@ -55,6 +55,7 @@ public:
         // Un QSO di un altro PC da mettere nel log; torna vero se e' entrato.
         std::function<bool(const core::AdifRecord& record, const QString& station)> insertRemote;
         std::function<void(qint64)> reviewedQsoInserted;
+        std::function<void(qint64, bool, const QString&)> reviewedQsoChanged;
         // Uno spot interno: nel cluster, come gli altri.
         std::function<void(const QString& call, double khz, const QString& comment, const QString& station)> spot;
         // Dove sta questo PC: {band, mode, freqKhz, op}.
@@ -107,6 +108,7 @@ public:
     Q_INVOKABLE void cancelQsoComparison();
     Q_INVOKABLE bool reviewQsoComparison(const QString& uuid);
     Q_INVOKABLE QString applyReviewedMissingQso();
+    Q_INVOKABLE QString applyReviewedExistingQso();
     bool qsoReviewBusy() const { return m_qsoReviewBusy; }
     QVariantMap qsoReview() const { return m_qsoReview; }
     bool qsoComparisonBusy() const { return m_qsoComparisonBusy; }
@@ -207,6 +209,7 @@ private:
     bool m_qsoReviewBusy{false};
     QVariantMap m_qsoReview;
     std::shared_ptr<core::contestqso::Receiver> m_reviewedMissing;
+    core::contestqso::Review m_reviewedExisting;
     bool qsoComparisonCurrent() const;
     QVariantMap m_qsoComparisonSummary;
     QVariantList m_qsoComparisonRows;

@@ -2273,6 +2273,17 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Import and apply are unavailable when a field exceeds the visible limit.</source><translation>Importazione e applicazione non sono disponibili se un campo supera il limite visibile.</translation></message>
+    <message><source>Review deletion…</source><translation>Esamina cancellazione…</translation></message>
+    <message><source>Review selected changes…</source><translation>Esamina le modifiche selezionate…</translation></message>
+    <message><source>Delete current QSO?</source><translation>Cancellare il QSO corrente?</translation></message>
+    <message><source>Apply selected QSO fields?</source><translation>Applicare i campi del QSO selezionato?</translation></message>
+    <message><source>Change applied. Compare the logs again.</source><translation>Modifica applicata. Ripeti il confronto dei log.</translation></message>
+    <message><source>Delete the current QSO? It remains in history, and configured services may receive a deletion.</source><translation>Cancellare il QSO corrente? Rimane nello storico e i servizi configurati possono ricevere una cancellazione.</translation></message>
+    <message><source>Replace the current QSO's ADIF fields and QSL states with the selected log's values? Existing station profile and attachments remain. Configured services may receive the change.</source><translation>Sostituire i campi ADIF e gli stati QSL del QSO corrente con i valori del log selezionato? Profilo di stazione e allegati esistenti rimangono. I servizi configurati possono ricevere la modifica.</translation></message>
+    <message><source>The QSO will be checked again. This is an explicit choice, not an automatic merge.</source><translation>Il QSO verrà controllato nuovamente. Questa è una scelta esplicita, non una fusione automatica.</translation></message>
+    <message><source>Delete QSO</source><translation>Cancella QSO</translation></message>
+    <message><source>Apply changes</source><translation>Applica modifiche</translation></message>
     <message><source>Snapshot comparison · imports require confirmation</source><translation>Confronto delle istantanee · importazioni con conferma</translation></message>
     <message><source>Compare the open log with a local copy from another station. The comparison does not contact the station. Missing QSO can be imported after inspection and confirmation. Matching covers ADIF fields only; attachments and local metadata are excluded.</source><translation>Confronta il log aperto con una copia locale di un’altra stazione. Il confronto non contatta la stazione. I QSO mancanti possono essere importati dopo esame e conferma. La corrispondenza riguarda solo i campi ADIF; allegati e metadati locali sono esclusi.</translation></message>
     <message><source>Import this missing QSO…</source><translation>Importa questo QSO mancante…</translation></message>

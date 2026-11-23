@@ -103,6 +103,23 @@ private slots:
         QVERIFY2(output.contains("PROBE netimport true") && !output.contains("TypeError"),output.constData());
         LogDatabase local; QVERIFY(local.open(localPath)); QCOMPARE(local.qsoCount(),qint64(accept?1:0)); if (accept) QVERIFY(local.idForUuid(uuid)>0);
     }
+    void stationNetworkApplyConfirmation_data()
+    {
+        QTest::addColumn<bool>("accept"); QTest::addColumn<bool>("deletion");
+        QTest::newRow("reject edit") << false << false; QTest::newRow("accept edit") << true << false;
+        QTest::newRow("reject deletion") << false << true; QTest::newRow("accept deletion") << true << true;
+    }
+    void stationNetworkApplyConfirmation()
+    {
+        using namespace decolog::core; QFETCH(bool,accept); QFETCH(bool,deletion); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const auto localPath=dir.filePath("test.sqlite"), remotePath=dir.filePath("remote.sqlite"); qint64 localId=0;
+        auto add=[](LogDatabase& db,const QString& name) { const auto q=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME",name}},"fixture"); return q.id>0 && db.adoptUuid(q.id,"shared")?q.id:qint64(0); };
+        { LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath)); localId=add(local,"Local"); const auto remoteId=add(remote,"Remote"); QVERIFY(localId>0 && remoteId>0); if (deletion) QVERIFY(remote.softDeleteQso(remoteId)); }
+        QByteArray output; QVERIFY2(launch(dir,(accept?"netapplyprobe:":"netapplycancelprobe:")+remotePath,output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE netapply true") && !output.contains("TypeError"),output.constData());
+        LogDatabase local; QVERIFY(local.open(localPath)); QVERIFY(local.meta(localId)); QCOMPARE(local.meta(localId)->deleted,accept && deletion);
+        if (!deletion) QCOMPARE(local.record(localId)->value("NAME"),accept?QString("Remote"):QString("Local"));
+    }
     void contestSerialEntryUsesSelectedGrant_data()
     {
         QTest::addColumn<QString>("probe");

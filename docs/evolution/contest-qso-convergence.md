@@ -29,3 +29,5 @@ A separate experimental review token can guard a caller-selected edit or soft de
 A pinned inventory can also fetch an individual UUID without advancing its page cursor. The lookup returns the same snapshot content and uses the same payload and file-identity guards as pagination; it does not itself authorize or apply a change.
 
 The offline comparison UI can inspect all ADIF fields of a displayed difference using direct UUID lookup in fresh pinned snapshots, guarded against observed log changes. The inspection is read-only; after a separate confirmation the operator can import a missing, non-deleted QSO into the open log. Long values are visually truncated and attachments/local-only metadata are not displayed or copied.
+
+For an existing non-deleted local QSO, the offline inspection can also explicitly apply the selected ADIF fields or a selected deletion after a separate confirmation and a transactional local-state recheck. It is not automatic merging. Long values that cannot be shown in full disable import/apply; attachments and station profiles are retained locally and are not copied. Normal configured QSL/service edit or deletion workflows may run.

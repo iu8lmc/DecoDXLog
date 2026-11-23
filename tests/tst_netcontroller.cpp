@@ -79,6 +79,39 @@ private slots:
         const auto id=local.idForUuid(uuid); QVERIFY(id>0); QCOMPARE(local.record(id)->value("COMMENT"),QString("changed")); QVERIFY(net.qsoComparisonSummary().value("stale").toBool());
         QVERIFY(!net.applyReviewedMissingQso().isEmpty()); QCOMPARE(local.qsoCount(),qint64(1)); QCOMPARE(notifications,1);
     }
+    void offlineComparisonAppliesOnlyReviewedChanges()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("ApplyReview"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"), remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME","Local"}};
+        const auto a=local.insertQso(record,"fixture"); record.set("NAME","Remote"); const auto b=remote.insertQso(record,"fixture"); QVERIFY(a.id>0 && b.id>0);
+        QVERIFY(local.adoptUuid(a.id,"shared")); QVERIFY(remote.adoptUuid(b.id,"shared")); int notifications=0; bool deleted=false;
+        NetController::Context ctx; ctx.db=&local; ctx.reviewedQsoChanged=[&](qint64 id,bool isDeleted,const QString&){ QCOMPARE(id,a.id); ++notifications; deleted=isDeleted; }; NetController net(ctx);
+        QVERIFY(!net.applyReviewedExistingQso().isEmpty()); QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QVERIFY(net.reviewQsoComparison("shared")); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoReviewBusy(),10000); QVERIFY(net.qsoReview().value("canApply").toBool());
+        auto edited=*local.record(a.id); edited.set("NAME","Concurrent"); QVERIFY(local.updateQso(a.id,edited).status==InsertResult::Status::Inserted);
+        QVERIFY(!net.applyReviewedExistingQso().isEmpty()); QCOMPARE(local.record(a.id)->value("NAME"),QString("Concurrent")); QCOMPARE(notifications,0);
+        QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000); QVERIFY(net.reviewQsoComparison("shared")); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoReviewBusy(),10000);
+        QVERIFY(net.applyReviewedExistingQso().isEmpty()); QCOMPARE(local.record(a.id)->value("NAME"),QString("Remote")); QCOMPARE(notifications,1); QVERIFY(!deleted);
+        QVERIFY(remote.softDeleteQso(b.id)); QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QVERIFY(net.reviewQsoComparison("shared")); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoReviewBusy(),10000); QVERIFY(net.qsoReview().value("canApply").toBool()); QVERIFY(net.qsoReview().value("remoteDeleted").toBool());
+        QVERIFY(net.applyReviewedExistingQso().isEmpty()); QVERIFY(local.meta(a.id)->deleted); QCOMPARE(notifications,2); QVERIFY(deleted);
+    }
+    void offlineComparisonDoesNotApplyUnseenLongValues()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("LongReview"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"), remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(2050,'x')}};
+        const auto q=remote.insertQso(record,"fixture"); QVERIFY(q.id>0); NetController::Context ctx; ctx.db=&local; NetController net(ctx);
+        QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QVERIFY(net.reviewQsoComparison(remote.meta(q.id)->uuid)); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoReviewBusy(),10000);
+        QVERIFY(net.qsoReview().value("ok").toBool()); QVERIFY(net.qsoReview().value("hasLongFields").toBool()); QVERIFY(!net.qsoReview().value("canInsert").toBool());
+        QVERIFY(!net.applyReviewedMissingQso().isEmpty()); QCOMPARE(local.qsoCount(),qint64(0));
+    }
     void offlineQsoComparisonCancelsWithoutPublishingPartialRows()
     {
         using namespace decolog::core; using decolog::app::NetController;

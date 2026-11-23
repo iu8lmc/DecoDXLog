@@ -1371,6 +1371,25 @@ bool DecoLogController::openDatabase(const QString& path)
         m_cloud->qsoLogged();
         emit logChanged();
     };
+    netCtx.reviewedQsoChanged = [this](qint64 id, bool deleted, const QString& oldCall) {
+        if (deleted) {
+            QStringList pending;
+            for (const auto& state:m_db.qslStatus(id))
+                if (LogDatabase::editableServices().contains(state.service) && state.sent==QLatin1String("D") && !state.remoteId.isEmpty() && !pending.contains(state.service)) pending << state.service;
+            m_qsl->scheduleAutomaticServices(pending);
+            m_model->removeDeletedIds({id});
+        } else {
+            const auto current=m_db.record(id);
+            if (current && !oldCall.isEmpty() && oldCall.trimmed().compare(current->value(QStringLiteral("CALL")).trimmed(),Qt::CaseInsensitive)!=0)
+                m_db.markSentForResend(id);
+            m_db.queueRemoteEdit(id);
+            m_qsl->qsoEdited(id);
+            m_model->reloadAfterEdit(id);
+        }
+        emit logChanged();
+        m_decoLink.resendSnapshot();
+        refreshCallInfo();
+    };
     netCtx.spot = [this](const QString& call, double khz, const QString& comment, const QString& station) {
         if (!m_cluster)
             return;

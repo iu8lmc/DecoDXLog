@@ -13,6 +13,7 @@ GlassPanel {
     readonly property var net: decolog.net
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
     function probeReview() { const rows=root.net.qsoComparisonRows; if (!rows.length || !root.net.reviewQsoComparison(rows[0].uuid)) return false; qsoDetailsDialog.open(); return true }
+    function probeApply(accept) { if (!root.net.qsoReview.canApply) return false; qsoApplyDialog.open(); if (accept) qsoApplyDialog.confirmApply(); else qsoApplyDialog.close(); return true }
     function probeImport(accept) { if (!root.net.qsoReview.canInsert) return false; qsoImportDialog.open(); if (accept) qsoImportDialog.confirmImport(); else qsoImportDialog.close(); return true }
     function probeReviewState() { return {visible:qsoDetailsDialog.visible,title:qsoDetailsDialog.title,fields:(root.net.qsoReview.fields || []).length,ok:root.net.qsoReview.ok || false} }
     function probeComparisonState() { const rows=root.net.qsoComparisonRows, first=qsoComparisonList.itemAtIndex(0); return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:rows.length,firstFields:rows.length ? (rows[0].fields || []).length : 0,fieldShown:first ? first.fieldTextAt(0) : ""} }
@@ -315,6 +316,8 @@ GlassPanel {
             spacing:8
             Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
                 text:qsTr("Fields are shown up to 2048 characters. Long values are marked; attachments and local metadata are not shown.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; visible:root.net.qsoReview.hasLongFields === true
+                text:qsTr("Import and apply are unavailable when a field exceeds the visible limit.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.warningColor
                 text:root.net.qsoReviewBusy ? qsTr("Reading QSO snapshots…") : root.net.qsoReview.error || (root.net.qsoComparisonSummary.stale ? qsTr("A log changed; compare again.") : "") }
             Rectangle {
@@ -335,6 +338,9 @@ GlassPanel {
             RowLayout {
                 GlassButton { text:qsTr("Import this missing QSO…"); visible:root.net.qsoReview.canInsert === true
                     enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale; onClicked:qsoImportDialog.open() }
+                GlassButton { text:root.net.qsoReview.remoteDeleted ? qsTr("Review deletion…") : qsTr("Review selected changes…")
+                    visible:root.net.qsoReview.canApply === true; enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale
+                    onClicked:qsoApplyDialog.open() }
                 GlassButton { text:qsTr("Close"); onClicked:qsoDetailsDialog.close() }
             }
         }
@@ -360,6 +366,33 @@ GlassPanel {
             RowLayout {
                 GlassButton { text:qsTr("Cancel"); onClicked:qsoImportDialog.close() }
                 GlassButton { text:qsTr("Import QSO"); onClicked:qsoImportDialog.confirmImport() }
+            }
+        }
+    }
+
+    DialogFrame {
+        id:qsoApplyDialog
+        transientParent:root.Window.window
+        title:root.net.qsoReview.remoteDeleted ? qsTr("Delete current QSO?") : qsTr("Apply selected QSO fields?")
+        width:680; height:340
+        function confirmApply() {
+            const error=root.net.applyReviewedExistingQso()
+            qsoComparisonDialog.localError=error || qsTr("Change applied. Compare the logs again.")
+            if (!error) qsoDetailsDialog.close()
+            close()
+        }
+        body:ColumnLayout {
+            spacing:12
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:root.net.qsoReview.remoteDeleted
+                    ? qsTr("Delete the current QSO? It remains in history, and configured services may receive a deletion.")
+                    : qsTr("Replace the current QSO's ADIF fields and QSL states with the selected log's values? Existing station profile and attachments remain. Configured services may receive the change.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                text:qsTr("The QSO will be checked again. This is an explicit choice, not an automatic merge.") }
+            Item { Layout.fillHeight:true }
+            RowLayout {
+                GlassButton { text:qsTr("Cancel"); onClicked:qsoApplyDialog.close() }
+                GlassButton { text:root.net.qsoReview.remoteDeleted ? qsTr("Delete QSO") : qsTr("Apply changes"); onClicked:qsoApplyDialog.confirmApply() }
             }
         }
     }
