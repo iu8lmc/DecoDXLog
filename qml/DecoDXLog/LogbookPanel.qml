@@ -336,7 +336,15 @@ GlassPanel {
         bulkDialog.prepareProbe(ids, field, value, onlyEmpty)
         return ids.length
     }
+    function prepareSelectedBulkProbe(field, value, onlyEmpty) {
+        root.selectedIds = root.model.shownIds()
+        rowMenu.qsoId = root.selectedIds.length ? root.selectedIds[0] : 0
+        changeFieldMenu.triggered()
+        bulkDialog.configureProbe(field, value, onlyEmpty)
+        return root.selectedIds.length
+    }
     function bulkProbeButton() { return bulkDialog.probeApplyButton() }
+    function bulkProbeResult() { return bulkDialog.probeResult() }
     function columnWidthOf(col) { return table.columnWidth(col) }
     // Per le schermate di prova (--show select:<righe separate da virgola>:<cosa>).
     function showSelection(rows, what) {
@@ -1894,6 +1902,7 @@ GlassPanel {
         // Lo stesso campo su tutti quelli scelti: il locatore di casa, un
         // riferimento POTA, le QSL spedite.
         StyledMenuItem {
+            id: changeFieldMenu
             readonly property int chosen: root.selectedIds.length
             text: chosen > 1 ? qsTr("Change a field on the %1 QSO selected…").arg(chosen) : qsTr("Change a field…")
             enabled: decolog.bulkProgress < 0

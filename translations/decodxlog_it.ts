@@ -1094,6 +1094,10 @@
 </context>
 <context>
     <name>BulkEditDialog</name>
+    <message><source>Changed: %1 · unchanged: %2 · failed: %3</source><translation>Modificati: %1 · invariati: %2 · non riusciti: %3</translation></message>
+    <message><source>For QSL statuses, N is treated as empty. Other existing values are left unchanged when this option is enabled.</source><translation>Per gli stati QSL, N è considerato vuoto. Con questa opzione gli altri valori esistenti rimangono invariati.</translation></message>
+    <message><source>Applying changes… Hiding this window does not cancel the operation.</source><translation>Applicazione delle modifiche… Nascondere questa finestra non annulla l'operazione.</translation></message>
+    <message><source>Hide</source><translation>Nascondi</translation></message>
     <message>
         <source>CHANGE A FIELD ON %1 QSO</source>
         <translation>CAMBIA UN CAMPO SU %1 QSO</translation>
@@ -10241,6 +10245,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>TopBar</name>
+    <message><source>A complete callsign matches exactly. Use call: for partial calls, or all: to search calls, locators, names, QTH and comments.</source><translation>Un nominativo completo viene cercato esattamente. Usa call: per cercare nominativi parziali oppure all: per cercare in nominativi, locator, nomi, QTH e commenti.</translation></message>
     <message>
         <source>DXpedition calendar</source>
         <translation>Calendario DX-Pedition</translation>
@@ -11596,6 +11601,8 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Select QSO and a field first.</source><translation>Seleziona prima i QSO e un campo.</translation></message>
+    <message><source>The open log changed. Check the original log for the result.</source><translation>Il log aperto è cambiato. Controlla il risultato nel log originale.</translation></message>
     <message><source>The reviewed log or plan changed; reopen the cost editor.</source><translation>Il log o il piano verificato è cambiato; riapri l'editor dei costi.</translation></message>
     <message>
         <source>General QSL settings</source>

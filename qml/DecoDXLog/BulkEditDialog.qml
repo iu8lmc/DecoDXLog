@@ -14,6 +14,8 @@ Popup {
 
     property var ids: []
     property var fields: []
+    property bool waiting: false
+    property bool finished: false
     readonly property var chosen: fieldBox.currentIndex >= 0 && fieldBox.currentIndex < fields.length
                                   ? fields[fieldBox.currentIndex] : null
     readonly property bool hasChoices: chosen !== null && chosen.choices.length > 0
@@ -23,6 +25,7 @@ Popup {
         root.fields = decolog.bulkFields()
         valueField.text = ""
         onlyEmpty.checked = true
+        waiting = false; finished = false; resultText.text = ""
         open()
     }
 
@@ -30,11 +33,26 @@ Popup {
     // application send a mouse click to the same button used by operators.
     function prepareProbe(list, field, value, onlyEmptyValue) {
         openFor(list)
+        configureProbe(field, value, onlyEmptyValue)
+    }
+    function configureProbe(field, value, onlyEmptyValue) {
         fieldBox.currentIndex = root.fields.findIndex(function(f) { return f.field === field })
+        fieldBox.activated(fieldBox.currentIndex)
         valueField.text = value
+        if (root.hasChoices && value !== "Y") valueBox.currentIndex = Math.max(0, root.chosen.choices.findIndex(function(c) { return c.value === value }))
         onlyEmpty.checked = onlyEmptyValue
     }
     function probeApplyButton() { return applyButton }
+    function probeResult() { return root.visible && resultText.visible ? resultText.text : "<not visible>" }
+
+    Connections {
+        target: decolog
+        function onBulkEditFinished(changed, unchanged, failed, error) {
+            if (!root.waiting) return
+            root.waiting = false; root.finished = true
+            resultText.text = qsTr("Changed: %1 · unchanged: %2 · failed: %3").arg(changed).arg(unchanged).arg(failed) + (error ? "\n" + error : "")
+        }
+    }
 
     // In una finestra sua il popup riceve i tasti solo se ha il fuoco: senza
     // "focus: true" il campo prende il cursore ma quello che si scrive si perde.
@@ -115,6 +133,12 @@ Popup {
             checked: true
         }
         Text {
+            Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary; font.pixelSize: 11
+            visible: root.chosen !== null && ["QSL_SENT", "QSL_RCVD", "LOTW_QSL_SENT", "EQSL_QSL_SENT"].indexOf(root.chosen.field) >= 0
+            text: qsTr("For QSL statuses, N is treated as empty. Other existing values are left unchanged when this option is enabled.")
+        }
+        Text { id: resultText; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; visible: text.length > 0 }
+        Text {
             Layout.fillWidth: true
             visible: root.ids.length > 1000
             wrapMode: Text.Wrap
@@ -128,18 +152,18 @@ Popup {
             Layout.fillWidth: true
             spacing: 8
             Item { Layout.fillWidth: true }
-            GlassButton { text: qsTr("Cancel"); onClicked: root.close() }
+            GlassButton { text: root.waiting ? qsTr("Hide") : root.finished ? qsTr("Close") : qsTr("Cancel"); onClicked: root.close() }
             GlassButton {
                 id: applyButton
                 text: qsTr("Change %1 QSO").arg(root.ids.length)
                 tone: Theme.accentColor
                 filled: true
-                enabled: root.chosen !== null && root.ids.length > 0 && decolog.bulkProgress < 0
+                enabled: root.chosen !== null && root.ids.length > 0 && decolog.bulkProgress < 0 && !root.waiting
                 onClicked: {
                     const value = root.hasChoices ? root.chosen.choices[Math.max(0, valueBox.currentIndex)].value
                                                   : valueField.text
+                    root.waiting = true; root.finished = false; resultText.text = qsTr("Applying changes… Hiding this window does not cancel the operation.")
                     decolog.bulkEdit(root.ids, root.chosen.field, value, onlyEmpty.checked)
-                    root.close()
                 }
             }
         }

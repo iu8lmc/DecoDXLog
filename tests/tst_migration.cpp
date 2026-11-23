@@ -21,6 +21,23 @@ class TestMigration : public QObject
     Q_OBJECT
 
 private slots:
+    void bulkPaperConfirmationPreservesOtherQsos()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto first=db.insertQso({{"CALL","J51A"},{"QSO_DATE","20260228"},{"TIME_ON","1100"},{"BAND","20m"},{"MODE","CW"}},"fixture");
+        const auto second=db.insertQso({{"CALL","J51A"},{"QSO_DATE","20260228"},{"TIME_ON","1101"},{"BAND","40m"},{"MODE","CW"}},"fixture");
+        const auto other=db.insertQso({{"CALL","ZY0SAT"},{"QSO_DATE","20260301"},{"TIME_ON","2035"},{"BAND","20m"},{"MODE","SSB"},{"GRIDSQUARE","HJ51AM"}},"fixture"); QVERIFY(first.id>0 && second.id>0 && other.id>0);
+        QslState state; state.service="card"; state.rcvd="N"; state.sent="Y"; state.via="D"; QVERIFY(db.setCardState(first.id,state));
+        const auto result=db.bulkEdit({first.id,second.id},"QSL_RCVD","Y",true); QCOMPARE(result.changed,2); QCOMPARE(result.failed,0);
+        QCOMPARE(db.record(first.id)->value("QSL_RCVD"),QString("Y")); QCOMPARE(db.record(second.id)->value("QSL_RCVD"),QString("Y"));
+        QCOMPARE(db.record(first.id)->value("QSLRDATE"),QDateTime::currentDateTimeUtc().date().toString("yyyyMMdd"));
+        QCOMPARE(db.qslStatus(first.id).first().sent,QString("Y")); QCOMPARE(db.qslStatus(first.id).first().via,QString("D")); QVERIFY(db.record(other.id)->value("QSL_RCVD").isEmpty());
+        for (const QString& field : {QStringLiteral("LOTW_QSL_RCVD"),QStringLiteral("EQSL_QSL_RCVD")}) {
+            const auto similar=db.bulkEdit({first.id,second.id},field,"Y",true); QCOMPARE(similar.changed,2); QCOMPARE(similar.failed,0);
+            QCOMPARE(db.record(first.id)->value(field),QString("Y")); QCOMPARE(db.record(second.id)->value(field),QString("Y"));
+            const auto repeated=db.bulkEdit({first.id,second.id},field,"Y",true); QCOMPARE(repeated.changed,0); QCOMPARE(repeated.unchanged,2);
+        }
+    }
     void cancellingPreviewLeavesSourceUntouched()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

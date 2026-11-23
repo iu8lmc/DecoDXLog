@@ -80,6 +80,23 @@ class TestBulkResponsiveness : public QObject {
     }
 
 private slots:
+    void callsignSearchAndBulkPaperConfirmation()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+          for (int i=0;i<32;++i) { const QString time=QString("%1%2").arg(i/60,2,10,QLatin1Char('0')).arg(i%60,2,10,QLatin1Char('0'));
+              const auto r=db.insertQso({{"CALL","J51A"},{"QSO_DATE","20260228"},{"TIME_ON",time},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false); QVERIFY(r.id>0); }
+          QVERIFY(db.insertQso({{"CALL","ZY0SAT"},{"QSO_DATE","20260301"},{"TIME_ON","2035"},{"BAND","20m"},{"MODE","SSB"},{"GRIDSQUARE","HJ51AM"}},"fixture").id>0);
+          QVERIFY(db.insertQso({{"CALL","J51ABC"},{"QSO_DATE","20260301"},{"TIME_ON","2036"},{"BAND","20m"},{"MODE","SSB"}},"fixture").id>0); }
+        QByteArray output; qint64 maxGap=0,elapsed=0; int rows=0; QVERIFY2(runProbe(dir,"paperqsl",output,maxGap,elapsed,rows),output.constData()); QCOMPARE(rows,32);
+        QVERIFY2(output.contains("PROBE bulk result Changed: 32") || output.contains("PROBE bulk result Modificati: 32"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM qso JOIN qsl_status s ON s.qso_id=qso.id AND s.service='card' WHERE qso.call='J51A' AND s.rcvd='Y'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),32);
+        const auto other=db.record(db.latestIds("ZY0SAT",1).first()); QVERIFY(other); QVERIFY(other->value("QSL_RCVD").isEmpty());
+        const auto similar=db.record(db.latestIds("J51ABC",1).first()); QVERIFY(similar); QVERIFY(similar->value("QSL_RCVD").isEmpty());
+        db.close(); QByteArray again; QVERIFY2(runProbe(dir,"paperqsl",again,maxGap,elapsed,rows),again.constData()); QCOMPARE(rows,32);
+        QVERIFY2((again.contains("Changed: 0") && again.contains("unchanged: 32")) || (again.contains("Modificati: 0") && again.contains("invariati: 32")),again.constData());
+    }
     void deepScrollSingleBulkAndNoop()
     {
         if (qEnvironmentVariableIsSet("DECODXLOG_FOCUSED_FIXTURE")) QSKIP("running focused USB checks");

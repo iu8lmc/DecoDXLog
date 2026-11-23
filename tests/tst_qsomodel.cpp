@@ -43,6 +43,19 @@ class TestQsoModel : public QObject {
     Q_OBJECT
 
 private slots:
+    void callSearchDoesNotMatchAnotherStationsGrid()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto wanted=db.insertQso({{"CALL","J51A"},{"QSO_DATE","20260228"},{"TIME_ON","1100"},{"BAND","20m"},{"MODE","CW"},{"GRIDSQUARE","IK21FQ"}},"fixture");
+        const auto other=db.insertQso({{"CALL","ZY0SAT"},{"QSO_DATE","20260301"},{"TIME_ON","2035"},{"BAND","20m"},{"MODE","SSB"},{"GRIDSQUARE","HJ51AM"}},"fixture"); QVERIFY(wanted.id>0 && other.id>0);
+        const auto similar=db.insertQso({{"CALL","J51ABC"},{"QSO_DATE","20260301"},{"TIME_ON","2036"},{"BAND","20m"},{"MODE","SSB"}},"fixture"); QVERIFY(similar.id>0);
+        QsoTableModel model(&db); model.setFilterText("J51A"); QCOMPARE(model.count(),1); QCOMPARE(model.idAt(0),wanted.id);
+        model.setFilterText("HJ51AM"); QCOMPARE(model.count(),1); QCOMPARE(model.idAt(0),other.id);
+        model.setFilterText("all:J51A"); QCOMPARE(model.count(),3);
+        model.setFilterText("call:J51A"); QCOMPARE(model.count(),2);
+        model.setFilterText("call:"); QCOMPARE(model.count(),0);
+        model.setFilterText("all:"); QCOMPARE(model.count(),0);
+    }
     void largeFileReloadIsAsyncAndInsertInvalidatesPendingSnapshot()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

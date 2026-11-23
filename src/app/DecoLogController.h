@@ -926,6 +926,7 @@ signals:
     void importUndoPreviewReady(const QVariantMap& result);
     void importPreviewReady(const QUrl& file, const QVariantMap& result);
     void bulkChanged();
+    void bulkEditFinished(int changed, int unchanged, int failed, const QString& error);
     void exportBusyChanged();
     void duplicatesChanged();
     void backupInspected(const QVariantMap& info);

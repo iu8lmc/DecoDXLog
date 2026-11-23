@@ -650,6 +650,8 @@ Rectangle {
                 visible: !searchBlock.compact
                 Layout.fillWidth: true
                 placeholderText: qsTr("Search…")
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("A complete callsign matches exactly. Use call: for partial calls, or all: to search calls, locators, names, QTH and comments.")
                 text: decolog.qsoModel.filterText
                 onTextEdited: decolog.qsoModel.filterText = text
                 Keys.onEscapePressed: { text = ""; decolog.qsoModel.filterText = "" }
@@ -684,6 +686,8 @@ Rectangle {
                 contentItem: StyledTextField {
                     id: popupSearchField
                     placeholderText: qsTr("Search…")
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("A complete callsign matches exactly. Use call: for partial calls, or all: to search calls, locators, names, QTH and comments.")
                     text: decolog.qsoModel.filterText
                     onTextEdited: decolog.qsoModel.filterText = text
                     Keys.onEscapePressed: { text = ""; decolog.qsoModel.filterText = ""; searchPopup.close() }

@@ -11,6 +11,7 @@
 #include <QDebug>
 #include <QMetaObject>
 #include <QPointer>
+#include <QRegularExpression>
 
 #include <algorithm>
 #include <QSet>
@@ -1140,13 +1141,25 @@ QString QsoTableModel::whereSql(QVariantList& binds, bool otherLogs) const
 {
     QStringList where;
     {
-        const QString f = m_filter.trimmed().toUpper();
+        QString f = m_filter.trimmed().toUpper();
         if (!f.isEmpty()) {
-            // Ricerca libera: nominativo, locatore, nome, QTH o commento.
-            where << QStringLiteral("(call LIKE ? OR UPPER(gridsquare) LIKE ? OR UPPER(name) LIKE ? "
-                                    "OR UPPER(IFNULL(qth, '')) LIKE ? OR UPPER(IFNULL(comment, '')) LIKE ?)");
-            const QString like = QLatin1Char('%') + f + QLatin1Char('%');
-            binds << like << like << like << like << like;
+            const bool explicitAll=f.startsWith(QLatin1String("ALL:"));
+            const bool explicitCall=f.startsWith(QLatin1String("CALL:"));
+            if (explicitAll) f=f.mid(4).trimmed();
+            else if (explicitCall) f=f.mid(5).trimmed();
+            static const QRegularExpression callPattern(QStringLiteral("^(?:[A-Z0-9]{1,6}/)?[A-Z0-9]{1,3}[0-9][A-Z]{1,6}(?:/[A-Z0-9]{1,6})?$"));
+            static const QRegularExpression gridPattern(QStringLiteral("^[A-R]{2}[0-9]{2}(?:[A-X]{2}(?:[0-9]{2})?)?$"));
+            const bool exactCall=!explicitAll && !explicitCall && callPattern.match(f).hasMatch() && !gridPattern.match(f).hasMatch();
+            if (!f.isEmpty()) {
+                const QString like=QLatin1Char('%')+f+QLatin1Char('%');
+                if (exactCall) { where << QStringLiteral("UPPER(TRIM(call)) = ?"); binds << f; }
+                else if (explicitCall) { where << QStringLiteral("UPPER(call) LIKE ?"); binds << like; }
+                else {
+                    where << QStringLiteral("(call LIKE ? OR UPPER(gridsquare) LIKE ? OR UPPER(name) LIKE ? "
+                                            "OR UPPER(IFNULL(qth, '')) LIKE ? OR UPPER(IFNULL(comment, '')) LIKE ?)");
+                    binds << like << like << like << like << like;
+                }
+            } else if (explicitAll || explicitCall) where << QStringLiteral("0");
         }
         if (!m_bands.isEmpty()) {
             QStringList marks;

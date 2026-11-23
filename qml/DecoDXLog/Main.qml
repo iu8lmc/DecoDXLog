@@ -669,6 +669,7 @@ RoundedWindow {
                        : mode === "callbookscan" ? (now - startedAt >= 1000 && decolog.callbookQueued === 0)
                        : decolog.bulkProgress < 0
             if (sawRunning && done && !window.panelItem("logbook").item.model.busy && ++settledTicks >= 5) {
+                if (mode === "paperqsl") console.warn("PROBE bulk result " + window.panelItem("logbook").item.bulkProbeResult())
                 if (mode === "manual") console.warn("PROBE manual-model-count=" + window.panelItem("logbook").item.model.count)
                 console.warn("PROBE bulkcheck mode=" + mode + " rows=" + rows + " maxgap=" + maxGap
                              + " elapsed=" + (now - startedAt))
@@ -735,8 +736,8 @@ RoundedWindow {
                 const lp = window.panelItem("logbook").item
                 if (step === 11) {
                     bulkCheckHeartbeat.mode = key
-                    if (key === "filtered") {
-                        lp.model.filterText = "K123"
+                    if (key === "filtered" || key === "paperqsl") {
+                        lp.model.filterText = key === "paperqsl" ? "J51A" : "K123"
                         lp.model.setSort("call", true)
                     } else if (key === "one" || key === "all" || key === "noop") {
                         bulkCheckHeartbeat.rows = lp.prepareBulkProbe(key !== "one", "COMMENT", "BULK-TEST", false)
@@ -745,9 +746,9 @@ RoundedWindow {
                     }
                     return
                 }
-                if (key === "filtered" && !pointerProbe.filteredPrepared) {
+                if ((key === "filtered" || key === "paperqsl") && !pointerProbe.filteredPrepared) {
                     if (lp.model.busy) return
-                    bulkCheckHeartbeat.rows = lp.prepareBulkProbe(true, "NOTES", "FILTER-TEST", false)
+                    bulkCheckHeartbeat.rows = key === "paperqsl" ? lp.prepareSelectedBulkProbe("QSL_RCVD", "Y", true) : lp.prepareBulkProbe(true, "NOTES", "FILTER-TEST", false)
                     pointerProbe.filteredPrepared = true
                     return
                 }

@@ -5547,11 +5547,14 @@ void DecoLogController::bulkEdit(const QVariantList& ids, const QString& field, 
         if (v.toLongLong() > 0)
             list << v.toLongLong();
     }
-    if (list.isEmpty() || field.trimmed().isEmpty())
+    if (list.isEmpty() || field.trimmed().isEmpty()) {
+        emit bulkEditFinished(0,0,0,tr("Select QSO and a field first."));
         return;
+    }
     if (m_bulkProgress >= 0) {
         addActivity(QStringLiteral("LOG"), tr("A change on many QSO is already running: wait for it to finish."),
                     QStringLiteral("warning"));
+        emit bulkEditFinished(0,0,int(list.size()),tr("A change on many QSO is already running: wait for it to finish."));
         return;
     }
     const QString dbPath = m_db.path();
@@ -5592,6 +5595,7 @@ void DecoLogController::bulkEdit(const QVariantList& ids, const QString& field, 
                     self->addActivity(QStringLiteral("LOG"),
                         self->tr("A background log change finished on a log that is no longer open"),
                         QStringLiteral("warning"));
+                    emit self->bulkEditFinished(0,0,0,self->tr("The open log changed. Check the original log for the result."));
                     return;
                 }
                 self->finishBulk(field, value, result);
@@ -5621,6 +5625,7 @@ void DecoLogController::finishBulk(const QString& field, const QString& value, c
                 r.failed > 0 ? QStringLiteral("warning") : r.changed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     for (const QString& e : r.errors)
         addActivity(QStringLiteral("LOG"), e, QStringLiteral("error"));
+    emit bulkEditFinished(r.changed,r.unchanged,r.failed,r.errors.isEmpty() ? QString() : r.errors.first());
     if (r.changed == 0)
         return;
     // Remote edits were queued with each committed batch in the worker.
