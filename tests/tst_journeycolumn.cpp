@@ -643,6 +643,12 @@ private slots:
         QVERIFY(q.exec("SELECT a.ocr_text,r.reviewed_text FROM qsl_ocr_acquisition a JOIN qsl_ocr_review r ON r.acquisition_id=a.id")); QVERIFY(q.next());
         QCOMPARE(q.value(0).toString(),QString("Original OCR")); QCOMPARE(q.value(1).toString(),QString("Operator corrected K1ABC")); QVERIFY(!q.next());
         QCOMPARE(db.qsoCount(),qint64(1)); QVERIFY(db.record(1)->value("QSL_RCVD").isEmpty()); QCOMPARE(db.qslAttachments(1).size(),1);
+        QVERIFY(q.exec("SELECT a.id,a.uuid,r.id FROM qsl_ocr_acquisition a JOIN qsl_ocr_review r ON r.acquisition_id=a.id")); QVERIFY(q.next());
+        const qint64 acquisitionId=q.value(0).toLongLong(), latest=q.value(2).toLongLong(); const QString uuid=q.value(1).toString(); q.finish();
+        std::atomic_bool cancelled{false};
+        QVERIFY(decolog::core::QslOcrAcquisition::saveReviewExecute(db.path(),acquisitionId,uuid,latest,"Second operator correction",&cancelled).value("ok").toBool());
+        QByteArray revisions; QVERIFY2(launch(dir,"qslocrrevisions",revisions,5000),revisions.constData());
+        QVERIFY2(revisions.contains("PROBE qslRevisions Second operator correction | Operator corrected K1ABC"),revisions.constData());
     }
     void roverManualQsoRespectsHistoryAndExplicitOverride()
     {

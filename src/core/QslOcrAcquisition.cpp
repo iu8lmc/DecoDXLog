@@ -45,6 +45,53 @@ bool QslOcrAcquisition::start(const QVariantList &selected, const QUrl &original
     return true;
 }
 void QslOcrAcquisition::cancel() { if (m_cancel) m_cancel->store(true); }
+bool QslOcrAcquisition::loadReviews(qint64 acquisitionId,const QString &uuid,qint64 beforeId)
+{
+    if (m_busy) return false;
+    m_result.clear(); m_reviews.clear(); m_error.clear();
+    if (!m_db || !m_db->isOpen() || m_db->path().isEmpty() || m_db->path()==QLatin1String(":memory:") || acquisitionId<=0 || uuid.isEmpty() || uuid.size()>80 || beforeId<0) {
+        m_error=tr("Choose a saved OCR acquisition"); emit changed(); return false;
+    }
+    const QString path=m_db->path(); m_cancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_cancel;
+    m_busy=true; emit changed(); QPointer<QslOcrAcquisition> self(this);
+    m_pool.start([self,path,acquisitionId,uuid,beforeId,cancelled] {
+        QVariantList rows; QString error; const QString connection=QStringLiteral("qsl-ocr-revisions-")+QUuid::createUuid().toString();
+        {
+            QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
+            db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100")); db.setDatabaseName(path);
+            if (!db.open() || !db.transaction()) error=tr("Cannot open review history");
+            else {
+                QSqlQuery q(db); q.prepare(QStringLiteral("SELECT 1 FROM qsl_ocr_acquisition WHERE id=? AND uuid=?")); q.addBindValue(acquisitionId); q.addBindValue(uuid);
+                if (!q.exec() || !q.next()) error=tr("Acquisition is unavailable");
+                if (error.isEmpty()) {
+                    q.prepare(QStringLiteral("SELECT id,created_at,substr(reviewed_text,1,65536),length(reviewed_text) FROM qsl_ocr_review WHERE acquisition_id=? AND id<? ORDER BY id DESC LIMIT 21"));
+                    q.addBindValue(acquisitionId); q.addBindValue(beforeId>0?beforeId:std::numeric_limits<qint64>::max());
+                    if (!q.exec()) error=tr("Cannot read review history");
+                    while (error.isEmpty() && !cancelled->load() && q.next())
+                        rows << QVariantMap{{QStringLiteral("id"),q.value(0)},{QStringLiteral("createdAt"),q.value(1)},
+                                            {QStringLiteral("text"),q.value(2)},{QStringLiteral("truncated"),q.value(3).toLongLong()>65536}};
+                    if (q.lastError().isValid()) error=tr("Cannot read review history");
+                }
+                q.finish();
+                if (error.isEmpty() && !cancelled->load()) { if (!db.commit()) error=tr("Cannot read review history"); }
+                else db.rollback();
+            }
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connection);
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,rows,error,cancelled] {
+            if (!self) return; self->m_busy=false; self->m_cancel.reset();
+            const bool same=self->m_db && self->m_db->isOpen() && self->m_db->path()==path;
+            const bool success=!cancelled->load() && error.isEmpty() && same;
+            self->m_reviews=success?rows:QVariantList{};
+            self->m_error=cancelled->load()?tr("Review history cancelled"):!same?tr("The open log changed"):error;
+            self->m_result={{QStringLiteral("ok"),success},{QStringLiteral("operation"),QStringLiteral("loadReviews")}};
+            emit self->changed(); emit self->finished(success);
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
 bool QslOcrAcquisition::review(qint64 qsoId, qint64 beforeId)
 {
     if (m_busy) return false;

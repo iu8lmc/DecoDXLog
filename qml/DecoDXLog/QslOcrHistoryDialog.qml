@@ -20,12 +20,13 @@ DialogFrame {
     property bool ownsWork: false
     property bool probing: false
     property bool probingReview: false
+    property bool probingRevisions: false
     readonly property var selected: selectedIndex >= 0 && selectedIndex < rows.length ? rows[selectedIndex] : ({})
     signal historyChanged()
     function refresh() { ownsWork = acquisition.review(qsoId, historyAnchors[historyAnchors.length - 1]) }
     onSelectedChanged: reviewText.text = selected.reviewId ? selected.reviewedText : (!selected.textTruncated ? (selected.text || "") : "")
-    function openFor(id, probe, reviewProbe) {
-        qsoId = id; historyAnchors = [0]; rows = []; selectedIndex = -1; probing = !!probe; probingReview=!!reviewProbe
+    function openFor(id, probe, reviewProbe, revisionsProbe) {
+        qsoId = id; historyAnchors = [0]; rows = []; selectedIndex = -1; probing = !!probe; probingReview=!!reviewProbe; probingRevisions=!!revisionsProbe
         open(); refresh()
     }
     onClosed: if (root.ownsWork) root.acquisition.cancel()
@@ -41,6 +42,7 @@ DialogFrame {
                 root.rows = found.slice(0, 50)
                 root.selectedIndex = root.rows.length ? 0 : -1
                 if (root.probing && root.rows.length) confirmUndo.open()
+                if (root.probingRevisions && root.rows.length) revisionHistory.openFor(root.selected)
                 if (root.probingReview && root.rows.length && !root.selected.reviewId) { reviewText.text="Operator corrected K1ABC"; saveReviewButton.clicked() }
                 else if (root.probingReview && root.rows.length && root.selected.reviewId) { console.warn("PROBE qslReview restored " + root.selected.reviewedText); root.probingReview=false }
             } else if (operation === "undo") {
@@ -49,6 +51,56 @@ DialogFrame {
             } else if (operation === "saveReview") {
                 if (root.probingReview) console.warn("PROBE qslReview saved=" + success + " error=" + root.acquisition.error)
                 if (success) root.refresh()
+            } else if (operation === "loadReviews" && success) {
+                const page=root.acquisition.reviews
+                revisionHistory.hasOlder=page.length>20
+                revisionHistory.rows=page.slice(0,20)
+                revisionHistory.selectedIndex=revisionHistory.rows.length ? 0 : -1
+                if (root.probingRevisions) {
+                    console.warn("PROBE qslRevisions " + revisionHistory.rows.map(x => x.text).join(" | "))
+                    root.probingRevisions=false
+                }
+            }
+        }
+    }
+    Popup {
+        id:revisionHistory
+        anchors.centerIn:Overlay.overlay; modal:true; padding:16; width:650; height:430
+        background:Rectangle { color:Theme.panelColor; border.color:Theme.secondaryColor; radius:6 }
+        property var acquisitionId:0
+        property string acquisitionUuid:""
+        property var anchorsList:[0]
+        property var rows:[]
+        property bool hasOlder:false
+        property int selectedIndex:-1
+        readonly property var selected:selectedIndex>=0 && selectedIndex<rows.length ? rows[selectedIndex] : ({})
+        function refresh() { root.ownsWork=root.acquisition.loadReviews(Number(acquisitionId),acquisitionUuid,anchorsList[anchorsList.length-1]) }
+        function openFor(item) { acquisitionId=item.id; acquisitionUuid=String(item.uuid); anchorsList=[0]; rows=[]; selectedIndex=-1; open(); refresh() }
+        onClosed:if (root.ownsWork && root.acquisition.result.operation !== "saveReview") root.acquisition.cancel()
+        contentItem:ColumnLayout {
+            spacing:8
+            Text { Layout.fillWidth:true; text:qsTr("Saved transcription revisions"); color:Theme.textPrimary; font.bold:true }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { text:qsTr("Newer"); enabled:!root.acquisition.busy && revisionHistory.anchorsList.length>1; onClicked:{ revisionHistory.anchorsList=revisionHistory.anchorsList.slice(0,-1); revisionHistory.refresh() } }
+                GlassButton { text:qsTr("Older"); enabled:!root.acquisition.busy && revisionHistory.hasOlder && revisionHistory.rows.length>0; onClicked:{ revisionHistory.anchorsList=revisionHistory.anchorsList.concat([revisionHistory.rows[revisionHistory.rows.length-1].id]); revisionHistory.refresh() } }
+                Item { Layout.fillWidth:true }
+                GlassButton { text:qsTr("Close"); onClicked:revisionHistory.close() }
+            }
+            Text { Layout.fillWidth:true; visible:root.acquisition.error.length>0; text:root.acquisition.error; color:Theme.warningColor; wrapMode:Text.Wrap }
+            ListView {
+                Layout.fillWidth:true; Layout.preferredHeight:110; clip:true; model:revisionHistory.rows
+                ScrollBar.vertical:ScrollBar {}
+                delegate:ItemDelegate {
+                    required property int index; required property var modelData; width:ListView.view.width
+                    highlighted:revisionHistory.selectedIndex===index; onClicked:revisionHistory.selectedIndex=index
+                    contentItem:Text { text:qsTr("Revision %1 · %2").arg(modelData.id).arg(modelData.createdAt); color:Theme.textPrimary; elide:Text.ElideRight }
+                }
+            }
+            Text { Layout.fillWidth:true; visible:!root.acquisition.busy && revisionHistory.rows.length===0; text:qsTr("No saved revisions."); color:Theme.textSecondary }
+            Text { Layout.fillWidth:true; visible:!!revisionHistory.selected.truncated; text:qsTr("This revision is truncated in the viewer."); color:Theme.warningColor }
+            ScrollView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                TextArea { readOnly:true; text:revisionHistory.selected.text || ""; textFormat:TextEdit.PlainText; color:Theme.textPrimary; background:null; wrapMode:TextArea.Wrap; selectByMouse:true }
             }
         }
     }
@@ -155,6 +207,7 @@ DialogFrame {
             Layout.fillWidth:true
             GlassButton { id:saveReviewButton; text:qsTr("Save reviewed text"); enabled:!!root.selected.id && !root.selected.undoneAt && !root.acquisition.busy && reviewText.text.trim().length>0 && reviewText.text.length<=65536
                 onClicked:root.ownsWork=root.acquisition.saveReview(Number(root.selected.id),String(root.selected.uuid),Number(root.selected.reviewId || 0),reviewText.text) }
+            GlassButton { text:qsTr("Review history…"); enabled:!!root.selected.reviewId && !root.acquisition.busy; onClicked:revisionHistory.openFor(root.selected) }
             Text { Layout.fillWidth:true; color:Theme.textSecondary; text:root.selected.reviewedAt ? qsTr("Latest review: %1").arg(root.selected.reviewedAt) : qsTr("No reviewed transcription saved"); wrapMode:Text.Wrap }
         }
         Text { Layout.fillWidth: true; visible: !!root.selected.id && !root.selected.undoneAt && !root.selected.guarded; text: qsTr("Undo is unavailable because a link is legacy, changed or missing. Review manually."); color: Theme.warningColor; wrapMode: Text.Wrap }

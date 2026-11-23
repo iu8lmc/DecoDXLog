@@ -209,6 +209,22 @@ class TestTesseractOcr : public QObject {
         cancelled.store(false);
         QVERIFY(q.exec("SELECT ocr_text,(SELECT COUNT(*) FROM qsl_ocr_review WHERE acquisition_id=qsl_ocr_acquisition.id) FROM qsl_ocr_acquisition"));
         QVERIFY(q.next()); QCOMPARE(q.value(0).toString(),QString("K1AAA K1BBB")); QCOMPARE(q.value(1).toInt(),2);
+        QslOcrAcquisition history(&db,nullptr); QSignalSpy reviewDone(&history,&QslOcrAcquisition::finished);
+        QVERIFY(history.loadReviews(acquisitionId,acquisitionUuid,0)); QTRY_COMPARE_WITH_TIMEOUT(reviewDone.size(),1,5000);
+        QVERIFY(reviewDone.first().first().toBool()); QCOMPARE(history.reviews().size(),2);
+        QCOMPARE(history.reviews().first().toMap().value("text").toString(),QString("Second correction"));
+        QCOMPARE(history.reviews().last().toMap().value("text").toString(),QString("Corrected: K1AAA"));
+        QVERIFY(history.loadReviews(acquisitionId,"wrong",0)); QTRY_COMPARE_WITH_TIMEOUT(reviewDone.size(),2,5000);
+        QVERIFY(!reviewDone.last().first().toBool()); QVERIFY(history.reviews().isEmpty());
+        QVERIFY(q.exec("SELECT MAX(id) FROM qsl_ocr_review")); QVERIFY(q.next()); qint64 latest=q.value(0).toLongLong(); q.finish();
+        for (int i=0;i<22;++i) {
+            const auto added=QslOcrAcquisition::saveReviewExecute(dbPath,acquisitionId,acquisitionUuid,latest,QString("Revision %1").arg(i),&cancelled);
+            QVERIFY(added.value("ok").toBool()); latest=added.value("reviewId").toLongLong();
+        }
+        QVERIFY(history.loadReviews(acquisitionId,acquisitionUuid,0)); QTRY_COMPARE_WITH_TIMEOUT(reviewDone.size(),3,5000);
+        QCOMPARE(history.reviews().size(),21); const qint64 next=history.reviews().at(19).toMap().value("id").toLongLong();
+        QVERIFY(history.loadReviews(acquisitionId,acquisitionUuid,next)); QTRY_COMPARE_WITH_TIMEOUT(reviewDone.size(),4,5000);
+        QCOMPARE(history.reviews().size(),4); QCOMPARE(history.reviews().last().toMap().value("text").toString(),QString("Corrected: K1AAA"));
         const auto repeated = QslOcrAcquisition::execute(dbPath, image, hash, "card.png", "repeat", selection, &cancelled);
         QVERIFY(repeated.value("ok").toBool()); QCOMPARE(repeated.value("newLinks").toInt(), 0);
         QVERIFY(q.exec("UPDATE qso SET revision=revision+1 WHERE id=" + QString::number(secondId)));
