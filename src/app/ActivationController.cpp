@@ -922,10 +922,14 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
 {
     if (m_contestReportBusy || !file.isLocalFile() || file.toLocalFile().isEmpty()) return false;
     const QString path = file.toLocalFile();
+    m_contestReportSnapshot.clear();
+    const QString logPath = m_ctx.db && m_ctx.db->isOpen() ? m_ctx.db->path() : QString();
+    const quint64 logGeneration = m_ctx.db ? m_ctx.db->openGeneration() : 0;
     m_contestReportBusy = true; emit contestReportBusyChanged();
     QPointer<ActivationController> self(this);
-    m_contestReportPool.start([self, path] {
+    m_contestReportPool.start([self, path, logPath, logGeneration] {
         QVariantMap result;
+        QByteArray snapshot;
         QFile input(path);
         if (!QFileInfo(path).isFile() || !input.open(QIODevice::ReadOnly)) {
             result.insert(QStringLiteral("error"), tr("Cannot open the selected report file."));
@@ -936,6 +940,7 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
                 report = {};
                 report.error = tr("Could not read the complete report file.");
             }
+            if (report.error.isEmpty()) snapshot = bytes;
             result.insert(QStringLiteral("error"), report.error);
             result.insert(QStringLiteral("contest"), report.contest);
             result.insert(QStringLiteral("ownCall"), report.ownCall);
@@ -962,10 +967,49 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
             result.insert(QStringLiteral("incorrectExchange"), exchanges);
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, result] {
+        QMetaObject::invokeMethod(self.data(), [self, result, snapshot, path, logPath, logGeneration] {
             if (!self) return;
+            const bool sameLog = self->m_ctx.db && self->m_ctx.db->isOpen() &&
+                self->m_ctx.db->path() == logPath && self->m_ctx.db->openGeneration() == logGeneration &&
+                !logPath.isEmpty() && logPath != QLatin1String(":memory:");
+            QVariantMap delivered = result;
+            delivered.insert(QStringLiteral("archiveReady"), sameLog && !snapshot.isEmpty());
+            if (sameLog && !snapshot.isEmpty()) {
+                self->m_contestReportSnapshot = snapshot;
+                self->m_contestReportLogPath = logPath;
+                self->m_contestReportLogGeneration = logGeneration;
+                self->m_contestReportSourceName = QFileInfo(path).fileName();
+            }
             self->m_contestReportBusy = false; emit self->contestReportBusyChanged();
-            emit self->contestReportFinished(result);
+            emit self->contestReportFinished(delivered);
+        }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+bool ActivationController::archiveContestReportPreview()
+{
+    if (m_contestReportBusy || m_contestReportSnapshot.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
+        m_ctx.db->path() != m_contestReportLogPath || m_ctx.db->openGeneration() != m_contestReportLogGeneration)
+        return false;
+    const QString path=m_contestReportLogPath, filename=m_contestReportSourceName;
+    const QByteArray snapshot=m_contestReportSnapshot;
+    m_contestReportBusy=true; emit contestReportBusyChanged();
+    QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self, path, filename, snapshot] {
+        QString error; qint64 id=0;
+        if (!QFileInfo(path).isFile()) error=tr("The reviewed log file is no longer available.");
+        else {
+            LogDatabase db;
+            if (!db.open(path)) error=db.lastError();
+            else id=db.archiveContestReport(snapshot,filename,&error);
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, id, error, path] {
+            if (!self) return;
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged();
+            emit self->contestReportArchiveFinished(id>0, id>0 ? tr("Saved in %1 (report %2).").arg(QFileInfo(path).fileName()).arg(id)
+                                                               : (error.isEmpty() ? tr("Could not archive the report.") : error));
         }, Qt::QueuedConnection);
     });
     return true;

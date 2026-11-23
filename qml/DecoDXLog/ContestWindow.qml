@@ -16,11 +16,13 @@ RoundedWindow {
 
     property int revision: 0
     property bool reportProbe: false
+    property bool reportProbeSave: false
     function inspectContestReport(url, probe) {
         reportProbe = !!probe
         reportReview.result = ({})
         reportReview.entries = []
         reportReview.errorText = ""
+        reportReview.saveMessage = ""
         reportReview.open()
         if (!decolog.activation.startContestReportPreview(url)) reportReview.errorText = qsTr("Cannot start report review.")
     }
@@ -33,6 +35,12 @@ RoundedWindow {
             const unknown = (result.unknown || []).map(e => ({line:e.line, text:e.text, kind:"unrecognised"}))
             reportReview.entries = entries.concat(unknown)
             if (root.reportProbe) console.warn("PROBE lcr ready " + result.total + " " + result.unknownTotal + " " + reportReview.entries.length + " " + reportReview.errorText)
+            if (root.reportProbeSave && result.archiveReady) reportReview.saveSnapshot()
+        }
+        function onContestReportArchiveFinished(success, message) {
+            reportReview.saveMessage = message
+            reportReview.saveSuccess = success
+            if (root.reportProbeSave) console.warn("PROBE lcr archive " + success + " " + message)
         }
     }
     readonly property var session: { revision; return decolog.activation.state }
@@ -812,6 +820,15 @@ RoundedWindow {
         property var result: ({})
         property var entries: []
         property string errorText: ""
+        property string saveMessage: ""
+        property bool saveSuccess: false
+        function saveSnapshot() {
+            saveMessage = ""
+            if (!decolog.activation.archiveContestReportPreview()) {
+                saveSuccess = false
+                saveMessage = qsTr("The log changed or the reviewed copy is unavailable; review the report again.")
+            }
+        }
         dialogKey: "contestReportReview"; width: 800; height: 600
         title: qsTr("CQ WW report review"); dotColor: Theme.primaryColor
         ColumnLayout {
@@ -833,7 +850,13 @@ RoundedWindow {
                     font.family:Theme.monoFamily; font.pixelSize:11
                     text:qsTr("Line %1 · %2 · %3").arg(modelData.line).arg(modelData.kind).arg(modelData.text) }
             }
-            GlassButton { Layout.alignment:Qt.AlignRight; text:qsTr("Close"); onClicked:reportReview.close() }
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; visible:reportReview.saveMessage.length>0
+                color:reportReview.saveSuccess ? Theme.accentColor : Theme.errorColor; text:reportReview.saveMessage }
+            RowLayout { Layout.alignment:Qt.AlignRight
+                GlassButton { text:qsTr("Save reviewed copy to log"); enabled:!!reportReview.result.archiveReady && !decolog.activation.contestReportBusy
+                    onClicked:reportReview.saveSnapshot() }
+                GlassButton { text:qsTr("Close"); onClicked:reportReview.close() }
+            }
         }
     }
 

@@ -236,6 +236,7 @@ bool LogDatabase::isOpen() const
 
 bool LogDatabase::open(const QString& path)
 {
+    ++m_openGeneration;
     decolog::StartupSpan trace("LogDatabase::open");
     close();
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
@@ -272,6 +273,7 @@ bool LogDatabase::open(const QString& path)
 
 bool LogDatabase::openReadOnly(const QString& path)
 {
+    ++m_openGeneration;
     close();
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
     db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100"));

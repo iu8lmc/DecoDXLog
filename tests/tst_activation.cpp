@@ -23,6 +23,24 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void archiveContestReportUsesReviewedSnapshotAndRejectsLogChange()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString filePath=dir.filePath("report.rpt");
+        const QByteArray original="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\nunknown row\n";
+        QFile file(filePath); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(original),original.size()); file.close();
+        LogDatabase db; QVERIFY(db.open(dir.filePath("a.sqlite"))); ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy preview(&act,&ActivationController::contestReportFinished);
+        QSignalSpy saved(&act,&ActivationController::contestReportArchiveFinished);
+        QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(filePath))); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
+        QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate)); file.write("changed after preview"); file.close();
+        QVERIFY(act.archiveContestReportPreview()); QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,5000);
+        QVERIFY2(saved.first().at(0).toBool(),qPrintable(saved.first().at(1).toString()));
+        const auto reports=db.contestReports(); QCOMPARE(reports.size(),1); QCOMPARE(db.contestReportBytes(reports.first().id),original);
+        QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate)); file.write(original); file.close();
+        QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(filePath))); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),2,5000);
+        QVERIFY(db.open(dir.filePath("b.sqlite"))); QVERIFY(!act.archiveContestReportPreview()); QVERIFY(db.contestReports().isEmpty());
+        QVERIFY(db.open(dir.filePath("a.sqlite"))); QVERIFY(!act.archiveContestReportPreview()); QCOMPARE(db.contestReports().size(),1);
+    }
     void cqWwReportPreviewIsReadOnlyAndShowsUnknownRows()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("report.rpt");

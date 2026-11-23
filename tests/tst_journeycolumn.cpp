@@ -67,6 +67,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void contestReportArchiveSavesReviewedCopy()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("report.rpt"); QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray source="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\nunknown row\n";
+        QCOMPARE(file.write(source),source.size()); file.close(); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("cqwwarchiveprobe:")+path,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE lcr archive true") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto reports=db.contestReports();
+        QCOMPARE(reports.size(),1); QCOMPARE(db.contestReportBytes(reports.first().id),source); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestReportReviewShowsRecognisedAndUnknownLines()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
