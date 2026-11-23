@@ -26,7 +26,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 25;
+constexpr int kSchemaVersion = 26;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -62,6 +62,18 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void guardedContestArchiveRejectsOtherLogAndDoesNotCreateMissingFile()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString a=dir.filePath("a # ?.sqlite"), b=dir.filePath("b.sqlite"), missing=dir.filePath("missing.sqlite");
+        const QByteArray report="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n";
+        LogDatabase one,two,worker; QVERIFY(one.open(a)); QVERIFY(two.open(b));
+        const QString identity=one.identity(); QVERIFY(!identity.isEmpty()); QVERIFY(identity!=two.identity());
+        QVERIFY(!worker.openExistingReadWrite(missing)); QVERIFY(!QFile::exists(missing));
+        QVERIFY(worker.openExistingReadWrite(b)); QString error;
+        QCOMPARE(worker.archiveContestReport(report,"file.rpt",&error,identity),qint64(0)); QVERIFY(!error.isEmpty()); QVERIFY(two.contestReports().isEmpty());
+        QVERIFY(worker.openExistingReadWrite(a)); QVERIFY2(worker.archiveContestReport(report,"file.rpt",&error,identity)>0,qPrintable(error));
+        QCOMPARE(one.contestReports().size(),1); QCOMPARE(one.qsoCount(),qint64(0));
+    }
     void contestReportArchivePersistsExactBytesAndDeduplicates()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("archive.sqlite");
@@ -143,6 +155,17 @@ private slots:
             QVERIFY(q.exec("DROP TRIGGER reject_serial"));
             const auto retry=db.reserveContestSerial("contest", "node", "request", 1); QVERIFY2(retry.ok,qPrintable(retry.error)); QCOMPARE(retry.serial,1);
         }
+    }
+    void schema25IdentityMigrationKeepsArchivedReports()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("old.sqlite");
+        const QByteArray data="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n";
+        qint64 id=0;
+        { LogDatabase db; QVERIFY(db.open(path)); QString error; id=db.archiveContestReport(data,"file.rpt",&error); QVERIFY2(id>0,qPrintable(error));
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE log_identity")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=26")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QVERIFY(!db.identity().isEmpty());
+          QCOMPARE(db.contestReportBytes(id),data); QCOMPARE(db.qsoCount(),qint64(0)); const auto identity=db.identity();
+          db.close(); QVERIFY(db.open(path)); QCOMPARE(db.identity(),identity); }
     }
     void contestReportArchiveMigrationAndFailureAreSafe()
     {

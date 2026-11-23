@@ -19,6 +19,8 @@
 #include <QSqlQuery>
 #include <QSqlRecord>
 #include <QTimeZone>
+#include <QUrl>
+#include <QUrlQuery>
 #include <QUuid>
 #include <QVariant>
 #include <algorithm>
@@ -283,6 +285,29 @@ bool LogDatabase::openReadOnly(const QString& path)
     return true;
 }
 
+bool LogDatabase::openExistingReadWrite(const QString& path)
+{
+    ++m_openGeneration;
+    close();
+    QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),m_connectionName);
+    db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_URI;QSQLITE_BUSY_TIMEOUT=3000"));
+    QUrl uri=QUrl::fromLocalFile(QFileInfo(path).absoluteFilePath());
+    QUrlQuery query; query.addQueryItem(QStringLiteral("mode"),QStringLiteral("rw")); uri.setQuery(query);
+    db.setDatabaseName(uri.toString(QUrl::FullyEncoded));
+    if (!db.open()) { m_lastError=db.lastError().text(); return false; }
+    m_path=path;
+    QSqlQuery pragma(db);
+    if (!pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"))) { m_lastError=pragma.lastError().text(); close(); return false; }
+    return true;
+}
+
+QString LogDatabase::identity() const
+{
+    QSqlQuery q(connection());
+    if (q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && q.next()) return q.value(0).toString();
+    return {};
+}
+
 void LogDatabase::close()
 {
     if (!QSqlDatabase::contains(m_connectionName))
@@ -467,6 +492,8 @@ bool LogDatabase::migrate()
         {25, {QStringLiteral("CREATE TABLE IF NOT EXISTS contest_report_archive ("
               "id INTEGER PRIMARY KEY, sha256 TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, "
               "contest TEXT NOT NULL, own_call TEXT NOT NULL, original BLOB NOT NULL, imported_at TEXT NOT NULL)")}, nullptr},
+        {26, {QStringLiteral("CREATE TABLE IF NOT EXISTS log_identity (id INTEGER PRIMARY KEY CHECK(id=1), uuid TEXT NOT NULL)"),
+              QStringLiteral("INSERT OR IGNORE INTO log_identity(id,uuid) VALUES(1,lower(hex(randomblob(16))))")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1228,7 +1255,8 @@ InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 
     return result;
 }
 
-qint64 LogDatabase::archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error)
+qint64 LogDatabase::archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error,
+                                         const QString& expectedIdentity)
 {
     if (error) error->clear();
     const auto parsed = contestreport::parseCqWw(bytes);
@@ -1236,6 +1264,8 @@ qint64 LogDatabase::archiveContestReport(const QByteArray& bytes, const QString&
     QSqlDatabase db=connection(); QSqlQuery begin(db);
     if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) { if (error) *error=begin.lastError().text(); return 0; }
     const auto fail=[&](const QString& message) { db.rollback(); if (error) *error=message; return qint64(0); };
+    if (!expectedIdentity.isEmpty() && identity()!=expectedIdentity)
+        return fail(QStringLiteral("The reviewed log identity changed."));
     const QString hash=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
     QSqlQuery existing(db); existing.prepare(QStringLiteral("SELECT id,original FROM contest_report_archive WHERE sha256=?"));
     existing.addBindValue(hash);

@@ -23,6 +23,32 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void archiveDoesNotRecreateRemovedDatabase()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("active.sqlite"), moved=dir.filePath("moved.sqlite");
+        const QString reportPath=dir.filePath("report.rpt"); QFile report(reportPath); QVERIFY(report.open(QIODevice::WriteOnly));
+        report.write("Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n"); report.close();
+        LogDatabase db; QVERIFY(db.open(path)); { QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); }
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy preview(&act,&ActivationController::contestReportFinished); QSignalSpy saved(&act,&ActivationController::contestReportArchiveFinished);
+        QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(reportPath))); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
+        QVERIFY(QFile::rename(path,moved)); QVERIFY(act.archiveContestReportPreview()); QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,5000);
+        QVERIFY(!saved.first().at(0).toBool()); QVERIFY(!QFile::exists(path));
+    }
+    void archiveRejectsDifferentDatabaseReplacedAtSamePath()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString first=dir.filePath("active.sqlite"), replacement=dir.filePath("replacement.sqlite"), moved=dir.filePath("original.sqlite");
+        const QString reportPath=dir.filePath("report.rpt"); QFile report(reportPath); QVERIFY(report.open(QIODevice::WriteOnly));
+        report.write("Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n"); report.close();
+        { LogDatabase db; QVERIFY(db.open(replacement)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); }
+        LogDatabase db; QVERIFY(db.open(first)); { QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); }
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy preview(&act,&ActivationController::contestReportFinished); QSignalSpy saved(&act,&ActivationController::contestReportArchiveFinished);
+        QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(reportPath))); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
+        QVERIFY(QFile::rename(first,moved)); QVERIFY(QFile::rename(replacement,first));
+        QVERIFY(act.archiveContestReportPreview()); QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,5000);
+        QVERIFY(!saved.first().at(0).toBool()); LogDatabase verify; QVERIFY(verify.open(first)); QVERIFY(verify.contestReports().isEmpty());
+    }
     void archivedContestReportExportIsExactAndProtectsLog()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");

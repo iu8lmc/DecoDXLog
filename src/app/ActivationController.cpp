@@ -955,9 +955,10 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
     m_contestReportSnapshot.clear();
     const QString logPath = m_ctx.db && m_ctx.db->isOpen() ? m_ctx.db->path() : QString();
     const quint64 logGeneration = m_ctx.db ? m_ctx.db->openGeneration() : 0;
+    const QString logIdentity = m_ctx.db && m_ctx.db->isOpen() ? m_ctx.db->identity() : QString();
     m_contestReportBusy = true; emit contestReportBusyChanged();
     QPointer<ActivationController> self(this);
-    m_contestReportPool.start([self, path, logPath, logGeneration] {
+    m_contestReportPool.start([self, path, logPath, logGeneration, logIdentity] {
         QVariantMap result;
         QByteArray snapshot;
         QFile input(path);
@@ -974,16 +975,18 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
             result = contestReportResult(report);
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, result, snapshot, path, logPath, logGeneration] {
+        QMetaObject::invokeMethod(self.data(), [self, result, snapshot, path, logPath, logGeneration, logIdentity] {
             if (!self) return;
             const bool sameLog = self->m_ctx.db && self->m_ctx.db->isOpen() &&
                 self->m_ctx.db->path() == logPath && self->m_ctx.db->openGeneration() == logGeneration &&
-                !logPath.isEmpty() && logPath != QLatin1String(":memory:");
+                !logPath.isEmpty() && logPath != QLatin1String(":memory:") && !logIdentity.isEmpty() &&
+                self->m_ctx.db->identity() == logIdentity;
             QVariantMap delivered = result;
             delivered.insert(QStringLiteral("archiveReady"), sameLog && !snapshot.isEmpty());
             if (sameLog && !snapshot.isEmpty()) {
                 self->m_contestReportSnapshot = snapshot;
                 self->m_contestReportLogPath = logPath;
+                self->m_contestReportLogIdentity = logIdentity;
                 self->m_contestReportLogGeneration = logGeneration;
                 self->m_contestReportSourceName = QFileInfo(path).fileName();
             }
@@ -1143,20 +1146,18 @@ bool ActivationController::startContestReportExport(qint64 id, const QString& sh
 bool ActivationController::archiveContestReportPreview()
 {
     if (m_contestReportBusy || m_contestReportSnapshot.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
-        m_ctx.db->path() != m_contestReportLogPath || m_ctx.db->openGeneration() != m_contestReportLogGeneration)
+        m_ctx.db->path() != m_contestReportLogPath || m_ctx.db->openGeneration() != m_contestReportLogGeneration ||
+        m_contestReportLogIdentity.isEmpty() || m_ctx.db->identity()!=m_contestReportLogIdentity)
         return false;
-    const QString path=m_contestReportLogPath, filename=m_contestReportSourceName;
+    const QString path=m_contestReportLogPath, filename=m_contestReportSourceName, identity=m_contestReportLogIdentity;
     const QByteArray snapshot=m_contestReportSnapshot;
     m_contestReportBusy=true; emit contestReportBusyChanged();
     QPointer<ActivationController> self(this);
-    m_contestReportPool.start([self, path, filename, snapshot] {
+    m_contestReportPool.start([self, path, filename, snapshot, identity] {
         QString error; qint64 id=0;
-        if (!QFileInfo(path).isFile()) error=tr("The reviewed log file is no longer available.");
-        else {
-            LogDatabase db;
-            if (!db.open(path)) error=db.lastError();
-            else id=db.archiveContestReport(snapshot,filename,&error);
-        }
+        LogDatabase db;
+        if (!db.openExistingReadWrite(path)) error=db.lastError();
+        else id=db.archiveContestReport(snapshot,filename,&error,identity);
         if (!self) return;
         QMetaObject::invokeMethod(self.data(), [self, id, error, path] {
             if (!self) return;

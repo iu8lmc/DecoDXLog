@@ -215,6 +215,7 @@ private:
     bool m_contestReportBusy{false};
     QByteArray m_contestReportSnapshot;
     QString m_contestReportLogPath;
+    QString m_contestReportLogIdentity;
     QString m_contestReportSourceName;
     quint64 m_contestReportLogGeneration{0};
     QHash<qint64, QString> m_contestReportHistoryIds;

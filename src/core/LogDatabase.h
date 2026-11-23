@@ -263,6 +263,8 @@ public:
     bool open(const QString& path);
     // Read-only connection to an existing, already migrated log.
     bool openReadOnly(const QString& path);
+    bool openExistingReadWrite(const QString& path);
+    QString identity() const;
     void close();
     bool isOpen() const;
     QString path() const { return m_path; }
@@ -299,7 +301,8 @@ public:
                                   const QSet<QString>& touchedFields);
 
     // Preserves the complete original report bytes, without changing QSO.
-    qint64 archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error = nullptr);
+    qint64 archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error = nullptr,
+                               const QString& expectedIdentity = {});
     QList<ArchivedContestReport> contestReports(int limit = 100) const;
     QByteArray contestReportBytes(qint64 id) const;
 
