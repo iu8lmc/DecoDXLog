@@ -27,6 +27,18 @@ NetController::NetController(Context context, QObject* parent)
     , m_ctx(std::move(context))
 {
     m_durablePool.setMaxThreadCount(1);
+    m_durableRetry.setInterval(2000);
+    connect(&m_durableRetry, &QTimer::timeout, this, [this] {
+        if (!m_net.running() || !m_ctx.db || m_ctx.db->openGeneration()!=m_durableRetryDbGeneration ||
+            m_ctx.db->identity()!=m_durableRetryIdentity || m_ctx.db->openFileIdentity()!=m_durableRetryFileIdentity ||
+            !m_ctx.db->fileIdentityMatchesOpen()) {
+            m_durableRetry.stop();
+            m_durableStatus=tr("Retry stopped: the network or log changed. Reconfigure and retry.");
+            emit durableSerialStatusChanged();
+            return;
+        }
+        if (!m_durableBusy) requestDurableSerial(m_durableRetryMinimum);
+    });
     QSettings s;
     m_enabled = s.value(QStringLiteral("net/enabled"), false).toBool();
     m_group = s.value(QStringLiteral("net/group"), QStringLiteral("DECODXLOG")).toString();
@@ -73,6 +85,8 @@ QString NetController::configureDurableSerialAuthority(const QString& scope, con
     if (s.isEmpty() != a.isEmpty() || s.size() > 256 || a.size() > 256)
         return tr("Enter both a contest scope and an authority ID, or leave both empty to disable.");
     ++m_durableGeneration;
+    m_durableRetry.stop();
+    m_durableRetryRequestId.clear();
     m_durablePool.clear();
     m_durableBusy = false;
     m_durableScope = s;
@@ -116,12 +130,21 @@ QString NetController::requestDurableSerial(int minimum)
             if (!self->m_ctx.db || self->m_ctx.db->openGeneration()!=dbGeneration || self->m_ctx.db->identity()!=identity ||
                 self->m_ctx.db->openFileIdentity()!=fileIdentity || !self->m_ctx.db->fileIdentityMatchesOpen()) return;
             if (!request.ok) self->m_durableStatus=tr("Request failed: %1").arg(request.error);
-            else if (request.state==QLatin1String("granted")) self->m_durableStatus=tr("Experimental grant: %1; not connected to QSO entry.").arg(request.serial);
+            else if (request.state==QLatin1String("granted")) {
+                if (self->m_durableRetryRequestId==request.requestId) self->m_durableRetry.stop();
+                self->m_durableStatus=tr("Experimental grant: %1; not connected to QSO entry.").arg(request.serial);
+            }
             else if (self->m_net.running()) {
                 const QJsonObject body=contestserial::requestFrame(request);
                 if (!body.isEmpty()) {
                     self->send(QStringLiteral("serial_request_v3"),body);
-                    self->m_durableStatus=tr("Pending; no serial granted. Retry if the authority does not respond.");
+                    self->m_durableStatus=tr("Pending; no serial granted. Retrying while the authority is unavailable.");
+                    self->m_durableRetryRequestId=request.requestId;
+                    self->m_durableRetryMinimum=request.minimum;
+                    self->m_durableRetryIdentity=identity;
+                    self->m_durableRetryFileIdentity=fileIdentity;
+                    self->m_durableRetryDbGeneration=dbGeneration;
+                    self->m_durableRetry.start();
                     emit self->durableSerialRequestSent(body);
                 }
             }
@@ -191,6 +214,7 @@ void NetController::acceptDurableSerialGrant(const QString& from, const QJsonObj
             if (!grant.ok || !self->m_ctx.db || self->m_ctx.db->openGeneration() != dbGeneration ||
                 self->m_ctx.db->identity() != identity || self->m_ctx.db->openFileIdentity() != fileIdentity ||
                 !self->m_ctx.db->fileIdentityMatchesOpen()) return;
+            if (self->m_durableRetryRequestId==grant.requestId) self->m_durableRetry.stop();
             self->m_durableStatus = tr("Experimental grant: %1; not connected to QSO entry.").arg(grant.serial);
             emit self->durableSerialStatusChanged();
             emit self->durableSerialGrantAccepted(body);
@@ -249,6 +273,8 @@ void NetController::setPort(int port)
 void NetController::restart()
 {
     ++m_durableGeneration;
+    m_durableRetry.stop();
+    m_durableRetryRequestId.clear();
     m_durablePool.clear();
     m_durableBusy = false;
     m_net.stop();

@@ -165,6 +165,12 @@ private:
     QString m_durableScope;
     QString m_durableAuthority;
     QString m_durableStatus;
+    QTimer m_durableRetry;
+    QString m_durableRetryRequestId;
+    QString m_durableRetryIdentity;
+    QByteArray m_durableRetryFileIdentity;
+    quint64 m_durableRetryDbGeneration{0};
+    int m_durableRetryMinimum{0};
     quint64 m_durableGeneration{0};
     bool m_durableBusy{false};
     void requestSerial();

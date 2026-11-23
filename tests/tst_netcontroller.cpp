@@ -35,9 +35,10 @@ private slots:
         QSignalSpy sent(&requester,&NetController::durableSerialRequestSent), accepted(&requester,&NetController::durableSerialGrantAccepted);
         requester.setEnabled(true); QVERIFY(requester.running()); QVERIFY(requester.requestDurableSerial(11).isEmpty()); QTRY_COMPARE_WITH_TIMEOUT(sent.size(),1,10000);
         QTest::qWait(200); QCOMPARE(accepted.size(),0); auto pending=requesterDb.activeContestSerialRequest("event","client-a"); QVERIFY(pending.ok); QCOMPARE(pending.state,QString("pending"));
-        authority.setEnabled(true); QVERIFY(authority.running()); QVERIFY(requester.requestDurableSerial(11).isEmpty());
-        QTRY_COMPARE_WITH_TIMEOUT(accepted.size(),1,10000); auto granted=requesterDb.activeContestSerialRequest("event","client-a");
+        authority.setEnabled(true); QVERIFY(authority.running());
+        QTRY_COMPARE_WITH_TIMEOUT(accepted.size(),1,4000); QVERIFY(sent.size()>=2); auto granted=requesterDb.activeContestSerialRequest("event","client-a");
         QCOMPARE(granted.requestId,pending.requestId); QCOMPARE(granted.state,QString("granted")); QCOMPARE(granted.serial,11);
+        const auto count=sent.size(); QTest::qWait(2500); QCOMPARE(sent.size(),count);
         requester.setEnabled(false); authority.setEnabled(false);
     }
     void requesterRetriesSamePersistedRequestWithoutAuthority()
@@ -57,7 +58,8 @@ private slots:
         QCOMPARE(requests.at(1).at(0).toJsonObject().value("requestId").toString(),requestId);
         QVERIFY(net.requestDurableSerial(8).isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("different authority or minimum"),10000);
         QCOMPARE(requests.size(),2); QCOMPARE(db.activeContestSerialRequest("event","client-a").requestId,requestId);
-        net.setEnabled(false); db.close(); QVERIFY(db.open(dir.filePath("requester.sqlite")));
+        db.close(); QVERIFY(db.open(dir.filePath("requester.sqlite")));
+        QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("Retry stopped"),4000); QCOMPARE(requests.size(),2); net.setEnabled(false);
         stored=db.activeContestSerialRequest("event","client-a"); QCOMPARE(stored.state,QString("pending")); QCOMPARE(stored.requestId,requestId);
     }
     void requesterPersistsValidatedGrantFromUdp()
