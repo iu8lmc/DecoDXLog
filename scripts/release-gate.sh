@@ -19,10 +19,12 @@ else
     ctest --test-dir "$BUILD_DIR" --output-on-failure
 fi
 test -x "$EXECUTABLE"
-startup_probe_base="$(mktemp "${TMPDIR:-/tmp}/decodxlog-release-gate.XXXXXX")"
-startup_probe="${startup_probe_base}.png"
-trap 'rm -f "$startup_probe_base" "$startup_probe"' EXIT
-QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" "$EXECUTABLE" --show badge --grab "$startup_probe"
+startup_dir="$(mktemp -d "${TMPDIR:-/tmp}/decodxlog-release-gate.XXXXXX")"
+startup_probe="$startup_dir/startup.png"
+trap 'rm -rf "$startup_dir"' EXIT
+QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}" DECODXLOG_DATA_ROOT="$startup_dir/data" \
+    "$EXECUTABLE" --settings "$startup_dir/settings" --db "$startup_dir/log.sqlite" --port 0 \
+    --show badge --grab "$startup_probe"
 test -s "$startup_probe"
-echo "startup smoke test passed: $startup_probe"
+echo "startup smoke test passed with isolated settings and log"
 echo "release gate passed: $EXECUTABLE"
