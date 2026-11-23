@@ -60,6 +60,22 @@ def load_manifest(path):
     return value
 
 
+def contains_secret(value, secret):
+    """Check decoded JSON keys and values, including escaped or nested strings."""
+    pending = [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, str):
+            if secret in item:
+                return True
+        elif isinstance(item, list):
+            pending.extend(item)
+        elif isinstance(item, dict):
+            pending.extend(item.keys())
+            pending.extend(item.values())
+    return False
+
+
 def run_extension(manifest_path, token, port, timeout):
     manifest_path = pathlib.Path(manifest_path).resolve(strict=True)
     manifest = load_manifest(manifest_path)
@@ -110,6 +126,8 @@ def run_extension(manifest_path, token, port, timeout):
             if token.encode("utf-8") in raw_output:
                 raise ValueError("extension output contains a credential")
             output = json.loads(raw_output)
+            if contains_secret(output, token):
+                raise ValueError("extension output contains a credential")
     if not isinstance(output, dict) or output.get("scope") != expected_scope:
         raise ValueError("unsupported extension output")
     return output
@@ -127,7 +145,7 @@ def main():
             result = {"manifestValid": True, "id": manifest["id"], "apiVersion": manifest["apiVersion"]}
         else:
             result = run_extension(args.manifest, os.environ.get("DECODXLOG_READ_TOKEN", ""), args.port, args.timeout)
-    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, TypeError, RecursionError, json.JSONDecodeError) as exc:
         print(f"Extension check failed: {type(exc).__name__}", file=sys.stderr)
         return 1
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))

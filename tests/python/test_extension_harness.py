@@ -3,6 +3,8 @@ import pathlib
 import tempfile
 import json
 import os
+import subprocess
+import sys
 import time
 import unittest
 from unittest.mock import patch
@@ -58,6 +60,18 @@ class ExtensionHarnessTests(unittest.TestCase):
             self.assertEqual(result["scope"], "recent_sample")
             self.assertFalse(result["leaked"])
             entry.write_text("import os,json; print(json.dumps({'scope':'recent_sample','token':os.environ['DECODXLOG_READ_TOKEN']}))")
+            with self.assertRaises(ValueError):
+                harness.run_extension(manifest, "read-only", 12345, 3)
+            # JSON may spell the same secret with Unicode escapes; checking only
+            # the raw output bytes would miss it and main() would print it decoded.
+            entry.write_text("print(r'{\"scope\":\"recent_sample\",\"nested\":[{\"value\":\"\\u0072ead-only\"}]}')")
+            with self.assertRaises(ValueError):
+                harness.run_extension(manifest, "read-only", 12345, 3)
+            env = {**os.environ, "DECODXLOG_READ_TOKEN": "read-only", "PYTHONDONTWRITEBYTECODE": "1"}
+            cli = subprocess.run([sys.executable, str(path), str(manifest), "--port", "12345"], env=env, capture_output=True, timeout=5)
+            self.assertNotEqual(cli.returncode, 0)
+            self.assertNotIn(b"read-only", cli.stdout + cli.stderr)
+            entry.write_text("print(r'{\"scope\":\"recent_sample\",\"\\u0072ead-only\":true}')")
             with self.assertRaises(ValueError):
                 harness.run_extension(manifest, "read-only", 12345, 3)
             entry.write_text("raise RuntimeError('crash')")

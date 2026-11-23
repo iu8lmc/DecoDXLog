@@ -160,6 +160,9 @@ figlio che crea una nuova sessione può comunque sfuggire. Su Windows termina
 solo il processo diretto. Non è un gestore di installazione né una sandbox:
 non impedisce al programma di accedere ai file o alla rete, avviare altri processi
 o leggere credenziali disponibili all'utente. Usare solo codice attendibile.
+Il controllo dell'output rifiuta il token esatto anche in chiavi e valori JSON
+annidati o rappresentati tramite escape; non è un filtro generale per segreti,
+trasformazioni arbitrarie o dati inviati dall'estensione tramite altri canali.
 
 ### Esempio di adattatore tracker
 
