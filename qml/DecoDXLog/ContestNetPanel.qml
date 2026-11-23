@@ -11,6 +11,13 @@ GlassPanel {
     id: root
 
     readonly property var net: decolog.net
+    function probeNetworkReviewStart(secure) {
+        root.net.setLoopbackForProbe(); root.net.enabled=true; qsoWireDialog.open(); wireKey.text=secure ? "a".repeat(64) : ""
+        const error=root.net.setExperimentalQsoKey(wireKey.text); qsoWireDialog.keyReady=!error
+        return !error && !root.net.armExperimentalQsoReceiver("sender","test-transfer")
+    }
+    function probeNetworkReviewOpen() { if (!root.net.reviewExperimentalQso()) return false; qsoDetailsDialog.open(); return true }
+    function probeNetworkReviewState() { return {visible:qsoDetailsDialog.visible,fromNetwork:root.net.qsoReview.fromNetwork || false,secure:root.net.qsoReview.transportSecure || false,sender:root.net.qsoReview.sender || "",sourceLog:root.net.qsoReview.sourceLog || "",trust:networkReviewTrust.text,staleNotice:networkReviewStale.text,canInsert:root.net.qsoReview.canInsert || false,canApply:root.net.qsoReview.canApply || false,fields:(root.net.qsoReview.fields || []).length} }
     function probeExperimentalWire(secure) {
         qsoWireDialog.open()
         let expiryGuard=true
@@ -254,7 +261,7 @@ GlassPanel {
                     ? qsTr("Shared-key mode encrypts only this experimental transfer. Group and station IDs remain visible; anyone with the key can impersonate a station. Legacy QSO and other network messages remain unencrypted. Use a new random key and transfer ID, and share the key separately.")
                     : qsTr("Experimental UDP broadcast: QSO data is not encrypted and any listener on the network may read it. Station IDs are not authenticated. Only share data with trusted stations and networks.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
-                text:qsTr("Your station ID: %1. Both stations must enter the same transfer ID. The receiver arms first; the sender then sends one QSO. Received data is not added to the log.").arg(root.net.nodeId) }
+                text:qsTr("Your station ID: %1. Both stations must enter the same transfer ID. The receiver arms first; the sender then sends one QSO. Received data is added only after review and confirmation.").arg(root.net.nodeId) }
             LabeledField { label:qsTr("Shared key (64 hexadecimal characters; optional)"); RowLayout { Layout.fillWidth:true
                 StyledTextField { id:wireKey; Layout.fillWidth:true; echoMode:wireKeyShow.checked ? TextInput.Normal : TextInput.Password; onTextChanged:qsoWireDialog.keyReady=false }
                 CheckBox { id:wireKeyShow; text:qsTr("Show") }
@@ -276,6 +283,8 @@ GlassPanel {
             }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textSecondary
                 text:qsoWireDialog.localError || root.net.experimentalQsoStatus }
+            GlassButton { text:qsTr("Review received QSO…"); visible:root.net.experimentalQsoPreview.complete === true
+                enabled:!root.net.qsoReviewBusy; onClicked: { if (root.net.reviewExperimentalQso()) qsoDetailsDialog.open(); else qsoWireDialog.localError=qsTr("Cannot review the received QSO; check the current log.") } }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textPrimary
                 visible:root.net.experimentalQsoPreview.complete === true
                 text:qsTr("Received %1 · UUID %2 · revision %3 · deleted %4").arg(root.net.experimentalQsoPreview.call || "—").arg(root.net.experimentalQsoPreview.uuid || "").arg(root.net.experimentalQsoPreview.revision).arg(root.net.experimentalQsoPreview.deleted ? qsTr("yes") : qsTr("no")) }
@@ -386,10 +395,16 @@ GlassPanel {
             spacing:8
             Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
                 text:qsTr("Fields are shown up to 2048 characters. Long values are marked; attachments and local metadata are not shown.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textSecondary; visible:root.net.qsoReview.fromNetwork === true
+                text:qsTr("Sender %1 · source log %2").arg(root.net.qsoReview.sender || "—").arg(root.net.qsoReview.sourceLog || "—") }
+            Text { id:networkReviewTrust; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; visible:root.net.qsoReview.fromNetwork === true
+                text:root.net.qsoReview.transportSecure ? qsTr("Received over the network with a shared key. Any key holder can impersonate a station; verify the source before applying.") : qsTr("Received over the network without authentication. The sender can be impersonated; verify the source before applying.") }
+            Text { id:networkReviewStale; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; visible:root.net.qsoReview.fromNetwork === true
+                text:qsTr("The received snapshot may no longer match the sender's current log.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; visible:root.net.qsoReview.hasLongFields === true
                 text:qsTr("Open and read every page of each long field before importing or applying. Remaining: %1").arg(root.net.qsoReview.longRemaining || 0) }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.warningColor
-                text:root.net.qsoReviewBusy ? qsTr("Reading QSO snapshots…") : root.net.qsoReview.error || (root.net.qsoComparisonSummary.stale ? qsTr("A log changed; compare again.") : "") }
+                text:root.net.qsoReviewBusy ? qsTr("Reading QSO snapshots…") : root.net.qsoReview.error || ((!root.net.qsoReview.fromNetwork && root.net.qsoComparisonSummary.stale) ? qsTr("A log changed; compare again.") : "") }
             Rectangle {
                 Layout.fillWidth:true; Layout.fillHeight:true; color:Theme.bgDeep; radius:4; border.color:Theme.borderSoft
                 ListView {
@@ -416,9 +431,9 @@ GlassPanel {
             }
             RowLayout {
                 GlassButton { text:qsTr("Import this missing QSO…"); visible:root.net.qsoReview.canInsert === true
-                    enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale; onClicked:qsoImportDialog.open() }
+                    enabled:!root.net.qsoReviewBusy && (root.net.qsoReview.fromNetwork || !root.net.qsoComparisonSummary.stale); onClicked:qsoImportDialog.open() }
                 GlassButton { text:root.net.qsoReview.remoteDeleted ? qsTr("Review deletion…") : qsTr("Review selected changes…")
-                    visible:root.net.qsoReview.canApply === true; enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale
+                    visible:root.net.qsoReview.canApply === true; enabled:!root.net.qsoReviewBusy && (root.net.qsoReview.fromNetwork || !root.net.qsoComparisonSummary.stale)
                     onClicked:qsoApplyDialog.open() }
                 GlassButton { text:qsTr("Close"); onClicked:qsoDetailsDialog.close() }
             }
@@ -461,8 +476,10 @@ GlassPanel {
         title:qsTr("Import reviewed QSO?")
         width:620; height:300
         function confirmImport() {
+            const network=root.net.qsoReview.fromNetwork === true
             const error=root.net.applyReviewedMissingQso()
-            qsoComparisonDialog.localError=error || qsTr("QSO imported. Compare the logs again.")
+            if (network) qsoWireDialog.localError=error || qsTr("Received QSO imported.")
+            else qsoComparisonDialog.localError=error || qsTr("QSO imported. Compare the logs again.")
             if (!error) qsoDetailsDialog.close()
             close()
         }
@@ -471,7 +488,7 @@ GlassPanel {
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
                 text:qsTr("Import this QSO into the current log? Its ADIF fields and QSL states will be copied. Attachments, local service metadata and station profile are not copied. The QSO may be included in the normal Cloud sync.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("The current log and selected log will be checked again. Existing or duplicate QSO are not overwritten.") }
+                text:root.net.qsoReview.fromNetwork ? qsTr("The current log will be checked again. Existing or duplicate QSO are not overwritten.") : qsTr("The current log and selected log will be checked again. Existing or duplicate QSO are not overwritten.") }
             Item { Layout.fillHeight:true }
             RowLayout {
                 GlassButton { text:qsTr("Cancel"); onClicked:qsoImportDialog.close() }
@@ -486,8 +503,10 @@ GlassPanel {
         title:root.net.qsoReview.remoteDeleted ? qsTr("Delete current QSO?") : qsTr("Apply selected QSO fields?")
         width:680; height:340
         function confirmApply() {
+            const network=root.net.qsoReview.fromNetwork === true
             const error=root.net.applyReviewedExistingQso()
-            qsoComparisonDialog.localError=error || qsTr("Change applied. Compare the logs again.")
+            if (network) qsoWireDialog.localError=error || qsTr("Received change applied.")
+            else qsoComparisonDialog.localError=error || qsTr("Change applied. Compare the logs again.")
             if (!error) qsoDetailsDialog.close()
             close()
         }
@@ -496,7 +515,7 @@ GlassPanel {
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
                 text:root.net.qsoReview.remoteDeleted
                     ? qsTr("Delete the current QSO? It remains in history, and configured services may receive a deletion.")
-                    : qsTr("Replace the current QSO's ADIF fields and QSL states with the selected log's values? Existing station profile and attachments remain. Configured services may receive the change.") }
+                    : root.net.qsoReview.fromNetwork ? qsTr("Replace the current QSO's ADIF fields and QSL states with the received values? Existing station profile and attachments remain. Configured services may receive the change.") : qsTr("Replace the current QSO's ADIF fields and QSL states with the selected log's values? Existing station profile and attachments remain. Configured services may receive the change.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
                 text:qsTr("The QSO will be checked again. This is an explicit choice, not an automatic merge.") }
             Item { Layout.fillHeight:true }

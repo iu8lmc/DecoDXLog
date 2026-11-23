@@ -13,6 +13,9 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include "core/LogDatabase.h"
+#include "core/ContestNet.h"
+#include "core/ContestNetSecure.h"
+#include "core/ContestNetQsoTransfer.h"
 #include "core/CqMarathon.h"
 #include "core/Activation.h"
 #include "core/ContestAudioFile.h"
@@ -28,6 +31,8 @@
 #include "core/QslOcrAcquisition.h"
 #include <QCryptographicHash>
 #include <algorithm>
+#include <atomic>
+#include <thread>
 
 class TestJourneyColumn : public QObject {
     Q_OBJECT
@@ -53,6 +58,7 @@ private:
         env.insert(QStringLiteral("DECODXLOG_DATA_ROOT"), dir.filePath(QStringLiteral("data")));
         env.insert(QStringLiteral("DECODXLOG_GRAB_MS"), QString::number(grabMs));
         if (traceActivity) env.insert(QStringLiteral("DECODXLOG_TRACE_ACTIVITY"),QStringLiteral("1"));
+        if (probe.startsWith(QStringLiteral("netreceive"))) env.insert(QStringLiteral("DECODXLOG_TEST_LOOPBACK"),QStringLiteral("1"));
         QProcess app;
         app.setProcessEnvironment(env);
         app.setProcessChannelMode(QProcess::MergedChannels);
@@ -69,6 +75,45 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void stationNetworkReceivedQsoReview_data()
+    {
+        QTest::addColumn<bool>("accept"); QTest::addColumn<QString>("kind"); QTest::addColumn<bool>("secure");
+        QTest::newRow("reject insert") << false << QStringLiteral("insert") << true; QTest::newRow("accept insert") << true << QStringLiteral("insert") << true;
+        QTest::newRow("reject edit") << false << QStringLiteral("edit") << true; QTest::newRow("accept edit") << true << QStringLiteral("edit") << true;
+        QTest::newRow("reject delete") << false << QStringLiteral("delete") << true; QTest::newRow("accept delete") << true << QStringLiteral("delete") << true;
+        QTest::newRow("reject clear insert") << false << QStringLiteral("insert") << false; QTest::newRow("accept clear insert") << true << QStringLiteral("insert") << false;
+    }
+    void stationNetworkReceivedQsoReview()
+    {
+        using namespace decolog::core; QFETCH(bool,accept); QFETCH(QString,kind); QFETCH(bool,secure); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const auto port=probe.localPort(); probe.close();
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("net/enabled",false); settings.setValue("net/id","receiver"); settings.setValue("net/group","FIELD"); settings.setValue("net/port",port); settings.setValue("ui/language",accept?"it":"en"); settings.sync(); }
+        ContestNetInventoryRow row; QString logIdentity; qint64 localId=0;
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT","network review"},{"NAME","Remote"}};
+        { LogDatabase source; const auto path=dir.filePath("source.sqlite"); QVERIFY(source.open(path)); const auto inserted=source.insertQso(record,"fixture"); QVERIFY(inserted.id>0);
+          if (kind=="delete") QVERIFY(source.softDeleteQso(inserted.id));
+          ContestNetInventory inv; QVERIFY(inv.begin(path)); const auto page=inv.next(1); QVERIFY(page.ok && page.rows.size()==1); row=page.rows.first(); logIdentity=inv.logIdentity(); }
+        if (kind!="insert") { LogDatabase local; QVERIFY(local.open(dir.filePath("test.sqlite"))); record.set("NAME","Local"); const auto inserted=local.insertQso(record,"fixture"); QVERIFY(inserted.id>0); localId=inserted.id; QVERIFY(local.adoptUuid(localId,row.uuid)); }
+        std::atomic_bool stop{false}; std::thread sender([&] {
+            QUdpSocket socket; contestqso::Encoder encoder("test-transfer",logIdentity,row,secure?256:512); const auto key=QByteArray::fromHex(QByteArray(64,'a')); qint64 seq=0;
+            while (!stop.load()) { for (int i=0;i<encoder.count();++i) {
+                auto frame=encoder.frame(i); frame.insert("to","receiver"); QString type=QStringLiteral("qso_chunk_v1");
+                if (secure) { const auto sealed=contestsecure::seal(key,"FIELD","sender","receiver",type,frame); if (!sealed.ok) continue; frame=sealed.frame; type=QStringLiteral("qso_secure_v1"); }
+                frame.insert("seq",++seq); frame.insert("session","app-test"); const auto packet=ContestNet::pack("FIELD","sender",type,frame); socket.writeDatagram(packet,QHostAddress::LocalHost,port);
+            } QThread::msleep(80); }
+        });
+        QByteArray output; const bool launched=launch(dir,"netreceive"+(secure?QString():QStringLiteral("clear"))+kind+(accept?"accept":"cancel"),output,6500); stop.store(true); sender.join();
+        QVERIFY2(launched,output.constData()); QVERIFY2(output.contains("PROBE netreceive ") && output.contains("\"fromNetwork\":true") && output.contains(secure?"\"secure\":true":"\"secure\":false") && output.contains("\"sender\":\"sender\"") && output.contains(logIdentity.toUtf8()) &&
+            output.contains(secure?(accept?"chiave condivisa":"shared key"):(accept?"senza autenticazione":"without authentication")) &&
+            output.contains(accept?"log corrente del mittente":"sender's current log") && output.contains(kind=="insert"?"\"canInsert\":true":"\"canApply\":true") && output.contains("PROBE netreceive choice true") && !output.contains("TypeError"),output.constData());
+        const int expectedCount=kind=="insert"?(accept?1:0):(kind=="delete" && accept?0:1);
+        QVERIFY2(output.contains("PROBE netreceive model "+QByteArray::number(expectedCount)),output.constData());
+        LogDatabase local; QVERIFY(local.open(dir.filePath("test.sqlite")));
+        if (kind=="insert") { QCOMPARE(local.qsoCount(),qint64(accept?1:0)); if (accept) QVERIFY(local.idForUuid(row.uuid)>0); }
+        else { QVERIFY(local.meta(localId)); QCOMPARE(local.meta(localId)->deleted,accept && kind=="delete");
+            if (kind=="edit") QCOMPARE(local.record(localId)->value("NAME"),accept?QString("Remote"):QString("Local")); }
+
+    }
     void stationNetworkExperimentalQsoDialog_data()
     {
         QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("warning"); QTest::addColumn<bool>("secure");

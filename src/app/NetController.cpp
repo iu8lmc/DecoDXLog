@@ -240,6 +240,7 @@ bool NetController::qsoComparisonCurrent() const
 bool NetController::reviewQsoComparison(const QString& uuid)
 {
     if (m_qsoReviewBusy || uuid.isEmpty() || !qsoComparisonCurrent()) return false;
+    m_reviewFromNetwork=false; m_reviewWireOriginal.reset();
     QVariantMap selected;
     for (const auto& value:m_qsoComparisonRows) if (value.toMap().value(QStringLiteral("uuid")).toString()==uuid) { selected=value.toMap(); break; }
     if (selected.isEmpty()) return false;
@@ -333,7 +334,7 @@ bool NetController::reviewQsoComparison(const QString& uuid)
 
 QVariantMap NetController::qsoLongFieldPage(int fieldIndex,const QString& part,int offset)
 {
-    if (m_qsoReviewBusy || !qsoComparisonCurrent() || (part!=QLatin1String("name") && part!=QLatin1String("local") && part!=QLatin1String("remote"))) return {};
+    if (m_qsoReviewBusy || !qsoReviewCurrent() || (part!=QLatin1String("name") && part!=QLatin1String("local") && part!=QLatin1String("remote"))) return {};
     const auto fields=m_qsoReview.value(QStringLiteral("fields")).toList();
     if (fieldIndex<0 || fieldIndex>=fields.size()) return {};
     const auto key=QString::number(fieldIndex)+QLatin1Char(':')+part;
@@ -350,7 +351,7 @@ QVariantMap NetController::qsoLongFieldPage(int fieldIndex,const QString& part,i
     int remaining=0; for (auto it=m_reviewedLongOffsets.cbegin();it!=m_reviewedLongOffsets.cend();++it) if (it.value()!=-1) ++remaining;
     const bool ready=remaining==0;
     m_qsoReview.insert(QStringLiteral("longRemaining"),remaining);
-    m_qsoReview.insert(QStringLiteral("canInsert"),ready && bool(m_reviewedMissing) && m_qsoReview.value(QStringLiteral("kind"))==QLatin1String("remoteOnly"));
+    m_qsoReview.insert(QStringLiteral("canInsert"),ready && bool(m_reviewedMissing) && m_qsoReview.value(QStringLiteral("kind"))==QLatin1String("remoteOnly") && !m_qsoReview.value(QStringLiteral("remoteDeleted")).toBool());
     m_qsoReview.insert(QStringLiteral("canApply"),ready && bool(m_reviewedMissing) && m_reviewedExisting.ok);
     emit qsoReviewChanged();
     return {{QStringLiteral("text"),text},{QStringLiteral("next"),end},{QStringLiteral("done"),done},{QStringLiteral("total"),value.size()}};
@@ -359,33 +360,122 @@ QVariantMap NetController::qsoLongFieldPage(int fieldIndex,const QString& part,i
 QString NetController::applyReviewedMissingQso()
 {
     if (m_qsoReviewBusy || !m_reviewedMissing || !m_qsoReview.value(QStringLiteral("ok")).toBool()
-        || !m_qsoReview.value(QStringLiteral("canInsert")).toBool() || !qsoComparisonCurrent())
+        || !m_qsoReview.value(QStringLiteral("canInsert")).toBool() || !qsoReviewCurrent())
         return tr("Review the current comparison again before importing.");
-    const auto result=contestqso::applyMissing(*m_ctx.db,m_qsoComparisonIdentity,*m_reviewedMissing);
+    const auto result=contestqso::applyMissing(*m_ctx.db,m_reviewFromNetwork?m_reviewWireIdentity:m_qsoComparisonIdentity,*m_reviewedMissing);
     if (!result.ok) return result.error;
     m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true);
-    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged(); emit qsoComparisonChanged();
+    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); m_reviewFromNetwork=false; m_reviewWireOriginal.reset(); emit qsoReviewChanged(); emit qsoComparisonChanged();
     if (result.inserted && m_ctx.reviewedQsoInserted) m_ctx.reviewedQsoInserted(result.id);
     return {};
 }
 
 QString NetController::applyReviewedExistingQso()
 {
-    if (m_qsoReviewBusy || !m_reviewedMissing || !m_reviewedExisting.ok || !m_qsoReview.value(QStringLiteral("canApply")).toBool() || !qsoComparisonCurrent())
+    if (m_qsoReviewBusy || !m_reviewedMissing || !m_reviewedExisting.ok || !m_qsoReview.value(QStringLiteral("canApply")).toBool() || !qsoReviewCurrent())
         return tr("Review the current comparison again before applying changes.");
     const auto before=m_ctx.db->record(m_reviewedExisting.id);
     const QString oldCall=before?before->value(QStringLiteral("CALL")):QString();
     const bool deleted=m_reviewedMissing->row().deleted;
-    const auto result=contestqso::applyReviewed(*m_ctx.db,m_qsoComparisonIdentity,*m_reviewedMissing,m_reviewedExisting);
+    const auto result=contestqso::applyReviewed(*m_ctx.db,m_reviewFromNetwork?m_reviewWireIdentity:m_qsoComparisonIdentity,*m_reviewedMissing,m_reviewedExisting);
     if (!result.ok) return result.error;
     m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true);
-    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged(); emit qsoComparisonChanged();
+    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); m_reviewFromNetwork=false; m_reviewWireOriginal.reset(); emit qsoReviewChanged(); emit qsoComparisonChanged();
     if (m_ctx.reviewedQsoChanged) m_ctx.reviewedQsoChanged(result.id,deleted,oldCall);
     return {};
 }
 
+bool NetController::qsoReviewCurrent() const
+{
+    if (!m_reviewFromNetwork) return qsoComparisonCurrent();
+    return m_net.running() && m_reviewWireOriginal && m_wireReceiver==m_reviewWireOriginal && m_wireReceiver->complete()
+        && m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==m_reviewWirePath && m_ctx.db->identity()==m_reviewWireIdentity
+        && m_ctx.db->openGeneration()==m_reviewWireDbGeneration && m_ctx.db->openFileIdentity()==m_reviewWireFileIdentity
+        && m_ctx.db->fileIdentityMatchesOpen() && m_ctx.db->changeStamp()==m_reviewWireStamp;
+}
+void NetController::invalidateNetworkReview()
+{
+    if (!m_reviewFromNetwork) return;
+    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={};
+    m_reviewedLongOffsets.clear(); m_reviewFromNetwork=false; m_reviewWireOriginal.reset(); emit qsoReviewChanged();
+}
+bool NetController::reviewExperimentalQso()
+{
+    if (m_qsoComparisonBusy || m_qsoReviewBusy || !m_net.running() || !m_wireReceiver || !m_wireReceiver->complete()
+        || !m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen()) return false;
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity(), stamp=m_ctx.db->changeStamp(), sender=m_wireSender;
+    const QByteArray file=m_ctx.db->openFileIdentity(); const quint64 dbGeneration=m_ctx.db->openGeneration();
+    if (identity.isEmpty() || stamp.isEmpty() || file.isEmpty()) return false;
+    const bool secure=!m_wireKey.isEmpty(); const auto original=m_wireReceiver;
+    const auto received=std::make_shared<contestqso::Receiver>(*original);
+    m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset();
+    if (!m_qsoComparisonSummary.isEmpty()) { m_qsoComparisonSummary.insert(QStringLiteral("stale"),true); emit qsoComparisonChanged(); }
+    m_reviewFromNetwork=true; m_reviewWireOriginal=original; m_reviewWirePath=path; m_reviewWireIdentity=identity; m_reviewWireStamp=stamp;
+    m_reviewWireFileIdentity=file; m_reviewWireDbGeneration=dbGeneration;
+    const quint64 generation=++m_qsoReviewGeneration; m_qsoReviewBusy=true; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged();
+    QPointer<NetController> self(this);
+    m_qsoComparisonPool.start([self,path,identity,file,sender,secure,received,generation] {
+        QVariantMap output; QString error; contestqso::Review review; ContestNetInventory inventory;
+        const auto incoming=received->row();
+        if (!inventory.begin(path) || inventory.logIdentity()!=identity || inventory.fileIdentity()!=file) error=QStringLiteral("Destination log changed or could not be opened");
+        else {
+            const auto local=inventory.findUuid(incoming.uuid,4*1024*1024);
+            if (!local.ok) error=local.error;
+            else {
+                QMap<QString,QString> left,right;
+                if (!local.rows.isEmpty()) { const auto doc=adif::parse(local.rows.first().adifPayload); if (doc.records.size()==1) for (const auto& f:doc.records.first().fields()) left.insert(f.name,f.value); }
+                const auto doc=adif::parse(incoming.adifPayload); if (doc.records.size()!=1) error=QStringLiteral("Invalid received ADIF");
+                else {
+                    for (const auto& f:doc.records.first().fields()) right.insert(f.name,f.value);
+                    QSet<QString> names(left.keyBegin(),left.keyEnd()); for (auto it=right.cbegin();it!=right.cend();++it) names.insert(it.key());
+                    QStringList ordered=names.values(); ordered.sort(Qt::CaseSensitive); QVariantList fields; bool longFields=false;
+                    for (const auto& name:ordered) {
+                        if (name.size()>2048 || left.value(name).size()>2048 || right.value(name).size()>2048) longFields=true;
+                        fields.append(QVariantMap{{QStringLiteral("name"),name},{QStringLiteral("local"),left.value(name)},{QStringLiteral("remote"),right.value(name)},
+                            {QStringLiteral("localPresent"),left.contains(name)},{QStringLiteral("remotePresent"),right.contains(name)}});
+                    }
+                    QString kind=QStringLiteral("remoteOnly"); bool canInsert=local.rows.isEmpty() && !incoming.deleted, canApply=false;
+                    if (!local.rows.isEmpty()) {
+                        const auto& current=local.rows.first();
+                        kind=current.deleted!=incoming.deleted?QStringLiteral("deletionConflict"):current.contentHash!=incoming.contentHash?QStringLiteral("contentConflict"):QStringLiteral("matching");
+                        if (!current.deleted && kind!=QLatin1String("matching")) {
+                            LogDatabase db; if (db.openReadOnly(path) && db.openFileIdentity()==file) review=contestqso::reviewExisting(db,identity,*received);
+                            if (!review.ok || review.uuid!=current.uuid || review.localRevision!=current.revision || review.localDeleted!=current.deleted || review.localHash!=current.contentHash) error=QStringLiteral("Cannot pin current QSO review");
+                            else canApply=true;
+                        }
+                    }
+                    output={{QStringLiteral("ok"),true},{QStringLiteral("fromNetwork"),true},{QStringLiteral("transportSecure"),secure},{QStringLiteral("sender"),sender},{QStringLiteral("sourceLog"),received->sourceLog()},
+                        {QStringLiteral("uuid"),incoming.uuid},{QStringLiteral("kind"),kind},{QStringLiteral("localDeleted"),!local.rows.isEmpty() && local.rows.first().deleted},
+                        {QStringLiteral("remoteDeleted"),incoming.deleted},{QStringLiteral("fields"),fields},{QStringLiteral("hasLongFields"),longFields},
+                        {QStringLiteral("canInsert"),canInsert && !longFields},{QStringLiteral("canApply"),canApply && !longFields}};
+                    if (!inventory.fileIdentityCurrent()) error=QStringLiteral("Destination log changed");
+                }
+            }
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self,[self,generation,output,error,received,review] {
+            if (!self || self->m_qsoReviewGeneration!=generation) return;
+            self->m_qsoReviewBusy=false;
+            if (!self->qsoReviewCurrent()) self->m_qsoReview={{QStringLiteral("error"),self->tr("The log or received transfer changed; review again.")},{QStringLiteral("fromNetwork"),true}};
+            else if (!error.isEmpty()) self->m_qsoReview={{QStringLiteral("error"),error},{QStringLiteral("fromNetwork"),true}};
+            else {
+                self->m_qsoReview=output; self->m_reviewedMissing=received; self->m_reviewedExisting=review; self->m_reviewedLongOffsets.clear();
+                const auto fields=output.value(QStringLiteral("fields")).toList();
+                for (int i=0;i<fields.size();++i) { const auto field=fields.at(i).toMap();
+                    for (const auto& part:{QStringLiteral("name"),QStringLiteral("local"),QStringLiteral("remote")})
+                        if (field.value(part).toString().size()>2048) self->m_reviewedLongOffsets.insert(QString::number(i)+QLatin1Char(':')+part,0);
+                }
+                self->m_qsoReview.insert(QStringLiteral("longRemaining"),self->m_reviewedLongOffsets.size());
+            }
+            emit self->qsoReviewChanged();
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
+
 void NetController::clearExperimentalQso()
 {
+    invalidateNetworkReview();
     ++m_wireGeneration; m_qsoWireTimer.stop(); m_qsoWireExpiry.stop(); m_qsoWireRetry.stop(); m_wireServeLimit.invalidate(); m_wireIndices.clear(); m_wireEncoder.reset(); m_wireReceiver.reset();
     m_wirePeer.clear(); m_wireSender.clear(); m_wireTransferIn.clear(); m_wireTransferOut.clear(); m_wirePreview.clear();
     m_wireKey.fill('\0'); m_wireKey.clear(); m_wireSeenNonces.clear(); m_wirePreparing=false; m_wireStatus.clear(); emit experimentalQsoChanged();
@@ -423,6 +513,7 @@ QString NetController::armExperimentalQsoReceiver(const QString& sender,const QS
     static const QRegularExpression identifier(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$"));
     if (!m_net.running() || !identifier.match(sender).hasMatch() || !identifier.match(transfer).hasMatch() || sender==m_id)
         return tr("Enter a running network, a different sender ID and a valid transfer ID.");
+    invalidateNetworkReview();
     m_wireReceiver=std::make_shared<contestqso::Receiver>(sender,transfer); m_wireSender=sender; m_wireTransferIn=transfer; m_wirePreview.clear(); m_qsoWireRetry.start();
     m_wireStatus=tr("Waiting for the selected sender and transfer."); m_qsoWireExpiry.start(); emit experimentalQsoChanged(); return {};
 }

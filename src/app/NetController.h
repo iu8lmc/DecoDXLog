@@ -120,6 +120,7 @@ public:
     Q_INVOKABLE QString armExperimentalQsoReceiver(const QString& sender, const QString& transfer);
     Q_INVOKABLE QString sendExperimentalQso(const QString& receiver, const QString& uuid, const QString& transfer);
     Q_INVOKABLE QString requestExperimentalQsoMissing();
+    Q_INVOKABLE bool reviewExperimentalQso();
     Q_INVOKABLE void clearExperimentalQso();
     QVariantMap experimentalQsoPreview() const { return m_wirePreview; }
     QString experimentalQsoStatus() const { return m_wireStatus; }
@@ -141,6 +142,7 @@ public:
     Q_INVOKABLE void requestSync();
     // Per i test: invece del broadcast, a questo indirizzo.
     void setTarget(const QHostAddress& a) { m_net.setTarget(a); }
+    Q_INVOKABLE void setLoopbackForProbe() { if (qEnvironmentVariableIntValue("DECODXLOG_TEST_LOOPBACK")==1) m_net.setTarget(QHostAddress::LocalHost); }
     void setIdForTests(const QString& id) { m_id = id; }
 
 signals:
@@ -245,6 +247,13 @@ private:
     core::contestqso::Review m_reviewedExisting;
     QHash<QString,int> m_reviewedLongOffsets;
     bool qsoComparisonCurrent() const;
+    bool qsoReviewCurrent() const;
+    void invalidateNetworkReview();
+    bool m_reviewFromNetwork{false};
+    std::shared_ptr<core::contestqso::Receiver> m_reviewWireOriginal;
+    QString m_reviewWirePath, m_reviewWireIdentity, m_reviewWireStamp;
+    QByteArray m_reviewWireFileIdentity;
+    quint64 m_reviewWireDbGeneration{0};
     QVariantMap m_qsoComparisonSummary;
     QVariantList m_qsoComparisonRows;
     QString m_qsoComparisonPath, m_qsoComparisonIdentity, m_qsoComparisonStamp, m_qsoComparisonRemotePath;

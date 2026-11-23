@@ -51,7 +51,9 @@ private slots:
         QTest::qWait(150); QVERIFY(!b.experimentalQsoPreview().value("complete").toBool()); QCOMPARE(destination.qsoCount(),qint64(0));
         retries=true; QVERIFY(b.requestExperimentalQsoMissing().isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),10000);
         QCOMPARE(b.experimentalQsoPreview().value("uuid").toString(),uuid); QCOMPARE(b.experimentalQsoPreview().value("call").toString(),QString("K1AAA"));
-        QCOMPARE(destination.qsoCount(),qint64(0)); QCOMPARE(source.qsoCount(),qint64(1)); a.setEnabled(false); b.setEnabled(false); QVERIFY(b.experimentalQsoPreview().isEmpty());
+        QCOMPARE(destination.qsoCount(),qint64(0)); QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000);
+        QVERIFY(b.qsoReview().value("fromNetwork").toBool()); QVERIFY(!b.qsoReview().value("transportSecure").toBool()); QVERIFY(b.qsoReview().value("canInsert").toBool());
+        QVERIFY(b.applyReviewedMissingQso().isEmpty()); QCOMPARE(destination.qsoCount(),qint64(1)); QCOMPARE(source.qsoCount(),qint64(1)); a.setEnabled(false); b.setEnabled(false); QVERIFY(b.experimentalQsoPreview().isEmpty());
     }
     void experimentalQsoTransferAutomaticallyRecoversAllInitialLoss()
     {
@@ -126,9 +128,49 @@ private slots:
         for (const auto& frame:frames) forward("sender","qso_secure_v1",frame,receiverPort);
         QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),5000); QCOMPARE(b.experimentalQsoPreview().value("call").toString(),QString("K1AAA"));
         QSignalSpy changed(&b,&NetController::experimentalQsoChanged); forward("sender","qso_secure_v1",frames.first(),receiverPort); QTest::qWait(200); QCOMPARE(changed.size(),0);
+        QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000); QVERIFY(b.qsoReview().value("ok").toBool()); QVERIFY(b.qsoReview().value("fromNetwork").toBool()); QVERIFY(b.qsoReview().value("canInsert").toBool());
+        AdifRecord independent{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}}; QVERIFY(destination.insertQso(independent,"fixture").id>0);
+        QVERIFY(!b.applyReviewedMissingQso().isEmpty()); QCOMPARE(destination.qsoCount(),qint64(1));
+        QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000); QVERIFY(b.qsoReview().value("canInsert").toBool());
+        QVERIFY(b.applyReviewedMissingQso().isEmpty()); QCOMPARE(destination.qsoCount(),qint64(2)); QVERIFY(destination.idForUuid(source.meta(q.id)->uuid)>0);
         a.setStationName(QString(1000,'n')); const int beforeOversize=sent.size(); QVERIFY(a.sendExperimentalQso("receiver",source.meta(q.id)->uuid,"oversized").isEmpty());
         QTRY_VERIFY_WITH_TIMEOUT(!a.experimentalQsoSending(),10000); QVERIFY(a.experimentalQsoStatus().contains("too large")); QCOMPARE(sent.size(),beforeOversize);
-        QCOMPARE(destination.qsoCount(),qint64(0)); a.setEnabled(false); b.setEnabled(false);
+        QCOMPARE(destination.qsoCount(),qint64(2)); a.setEnabled(false); b.setEnabled(false);
+    }
+    void experimentalSecureQsoReviewAppliesEditAndDeletion()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoNetTransferTest"); QCoreApplication::setApplicationName("NetworkReview"); QSettings().setValue("net/enabled",false);
+        LogDatabase source,target; QVERIFY(source.open(dir.filePath("source.sqlite"))); QVERIFY(target.open(dir.filePath("target.sqlite")));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(2050,'x')},{"NAME","Remote"}};
+        const auto aQso=source.insertQso(record,"fixture"); record.set("NAME","Local"); const auto bQso=target.insertQso(record,"fixture"); QVERIFY(aQso.id>0 && bQso.id>0); const auto uuid=source.meta(aQso.id)->uuid; QVERIFY(target.adoptUuid(bQso.id,uuid));
+        QUdpSocket p1,p2; QVERIFY(p1.bind(QHostAddress::LocalHost,0)); QVERIFY(p2.bind(QHostAddress::LocalHost,0)); const auto senderPort=p1.localPort(),receiverPort=p2.localPort(); p1.close(); p2.close();
+        int changes=0; bool deleted=false; NetController::Context aCtx; aCtx.db=&source; NetController a(aCtx); NetController::Context bCtx; bCtx.db=&target;
+        bCtx.reviewedQsoChanged=[&](qint64 id,bool isDeleted,const QString&) { QCOMPARE(id,bQso.id); ++changes; deleted=isDeleted; }; NetController b(bCtx);
+        a.setIdForTests("sender"); b.setIdForTests("receiver"); a.setGroup("FIELD"); b.setGroup("FIELD"); a.setPort(senderPort); b.setPort(receiverPort); a.setTarget(QHostAddress::LocalHost); b.setTarget(QHostAddress::LocalHost); a.setEnabled(true); b.setEnabled(true);
+        const QString key(64,'a'); QVERIFY(a.setExperimentalQsoKey(key).isEmpty()); QVERIFY(b.setExperimentalQsoKey(key).isEmpty()); QUdpSocket relay; int seq=0;
+        auto forward=[&](const QString& from,const QString& type,QJsonObject body,quint16 port) { body.insert("seq",++seq); body.insert("session","network-review-relay"); const auto bytes=ContestNet::pack("FIELD",from,type,body); relay.writeDatagram(bytes,QHostAddress::LocalHost,port); };
+        connect(&a,&NetController::experimentalQsoFrameSent,&relay,[&](const QString& type,const QJsonObject& frame) { if (type=="qso_secure_v1") forward("sender",type,frame,receiverPort); });
+        connect(&b,&NetController::experimentalQsoFrameSent,&relay,[&](const QString& type,const QJsonObject& frame) { if (type=="qso_secure_v1") forward("receiver",type,frame,senderPort); });
+        QVERIFY(b.armExperimentalQsoReceiver("sender","edit").isEmpty()); QVERIFY(a.sendExperimentalQso("receiver",uuid,"edit").isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),10000);
+        auto readLong=[&] {
+            const auto fields=b.qsoReview().value("fields").toList();
+            for (int i=0;i<fields.size();++i) for (const auto& part:{QStringLiteral("name"),QStringLiteral("local"),QStringLiteral("remote")}) {
+                if (fields[i].toMap().value(part).toString().size()<=2048) continue; int offset=0;
+                for (;;) { const auto page=b.qsoLongFieldPage(i,part,offset); QVERIFY(!page.isEmpty()); if (page.value("done").toBool()) break; offset=page.value("next").toInt(); }
+            }
+        };
+        QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000); QVERIFY(!b.qsoReview().value("canApply").toBool()); QVERIFY(b.qsoReview().value("hasLongFields").toBool()); readLong(); QVERIFY(b.qsoReview().value("canApply").toBool()); QVERIFY(b.qsoReview().value("transportSecure").toBool());
+        auto local=*target.record(bQso.id); local.set("NAME","Concurrent"); QVERIFY(target.updateQso(bQso.id,local).status==InsertResult::Status::Inserted);
+        QVERIFY(!b.applyReviewedExistingQso().isEmpty()); QCOMPARE(target.record(bQso.id)->value("NAME"),QString("Concurrent")); QCOMPARE(changes,0);
+        QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000); readLong(); QVERIFY(b.applyReviewedExistingQso().isEmpty()); QCOMPARE(target.record(bQso.id)->value("NAME"),QString("Remote")); QCOMPARE(changes,1); QVERIFY(!deleted);
+        QVERIFY(source.softDeleteQso(aQso.id)); QVERIFY(b.armExperimentalQsoReceiver("sender","delete").isEmpty()); QVERIFY(a.sendExperimentalQso("receiver",uuid,"delete").isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),10000);
+        QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000); readLong(); QVERIFY(b.qsoReview().value("canApply").toBool()); QVERIFY(b.qsoReview().value("remoteDeleted").toBool());
+        b.clearExperimentalQso(); QVERIFY(!b.applyReviewedExistingQso().isEmpty()); QVERIFY(!target.meta(bQso.id)->deleted);
+        QVERIFY(b.setExperimentalQsoKey(key).isEmpty()); QVERIFY(b.armExperimentalQsoReceiver("sender","delete-retry").isEmpty()); QVERIFY(a.sendExperimentalQso("receiver",uuid,"delete-retry").isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(b.experimentalQsoPreview().value("complete").toBool(),10000); QVERIFY(b.reviewExperimentalQso()); QTRY_VERIFY_WITH_TIMEOUT(!b.qsoReviewBusy(),10000); readLong();
+        QVERIFY(b.applyReviewedExistingQso().isEmpty()); QVERIFY(target.meta(bQso.id)->deleted); QCOMPARE(changes,2); QVERIFY(deleted); a.setEnabled(false); b.setEnabled(false);
     }
     void offlineQsoComparisonShowsDifferencesAndExpiresOnLocalEdit()
     {

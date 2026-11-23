@@ -1286,6 +1286,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
+        else if (what[0].indexOf("netreceive") === 0) { window.openContestDesk(); contestLayout.setShown("net",true); netReceiveProbe.start() }
         else if ((what[0] === "netwireprobe" || what[0] === "netwiresecureprobe")) { window.openContestDesk(); contestLayout.setShown("net",true); netWireProbe.start() }
         else if (what[0] === "netcompareprobe" || what[0] === "netimportprobe" || what[0] === "netimportcancelprobe" || what[0] === "netapplyprobe" || what[0] === "netapplycancelprobe" || what[0] === "netlongprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netCompareProbe.start() }
         else if (what[0] === "contestserialpanelprobe" || what[0] === "contestserialwindowprobe") {
@@ -1774,6 +1775,26 @@ RoundedWindow {
     Timer { id:cqwwHistoryProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportHistoryProbe=true; contestWindow.item.reportExportProbePath=startupShow.split(":")[0] === "cqwwexportprobe" ? startupShow.split(":").slice(1).join(":") : ""; contestWindow.item.probeReportHistory() } else console.warn("PROBE lcr history missing window") } }
     Timer { id:cqwwReportProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportProbeSave = startupShow.split(":")[0] === "cqwwarchiveprobe"; contestWindow.item.reportProbeFind = startupShow.split(":")[0] === "cqwwfindprobe" || startupShow.split(":")[0] === "cqwwopenprobe" || startupShow.split(":")[0] === "cqwwwindowprobe"; contestWindow.item.reportProbeWindow = startupShow.split(":")[0] === "cqwwwindowprobe"; contestWindow.item.reportProbeOpen = startupShow.split(":")[0] === "cqwwopenprobe"; contestWindow.item.inspectContestReport("file://" + startupShow.split(":").slice(1).join(":"), true) } else console.warn("PROBE lcr missing window") } }
     Timer { id:callQueueProbe; interval:1000; onTriggered: { const p=window.panelItem("newqso"); if (p && p.item) p.item.probeCallQueue(); else console.warn("PROBE callqueue missing panel") } }
+    Timer { id:netReceiveProbe; interval:250; repeat:true; property int tries:0; property int stage:0; property int expectedCount:-1
+        onTriggered: {
+            const container=contestLayout.panelFor("net"), panel=container ? container.item : null
+            if (!panel) { if (++tries>20) { console.warn("PROBE netreceive missing panel"); stop() } return }
+            if (stage===3) {
+                if (decolog.qsoModel.count!==expectedCount && ++tries<36) return
+                console.warn("PROBE netreceive model " + decolog.qsoModel.count); stop(); return
+            }
+            if (stage===0) { if (!panel.probeNetworkReviewStart(startupShow.indexOf("clear")<0)) { console.warn("PROBE netreceive start failed"); stop() } else stage=1; return }
+            if (stage===1) { if (!decolog.net.experimentalQsoPreview.complete) { if (++tries>24) { console.warn("PROBE netreceive timed out"); stop() } return }
+                if (!panel.probeNetworkReviewOpen()) { console.warn("PROBE netreceive review failed"); stop() } else stage=2; return }
+            if (decolog.net.qsoReviewBusy) { if (++tries>28) { console.warn("PROBE netreceive review timeout"); stop() } return }
+            console.warn("PROBE netreceive " + JSON.stringify(panel.probeNetworkReviewState()))
+            const accepted=startupShow.endsWith("accept")
+            const choice=decolog.net.qsoReview.canInsert ? panel.probeImport(accepted) : panel.probeApply(accepted)
+            console.warn("PROBE netreceive choice " + choice)
+            expectedCount=startupShow.indexOf("insert")>=0 ? (accepted?1:0) : (startupShow.indexOf("delete")>=0 && accepted?0:1)
+            stage=3
+        }
+    }
     Timer { id:netWireProbe; interval:300; repeat:true; property int tries:0
         onTriggered: {
             const container=contestLayout.panelFor("net"), panel=container ? container.item : null
