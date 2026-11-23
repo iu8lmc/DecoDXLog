@@ -70,6 +70,7 @@ public:
         std::function<QString()> stationProfileName; // nome del profilo attivo
         std::function<void(const QString& category, const QString& text, const QString& level)> activity;
         std::function<void(const QSet<qint64>&)> uploadStateChanged;
+        std::function<bool()> tqslCertificateCheck; // Optional dependency injection; defaults to the real TQSL check.
     };
 
     explicit QslController(Context context, QObject* parent = nullptr);

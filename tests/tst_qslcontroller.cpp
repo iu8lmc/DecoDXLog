@@ -562,6 +562,40 @@ private slots:
         }
     }
 
+    void tqslCrashPausesAutomaticUploadAndPersistsPause()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), adif=dir.filePath("batch.adi");
+        QFile file(script); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#!/bin/sh\nkill -SEGV $$\n"); file.close(); QVERIFY(file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        QFile input(adif); QVERIFY(input.open(QIODevice::WriteOnly)); input.write("fixture"); input.close();
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; };
+        { QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.setAutoUpload("lotw",true); controller.m_busyService="lotw"; controller.m_batchMode=true; controller.m_batch={qso.id}; controller.m_adifFile=adif;
+          QSignalSpy done(&controller.m_tqsl,&TqslUploader::finished); controller.m_tqsl.upload(adif,{},1); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QTest::qWait(100); QCOMPARE(done.size(),1);
+          QVERIFY(!controller.busy()); QVERIFY(!controller.autoUpload("lotw")); QVERIFY(!QFile::exists(adif)); QCOMPARE(db.qsosToUpload("lotw",0).size(),1); }
+        QslController restarted(ctx); QVERIFY(!restarted.autoUpload("lotw")); QCOMPARE(db.qsoCount(),qint64(1));
+    }
+
+    void cancellingRunningTqslPausesAutomaticUploadAndKeepsBatchUntilExit()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), ready=dir.filePath("ready"), adif=dir.filePath("batch.adi");
+        QFile file(script); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\nexec sleep 30\n"); file.close(); QVERIFY(file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        QFile input(adif); QVERIFY(input.open(QIODevice::WriteOnly)); input.write("fixture"); input.close();
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QStringList notices; ctx.activity=[&](const QString&,const QString& text,const QString&) { notices << text; };
+        { QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.setAutoUpload("lotw",true); controller.m_busyService="lotw"; controller.m_batchMode=true; controller.m_batch={qso.id}; controller.m_adifFile=adif;
+          controller.m_tqsl.upload(adif,{},1); QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ready),5000); QVERIFY(controller.m_tqsl.busy()); controller.cancel();
+          QVERIFY(!controller.autoUpload("lotw")); QVERIFY(controller.busy()); QCOMPARE(controller.m_batch.size(),1); QVERIFY(QFile::exists(adif));
+          QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(),5000); QVERIFY(!QFile::exists(adif)); QVERIFY(!controller.autoUpload("lotw")); QVERIFY(!notices.filter("LoTW").isEmpty());
+          QCOMPARE(db.qsosToUpload("lotw",0).size(),1); }
+        QslController restarted(ctx); QVERIFY(!restarted.autoUpload("lotw")); QCOMPARE(db.qsoCount(),qint64(1));
+    }
+
     void serverErrorDoesNotScheduleAnotherAutomaticRecheck()
     {
         QSettings settings;

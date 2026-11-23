@@ -202,7 +202,12 @@ QslUploadResult resultFromTqslExit(int exitCode, const QString& output, int qsoC
         r.message = QCoreApplication::translate("Qsl", "TQSL processed only part of the batch; individual QSO status is unknown. Verify in LoTW before retrying (%1)").arg(r.message);
         break;
     case 1:
-        r.message = QCoreApplication::translate("Qsl", "TQSL: cancelled");
+        r.requiresReconciliation = true;
+        r.message = QCoreApplication::translate("Qsl", "TQSL cancelled after launch; check LoTW before retrying");
+        break;
+    case 3:
+        r.requiresReconciliation = true;
+        r.message = QCoreApplication::translate("Qsl", "TQSL received an unexpected LoTW response; check LoTW before retrying (%1)").arg(r.message);
         break;
     case 2:
         r.rejected = qsoCount;
@@ -215,11 +220,12 @@ QslUploadResult resultFromTqslExit(int exitCode, const QString& output, int qsoC
         r.message = QCoreApplication::translate("Qsl", "TQSL: command syntax error (%1)").arg(r.message);
         break;
     case 11:
-        r.retryLater = true;
-        r.message = QCoreApplication::translate("Qsl", "TQSL: cannot reach LoTW (%1)").arg(r.message);
+        r.requiresReconciliation = true;
+        r.message = QCoreApplication::translate("Qsl", "TQSL network failure; check LoTW before retrying (%1)").arg(r.message);
         break;
     default:
-        r.message = QCoreApplication::translate("Qsl", "TQSL: error %1 %2").arg(exitCode).arg(r.message);
+        r.requiresReconciliation = true;
+        r.message = QCoreApplication::translate("Qsl", "TQSL: error %1 %2; check LoTW before retrying").arg(exitCode).arg(r.message);
         break;
     }
     return r;
@@ -625,9 +631,10 @@ QslUploadResult parseClubLogResponse(int status, const QByteArray& body, int qso
 
 // ── TQSL ──────────────────────────────────────────────────────────────────────
 
-TqslUploader::TqslUploader(QObject* parent)
+TqslUploader::TqslUploader(QObject* parent, std::function<bool()> certificateCheck)
     : QObject(parent)
     , m_program(qsl::findTqsl())
+    , m_certificateCheck(certificateCheck ? std::move(certificateCheck) : qsl::tqslHasCertificate)
 {
 }
 
@@ -641,7 +648,7 @@ void TqslUploader::upload(const QString& adifPath, const QString& location, int 
         emit finished(error);
         return;
     }
-    if (!qsl::tqslHasCertificate()) {
+    if (!m_certificateCheck()) {
         error.message = tr("TQSL has no certificate: import your LoTW certificate in TQSL first");
         emit finished(error);
         return;
@@ -666,17 +673,21 @@ void TqslUploader::upload(const QString& adifPath, const QString& location, int 
         m_busy = false;
         if (status == QProcess::CrashExit) {
             QslUploadResult crashed;
-            crashed.message = tr("TQSL stopped unexpectedly");
+            crashed.requiresReconciliation = true;
+            crashed.message = tr("TQSL stopped after launch; check LoTW before retrying");
             emit finished(crashed);
             return;
         }
         emit finished(qsl::resultFromTqslExit(code, output, qsoCount));
     });
-    connect(m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
-        if (!m_busy)
+    connect(m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
+        // Crashed processes also emit finished; handle their uncertain outcome once there.
+        if (!m_busy || error != QProcess::FailedToStart)
             return;
         QslUploadResult failed;
         failed.message = tr("Cannot run TQSL: %1").arg(m_process ? m_process->errorString() : QString());
+        if (m_process) m_process->deleteLater();
+        m_process = nullptr;
         m_busy = false;
         emit finished(failed);
     });

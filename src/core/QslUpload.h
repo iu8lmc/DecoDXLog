@@ -130,7 +130,7 @@ class TqslUploader : public QObject {
     Q_OBJECT
 
 public:
-    explicit TqslUploader(QObject* parent = nullptr);
+    explicit TqslUploader(QObject* parent = nullptr, std::function<bool()> certificateCheck = {});
 
     void setProgram(const QString& path) { m_program = path; }
     QString program() const { return m_program; }
@@ -146,6 +146,7 @@ signals:
 
 private:
     QString m_program;
+    std::function<bool()> m_certificateCheck;
     bool    m_busy{false};
     QProcess* m_process{nullptr};
 };

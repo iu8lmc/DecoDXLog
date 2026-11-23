@@ -69,6 +69,7 @@ QString tempAdifPath()
 QslController::QslController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
+    , m_tqsl(nullptr, m_ctx.tqslCertificateCheck)
 {
     m_downloadNet = new QNetworkAccessManager(this);
     if (m_ctx.credentials) {
@@ -1493,6 +1494,16 @@ void QslController::finishBatch(const QslUploadResult& result)
 
 void QslController::cancel()
 {
+    if (m_busyService == QLatin1String("lotw") && m_tqsl.busy()) {
+        // Keep the batch and temporary file until TQSL exits: it may already
+        // have submitted data, and finishBatch must report the uncertain result.
+        m_automaticUploads.clear(); m_autoDelay.stop(); m_autoServices.clear();
+        if (m_auto.value(QStringLiteral("lotw"))) setAutoUpload(QStringLiteral("lotw"), false);
+        note(tr("LoTW upload cancelled after launch; check the original batch in LoTW before retrying"), QStringLiteral("warning"));
+        m_tqsl.cancel();
+        emit changed();
+        return;
+    }
     // Do not clear a checkpoint: a submitted network request may have reached
     // Club Log even if the user cancels the local operation.
     m_clubLogRestJournalThisRun = false;

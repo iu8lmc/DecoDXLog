@@ -6215,6 +6215,22 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
         <source>eQSL sent no card picture for this QSO (found: %1)</source>
         <translation>eQSL non ha mandato l&apos;immagine della cartolina per questo QSO (trovato: %1)</translation>
     </message>
+    <message>
+        <source>TQSL cancelled after launch; check LoTW before retrying</source>
+        <translation>TQSL annullato dopo l’avvio; controlla LoTW prima di riprovare</translation>
+    </message>
+    <message>
+        <source>TQSL received an unexpected LoTW response; check LoTW before retrying (%1)</source>
+        <translation>TQSL ha ricevuto una risposta LoTW inattesa; controlla LoTW prima di riprovare (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL network failure; check LoTW before retrying (%1)</source>
+        <translation>Errore di rete TQSL; controlla LoTW prima di riprovare (%1)</translation>
+    </message>
+    <message>
+        <source>TQSL: error %1 %2; check LoTW before retrying</source>
+        <translation>TQSL: errore %1 %2; controlla LoTW prima di riprovare</translation>
+    </message>
 </context>
 <context>
     <name>QslCardController</name>
@@ -13457,6 +13473,10 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
         <source>Club Log: no pending contacts belong to the active station</source>
         <translation>Club Log: nessun contatto in sospeso appartiene alla stazione attiva</translation>
     </message>
+    <message>
+        <source>LoTW upload cancelled after launch; check the original batch in LoTW before retrying</source>
+        <translation>Invio LoTW annullato dopo l’avvio; controlla il lotto originale su LoTW prima di riprovare</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::QsoTableModel</name>
@@ -14801,6 +14821,10 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
     <message>
         <source>Cannot run TQSL: %1</source>
         <translation>Non riesco ad avviare TQSL: %1</translation>
+    </message>
+    <message>
+        <source>TQSL stopped after launch; check LoTW before retrying</source>
+        <translation>TQSL si è arrestato dopo l’avvio; controlla LoTW prima di riprovare</translation>
     </message>
 </context>
 <context>

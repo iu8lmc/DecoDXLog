@@ -490,6 +490,23 @@ private slots:
         QVERIFY(queue.isEmpty());
     }
 
+    void tqslCrashAndCancellationNeedReconciliation()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"); const QString ready=dir.filePath("ready");
+        QFile f(script); QVERIFY(f.open(QIODevice::WriteOnly)); f.write("#!/bin/sh\nkill -SEGV $$\n"); f.close(); QVERIFY(f.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        TqslUploader uploader(nullptr, [] { return true; }); uploader.setProgram(script); QSignalSpy done(&uploader,&TqslUploader::finished);
+        uploader.upload(dir.filePath("input.adi"),{},2); QTRY_VERIFY_WITH_TIMEOUT(done.size()>=1,5000); QTest::qWait(200);
+        QCOMPARE(done.size(),1); const auto crashed=done.takeFirst().first().value<QslUploadResult>(); QVERIFY(!crashed.ok); QVERIFY(crashed.requiresReconciliation); QVERIFY(!crashed.retryLater);
+        QVERIFY(f.open(QIODevice::WriteOnly|QIODevice::Truncate)); f.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\nexec sleep 30\n"); f.close();
+        uploader.upload(dir.filePath("input.adi"),{},2); QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ready),5000); uploader.cancel(); QTRY_VERIFY_WITH_TIMEOUT(done.size()>=1,5000); QTest::qWait(200);
+        QCOMPARE(done.size(),1); const auto cancelled=done.takeFirst().first().value<QslUploadResult>(); QVERIFY(!cancelled.ok); QVERIFY(cancelled.requiresReconciliation); QVERIFY(!cancelled.retryLater);
+        QVERIFY(f.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner)); uploader.upload(dir.filePath("input.adi"),{},2);
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); const auto notStarted=done.takeFirst().first().value<QslUploadResult>(); QVERIFY(!notStarted.ok); QVERIFY(!notStarted.requiresReconciliation);
+    }
+
     void tqslExitCodes()
     {
         auto r = qsl::resultFromTqslExit(0, "Sending to LoTW", 12);
@@ -521,7 +538,12 @@ private slots:
         QVERIFY(!r.retryLater);
         r = qsl::resultFromTqslExit(11, "connection failed", 3);
         QVERIFY(!r.ok);
-        QVERIFY(r.retryLater);
+        QVERIFY(!r.retryLater);
+        QVERIFY(r.requiresReconciliation);
+        for (int code : {1, 3, 12, 99}) {
+            r = qsl::resultFromTqslExit(code, "uncertain", 3);
+            QVERIFY(!r.ok); QVERIFY(r.requiresReconciliation); QVERIFY(!r.retryLater);
+        }
 
         r = qsl::resultFromTqslExit(5, "no station location", 3);
         QVERIFY(!r.ok);
