@@ -79,6 +79,19 @@ private slots:
         QVERIFY2(output.contains("PROBE lcr candidates 1 ") && output.contains("PROBE lcr opened true") && !output.contains("TypeError"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(1));
     }
+    void contestReportFindsCorrectedCallInActualApp()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log));
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","DL1GOOD"},{"QSO_DATE","20241123"},{"TIME_ON","120145"},
+            {"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","K1ABC"}},"fixture",{},true).id>0); }
+        const QString path=dir.filePath("report.rpt"); QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Incorrect Call ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1BAD 14 correct DL1GOOD\n"); file.close();
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("cqwwopenprobe:")+path,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE lcr candidates 1 ") && output.contains("PROBE lcr basis corrected call DL1GOOD") &&
+                 output.contains("PROBE lcr opened true") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(1));
+    }
     void contestReportHistoryExportsOriginalBytes()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

@@ -962,6 +962,7 @@ bool ActivationController::startContestReportCandidates(const QVariantMap& row)
     entry.time=row.value(QStringLiteral("time")).toString(); entry.frequencyKhz=row.value(QStringLiteral("frequency")).toString();
     entry.mode=row.value(QStringLiteral("mode")).toString(); entry.lineNumber=row.value(QStringLiteral("line")).toInt();
     entry.receivedExchange=row.value(QStringLiteral("receivedExchange")).toString();
+    entry.kind=row.value(QStringLiteral("kind")).toString(); entry.correction=row.value(QStringLiteral("correction")).toString();
     m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
     m_contestReportPool.start([self,path,identity,generation,entry] {
         QVariantMap result{{QStringLiteral("line"),entry.lineNumber},{QStringLiteral("call"),entry.call},
@@ -976,7 +977,7 @@ bool ActivationController::startContestReportCandidates(const QVariantMap& row)
                     {QStringLiteral("utc"),item.utc},{QStringLiteral("stationCall"),item.stationCall},
                     {QStringLiteral("stationSource"),item.stationSource},{QStringLiteral("revision"),item.revision},
                     {QStringLiteral("frequency"),item.frequencyKhz},{QStringLiteral("receivedExchange"),item.receivedExchange},
-                    {QStringLiteral("contestId"),item.contestId}};
+                    {QStringLiteral("contestId"),item.contestId},{QStringLiteral("call"),item.call},{QStringLiteral("matchBasis"),item.matchBasis}};
             result.insert(QStringLiteral("error"),found.error); result.insert(QStringLiteral("candidates"),candidates);
             result.insert(QStringLiteral("truncated"),found.truncated);
         }

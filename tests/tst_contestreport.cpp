@@ -28,6 +28,24 @@ private slots:
         auto unknown=parsed.entries.first(); unknown.mode="unsupported"; QVERIFY(!contestreport::findCandidates(db,unknown).error.isEmpty());
         QCOMPARE(db.qsoCount(),qint64(5));
     }
+    void findsAlreadyCorrectedCallsWithoutConfusingExchangeCorrections()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto insert=[&](const QString &call) {
+            return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20241123"},{"TIME_ON","120145"},
+                {"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id;
+        };
+        const auto original=insert("DL1BAD"), corrected=insert("DL1GOOD"); QVERIFY(original>0); QVERIFY(corrected>0);
+        contestreport::Entry row; row.kind="incorrect_call"; row.call="DL1BAD"; row.correction="DL1GOOD";
+        row.date="2024-11-23"; row.time="1201"; row.frequencyKhz="14020"; row.mode="CW";
+        auto found=contestreport::findCandidates(db,row); QVERIFY(found.error.isEmpty()); QCOMPARE(found.candidates.size(),2);
+        QCOMPARE(found.candidates[0].id,original); QCOMPARE(found.candidates[0].matchBasis,QString("reported"));
+        QCOMPARE(found.candidates[1].id,corrected); QCOMPARE(found.candidates[1].call,QString("DL1GOOD"));
+        QCOMPARE(found.candidates[1].matchBasis,QString("corrected"));
+        row.kind="incorrect_exchange"; found=contestreport::findCandidates(db,row); QCOMPARE(found.candidates.size(),1);
+        row.kind="incorrect_call"; row.correction="DL1BAD"; found=contestreport::findCandidates(db,row); QCOMPARE(found.candidates.size(),1);
+        QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void candidateExposesRecordedComparisonFieldsWithoutGuessing()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

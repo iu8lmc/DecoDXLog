@@ -43,6 +43,8 @@ struct Candidate {
     QString frequencyKhz;
     QString receivedExchange;
     QString contestId;
+    QString call;
+    QString matchBasis; // reported or corrected call from an incorrect-call finding
 };
 struct CandidateResult {
     QString error;
@@ -50,7 +52,7 @@ struct CandidateResult {
     bool truncated{false};
 };
 
-// Read-only possible matches by recorded call, band, mode family and UTC minute.
+// Read-only possible matches by reported or explicitly corrected call, band, mode family and UTC minute.
 // Results are suggestions, never an assertion of identity or an edit.
 CandidateResult findCandidates(const LogDatabase& db, const Entry& entry);
 

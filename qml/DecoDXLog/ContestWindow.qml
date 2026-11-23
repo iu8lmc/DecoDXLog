@@ -48,6 +48,7 @@ RoundedWindow {
             reportCandidates.result=result
             reportCandidates.errorText=result.error || ""
             if (root.reportProbeFind) console.warn("PROBE lcr candidates " + (result.candidates || []).length + " " + reportCandidates.errorText)
+            if (root.reportProbeFind && (result.candidates || []).length) console.warn("PROBE lcr basis " + result.candidates[0].matchBasis + " call " + result.candidates[0].call)
             if (root.reportProbeOpen && (result.candidates || []).length) {
                 const id=result.candidates[0].id
                 reportCandidates.openCandidate(result.candidates[0])
@@ -988,7 +989,7 @@ RoundedWindow {
         ColumnLayout {
             anchors.fill:parent; spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
-                text:qsTr("Suggestions share the logged callsign, band, mode family and UTC minute. Check the station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
+                text:qsTr("Suggestions share the reported or suggested corrected call, band, mode family and UTC minute. Check the station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.errorColor; visible:reportCandidates.errorText.length>0; text:reportCandidates.errorText }
             Text { Layout.fillWidth:true; color:Theme.textSecondary
                 text:decolog.activation.contestReportBusy ? qsTr("Searching…") : qsTr("Line %1 · %2 · %3 shown%4").arg(reportCandidates.result.line || "—").arg(reportCandidates.result.call || "").arg((reportCandidates.result.candidates || []).length).arg(reportCandidates.result.truncated ? qsTr(" · more matches exist") : "") }
@@ -1001,7 +1002,7 @@ RoundedWindow {
                             .arg(modelData.id).arg(modelData.utc).arg(modelData.stationCall || qsTr("unknown")).arg(modelData.stationSource)
                             .arg(modelData.frequency || qsTr("unknown")).arg(reportCandidates.result.reportFrequency || qsTr("unknown"))
                             .arg(modelData.receivedExchange || qsTr("unknown")).arg(reportCandidates.result.reportExchange || qsTr("unknown"))
-                            .arg(modelData.contestId || qsTr("unknown")) }
+                            .arg(modelData.contestId || qsTr("unknown")) + "\n" + qsTr("Call: %1 (%2)").arg(modelData.call || qsTr("unknown")).arg(modelData.matchBasis === "corrected" ? qsTr("report correction") : qsTr("as reported")) }
                     GlassButton { text:qsTr("Open QSO"); onClicked:reportCandidates.openCandidate(modelData) }
                 }
             }

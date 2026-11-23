@@ -29,6 +29,12 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
         result.error=QStringLiteral("Cannot search this report row: invalid time, frequency, callsign or unsupported mode.");
         return result;
     }
+    const QString reportedCall=entry.call.trimmed().toUpper();
+    QString correctedCall=reportedCall;
+    const QString correction=entry.correction.trimmed().toUpper();
+    static const QRegularExpression safeCall(QStringLiteral("^[A-Z0-9/]{1,32}$"));
+    if (entry.kind == QLatin1String("incorrect_call") && safeCall.match(correction).hasMatch())
+        correctedCall=correction;
     const QDateTime start(day,minute,QTimeZone::UTC);
     QSqlQuery q(db.connection());
     q.prepare(QStringLiteral("SELECT q.id,q.uuid,q.qso_datetime_on,"
@@ -37,18 +43,19 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
         "WHEN NULLIF(p.station_callsign,'') IS NOT NULL THEN 'profile' ELSE 'unknown' END, "
         "q.revision,q.freq,"
         "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(NULLIF(json_extract(q.adif_extra,'$.SRX_STRING'),''),json_extract(q.adif_extra,'$.SRX'),'') ELSE '' END,"
-        "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(json_extract(q.adif_extra,'$.CONTEST_ID'),'') ELSE '' END "
+        "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(json_extract(q.adif_extra,'$.CONTEST_ID'),'') ELSE '' END, q.call "
         "FROM qso q LEFT JOIN station_profile p ON p.id=q.station_profile_id "
-        "WHERE q.deleted=0 AND q.call=? AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
-        + modeClause + QStringLiteral(" ORDER BY q.qso_datetime_on,q.id LIMIT 6"));
-    q.addBindValue(entry.call.trimmed().toUpper()); q.addBindValue(band);
-    q.addBindValue(start.toString(Qt::ISODate)); q.addBindValue(start.addSecs(60).toString(Qt::ISODate));
+        "WHERE q.deleted=0 AND q.call IN (?,?) AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
+        + modeClause + QStringLiteral(" ORDER BY CASE WHEN q.call=? THEN 0 ELSE 1 END,q.qso_datetime_on,q.id LIMIT 6"));
+    q.addBindValue(reportedCall); q.addBindValue(correctedCall); q.addBindValue(band);
+    q.addBindValue(start.toString(Qt::ISODate)); q.addBindValue(start.addSecs(60).toString(Qt::ISODate)); q.addBindValue(reportedCall);
     if (!q.exec()) { result.error=q.lastError().text(); return result; }
     while (q.next()) {
         if (result.candidates.size()==5) { result.truncated=true; break; }
         const QString frequency=q.value(6).isNull() ? QString() : QString::number(q.value(6).toDouble()*1000.0,'g',12);
         result.candidates.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toString(),
-                                  q.value(4).toString(),q.value(5).toInt(),frequency,q.value(7).toString(),q.value(8).toString()});
+                                  q.value(4).toString(),q.value(5).toInt(),frequency,q.value(7).toString(),q.value(8).toString(),
+                                  q.value(9).toString(),q.value(9).toString()==reportedCall ? QStringLiteral("reported") : QStringLiteral("corrected")});
     }
     return result;
 }

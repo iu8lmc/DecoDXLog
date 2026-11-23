@@ -42,6 +42,23 @@ private slots:
         QVERIFY(act.startContestReportCandidates(row)); QVERIFY(db.open(dir.filePath("other.sqlite"))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
         QVERIFY(!done.last().at(0).toMap().value("error").toString().isEmpty()); QCOMPARE(db.qsoCount(),qint64(0));
     }
+    void contestReportCorrectedCandidateIsMarkedAndGuarded()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        const auto inserted=db.insertQso(AdifRecord{{"CALL","DL1GOOD"},{"QSO_DATE","20241123"},{"TIME_ON","120145"},
+          {"BAND","20m"},{"MODE","CW"}},"fixture",{},true); QVERIFY(inserted.id>0);
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy done(&act,&ActivationController::contestReportCandidatesFinished);
+        QVariantMap row{{"kind","incorrect_call"},{"call","DL1BAD"},{"correction","DL1GOOD"},
+          {"date","2024-11-23"},{"time","1201"},{"frequency","14020"},{"mode","CW"},{"line",4}};
+        QVERIFY(act.startContestReportCandidates(row)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        const auto result=done.first().at(0).toMap(); QVERIFY(result.value("error").toString().isEmpty());
+        const auto matches=result.value("candidates").toList(); QCOMPARE(matches.size(),1);
+        const auto candidate=matches.first().toMap(); QCOMPARE(candidate.value("matchBasis").toString(),QString("corrected"));
+        QCOMPARE(candidate.value("call").toString(),QString("DL1GOOD"));
+        QVERIFY(act.isContestReportCandidateCurrent(candidate.value("id").toLongLong(),candidate.value("uuid").toString(),candidate.value("revision").toInt()));
+        QCOMPARE(db.qsoCount(),qint64(1));
+    }
     void archiveDoesNotRecreateRemovedDatabase()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("active.sqlite"), moved=dir.filePath("moved.sqlite");
