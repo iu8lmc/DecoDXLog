@@ -37,7 +37,7 @@ NetController::NetController(Context context, QObject* parent)
             emit durableSerialStatusChanged();
             return;
         }
-        if (!m_durableBusy) requestDurableSerial(m_durableRetryMinimum);
+        if (!m_durableBusy) requestDurableSerialImpl(m_durableRetryMinimum,m_durableRetryRequestId);
     });
     QSettings s;
     m_enabled = s.value(QStringLiteral("net/enabled"), false).toBool();
@@ -93,14 +93,22 @@ QString NetController::configureDurableSerialAuthority(const QString& scope, con
     m_durableAuthority = a;
     m_durableStatus = s.isEmpty() ? tr("Experimental serials disabled.") : tr("Configured; no request checked yet.");
     emit durableSerialStatusChanged();
+    if (m_net.running() && !s.isEmpty()) QTimer::singleShot(0,this,&NetController::resumeDurableSerialRequest);
     return {};
 }
 
 QString NetController::requestDurableSerial(int minimum)
 {
+    return requestDurableSerialImpl(minimum,{});
+}
+
+QString NetController::requestDurableSerialImpl(int minimum, const QString& expectedRequestId)
+{
     if (minimum < 1) return tr("Enter a positive minimum serial.");
     if (!m_net.running() || m_durableScope.isEmpty() || m_durableAuthority.isEmpty())
         return tr("Enable the network and configure the contest scope and authority first.");
+    if (m_durableAuthority==m_id)
+        return tr("This experimental requester needs a different authority station.");
     if (m_durableBusy) return tr("Serial operation in progress; retry shortly.");
     if (!m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen())
         return tr("Open the original file-backed log before requesting a serial.");
@@ -112,24 +120,33 @@ QString NetController::requestDurableSerial(int minimum)
     const QString requestId=QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_durableBusy=true;
     QPointer<NetController> self(this);
-    m_durablePool.start([self,path,identity,fileIdentity,dbGeneration,configGeneration,scope,authority,requester,requestId,minimum] {
+    m_durablePool.start([self,path,identity,fileIdentity,dbGeneration,configGeneration,scope,authority,requester,requestId,minimum,expectedRequestId] {
         ContestSerialRequest request;
         LogDatabase db;
         if (db.openExistingReadWrite(path) && db.openFileIdentity()==fileIdentity && db.fileIdentityMatchesOpen() && db.identity()==identity) {
             request=db.activeContestSerialRequest(scope,requester);
-            if (!request.ok && request.error==QLatin1String("No active serial request"))
+            if (!request.ok && request.error==QLatin1String("No active serial request") && expectedRequestId.isEmpty())
                 request=db.beginContestSerialRequest(scope,requester,requestId,authority,minimum);
+            else if (!request.ok && request.error==QLatin1String("No active serial request") && !expectedRequestId.isEmpty())
+                request.error=QStringLiteral("The pending request is no longer active");
+            else if (request.ok && !expectedRequestId.isEmpty() && request.requestId!=expectedRequestId) {
+                request.ok=false; request.error=QStringLiteral("A different serial request is active");
+            }
             else if (request.ok && (request.authority!=authority || request.minimum!=minimum)) {
                 request.ok=false; request.error=QStringLiteral("An active request has different authority or minimum");
             }
         } else request.error=QStringLiteral("Cannot open the original log");
         if (!self) return;
-        QMetaObject::invokeMethod(self,[self,request,identity,fileIdentity,dbGeneration,configGeneration] {
+        QMetaObject::invokeMethod(self,[self,request,identity,fileIdentity,dbGeneration,configGeneration,expectedRequestId] {
             if (!self || self->m_durableGeneration!=configGeneration) return;
             self->m_durableBusy=false;
             if (!self->m_ctx.db || self->m_ctx.db->openGeneration()!=dbGeneration || self->m_ctx.db->identity()!=identity ||
                 self->m_ctx.db->openFileIdentity()!=fileIdentity || !self->m_ctx.db->fileIdentityMatchesOpen()) return;
-            if (!request.ok) self->m_durableStatus=tr("Request failed: %1").arg(request.error);
+            if (!request.ok) {
+                if (!expectedRequestId.isEmpty() && (request.error==QLatin1String("The pending request is no longer active") || request.error==QLatin1String("A different serial request is active")))
+                    self->m_durableRetry.stop();
+                self->m_durableStatus=tr("Request failed: %1").arg(request.error);
+            }
             else if (request.state==QLatin1String("granted")) {
                 if (self->m_durableRetryRequestId==request.requestId) self->m_durableRetry.stop();
                 self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
@@ -152,6 +169,43 @@ QString NetController::requestDurableSerial(int minimum)
         },Qt::QueuedConnection);
     });
     return {};
+}
+
+void NetController::resumeDurableSerialRequest()
+{
+    if (m_durableBusy || !m_net.running() || m_durableScope.isEmpty() || m_durableAuthority.isEmpty() ||
+        m_durableAuthority==m_id || !m_ctx.db || !m_ctx.db->isOpen() ||
+        m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) return;
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity();
+    const QByteArray fileIdentity=m_ctx.db->openFileIdentity();
+    const quint64 dbGeneration=m_ctx.db->openGeneration(), configGeneration=m_durableGeneration;
+    const QString scope=m_durableScope, authority=m_durableAuthority, requester=m_id;
+    m_durableBusy=true;
+    QPointer<NetController> self(this);
+    m_durablePool.start([self,path,identity,fileIdentity,dbGeneration,configGeneration,scope,authority,requester] {
+        ContestSerialRequest request; LogDatabase db;
+        if (db.openExistingReadWrite(path) && db.openFileIdentity()==fileIdentity && db.fileIdentityMatchesOpen() && db.identity()==identity)
+            request=db.activeContestSerialRequest(scope,requester);
+        else request.error=QStringLiteral("Cannot open the original log");
+        if (!self) return;
+        QMetaObject::invokeMethod(self,[self,request,identity,fileIdentity,dbGeneration,configGeneration,authority] {
+            if (!self || self->m_durableGeneration!=configGeneration) return;
+            self->m_durableBusy=false;
+            if (!self->m_net.running() || !self->m_ctx.db || self->m_ctx.db->openGeneration()!=dbGeneration ||
+                self->m_ctx.db->identity()!=identity || self->m_ctx.db->openFileIdentity()!=fileIdentity ||
+                !self->m_ctx.db->fileIdentityMatchesOpen()) return;
+            if (!request.ok) {
+                self->m_durableStatus=request.error==QLatin1String("No active serial request") ? tr("No saved serial request for this scope.") : tr("Cannot recover serial request: %1").arg(request.error);
+            } else if (request.authority!=authority) {
+                self->m_durableStatus=tr("The saved serial request names a different authority; review the configuration.");
+            } else if (request.state==QLatin1String("pending")) {
+                self->requestDurableSerialImpl(request.minimum,request.requestId); return;
+            } else {
+                self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
+            }
+            emit self->durableSerialStatusChanged();
+        },Qt::QueuedConnection);
+    });
 }
 
 QVariantMap NetController::durableSerialGrantForQso() const
@@ -304,6 +358,7 @@ void NetController::restart()
         m_status = tr("on the network %1 (UDP %2) as %3").arg(m_group).arg(m_port).arg(m_name);
         m_hello.start();
         hello();
+        if (!m_durableScope.isEmpty()) QTimer::singleShot(0,this,&NetController::resumeDurableSerialRequest);
         // Chi arriva a gara iniziata si fa mandare quello che manca.
         QTimer::singleShot(1500, this, &NetController::requestSync);
         if (m_ctx.activity)

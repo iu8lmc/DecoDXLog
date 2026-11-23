@@ -177,7 +177,7 @@ GlassPanel {
             }
             Text {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                text: qsTr("This station ID: %1. Select one authority for the contest. Configuration is cleared on restart. Leave both fields empty to disable.").arg(root.net.nodeId)
+                text: qsTr("This station ID: %1. Select one authority for the contest. Configuration is cleared on restart; after reconfiguration a saved request resumes when the network is on. Leave both fields empty to disable.").arg(root.net.nodeId)
             }
             LabeledField {
                 label: qsTr("Contest scope")
