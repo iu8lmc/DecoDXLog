@@ -669,6 +669,23 @@ private slots:
         QVERIFY(cards.mailStatus().contains(QStringLiteral("log changed"), Qt::CaseInsensitive));
     }
 
+    void emailLookupStopsWhenLogIdentityChangesAtSamePath()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("mail-origin-identity.sqlite")));
+        const auto qso=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        core::QslState state; state.service="card"; state.sent="Q"; state.via="E"; QVERIFY(db.setCardState(qso.id,state));
+        FakeCloud cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost));
+        std::function<void(const QString&, const QString&)> callback;
+        QslCardController::Context ctx; ctx.db=&db; ctx.cloudAccess=[&] { return QPair<QString,QString>{cloud.url(),"fake"}; };
+        ctx.emailFor=[&](const QString&,auto done) { callback=std::move(done); };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.sendCardsByEmail({QVariant(qso.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(bool(callback),15000);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE log_identity SET uuid='other-log-identity' WHERE id=1"));
+        callback(QStringLiteral("test@example.invalid"),{});
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),5000);
+        QVERIFY(cloud.request.isEmpty()); QVERIFY(cards.mailStatus().contains("log changed",Qt::CaseInsensitive));
+    }
+
     void confirmedEmailIsRecordedOnlyInOriginalLog()
     {
         core::LogDatabase db;
@@ -731,6 +748,26 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(), 15000);
         QCOMPARE(db.qslStatus(b.id).first().sent, QStringLiteral("Q"));
         QVERIFY(notes.join(' ').contains(QStringLiteral("could not be recorded")));
+    }
+
+    void confirmedEmailDoesNotMarkChangedLogIdentity()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("mail-confirm-identity.sqlite")));
+        const auto qso=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        core::QslState state; state.service="card"; state.sent="Q"; state.via="E"; QVERIFY(db.setCardState(qso.id,state));
+        QTcpServer cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost)); QStringList notes;
+        QslCardController::Context ctx; ctx.db=&db;
+        ctx.cloudAccess=[&] { return QPair<QString,QString>{QStringLiteral("http://127.0.0.1:%1").arg(cloud.serverPort()),"fake"}; };
+        ctx.emailFor=[](const QString&,auto done) { done(QStringLiteral("test@example.invalid"),{}); };
+        ctx.activity=[&](const QString&,const QString& message,const QString&) { notes << message; };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.sendCardsByEmail({QVariant(qso.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(cloud.hasPendingConnections(),15000); QTcpSocket* socket=cloud.nextPendingConnection(); QVERIFY(socket);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable()>0,5000);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE log_identity SET uuid='other-log-identity' WHERE id=1"));
+        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}"); socket->flush();
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),15000);
+        QCOMPARE(db.qslStatus(qso.id).first().sent,QString("Q"));
+        QVERIFY(notes.join(' ').contains("could not be recorded")); QVERIFY(notes.join(' ').contains("identity",Qt::CaseInsensitive));
     }
 
     void whatWasPutByHandAndIsNotUsualStays()

@@ -204,7 +204,7 @@ QslCardController::QslCardController(Context context, QObject* parent)
         if (!m_mailTargets.contains(tag)) return;
         const MailTarget target = m_mailTargets.take(tag);
         if (target.generation == m_mailGeneration) ++m_mailSent;
-        recordConfirmedMail(target.path, target.id, target.uuid, to);
+        recordConfirmedMail(target.path, target.identity, target.openGeneration, target.id, target.uuid, to);
         emit mailChanged();
     });
     connect(&m_mail, &core::MailSender::failed, this,
@@ -1022,10 +1022,12 @@ void QslCardController::setMailRoute(const QString& route)
 
 bool QslCardController::mailOriginIsCurrent() const
 {
-    return m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path() == m_mailOriginPath;
+    return m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path() == m_mailOriginPath &&
+           m_ctx.db->openGeneration()==m_mailOriginOpenGeneration && !m_mailOriginIdentity.isEmpty() &&
+           m_ctx.db->identity()==m_mailOriginIdentity;
 }
 
-void QslCardController::recordConfirmedMail(const QString& path, qint64 id,
+void QslCardController::recordConfirmedMail(const QString& path, const QString& identity, quint64 openGeneration, qint64 id,
                                             const QString& uuid, const QString& email)
 {
     ++m_mailPendingRecords;
@@ -1042,30 +1044,30 @@ void QslCardController::recordConfirmedMail(const QString& path, qint64 id,
         }
         emit mailChanged();
     };
-    if (uuid.isEmpty()) {
+    if (uuid.isEmpty() || identity.isEmpty()) {
         CardBatchResult result; result.failed = 1;
-        result.error = tr("The original QSO identity is missing.");
+        result.error = tr("The original log or QSO identity is missing.");
         complete(result);
         return;
     }
     if (path.isEmpty() || path == QLatin1String(":memory:")) {
         CardBatchResult result;
-        if (mailOriginIsCurrent())
-            result = changeCardBatch(*m_ctx.db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid);
+        if (m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==path && m_ctx.db->openGeneration()==openGeneration && m_ctx.db->identity()==identity)
+            result = changeCardBatch(*m_ctx.db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid, false, -1, identity);
         else { result.failed = 1; result.error = tr("The original log is unavailable."); }
         complete(result);
         return;
     }
     QPointer<QslCardController> self(this);
-    m_cardPool.start([self, path, id, uuid, complete] {
+    m_cardPool.start([self, path, identity, id, uuid, complete] {
         CardBatchResult result;
         LogDatabase db;
         if (!QFileInfo::exists(path)) {
             result.failed = 1; result.error = QObject::tr("The original log is unavailable.");
-        } else if (!db.open(path)) {
+        } else if (!db.openExistingReadWrite(path)) {
             result.failed = 1; result.error = db.lastError();
         } else {
-            result = changeCardBatch(db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid);
+            result = changeCardBatch(db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid, false, -1, identity);
         }
         if (self) QMetaObject::invokeMethod(self.data(), [self, complete, result] {
             if (self) complete(result);
@@ -1114,9 +1116,11 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
     ++m_mailWaiting;
     const quint64 generation = m_mailGeneration;
     const QString originPath = m_mailOriginPath;
+    const QString originIdentity = m_mailOriginIdentity;
+    const quint64 originOpenGeneration = m_mailOriginOpenGeneration;
     const QString uuid = qso.value(QStringLiteral("uuid")).toString();
     QNetworkReply* reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, id, email, generation, originPath, uuid] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, id, email, generation, originPath, originIdentity, originOpenGeneration, uuid] {
         reply->deleteLater();
         // Fermato a meta': i conti sono gia' azzerati, non si tocca piu' niente.
         if (reply->error() == QNetworkReply::OperationCanceledError)
@@ -1127,7 +1131,7 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
             // user pressed Stop. Preserve the real sent state without touching
             // counters of any newer batch.
             if (code == 200) {
-                recordConfirmedMail(originPath, id, uuid, email);
+                recordConfirmedMail(originPath, originIdentity, originOpenGeneration, id, uuid, email);
             }
             return;
         }
@@ -1135,7 +1139,7 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
         const QJsonObject answer = QJsonDocument::fromJson(reply->readAll()).object();
         if (code == 200) {
             ++m_mailSent;
-            recordConfirmedMail(originPath, id, uuid, email);
+            recordConfirmedMail(originPath, originIdentity, originOpenGeneration, id, uuid, email);
         } else {
             ++m_mailFailed;
             const QString detail = answer.value(QStringLiteral("detail")).toString();
@@ -1163,7 +1167,7 @@ void QslCardController::queueCard(const QVariantMap& qso, const QString& email)
     const QString call = qso.value(QStringLiteral("call")).toString().toUpper();
     core::MailMessage message;
     message.tag = ++m_mailNextTag;
-    m_mailTargets.insert(message.tag, MailTarget{m_mailOriginPath,
+    m_mailTargets.insert(message.tag, MailTarget{m_mailOriginPath,m_mailOriginIdentity,m_mailOriginOpenGeneration,
         qso.value(QStringLiteral("id")).toLongLong(),
         qso.value(QStringLiteral("uuid")).toString(), m_mailGeneration});
     message.to = email;
@@ -1214,6 +1218,11 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
     }
     const QString path = m_ctx.db->path();
     m_mailOriginPath = path;
+    m_mailOriginIdentity = m_ctx.db->identity();
+    m_mailOriginOpenGeneration = m_ctx.db->openGeneration();
+    if (m_mailOriginIdentity.isEmpty()) {
+        m_mailStatus=tr("Cannot verify log identity"); note(m_mailStatus,QStringLiteral("warning")); emit mailChanged(); return;
+    }
     if (path.isEmpty() || path == QLatin1String(":memory:")) {
         beginMail(chosenQsos(ids), generation);
         return;
@@ -1223,16 +1232,18 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
     emit mailChanged();
     QPointer<QslCardController> self(this);
     const QList<qint64> selected = toIds(ids);
-    m_readPool.start([self, path, selected, generation] {
+    const QString identity=m_mailOriginIdentity;
+    m_readPool.start([self, path, identity, selected, generation] {
         LogDatabase db;
-        const bool ok = db.open(path);
+        const bool opened = db.openReadOnly(path);
+        const bool ok = opened && db.identity()==identity;
         const QList<QVariantMap> rows = ok ? chosenCardRows(db, selected) : QList<QVariantMap>();
-        const QString error = ok ? QString() : db.lastError();
+        const QString error = ok ? QString() : (opened ? QObject::tr("Log identity changed during email preparation") : db.lastError());
         if (!self) return;
         QMetaObject::invokeMethod(self.data(), [self, path, generation, ok, error, rows] {
             if (!self || self->m_mailGeneration != generation) return;
             self->m_mailPreparing = false;
-            if (!ok || !self->m_ctx.db || self->m_ctx.db->path() != path) {
+            if (!ok || !self->mailOriginIsCurrent()) {
                 self->m_mailStatus = ok ? self->tr("The log changed before email preparation completed.") : error;
                 self->note(self->m_mailStatus, QStringLiteral("warning"));
                 emit self->mailChanged();
