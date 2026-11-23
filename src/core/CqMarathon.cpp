@@ -107,7 +107,10 @@ Result select(const QList<Entry>& entries, const Rules& rules)
     QHash<int, int> entityCount;
     QSet<int> zones;
     for (const Entry& entry : sorted) {
-        if (!entry.timestamp.isValid() || entry.timestamp.toUTC().date().year() != rules.year) {
+        if (!entry.timestamp.isValid() || entry.timestamp.timeSpec()==Qt::LocalTime) {
+            result.exclusions << QStringLiteral("QSO %1: valid UTC timestamp required").arg(entry.qsoId); continue;
+        }
+        if (entry.timestamp.toUTC().date().year() != rules.year) {
             result.exclusions << QStringLiteral("QSO %1: outside edition year").arg(entry.qsoId);
             continue;
         }
@@ -122,6 +125,20 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         if (!categoryMatches(entry, rules.category)) {
             result.exclusions << QStringLiteral("QSO %1: category mismatch").arg(entry.qsoId);
             continue;
+        }
+        if (rules.year==2026) {
+            static const QSet<QString> bands{QStringLiteral("160M"),QStringLiteral("80M"),QStringLiteral("60M"),QStringLiteral("40M"),
+                QStringLiteral("30M"),QStringLiteral("20M"),QStringLiteral("17M"),QStringLiteral("15M"),QStringLiteral("12M"),QStringLiteral("10M"),QStringLiteral("6M")};
+            if (!bands.contains(entry.band.trimmed().toUpper())) {
+                result.exclusions << QStringLiteral("QSO %1: outside supported 2026 bands").arg(entry.qsoId); continue;
+            }
+            const QString call=entry.call.trimmed().toUpper();
+            if (call.endsWith(QLatin1String("/AM"))) {
+                result.exclusions << QStringLiteral("QSO %1: aeronautical mobile designation").arg(entry.qsoId); continue;
+            }
+            if (call.endsWith(QLatin1String("/MM"))) {
+                result.exclusions << QStringLiteral("QSO %1: maritime mobile designation; location requires review").arg(entry.qsoId); continue;
+            }
         }
         const bool newZone = entry.cqZone >= 1 && entry.cqZone <= 40 && !zones.contains(entry.cqZone);
         if (newZone) {
@@ -162,7 +179,8 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.cqZone = query.value(3).toInt();
         entry.band = query.value(4).toString();
         entry.mode = query.value(5).toString();
-        entry.timestamp = QDateTime::fromString(query.value(6).toString(), Qt::ISODate).toUTC();
+        const auto timestamp=QDateTime::fromString(query.value(6).toString(),Qt::ISODateWithMs);
+        if (timestamp.isValid() && timestamp.timeSpec()!=Qt::LocalTime) entry.timestamp=timestamp.toUTC();
         entry.stationProfileId = query.value(7).toLongLong();
         entries << entry;
     }

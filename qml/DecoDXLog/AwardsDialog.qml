@@ -41,6 +41,9 @@ DialogFrame {
     property string marathonCategory: "mixed"
     property int marathonMaxPerEntity: 1
     property var marathonPreview: ({})
+    onMarathonYearChanged: marathonPreview=({})
+    onMarathonCategoryChanged: marathonPreview=({})
+    onMarathonMaxPerEntityChanged: marathonPreview=({})
     property string marathonAdifMessage: ""
     property int marathonAdifYear: 0
     property double marathonAdifProfile: 0
@@ -498,6 +501,10 @@ DialogFrame {
         marathonPreview = decolog.cqMarathonPreview(marathonYear, marathonCategory,
                                                      marathonMaxPerEntity, decolog.awardProfile)
     }
+    function probeMarathonReview(profile) {
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
+        Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")) })
+    }
     function beginMarathonAdif(file,year,profile) {
         marathonAdifMessage=decolog.exportCqMarathonReviewAdif(file,year,profile)
         if (marathonAdifProbe && marathonAdifMessage.length) console.warn("PROBE marathonAdif start="+marathonAdifMessage)
@@ -513,7 +520,7 @@ DialogFrame {
     function refreshVucc() {
         vuccResult = decolog.vuccPreview(vuccBand, vuccAccount, vuccSite, vuccTarget, vuccScope)
     }
-    Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close() } }
+    Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close(); root.marathonPreview=({}); marathonReview.close() } }
     function probeVuccReview(satellite) {
         openAt("dxcc"); vuccBand=satellite ? "2m" : "6m"; vuccScopePicker.currentIndex=satellite ? 1 : 0; refreshVucc(); vuccReview.open()
         Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")) })
@@ -556,6 +563,24 @@ DialogFrame {
                                                    root.marathonPreview.category, root.marathonPreview.maxPerEntity,
                                                    root.marathonPreview.stationProfileId)
     }
+    DialogFrame { id:marathonReview; title:qsTr("CQ DX Marathon candidate review"); dialogKey:"marathonReview"; width:740; height:650; dotColor:Theme.secondaryColor
+        body:ColumnLayout { anchors.margins:12; spacing:6
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Preliminary recorded data, not an official score or award credit. Review entity, zone, callsign, station location, frequency and propagation in the official tool. The review ADIF includes alternatives.") }
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
+            ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.selected || []; ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:marathonEntityRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
+                    text:qsTr("QSO %1 · %2 · DXCC %3 · CQ zone %4 · %5 %6 · %7").arg(modelData.qsoId).arg(modelData.call).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Independent zone candidates") }
+            ListView { id:marathonZoneRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.zoneCandidates || []; ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:marathonZoneRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
+                    text:qsTr("QSO %1 · %2 · CQ zone %3 · DXCC %4 · %5 %6 · %7").arg(modelData.qsoId).arg(modelData.call).arg(modelData.cqZone).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Exclusions") }
+            ListView { id:marathonExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.exclusions || []; ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:marathonExcludedRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary; text:modelData } }
+            GlassButton { text:qsTr("Close"); onClicked:marathonReview.close() }
+        }
+    }
     FileDialog { id:marathonAdifDialog; title:qsTr("Export CQ DX Marathon review ADIF"); fileMode:FileDialog.SaveFile
         defaultSuffix:"adi"; nameFilters:[qsTr("ADIF files (*.adi *.adif)")]
         onAccepted: { if (root.marathonAdifYear!==root.marathonYear || root.marathonAdifProfile!==decolog.awardProfile) root.marathonAdifMessage=qsTr("Year or profile changed; select the file again."); else root.beginMarathonAdif(selectedFile,root.marathonAdifYear,root.marathonAdifProfile) }
@@ -572,7 +597,7 @@ DialogFrame {
 
     Connections {
         target: decolog
-        function onAwardsChanged() { root.revision++ }
+        function onAwardsChanged() { root.revision++; root.marathonPreview=({}); marathonReview.close() }
     }
 
     body: RowLayout {
@@ -935,6 +960,7 @@ DialogFrame {
                         }
                         GlassButton { text:qsTr("Export review ADIF"); enabled:decolog.awardProfile>0 && !decolog.exportBusy
                             onClicked: { root.marathonAdifYear=root.marathonYear; root.marathonAdifProfile=decolog.awardProfile; marathonAdifDialog.open() } }
+                        GlassButton { text:qsTr("Review candidates"); enabled:root.marathonPreview.valid === true && root.marathonPreview.stationProfileId === decolog.awardProfile && root.marathonPreview.edition === root.marathonYear && root.marathonPreview.category === root.marathonCategory && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity; onClicked:marathonReview.open() }
                     }
                     Text {
                         Layout.fillWidth: true
@@ -950,6 +976,7 @@ DialogFrame {
                         Layout.fillWidth: true
                         text: root.marathonPreview.valid === undefined
                               ? qsTr("Configure edition, category and entity limit, then preview.")
+                              : root.marathonPreview.valid === false ? qsTr("Cannot preview: %1").arg(root.marathonPreview.error || qsTr("invalid request"))
                               : qsTr("Entity candidates: %1 · zone candidates: %2 · excluded: %3")
                                 .arg(root.marathonPreview.selected.length || 0)
                                 .arg(root.marathonPreview.zoneCandidateCount || 0)

@@ -3,6 +3,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QSqlQuery>
+#include <QFile>
 #include <QTest>
 
 using namespace decolog::core::cqmarathon;
@@ -10,6 +11,19 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void edition2026FiltersBandAndMobileDesignators()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","CW",when}, {2,"K1BBB",291,4,"2m","CW",when},
+            {3,"K1CCC/AM",291,3,"20m","CW",when}, {4,"K1DDD/MM",291,2,"20m","CW",when},
+            {5,"K1AM",291,1,"6m","CW",when}, {6,"K1EEE",291,6,"60m","CW",when}};
+        const auto r=select(entries,{2026,"mixed",1}); QCOMPARE(r.zoneCandidates.size(),3);
+        QCOMPARE(r.zoneCandidates[0].qsoId,qint64(1)); QCOMPARE(r.zoneCandidates[1].qsoId,qint64(5)); QCOMPARE(r.zoneCandidates[2].qsoId,qint64(6));
+        QVERIFY(r.exclusions.join('\n').contains("2026 bands")); QVERIFY(r.exclusions.join('\n').contains("aeronautical")); QVERIFY(r.exclusions.join('\n').contains("maritime"));
+        QVERIFY(!r.toJson().object().value("officialRulesVerified").toBool());
+        Entry historic=entries[1]; historic.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
+        QCOMPARE(select({historic},{2025,"mixed",1}).selected.size(),1); // do not apply unverified edition rules
+    }
     void reviewAdifIncludesAllAlternativesAndPreservesFields()
     {
         using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile p; p.name="A"; p.stationCallsign="K1ABC";
@@ -22,6 +36,8 @@ private slots:
         QSqlQuery shift(db.connection()); QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2027-01-01T00:30:00+01:00',qso_datetime_off='2027-01-01T00:35:00+01:00' WHERE call='K1AAA'"));
         QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2026-01-01T12:00:00' WHERE call='K1BAD'"));
         const auto report=reviewAdif(db,2026,profile); QVERIFY2(report.error.isEmpty(),qPrintable(report.error)); QCOMPARE(report.count,3); QCOMPARE(report.invalidTimestamp,1);
+        const QString sample=qEnvironmentVariable("DECOLOG_MARATHON_SAMPLE");
+        if (!sample.isEmpty()) { QFile file(sample); QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate)); QCOMPARE(file.write(report.bytes),qint64(report.bytes.size())); }
         const auto parsed=adif::parse(report.bytes); QCOMPARE(parsed.records.size(),3);
         QSet<QString> calls; for (const auto &r:parsed.records) { calls.insert(r.value("CALL")); QCOMPARE(r.value("APP_TEST"),QString("kept")); }
         QCOMPARE(parsed.records[0].value("QSO_DATE"),QString("20261231")); QCOMPARE(parsed.records[0].value("TIME_ON"),QString("233000")); QCOMPARE(parsed.records[0].value("TIME_OFF"),QString("233500"));
@@ -97,6 +113,8 @@ private slots:
         b.timestamp = a.timestamp.toUTC();
         QVERIFY(select({a}, rules).selected.isEmpty());
         QVERIFY(select({b}, rules).selected.isEmpty());
+        a.timestamp=QDateTime::fromString(QStringLiteral("2026-01-01T12:00:00"),Qt::ISODate);
+        const auto unknown=select({a},rules); QVERIFY(unknown.selected.isEmpty()); QVERIFY(unknown.exclusions.join('\n').contains("UTC timestamp"));
     }
 
     void selectsDeterministicallyByEditionCategoryAndEntity()

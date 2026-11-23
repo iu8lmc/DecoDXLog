@@ -3121,20 +3121,22 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                            {QStringLiteral("exclusions"), QStringList()}};
 
     const core::cqmarathon::Result result = core::cqmarathon::select(entries, rules);
-    QVariantList selected;
-    for (const auto& entry : result.selected) {
-        selected << QVariantMap{{QStringLiteral("qsoId"), entry.qsoId},
+    const auto rows=[](const QList<core::cqmarathon::Entry>& entries) {
+        QVariantList list;
+        for (const auto& entry : entries) list << QVariantMap{{QStringLiteral("qsoId"), entry.qsoId},
                                 {QStringLiteral("call"), entry.call},
                                 {QStringLiteral("dxcc"), entry.dxcc},
                                 {QStringLiteral("cqZone"), entry.cqZone},
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("mode"), entry.mode},
                                 {QStringLiteral("timestamp"), entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
-    }
+        return list;
+    };
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},
                        {QStringLiteral("error"), validationError},
-                       {QStringLiteral("selected"), selected},
+                       {QStringLiteral("selected"), rows(result.selected)},
+                       {QStringLiteral("zoneCandidates"), rows(result.zoneCandidates)},
                        {QStringLiteral("zoneCandidateCount"), result.zoneCandidates.size()},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))},
