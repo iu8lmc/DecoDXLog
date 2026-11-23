@@ -11,6 +11,23 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void unknownEntityDoesNotSuppressZoneCandidate()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> records{{1,"K1AAA",999,5,"20m","CW",when},
+                                   {2,"K1BBB",291,3,"20m","CW",when}};
+        const auto result=select(records,{2026,"mixed",1});
+        QCOMPARE(result.selected.size(),1); QCOMPARE(result.selected.first().qsoId,qint64(2));
+        QCOMPARE(result.zoneCandidates.size(),2);
+        QVERIFY(result.exclusions.join('\n').contains("entity code 999 not in published list"));
+        QVERIFY(result.toJson().object().value("entityListVersion").toString().contains("2023"));
+        Entry deleted=records.first(); deleted.dxcc=2;
+        QVERIFY(select({deleted},{2026,"mixed",1}).selected.isEmpty());
+        Entry special=records.first(); special.dxcc=906;
+        QCOMPARE(select({special},{2026,"mixed",1}).selected.first().entityCode,906);
+        Entry historic=records.first(); historic.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
+        QCOMPARE(select({historic},{2025,"mixed",1}).selected.size(),1);
+    }
     void specialEntitiesRequireMatchingRecordedRegionAndDxcc()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

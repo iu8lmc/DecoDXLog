@@ -566,7 +566,7 @@ DialogFrame {
     DialogFrame { id:marathonReview; title:qsTr("CQ DX Marathon candidate review"); dialogKey:"marathonReview"; width:740; height:650; dotColor:Theme.secondaryColor
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Preliminary recorded data, not an official score or award credit. Review entity, zone, callsign, station location, frequency and propagation in the official tool. The review ADIF includes alternatives.") }
+                text:qsTr("Preliminary recorded data, not an official score or award credit. For 2026 the entity check uses DX Marathon list v1.1, described as of 2023. Review entity, zone, callsign, station location, frequency and propagation in the official tool. The review ADIF includes alternatives.") }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
             ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.selected || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:marathonEntityRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary

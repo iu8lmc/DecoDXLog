@@ -1,4 +1,5 @@
 #include "core/CqMarathon.h"
+#include "core/CqMarathonEntityCodes.h"
 #include "core/Modes.h"
 
 #include <QJsonArray>
@@ -168,6 +169,11 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             }
             if (entry.dxcc >= 901 && entry.dxcc <= 906)
                 candidate.entityBasis = QStringLiteral("recorded Marathon special code; verify source");
+            if (!std::binary_search(detail::publishedEntityCodes.begin(), detail::publishedEntityCodes.end(), candidate.entityCode)) {
+                result.exclusions << QStringLiteral("QSO %1: entity code %2 not in published list v1.1; zone considered independently")
+                                         .arg(entry.qsoId).arg(candidate.entityCode);
+                continue;
+            }
         }
         if (entityCount.value(candidate.entityCode) >= rules.maxPerEntity) {
             if (!newZone)
@@ -235,6 +241,7 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("stationProfileId"), static_cast<double>(rules.stationProfileId)},
                                      {QStringLiteral("selected"), qsos},
                                      {QStringLiteral("zoneCandidates"), zones},
+                                     {QStringLiteral("entityListVersion"), rules.year == 2026 ? QStringLiteral("DX Marathon v1.1; list as of 2023") : QString()},
                                      {QStringLiteral("officialRulesVerified"), false},
                                      {QStringLiteral("exclusions"), exclusions}});
 }
