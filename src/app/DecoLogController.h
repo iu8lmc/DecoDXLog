@@ -523,6 +523,8 @@ public:
     QVariantMap qslPlan() const { return m_qslPlan; }
     bool qslPlanBusy() const { return m_qslPlanBusy; }
     Q_INVOKABLE void buildQslPlan(const QStringList& goals);
+    Q_INVOKABLE QString saveQslRouteCost(const QString& manager, const QString& channel, const QVariantMap& cost);
+    Q_INVOKABLE QString clearQslRouteCost(const QString& manager, const QString& channel);
     // Gli elementi di un award per la tabella. `view`: "all", "unconfirmed" o
     // "missing" (quelli mai lavorati, per gli award con un elenco chiuso).
     Q_INVOKABLE QVariantList awardItems(const QString& awardId, const QString& search, const QString& view) const;

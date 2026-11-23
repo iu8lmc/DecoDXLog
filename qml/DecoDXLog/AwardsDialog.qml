@@ -113,10 +113,19 @@ DialogFrame {
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
             console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
             const grouped = paperRoutes.itemAtIndex(0)
-            console.warn("PROBE qslplan group " + (grouped ? grouped.text : "missing"))
-            paperQueueButton.clicked()
-            decolog.cards.markReceived(2, true)
-            plannerProbeConfirm.start()
+            console.warn("PROBE qslplan group " + (grouped ? grouped.probeText : "missing"))
+            costEditor.edit(plan.paperRoutes[0]); amountField.text = "12.50"; currencyField.text = "EUR"; saveCostButton.clicked()
+            plannerProbeCost.start()
+        }
+    }
+    Timer {
+        id: plannerProbeCost; interval: 200; repeat: true; property int tries: 0
+        onTriggered: {
+            const p=decolog.qslPlan
+            if ((decolog.qslPlanBusy || p.stale || !p.paperRoutes || !p.paperRoutes.length || !p.paperRoutes[0].cost) && ++tries < 20) return
+            stop(); console.warn("PROBE qslplan saved cost " + JSON.stringify(p.paperRoutes || []))
+            const row=paperRoutes.itemAtIndex(0); console.warn("PROBE qslplan cost row " + (row ? row.probeText : "missing"))
+            paperQueueButton.clicked(); decolog.cards.markReceived(2, true); plannerProbeConfirm.start()
         }
     }
     Timer {
@@ -205,12 +214,19 @@ DialogFrame {
                 id: paperRoutes; Layout.fillWidth: true; Layout.preferredHeight: Math.min(90, contentHeight)
                 clip: true; spacing: 3
                 model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.paperRoutes || [])
-                delegate: Text {
+                delegate: RowLayout {
                     required property var modelData
-                    width: ListView.view.width; color: Theme.textPrimary; wrapMode: Text.Wrap
-                    text: modelData.manager + " · " + (modelData.channel === "B" ? qsTr("bureau") : qsTr("direct"))
-                        + " · " + qsTr("QSO: %1 · potential benefits: %2 · cost unknown")
-                            .arg(modelData.qsoIds.join(", ")).arg(modelData.uniqueBenefits)
+                    readonly property string probeText: routeLabel.text
+                    width: ListView.view.width
+                    Text {
+                        id: routeLabel; Layout.fillWidth: true; color: Theme.textPrimary; wrapMode: Text.Wrap
+                        text: modelData.manager + " · " + (modelData.channel === "B" ? qsTr("bureau") : qsTr("direct"))
+                            + " · " + qsTr("QSO: %1 · potential benefits: %2").arg(modelData.qsoIds.join(", ")).arg(modelData.uniqueBenefits)
+                            + " · " + (!modelData.cost ? qsTr("cost unknown")
+                                : qsTr("%1 %2 · %3").arg(modelData.cost.amount).arg(modelData.cost.currency)
+                                    .arg(modelData.cost.basis === "estimate" ? qsTr("operator estimate") : qsTr("operator-supplied source: %1 (%2)").arg(modelData.cost.source).arg(modelData.cost.observedDate)))
+                    }
+                    GlassButton { text: qsTr("Edit cost"); onClicked: costEditor.edit(modelData) }
                 }
             }
             ListView {
@@ -245,6 +261,57 @@ DialogFrame {
                 }
             }
             GlassButton { id: paperQueueButton; text: qsTr("Open paper QSL queue"); onClicked: root.openPaperQueue() }
+        }
+    }
+
+    DialogFrame {
+        id: costEditor
+        transientParent: qslPlanner
+        title: qsTr("Paper route cost")
+        info: qsTr("User supplied; not independently verified")
+        width: 600; height: 370
+        property var route: ({})
+        property string logPath: ""
+        function edit(selected) {
+            route = selected
+            logPath = decolog.currentLogInfo().path || ""
+            const c = selected.cost || ({})
+            amountField.text = c.amount || ""; currencyField.text = c.currency || "EUR"
+            basisField.currentIndex = c.basis === "sourced" ? 1 : 0
+            sourceField.text = c.source || ""; observedField.text = c.observedDate || ""
+            costError.text = ""; open()
+        }
+        body: ColumnLayout {
+            spacing: 8
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("%1 · %2. Amount is per route as entered; no currency conversion or source verification is performed.")
+                    .arg(costEditor.route.manager || "").arg(costEditor.route.channel === "B" ? qsTr("bureau") : qsTr("direct")) }
+            RowLayout {
+                StyledTextField { id: amountField; Layout.fillWidth: true; placeholderText: qsTr("Amount, e.g. 12.50"); Accessible.name: qsTr("Route cost amount") }
+                StyledTextField { id: currencyField; Layout.preferredWidth: 100; placeholderText: qsTr("Currency"); Accessible.name: qsTr("Route cost currency") }
+                StyledComboBox { id: basisField; Layout.preferredWidth: 180; model: [qsTr("Estimate"), qsTr("Source supplied")] }
+            }
+            StyledTextField { id: sourceField; Layout.fillWidth: true; placeholderText: qsTr("Source or note (required for source supplied)"); Accessible.name: qsTr("Cost source") }
+            StyledTextField { id: observedField; Layout.fillWidth: true; placeholderText: qsTr("Observation date YYYY-MM-DD (required for source supplied)"); Accessible.name: qsTr("Cost observation date") }
+            Text { id: costError; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                GlassButton {
+                    id: saveCostButton
+                    text: qsTr("Save cost")
+                    onClicked: {
+                        if (!costEditor.logPath || costEditor.logPath !== decolog.currentLogInfo().path) { costError.text=qsTr("The open log changed. Reopen this editor."); return }
+                        const error=decolog.saveQslRouteCost(costEditor.route.manager,costEditor.route.channel,
+                            {amount: amountField.text, currency: currencyField.text, basis: basisField.currentIndex === 0 ? "estimate" : "sourced", source: sourceField.text, observedDate: observedField.text})
+                        if (error.length) costError.text=error; else costEditor.close()
+                    }
+                }
+                GlassButton {
+                    text: qsTr("Clear cost")
+                    onClicked: { if (!costEditor.logPath || costEditor.logPath !== decolog.currentLogInfo().path) { costError.text=qsTr("The open log changed. Reopen this editor."); return }; const error=decolog.clearQslRouteCost(costEditor.route.manager,costEditor.route.channel); if (error.length) costError.text=error; else costEditor.close() }
+                }
+                GlassButton { text: qsTr("Cancel"); onClicked: costEditor.close() }
+            }
         }
     }
 

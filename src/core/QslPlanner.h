@@ -3,6 +3,17 @@
 #include "core/LogDatabase.h"
 
 namespace decolog::core::qslplanner {
+struct RouteCost {
+    QString amount;       // decimal string; not a currency conversion
+    QString currency;     // three-letter code supplied by operator
+    QString basis;        // estimate or sourced (source is user supplied)
+    QString source;
+    QString observedDate; // ISO date, optional for estimates
+};
+std::optional<RouteCost> routeCost(const LogDatabase& db, const QString& manager, const QString& channel);
+bool saveRouteCost(LogDatabase& db, const QString& manager, const QString& channel,
+                   const RouteCost& cost, QString* error = nullptr);
+bool clearRouteCost(LogDatabase& db, const QString& manager, const QString& channel, QString* error = nullptr);
 struct Benefit {
     QString award;
     QString key;
@@ -26,6 +37,7 @@ struct PaperRoute {
     QString channel;
     QList<qint64> qsoIds;
     int uniqueBenefits{0};
+    std::optional<RouteCost> cost;
 };
 struct Plan {
     QList<Candidate> candidates;

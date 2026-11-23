@@ -2280,8 +2280,13 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         QVariantList routes;
         for (const auto& route : plan.paperRoutes) {
             QVariantList ids; for (qint64 id : route.qsoIds) ids << id;
-            routes << QVariantMap{{QStringLiteral("manager"),route.manager},{QStringLiteral("channel"),route.channel},
+            QVariantMap row{{QStringLiteral("manager"),route.manager},{QStringLiteral("channel"),route.channel},
                 {QStringLiteral("qsoIds"),ids},{QStringLiteral("uniqueBenefits"),route.uniqueBenefits}};
+            if (route.cost) row.insert(QStringLiteral("cost"),QVariantMap{
+                {QStringLiteral("amount"),route.cost->amount},{QStringLiteral("currency"),route.cost->currency},
+                {QStringLiteral("basis"),route.cost->basis},{QStringLiteral("source"),route.cost->source},
+                {QStringLiteral("observedDate"),route.cost->observedDate}});
+            routes << row;
         }
         QVariantList ungrouped; for (qint64 id : plan.ungroupedPaperQsoIds) ungrouped << id;
         for (const auto& candidate : plan.candidates) {
@@ -2316,6 +2321,26 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
             emit self->qslPlanChanged();
         },Qt::QueuedConnection);
     });
+}
+
+QString DecoLogController::saveQslRouteCost(const QString& manager, const QString& channel, const QVariantMap& values)
+{
+    const qslplanner::RouteCost cost{values.value(QStringLiteral("amount")).toString().trimmed(),
+        values.value(QStringLiteral("currency")).toString().trimmed().toUpper(),
+        values.value(QStringLiteral("basis")).toString(),values.value(QStringLiteral("source")).toString().trimmed(),
+        values.value(QStringLiteral("observedDate")).toString().trimmed()};
+    QString error;
+    if (!qslplanner::saveRouteCost(m_db,manager,channel,cost,&error)) return error;
+    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
+    emit qslPlanChanged(); return {};
+}
+
+QString DecoLogController::clearQslRouteCost(const QString& manager, const QString& channel)
+{
+    QString error;
+    if (!qslplanner::clearRouteCost(m_db,manager,channel,&error)) return error;
+    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
+    emit qslPlanChanged(); return {};
 }
 
 void DecoLogController::loadClubLogCty()

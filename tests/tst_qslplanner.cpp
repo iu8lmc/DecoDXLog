@@ -1,10 +1,38 @@
 #include "core/QslPlanner.h"
 #include <QTemporaryDir>
+#include <QSqlQuery>
 #include <QTest>
 using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void routeCostIsScopedValidatedAndPersistent()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");
+        {
+            LogDatabase db; QVERIFY(db.open(path)); QString error;
+            qslplanner::RouteCost estimate{"12.50","EUR","estimate",{}, {}};
+            QVERIFY2(qslplanner::saveRouteCost(db,"M0ABC","B",estimate,&error),qPrintable(error));
+            QCOMPARE(qslplanner::routeCost(db," m0abc ","b")->amount,QString("12.50"));
+            QVERIFY(!qslplanner::routeCost(db,"M0ABC","D"));
+            qslplanner::RouteCost bad{"-1","EUR","estimate",{}, {}};
+            QVERIFY(!qslplanner::saveRouteCost(db,"M0ABC","B",bad,&error));
+            QCOMPARE(qslplanner::routeCost(db,"M0ABC","B")->amount,QString("12.50"));
+            QSqlQuery trigger(db.connection()); QVERIFY(trigger.exec("CREATE TRIGGER reject_cost BEFORE UPDATE ON app_setting BEGIN SELECT RAISE(ABORT,'rejected'); END"));
+            qslplanner::RouteCost rejected{"20","EUR","estimate",{}, {}};
+            QVERIFY(!qslplanner::saveRouteCost(db,"M0ABC","B",rejected,&error)); QVERIFY(!error.isEmpty());
+            QCOMPARE(qslplanner::routeCost(db,"M0ABC","B")->amount,QString("12.50")); QVERIFY(trigger.exec("DROP TRIGGER reject_cost"));
+            bad={"10.00","EUR","sourced",{}, {}};
+            QVERIFY(!qslplanner::saveRouteCost(db,"M0ABC","B",bad,&error));
+            qslplanner::RouteCost sourced{"10.00","USD","sourced","operator checked price list","2026-10-01"};
+            QVERIFY2(qslplanner::saveRouteCost(db,"M0ABC","D",sourced,&error),qPrintable(error));
+        }
+        LogDatabase reopened; QVERIFY(reopened.open(path));
+        const auto cost=qslplanner::routeCost(reopened,"M0ABC","D"); QVERIFY(cost.has_value());
+        QCOMPARE(cost->source,QString("operator checked price list")); QCOMPARE(cost->observedDate,QString("2026-10-01"));
+        QString error; QVERIFY(qslplanner::clearRouteCost(reopened,"M0ABC","D",&error));
+        QVERIFY(!qslplanner::routeCost(reopened,"M0ABC","D")); QVERIFY(qslplanner::routeCost(reopened,"M0ABC","B"));
+    }
     void groupsOnlyRecordedManagerAndPaperChannel()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

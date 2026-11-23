@@ -1,9 +1,71 @@
 #include "core/QslPlanner.h"
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QCryptographicHash>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QRegularExpression>
 #include <algorithm>
 
 namespace decolog::core::qslplanner {
+namespace {
+QString costKey(const QString& manager, const QString& channel)
+{
+    const QString name=manager.simplified().toUpper(), via=channel.trimmed().toUpper();
+    if (name.isEmpty() || name.size()>200 || (via!=QLatin1String("B") && via!=QLatin1String("D"))) return {};
+    const QByteArray route=QJsonDocument(QJsonArray{name,via}).toJson(QJsonDocument::Compact);
+    return QStringLiteral("qslplanner.paper-cost.")+QString::fromLatin1(QCryptographicHash::hash(route,QCryptographicHash::Sha256).toHex());
+}
+bool validCost(const RouteCost& cost)
+{
+    static const QRegularExpression amount(QStringLiteral("^(?:0|[1-9][0-9]{0,7})(?:\\.[0-9]{1,4})?$"));
+    static const QRegularExpression currency(QStringLiteral("^[A-Z]{3}$"));
+    if (!amount.match(cost.amount).hasMatch() || !currency.match(cost.currency).hasMatch() || cost.source.size()>1000 ||
+        (cost.basis!=QLatin1String("estimate") && cost.basis!=QLatin1String("sourced"))) return false;
+    if (cost.basis==QLatin1String("sourced") && (cost.source.trimmed().isEmpty() || cost.observedDate.isEmpty())) return false;
+    if (!cost.observedDate.isEmpty()) {
+        const QDate date=QDate::fromString(cost.observedDate,Qt::ISODate);
+        if (!date.isValid() || date.toString(Qt::ISODate)!=cost.observedDate || date>QDate::currentDate()) return false;
+    }
+    return true;
+}
+}
+std::optional<RouteCost> routeCost(const LogDatabase& db, const QString& manager, const QString& channel)
+{
+    const QString key=costKey(manager,channel); if (key.isEmpty() || !db.isOpen()) return std::nullopt;
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); q.addBindValue(key);
+    if (!q.exec() || !q.next()) return std::nullopt;
+    QJsonParseError error; const auto json=QJsonDocument::fromJson(q.value(0).toString().toUtf8(),&error);
+    if (error.error!=QJsonParseError::NoError || !json.isObject()) return std::nullopt;
+    const auto obj=json.object();
+    if (obj.value(QStringLiteral("manager")).toString()!=manager.simplified().toUpper() ||
+        obj.value(QStringLiteral("channel")).toString()!=channel.trimmed().toUpper()) return std::nullopt;
+    RouteCost cost{obj.value(QStringLiteral("amount")).toString(),obj.value(QStringLiteral("currency")).toString(),
+                   obj.value(QStringLiteral("basis")).toString(),obj.value(QStringLiteral("source")).toString(),
+                   obj.value(QStringLiteral("observedDate")).toString()};
+    return validCost(cost) ? std::optional<RouteCost>(cost) : std::nullopt;
+}
+bool saveRouteCost(LogDatabase& db, const QString& manager, const QString& channel, const RouteCost& cost, QString* error)
+{
+    const QString key=costKey(manager,channel);
+    if (!db.isOpen() || key.isEmpty() || !validCost(cost)) { if (error) *error=QStringLiteral("Invalid route or cost"); return false; }
+    const QJsonObject obj{{QStringLiteral("manager"),manager.simplified().toUpper()},{QStringLiteral("channel"),channel.trimmed().toUpper()},
+        {QStringLiteral("amount"),cost.amount},{QStringLiteral("currency"),cost.currency},{QStringLiteral("basis"),cost.basis},
+        {QStringLiteral("source"),cost.source},{QStringLiteral("observedDate"),cost.observedDate}};
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
+    q.addBindValue(key); q.addBindValue(QString::fromUtf8(QJsonDocument(obj).toJson(QJsonDocument::Compact)));
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
+    if (error) error->clear(); return true;
+}
+bool clearRouteCost(LogDatabase& db, const QString& manager, const QString& channel, QString* error)
+{
+    const QString key=costKey(manager,channel);
+    if (!db.isOpen() || key.isEmpty()) { if (error) *error=QStringLiteral("Invalid route"); return false; }
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("DELETE FROM app_setting WHERE key=?")); q.addBindValue(key);
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
+    if (error) error->clear(); return true;
+}
 Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>& goals,
            const AwardCalculator& calculator)
 {
@@ -88,7 +150,7 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         group.ids.append(candidate.qsoId); group.benefits.unite(paperBenefits);
     }
     for (auto it=routes.cbegin(); it!=routes.cend(); ++it)
-        result.paperRoutes.append({it.key().first,it.key().second,it->ids,int(it->benefits.size())});
+        result.paperRoutes.append({it.key().first,it.key().second,it->ids,int(it->benefits.size()),routeCost(db,it.key().first,it.key().second)});
     return result;
 }
 }

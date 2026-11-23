@@ -12,6 +12,7 @@
 #include <QTest>
 #include "core/LogDatabase.h"
 #include "core/Activation.h"
+#include "core/QslPlanner.h"
 #include "core/WsjtxProtocol.h"
 #include <QUdpSocket>
 #include <QElapsedTimer>
@@ -75,6 +76,8 @@ private slots:
         QVERIFY2(output.contains("sent/unconfirmed alternatives: 2"),output.constData());
         QVERIFY2(output.contains("route evidence older than 180 days; verify") && output.contains("route source: fixture"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan group M0ABC · bureau · QSO: 1, 2 · potential benefits: 2 · cost unknown"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan saved cost") && output.contains("\"amount\":\"12.50\"") && output.contains("\"basis\":\"estimate\""),output.constData());
+        QVERIFY2(output.contains("12.50 EUR · operator estimate"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan paperqueue queue"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan confirmation") && output.contains("\"uniqueBenefits\":1"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan stale true"),output.constData());
@@ -83,6 +86,7 @@ private slots:
         QByteArray reopened; QVERIFY2(launch(dir,"qslplanrestoreprobe",reopened,4500),reopened.constData());
         QVERIFY2(reopened.contains("PROBE qslplan restored [\"dxcc\",\"waz\"]"),reopened.constData());
         QVERIFY2(reopened.contains("PROBE qslplan restored result") && reopened.contains("\"uniqueBenefits\":0"),reopened.constData());
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost.has_value()); QCOMPARE(cost->amount,QString("12.50")); }
     }
     void recoveredRecordsUseTheirJournalPeriod()
     {
