@@ -947,6 +947,36 @@ private slots:
         QSettings settings(iniPath(dir),QSettings::IniFormat); const auto defs=decolog::core::newqso::decodeCustomFields(settings.value("ui/newQso/customFields").toString());
         QVERIFY(std::any_of(defs.cbegin(),defs.cend(),[](const QVariant& v) { const auto d=v.toMap(); return d.value("name")=="APP_TYPED_DOUBLE" && d.value("formula")=="{APP_TYPED_POWER} * 2"; }));
     }
+    void externalWriteDiscardsPendingGoalAlertInActualApp()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("test.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); const auto now=QDateTime::currentDateTimeUtc();
+          dxcampaign::Campaign c; c.title="Race watch"; c.calls={"3Y0J"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="synthetic"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; c.watched=true; c.watchGoalsOnly=true;
+          c.goals={{"20m","CW","worked"}}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment();
+        env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","6000"); env.insert("DECODXLOG_TRACE_ACTIVITY","1");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","dxgoalraceprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000));
+        QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE dxgoalrace queued") && timer.elapsed()<15000) {
+            app.waitForReadyRead(100); output += app.readAll();
+        }
+        QVERIFY2(output.contains("PROBE dxgoalrace queued"), output.constData());
+        QTest::qWait(500); // The UI remains held while the worker reads the empty goal.
+        { LogDatabase writer; QVERIFY(writer.open(path)); const auto now=QDateTime::currentDateTimeUtc();
+          const auto qso=writer.insertQso({{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
+          QCOMPARE(qso.status,InsertResult::Status::Inserted); }
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll();
+        QVERIFY2(output.contains("PROBE dxgoalrace resumed"),output.constData());
+        QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QCOMPARE(output.count("[activity] DXCAMPAIGN|highlight|"),0);
+    }
+
     void watchedCampaignCanAlertOnlyForOpenGoals()
     {
         using namespace decolog::core;
