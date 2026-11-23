@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QDateTime>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -112,6 +113,12 @@ bool Result::isValid(QString* error) const
         if (error) *error = QStringLiteral("VUCC band is required");
         return false;
     }
+    static const QSet<QString> bands{QStringLiteral("6M"),QStringLiteral("2M"),QStringLiteral("1.25M"),QStringLiteral("70CM"),
+        QStringLiteral("33CM"),QStringLiteral("23CM"),QStringLiteral("13CM"),QStringLiteral("9CM"),QStringLiteral("6CM"),QStringLiteral("3CM"),
+        QStringLiteral("1.25CM"),QStringLiteral("6MM"),QStringLiteral("4MM"),QStringLiteral("2.5MM"),QStringLiteral("2MM"),QStringLiteral("1MM"),QStringLiteral("SUBMM")};
+    if (rules.scope == QLatin1String("terrestrial") && !bands.contains(norm(rules.band))) {
+        if (error) *error=QStringLiteral("Band is not in the supported VUCC band list"); return false;
+    }
     return true;
 }
 
@@ -136,6 +143,13 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         if (entry.qsoId <= 0 || candidates.isEmpty()) {
             result.exclusions << QStringLiteral("QSO %1: invalid or inconsistent grid data").arg(entry.qsoId);
             continue;
+        }
+        const auto timestamp=QDateTime::fromString(entry.qsoUtc,Qt::ISODateWithMs);
+        if (!timestamp.isValid() || timestamp.timeSpec()==Qt::LocalTime) {
+            result.exclusions << QStringLiteral("QSO %1: valid UTC timestamp required").arg(entry.qsoId); continue;
+        }
+        if (timestamp.toUTC().date()<QDate(1983,1,1)) {
+            result.exclusions << QStringLiteral("QSO %1: before 1983-01-01 UTC").arg(entry.qsoId); continue;
         }
         const QString propagation=norm(entry.propMode), satelliteName=norm(entry.satName);
         if (!satelliteName.isEmpty() && propagation!=QLatin1String("SAT")) {
@@ -203,7 +217,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "IFNULL(p.operating_location, ''), "
             "EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
             "(SELECT group_concat(s.service, ',') FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
-            "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,'') "
+            "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,''), q.qso_datetime_on "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
             "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
@@ -219,6 +233,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.confirmed = query.value(5).toBool();
         entry.evidence = query.value(6).toString();
         entry.propMode=query.value(8).toString(); entry.satName=query.value(9).toString(); entry.rxBand=query.value(10).toString();
+        entry.qsoUtc=query.value(11).toString();
         const QByteArray extra = query.value(7).toByteArray();
         if (!extra.isEmpty()) {
             QJsonParseError parseError;
@@ -262,7 +277,7 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("evidence"), entry.evidence},
                                 {QStringLiteral("otherEvidence"), entry.otherEvidence},
                                 {QStringLiteral("propMode"),entry.propMode},{QStringLiteral("satName"),entry.satName},
-                                {QStringLiteral("rxBand"),entry.rxBand},{QStringLiteral("classification"),entry.classification}});
+                                {QStringLiteral("rxBand"),entry.rxBand},{QStringLiteral("classification"),entry.classification},{QStringLiteral("qsoUtc"),entry.qsoUtc}});
     }
     QJsonArray exclusions;
     for (const auto& value : this->exclusions) exclusions.append(value);

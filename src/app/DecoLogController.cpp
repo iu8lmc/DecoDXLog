@@ -3189,7 +3189,7 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
     for (qsizetype i=0;i<result.eligible.size();++i) {
         auto row=eligible[i].toMap(); const auto& e=result.eligible[i];
         row.insert(QStringLiteral("propMode"),e.propMode); row.insert(QStringLiteral("satName"),e.satName);
-        row.insert(QStringLiteral("rxBand"),e.rxBand); row.insert(QStringLiteral("classification"),e.classification); eligible[i]=row;
+        row.insert(QStringLiteral("rxBand"),e.rxBand); row.insert(QStringLiteral("classification"),e.classification); row.insert(QStringLiteral("qsoUtc"),e.qsoUtc); eligible[i]=row;
     }
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},

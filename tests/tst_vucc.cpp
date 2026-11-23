@@ -11,6 +11,23 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void appliesVuccDateAndSupportedBandBoundaries()
+    {
+        decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>19821231<TIME_ON:6>235959<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM10<QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>19830101<TIME_ON:6>000000<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EOR>";
+        QCOMPARE(db.importAdif(data).inserted,2); QString error; const auto entries=loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error));
+        const auto result=select(entries,Rules{{},{},"6m",100}); QCOMPARE(result.eligible.size(),1); QCOMPARE(result.eligible.first().grid,QString("EM11"));
+        QVERIFY(result.exclusions.join('\n').contains("1983")); QCOMPARE(result.eligible.first().qsoUtc,QString("1983-01-01T00:00:00Z"));
+        QVERIFY(!select(entries,Rules{{},{},"20m",100}).isValid()); QVERIFY(!select(entries,Rules{{},{},"4m",100}).isValid());
+        QVERIFY(select({},Rules{{},{},"2m",100}).isValid()); QVERIFY(select({},Rules{{},{},"1.25m",100}).isValid()); QVERIFY(select({},Rules{{},{},"submm",100}).isValid());
+        QVERIFY(select({},Rules{{},{},"",100,"satellite"}).isValid());
+        auto shifted=entries[1]; shifted.qsoUtc="1983-01-01T00:30:00+01:00"; QVERIFY(select({shifted},Rules{{},{},"6m",100}).eligible.isEmpty());
+        shifted.qsoUtc="1982-12-31T23:30:00-01:00"; QCOMPARE(select({shifted},Rules{{},{},"6m",100}).eligible.size(),1);
+        shifted.qsoUtc="1983-01-01T00:00:00"; QVERIFY(select({shifted},Rules{{},{},"6m",100}).eligible.isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='bad' WHERE call='K1BBB'"));
+        const auto malformed=select(loadEntries(db),Rules{{},{},"6m",100}); QVERIFY(malformed.eligible.isEmpty()); QVERIFY(malformed.exclusions.join('\n').contains("UTC timestamp"));
+    }
     void separatesTerrestrialAndSatelliteCandidates()
     {
         decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));
@@ -40,8 +57,8 @@ private slots:
         QCOMPARE(result.eligible[0].grid,QString("EM11")); QCOMPARE(result.eligible[0].evidence,QString("card"));
         QCOMPARE(result.eligible[1].grid,QString("EM12")); QCOMPARE(result.eligible[1].evidence,QString("lotw"));
         QCOMPARE(result.eligible[2].grid,QString("EM13")); QCOMPARE(result.eligible[2].evidence,QString("card")); QCOMPARE(result.eligible[2].otherEvidence,QString("eqsl"));
-        const Entry fake{99,"EM14","6m",{},{},true,"lotw-fake,eqsl"}; QVERIFY(select({fake},Rules{{},{},"6m",100}).eligible.isEmpty());
-        const Entry mixed{100,"EM15","6m",{},{},true,"LoTW, EQSL"}; const auto selected=select({mixed},Rules{{},{},"6m",100});
+        Entry fake{99,"EM14","6m",{},{},true,"lotw-fake,eqsl"}; fake.qsoUtc="2026-01-01T12:00:00Z"; QVERIFY(select({fake},Rules{{},{},"6m",100}).eligible.isEmpty());
+        Entry mixed{100,"EM15","6m",{},{},true,"LoTW, EQSL"}; mixed.qsoUtc="2026-01-01T12:00:00Z"; const auto selected=select({mixed},Rules{{},{},"6m",100});
         QCOMPARE(selected.eligible.size(),1); QCOMPARE(selected.eligible.first().evidence,QString("lotw")); QCOMPARE(selected.eligible.first().otherEvidence,QString("eqsl"));
         QVERIFY(!result.officialRulesVerified); QCOMPARE(db.qsoCount(),qint64(4));
     }
@@ -68,6 +85,7 @@ private slots:
     {
         auto make = [](qint64 id, const QString &primary, const QString &list) {
             Entry e{id, primary, "6m", {}, {}, true, "lotw"};
+            e.qsoUtc="2026-01-01T12:00:00Z";
             e.grids = list;
             return e;
         };
@@ -145,6 +163,7 @@ private slots:
             {4, QStringLiteral("JP52GX"), QStringLiteral("6m"), QStringLiteral("home"), QStringLiteral("JM68"), true, QStringLiteral("lotw")},
             {5, QStringLiteral("JN52GX"), QStringLiteral("6m"), QStringLiteral("home"), QStringLiteral("JM67"), false, {}},
         };
+        for (auto& entry : entries) entry.qsoUtc="2026-01-01T12:00:00Z";
         const Result result = select(entries, Rules{QStringLiteral("home"), QStringLiteral("JM67"), QStringLiteral("6m"), 100});
         QCOMPARE(result.eligible.size(), 2);
         QCOMPARE(result.eligible.at(0).grid, QStringLiteral("JN52"));

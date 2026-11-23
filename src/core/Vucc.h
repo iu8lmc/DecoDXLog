@@ -20,6 +20,7 @@ struct Entry {
     QString myGrid;
     QString otherEvidence; // recorded confirmations not accepted by this candidate filter
     QString propMode, satName, rxBand, classification;
+    QString qsoUtc;
 };
 
 struct Rules {

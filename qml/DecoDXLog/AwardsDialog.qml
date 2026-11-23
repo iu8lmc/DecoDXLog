@@ -512,7 +512,7 @@ DialogFrame {
             ListView { id:vuccCandidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.eligible || []
                 ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:vuccCandidateRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
-                    text:qsTr("%1 · QSO %2 · local confirmation: %3%4 · %5").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "").arg(modelData.classification === "terrestrial-unreported" ? qsTr("propagation unreported; verify") : modelData.classification === "satellite-name-missing" ? qsTr("satellite name missing; verify") : modelData.classification === "satellite" ? qsTr("satellite %1 · TX %2 / RX %3").arg(modelData.satName).arg(modelData.band).arg(modelData.rxBand || qsTr("unknown")) : qsTr("propagation %1").arg(modelData.propMode)) }
+                    text:qsTr("%1 · QSO %2 · local confirmation: %3%4 · %5 · %6").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "").arg(modelData.classification === "terrestrial-unreported" ? qsTr("propagation unreported; verify") : modelData.classification === "satellite-name-missing" ? qsTr("satellite name missing; verify") : modelData.classification === "satellite" ? qsTr("satellite %1 · TX %2 / RX %3").arg(modelData.satName).arg(modelData.band).arg(modelData.rxBand || qsTr("unknown")) : qsTr("propagation %1").arg(modelData.propMode)).arg(modelData.qsoUtc) }
             }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Excluded or duplicate candidates") }
             ListView { id:vuccExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.exclusions || []
@@ -965,6 +965,7 @@ DialogFrame {
                         Layout.fillWidth: true
                         text: root.vuccResult.valid === undefined
                               ? qsTr("Confirmed evidence is required; configure the band/account/site and preview.")
+                              : root.vuccResult.valid === false ? qsTr("Cannot preview: %1").arg(root.vuccResult.error || qsTr("invalid request"))
                               : qsTr("Candidate GRID4: %1 / %2 · excluded: %3 · external rules verified: %4")
                                 .arg(root.vuccResult.eligible.length || 0).arg(root.vuccTarget)
                                 .arg(root.vuccResult.exclusions.length || 0)
