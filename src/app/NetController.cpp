@@ -114,6 +114,37 @@ void NetController::serveDurableSerialRequest(const QString& from, const QJsonOb
     });
 }
 
+void NetController::acceptDurableSerialGrant(const QString& from, const QJsonObject& body)
+{
+    if (m_durableBusy || m_durableScope.isEmpty() || m_durableAuthority.isEmpty() ||
+        from != m_durableAuthority || !m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen())
+        return;
+    const QString path = m_ctx.db->path();
+    const QString identity = m_ctx.db->identity();
+    const QByteArray fileIdentity = m_ctx.db->openFileIdentity();
+    const quint64 dbGeneration = m_ctx.db->openGeneration();
+    const quint64 configGeneration = m_durableGeneration;
+    const QString scope = m_durableScope, authority = m_durableAuthority, requester = m_id;
+    m_durableBusy = true;
+    QPointer<NetController> self(this);
+    m_durablePool.start([self, path, identity, fileIdentity, dbGeneration, configGeneration, scope, authority, requester, from, body] {
+        ContestSerialRequest grant;
+        LogDatabase db;
+        if (db.openExistingReadWrite(path) && db.openFileIdentity() == fileIdentity &&
+            db.fileIdentityMatchesOpen() && db.identity() == identity)
+            grant = contestserial::acceptGrant(db, scope, requester, authority, from, body);
+        if (!self) return;
+        QMetaObject::invokeMethod(self, [self, grant, body, identity, fileIdentity, dbGeneration, configGeneration] {
+            if (!self || self->m_durableGeneration != configGeneration) return;
+            self->m_durableBusy = false;
+            if (!grant.ok || !self->m_ctx.db || self->m_ctx.db->openGeneration() != dbGeneration ||
+                self->m_ctx.db->identity() != identity || self->m_ctx.db->openFileIdentity() != fileIdentity ||
+                !self->m_ctx.db->fileIdentityMatchesOpen()) return;
+            emit self->durableSerialGrantAccepted(body);
+        }, Qt::QueuedConnection);
+    });
+}
+
 void NetController::setEnabled(bool on)
 {
     if (on == m_enabled)
@@ -455,6 +486,8 @@ void NetController::onReceived(const QString& from, const QString& type, const Q
         }
     } else if (type == QLatin1String("serial_request_v3")) {
         serveDurableSerialRequest(from, body);
+    } else if (type == QLatin1String("serial_grant_v3")) {
+        acceptDurableSerialGrant(from, body);
     } else if (type == QLatin1String("serialreq")) {
         if (m_serialSharing && isSerialServer())
             send(QStringLiteral("serialgrant"), QJsonObject{{QStringLiteral("to"), from},

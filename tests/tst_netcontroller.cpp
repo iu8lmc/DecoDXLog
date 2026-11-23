@@ -11,6 +11,28 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void requesterPersistsValidatedGrantFromUdp()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path()); QCoreApplication::setOrganizationName("DecoNetGrantTest"); QCoreApplication::setApplicationName("Grant");
+        QSettings().setValue("net/enabled",false);
+        LogDatabase db, authority; QVERIFY(db.open(dir.filePath("requester.sqlite"))); QVERIFY(authority.open(dir.filePath("authority.sqlite")));
+        auto req=db.beginContestSerialRequest("event","client-a","request-a","authority",7); QVERIFY(req.ok);
+        const auto reply=contestserial::handleRequest(authority,"event","authority","client-a",contestserial::requestFrame(req)); QVERIFY(reply.ok);
+        QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const int port=probe.localPort(); probe.close();
+        NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("client-a"); net.setGroup("FIELD"); net.setPort(port);
+        QVERIFY(net.configureDurableSerialAuthority("event","authority").isEmpty()); QSignalSpy accepted(&net,&NetController::durableSerialGrantAccepted);
+        net.setEnabled(true); QVERIFY(net.running()); QUdpSocket sender;
+        auto transmit=[&](const QString& from,int seq) { auto body=reply.body; body.insert("seq",seq); body.insert("session","authority-session");
+            const auto bytes=ContestNet::pack("FIELD",from,"serial_grant_v3",body); return sender.writeDatagram(bytes,QHostAddress::LocalHost,quint16(port))==bytes.size(); };
+        QVERIFY(transmit("impostor",1)); QTest::qWait(150); QCOMPARE(accepted.size(),0);
+        QCOMPARE(db.contestSerialRequest("event","client-a","request-a").state,QString("pending"));
+        QVERIFY(transmit("authority",2)); QTRY_COMPARE_WITH_TIMEOUT(accepted.size(),1,10000);
+        auto saved=db.contestSerialRequest("event","client-a","request-a"); QVERIFY(saved.ok); QCOMPARE(saved.state,QString("granted")); QCOMPARE(saved.serial,7);
+        net.setEnabled(false); db.close(); QVERIFY(db.open(dir.filePath("requester.sqlite")));
+        saved=db.contestSerialRequest("event","client-a","request-a"); QCOMPARE(saved.state,QString("granted")); QCOMPARE(saved.serial,7);
+    }
     void explicitAuthorityPersistsRequestsAcrossUdpRetryAndRestart()
     {
         using namespace decolog::core; using decolog::app::NetController;

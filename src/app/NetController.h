@@ -109,12 +109,14 @@ signals:
     void queuedCallsChanged();
     void gabReceived(const QString& from, const QString& text);
     void durableSerialGrantReady(const QJsonObject& grant);
+    void durableSerialGrantAccepted(const QJsonObject& grant);
 
 private:
     void restart();
     void send(const QString& type, QJsonObject body);
     void onReceived(const QString& from, const QString& type, const QJsonObject& body);
     void serveDurableSerialRequest(const QString& from, const QJsonObject& body);
+    void acceptDurableSerialGrant(const QString& from, const QJsonObject& body);
     void hello();
     void addMessage(const QString& from, const QString& text, bool mine, const QString& to = {});
     QJsonObject qsoMessage(qint64 id) const;
