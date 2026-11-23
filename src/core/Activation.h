@@ -25,6 +25,7 @@ struct Activation {
     bool      active{false};
     Kind      kind{Kind::None};
     QString   reference;        // "IT-1234", "I/LM-001", "IFF-0123", "EU-025"
+    QVariantMap programs;      // Additional operator references; never the contacted station's fields.
     QString   name;             // nome del parco o della cima, o del contest
     QString   contestId;        // CONTEST_ID ADIF, per i contest
     QString   myGrid;           // locatore del posto, se diverso da quello del profilo
@@ -46,6 +47,7 @@ struct Activation {
 
     static QString kindId(Kind kind);
     static Kind kindFromId(const QString& id);
+    static bool normalizePrograms(const QVariantMap& input, QVariantMap* normalized, QString* error = nullptr);
     // Quanti QSO servono perche' l'attivazione valga: POTA 10, SOTA 4.
     int requiredQsos() const;
     // Etichetta di default per il tipo ("pota", "sota"...).

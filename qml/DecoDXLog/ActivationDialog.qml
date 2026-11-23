@@ -29,6 +29,35 @@ DialogFrame {
         d[key] = value
         root.draft = d
     }
+    function setProgram(key, value) {
+        const programs = Object.assign({}, root.draft.programs || {})
+        if (String(value).trim().length) programs[key] = value
+        else delete programs[key]
+        root.set("programs", programs)
+    }
+    function probeMultiProgram() {
+        root.openDialog("pota")
+        root.set("reference", "IT-0001,IT-0002")
+        root.setProgram("sota", "invalid")
+        startSessionButton.clicked()
+        console.warn("PROBE multiInvalid blocked=" + (!root.act.active && errorText.text.length > 0))
+        root.setProgram("sota", "I/LM-001")
+        root.setProgram("wwff", "IFF-0123")
+        startSessionButton.clicked()
+        console.warn("PROBE multiStarted active=" + root.act.active + " sota=" + root.act.state.programs.sota)
+        const now = decolog.utcNow()
+        const one = decolog.logManualQso({call: "K1AAA", date: decolog.showDate(now.date), time: now.time,
+                                         band: "20m", mode: "CW", pota_ref: "US-1234", sota_ref: "W2/WE-003", wwff_ref: "KFF-4655"})
+        root.draft = Object.assign({}, root.act.state)
+        root.setProgram("sota", "invalid")
+        applySessionButton.clicked()
+        console.warn("PROBE multiInvalidUpdate blocked=" + (errorText.text.length > 0) + " sota=" + root.act.state.programs.sota)
+        root.setProgram("sota", "I/LM-002")
+        applySessionButton.clicked()
+        const two = decolog.logManualQso({call: "K1BBB", date: decolog.showDate(now.date), time: now.time, band: "20m", mode: "CW"})
+        console.warn("PROBE multiSaved count=" + decolog.currentLogInfo().qsos + " firstError=" + one + " secondError=" + two)
+        root.act.stop()
+    }
     readonly property var kindLabels: ({ pota: "POTA", sota: "SOTA", wwff: "WWFF", iota: "IOTA",
                                          contest: qsTr("Contest"), free: qsTr("Free session") })
     readonly property bool needsReference: ["pota", "sota", "wwff", "iota"].indexOf(draft.kind) >= 0
@@ -76,8 +105,13 @@ DialogFrame {
         font.pixelSize: 12
     }
 
-    body: ColumnLayout {
+    body: ScrollView {
+        id: activationScroll
         anchors.margins: 14
+        clip: true
+        contentWidth: availableWidth
+        ColumnLayout {
+        width: activationScroll.availableWidth
         spacing: 12
 
         // ── Quello che sta succedendo ───────────────────────────────────────
@@ -99,12 +133,10 @@ DialogFrame {
         MeterBar {
             Layout.fillWidth: true
             visible: root.act.active && root.act.requiredQsos > 0
-            label: root.act.qsoCount >= root.act.requiredQsos
-                   ? qsTr("activation valid: %1 QSO").arg(root.act.qsoCount)
-                   : qsTr("%1 QSO to go").arg(root.act.requiredQsos - root.act.qsoCount)
+            label: qsTr("Local QSO total; programme eligibility not verified")
             valueText: qsTr("%1 / %2").arg(root.act.qsoCount).arg(root.act.requiredQsos)
             fraction: root.act.requiredQsos > 0 ? Math.min(1, root.act.qsoCount / root.act.requiredQsos) : 0
-            barColor: root.act.qsoCount >= root.act.requiredQsos ? Theme.accentColor : Theme.warningColor
+            barColor: Theme.secondaryColor
         }
         Flow {
             Layout.fillWidth: true
@@ -190,6 +222,43 @@ DialogFrame {
                     onTextEdited: root.set("name", text)
                 }
             }
+        }
+        Text {
+            Layout.fillWidth: true
+            text: qsTr("Additional operator references (format checked; catalogue and eligibility not verified). Changes apply to future QSO only.")
+            color: Theme.textSecondary
+            wrapMode: Text.Wrap
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            Repeater {
+                model: [
+                    {key: "pota", label: "POTA", hint: "IT-0001,IT-0002"},
+                    {key: "sota", label: "SOTA", hint: "I/LM-001"},
+                    {key: "wwff", label: "WWFF", hint: "IFF-0123"},
+                    {key: "iota", label: "IOTA", hint: "EU-025"}
+                ]
+                LabeledField {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    label: modelData.label
+                    StyledTextField {
+                        Layout.fillWidth: true
+                        uppercase: true
+                        text: (root.draft.programs || {})[modelData.key] || ""
+                        placeholderText: modelData.hint
+                        onTextEdited: root.setProgram(modelData.key, text)
+                    }
+                }
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            text: qsTr("If an additional program is also the primary kind, its references must match the primary reference.")
+            color: Theme.textSecondary
+            wrapMode: Text.Wrap
         }
         RowLayout {
             Layout.fillWidth: true
@@ -337,6 +406,11 @@ DialogFrame {
                   : qsTr("The QSOs get the activator fields (MY_SIG, MY_SIG_INFO, MY_SOTA_REF…), the grid of the place and the tag. "
                          + "A call already worked in this session on the same band and mode counts as a duplicate, whenever it was.")
         }
+        Note {
+            visible: root.act.active && (Object.keys(root.state.programs || {}).length > 0 || String(root.state.reference || "").indexOf(",") >= 0)
+            text: qsTr("The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.")
+            color: Theme.warningColor
+        }
         Text {
             id: errorText
             Layout.fillWidth: true
@@ -369,9 +443,10 @@ DialogFrame {
             Item { Layout.fillWidth: true }
             GlassButton { text: qsTr("Close"); onClicked: root.close() }
             GlassButton {
+                id: applySessionButton
                 visible: root.act.active
                 text: qsTr("Apply changes")
-                onClicked: { root.act.update(root.draft); errorText.text = "" }
+                onClicked: errorText.text = root.act.update(root.draft)
             }
             GlassButton {
                 visible: root.act.active
@@ -380,6 +455,7 @@ DialogFrame {
                 onClicked: { root.act.stop(); root.close() }
             }
             GlassButton {
+                id: startSessionButton
                 visible: !root.act.active
                 text: qsTr("Start session")
                 tone: Theme.accentColor
@@ -397,6 +473,7 @@ DialogFrame {
                     }
                 }
             }
+        }
         }
     }
 

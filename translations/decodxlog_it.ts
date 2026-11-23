@@ -356,6 +356,22 @@
         <source>Cancel</source>
         <translation>Annulla</translation>
     </message>
+    <message>
+        <source>Additional operator references (format checked; catalogue and eligibility not verified). Changes apply to future QSO only.</source>
+        <translation>Referenze aggiuntive dell’operatore (formato controllato; catalogo e validità non verificati). Le modifiche valgono solo per i QSO successivi.</translation>
+    </message>
+    <message>
+        <source>If an additional program is also the primary kind, its references must match the primary reference.</source>
+        <translation>Se un programma aggiuntivo è anche il tipo principale, le referenze devono coincidere con quella principale.</translation>
+    </message>
+    <message>
+        <source>Local QSO total; programme eligibility not verified</source>
+        <translation>Totale QSO locale; validità per il programma non verificata</translation>
+    </message>
+    <message>
+        <source>The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.</source>
+        <translation>L’esportazione ADIF esistente non è suddivisa per programma, referenza o giorno UTC. Controlla e prepara file separati secondo le necessità.</translation>
+    </message>
 </context>
 <context>
     <name>Awards</name>
@@ -10832,6 +10848,18 @@ Campi extra conservati: %8</translation>
         <source>Exchange</source>
         <translation>Scambio</translation>
     </message>
+    <message>
+        <source>The additional %1 reference conflicts with the primary reference.</source>
+        <translation>La referenza aggiuntiva %1 è in conflitto con quella principale.</translation>
+    </message>
+    <message>
+        <source>Additional programs must be a map of references.</source>
+        <translation>I programmi aggiuntivi devono essere una mappa di referenze.</translation>
+    </message>
+    <message>
+        <source>Open a session first</source>
+        <translation>Apri prima una sessione</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::CallListController</name>
@@ -15687,6 +15715,21 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Undone at %1</source>
         <translation>Annullata il %1</translation>
+    </message>
+</context>
+<context>
+    <name>Activation</name>
+    <message>
+        <source>Unsupported or invalid additional program: %1</source>
+        <translation>Programma aggiuntivo non supportato o non valido: %1</translation>
+    </message>
+    <message>
+        <source>Too many references for %1</source>
+        <translation>Troppe referenze per %1</translation>
+    </message>
+    <message>
+        <source>Invalid or duplicate %1 reference: %2</source>
+        <translation>Referenza %1 non valida o duplicata: %2</translation>
     </message>
 </context>
 </TS>

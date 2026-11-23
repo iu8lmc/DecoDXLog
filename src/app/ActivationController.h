@@ -76,7 +76,7 @@ public:
 
     // {kind, reference, name, contestId, myGrid, tag, band, mode, serialEnabled, nextSerial}
     Q_INVOKABLE QString start(const QVariantMap& session);
-    Q_INVOKABLE void update(const QVariantMap& session);
+    Q_INVOKABLE QString update(const QVariantMap& session);
     Q_INVOKABLE void stop();
     Q_INVOKABLE void refresh();
     // Gli id dei QSO della sessione, dal primo.

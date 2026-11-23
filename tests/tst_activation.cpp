@@ -17,6 +17,94 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void simultaneousProgramReferencesStayIndependent()
+    {
+        const QVariantMap programs{{"sota", "I/LM-001"}, {"wwff", "IFF-0123"}};
+        Activation a = Activation::fromMap({{"active", true}, {"kind", "pota"},
+                                             {"reference", "IT-0001,IT-0002"}, {"programs", programs}});
+        AdifRecord r{{"CALL", "K1ABC"}, {"POTA_REF", "US-1234"}, {"SOTA_REF", "W2/WE-003"}};
+        a.applyTo(r, 0);
+        QCOMPARE(r.value("MY_POTA_REF"), QString("IT-0001,IT-0002"));
+        QCOMPARE(r.value("MY_SOTA_REF"), QString("I/LM-001"));
+        QCOMPARE(r.value("MY_WWFF_REF"), QString("IFF-0123"));
+        QCOMPARE(r.value("POTA_REF"), QString("US-1234"));
+        QCOMPARE(r.value("SOTA_REF"), QString("W2/WE-003"));
+        QCOMPARE(r.value("MY_SIG"), QString("POTA"));
+        QCOMPARE(Activation::fromMap(a.toMap()).toMap().value("programs").toMap(), programs);
+        AdifRecord already{{"CALL", "K1ABC"}, {"MY_SOTA_REF", "G/LD-003"}, {"WWFF_REF", "KFF-4655"}};
+        a.applyTo(already, 0);
+        QCOMPARE(already.value("MY_SOTA_REF"), QString("G/LD-003"));
+        QCOMPARE(already.value("WWFF_REF"), QString("KFF-4655"));
+    }
+    void additionalProgramSyntaxIsChecked()
+    {
+        QVariantMap normalized;
+        QString error;
+        QVERIFY(Activation::normalizePrograms({{"pota", " it-0001, it-0002@it-25 "}, {"sota", " i/lm-001 "},
+                                               {"wwff", " iff-0123 "}, {"iota", " eu-025 "}}, &normalized, &error));
+        QCOMPARE(normalized.value("pota").toString(), QString("IT-0001,IT-0002@IT-25"));
+        QCOMPARE(normalized.value("sota").toString(), QString("I/LM-001"));
+        QCOMPARE(normalized.value("wwff").toString(), QString("IFF-0123"));
+        QCOMPARE(normalized.value("iota").toString(), QString("EU-025"));
+        QVERIFY(!Activation::normalizePrograms({{"pota", "IT-0001,it-0001"}}, &normalized, &error));
+        QVERIFY(!Activation::normalizePrograms({{"pota", "IT-0001,"}}, &normalized, &error));
+        QVERIFY(!Activation::normalizePrograms({{"sota", "I/LM-001,I/LM-002"}}, &normalized, &error));
+        QVERIFY(!Activation::normalizePrograms({{"wwff", "IFF-123"}}, &normalized, &error));
+        QVERIFY(!Activation::normalizePrograms({{"iota", "EU-000"}}, &normalized, &error));
+        QVERIFY(!Activation::normalizePrograms({{"unknown", "X-0001"}}, &normalized, &error));
+        QVERIFY(!Activation::normalizePrograms({{"sota", 123}}, &normalized, &error));
+    }
+    void multiProgramSessionPersistsAndOnlyAffectsFutureQsos()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = dir.filePath("log.sqlite");
+        qint64 firstId = 0, secondId = 0;
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            ActivationController::Context ctx; ctx.db = &db;
+            ActivationController act(std::move(ctx)); act.load();
+            QVERIFY(!act.start({{"kind", "pota"}, {"reference", "IT-0001,IT-0002"},
+                                {"programs", QVariantMap{{"sota", "I/LM-001,I/LM-002"}}}}).isEmpty());
+            QVERIFY(!act.active());
+            QVERIFY(!act.start({{"kind", "pota"}, {"reference", "IT-0001"},
+                                {"programs", QVariantMap{{"pota", "IT-0002"}}}}).isEmpty());
+            QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001,IT-0002"},
+                               {"programs", QVariantMap{{"sota", "i/lm-001"}, {"wwff", "iff-0123"}}}}).isEmpty());
+            AdifRecord first{{"CALL", "K1ABC"}, {"QSO_DATE", "20261123"}, {"TIME_ON", "100000"}, {"BAND", "20m"}, {"MODE", "CW"}, {"SOTA_REF", "G/LD-003"}};
+            act.session().applyTo(first, 0);
+            const auto one = db.insertQso(first, "manual", {}, true, 0, false); QCOMPARE(one.status, InsertResult::Status::Inserted); firstId = one.id;
+            QVariantMap changed = act.state();
+            changed["programs"] = QVariantMap{{"sota", "I/LM-002"}, {"wwff", "IFF-0123"}};
+            QVERIFY(act.update(changed).isEmpty());
+            AdifRecord second{{"CALL", "K1DEF"}, {"QSO_DATE", "20261123"}, {"TIME_ON", "101000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            act.session().applyTo(second, 0);
+            const auto two = db.insertQso(second, "manual", {}, true, 0, false); QCOMPARE(two.status, InsertResult::Status::Inserted); secondId = two.id;
+            changed["programs"] = QVariantMap{{"sota", "invalid"}};
+            QVERIFY(!act.update(changed).isEmpty());
+            QCOMPARE(act.state().value("programs").toMap().value("sota").toString(), QString("I/LM-002"));
+            QVariantMap legacyUpdate = act.state(); legacyUpdate.remove("programs");
+            QVERIFY(act.update(legacyUpdate).isEmpty());
+            QCOMPARE(act.state().value("programs").toMap().value("sota").toString(), QString("I/LM-002"));
+            QCOMPARE(db.record(firstId)->value("MY_SOTA_REF"), QString("I/LM-001"));
+            QCOMPARE(db.record(firstId)->value("SOTA_REF"), QString("G/LD-003"));
+            QCOMPARE(db.record(secondId)->value("MY_SOTA_REF"), QString("I/LM-002"));
+        }
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            ActivationController::Context ctx; ctx.db = &db;
+            ActivationController act(std::move(ctx)); act.load(); QVERIFY(act.active());
+            QCOMPARE(act.state().value("programs").toMap().value("sota").toString(), QString("I/LM-002"));
+            QCOMPARE(db.record(firstId)->value("MY_SOTA_REF"), QString("I/LM-001"));
+            QCOMPARE(db.record(secondId)->value("MY_WWFF_REF"), QString("IFF-0123"));
+            const QByteArray exported = db.exportAdif();
+            LogDatabase imported; QVERIFY(imported.open(":memory:")); QCOMPARE(imported.importAdif(exported).inserted, 2);
+            const auto records = adif::parse(imported.exportAdif()).records; QCOMPARE(records.size(), 2);
+            QCOMPARE(records.at(0).value("MY_POTA_REF"), QString("IT-0001,IT-0002"));
+            QCOMPARE(records.at(0).value("MY_SOTA_REF"), QString("I/LM-001"));
+            QCOMPARE(records.at(0).value("MY_WWFF_REF"), QString("IFF-0123"));
+            QCOMPARE(records.at(0).value("SOTA_REF"), QString("G/LD-003"));
+        }
+    }
     void potaFieldsAndFileName()
     {
         Activation a;

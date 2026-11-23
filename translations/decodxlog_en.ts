@@ -356,6 +356,22 @@
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Additional operator references (format checked; catalogue and eligibility not verified). Changes apply to future QSO only.</source>
+        <translation>Additional operator references (format checked; catalogue and eligibility not verified). Changes apply to future QSO only.</translation>
+    </message>
+    <message>
+        <source>If an additional program is also the primary kind, its references must match the primary reference.</source>
+        <translation>If an additional program is also the primary kind, its references must match the primary reference.</translation>
+    </message>
+    <message>
+        <source>Local QSO total; programme eligibility not verified</source>
+        <translation>Local QSO total; programme eligibility not verified</translation>
+    </message>
+    <message>
+        <source>The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.</source>
+        <translation>The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.</translation>
+    </message>
 </context>
 <context>
     <name>Awards</name>
@@ -10797,6 +10813,18 @@ Extra fields are preserved: %8</source>
         <source>Exchange</source>
         <translation>Exchange</translation>
     </message>
+    <message>
+        <source>The additional %1 reference conflicts with the primary reference.</source>
+        <translation>The additional %1 reference conflicts with the primary reference.</translation>
+    </message>
+    <message>
+        <source>Additional programs must be a map of references.</source>
+        <translation>Additional programs must be a map of references.</translation>
+    </message>
+    <message>
+        <source>Open a session first</source>
+        <translation>Open a session first</translation>
+    </message>
 </context>
 <context>
     <name>decolog::app::CallListController</name>
@@ -15644,6 +15672,21 @@ Extra fields are preserved: %8</source>
     <message>
         <source>Undone at %1</source>
         <translation>Undone at %1</translation>
+    </message>
+</context>
+<context>
+    <name>Activation</name>
+    <message>
+        <source>Unsupported or invalid additional program: %1</source>
+        <translation>Unsupported or invalid additional program: %1</translation>
+    </message>
+    <message>
+        <source>Too many references for %1</source>
+        <translation>Too many references for %1</translation>
+    </message>
+    <message>
+        <source>Invalid or duplicate %1 reference: %2</source>
+        <translation>Invalid or duplicate %1 reference: %2</translation>
     </message>
 </context>
 </TS>

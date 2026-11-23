@@ -48,6 +48,18 @@ QString normalizeReferenceList(QString value, QString* error)
     return normalized.join(QLatin1Char(','));
 }
 
+QString normalizeAdditionalPrograms(core::Activation& session)
+{
+    QVariantMap normalized;
+    QString error;
+    if (!core::Activation::normalizePrograms(session.programs, &normalized, &error)) return error;
+    const QString primary = core::Activation::kindId(session.kind);
+    if (normalized.contains(primary) && normalized.value(primary).toString() != session.reference)
+        return QCoreApplication::translate("ActivationController", "The additional %1 reference conflicts with the primary reference.").arg(primary.toUpper());
+    session.programs = normalized;
+    return {};
+}
+
 } // namespace
 
 using namespace decolog::core;
@@ -117,6 +129,8 @@ QString ActivationController::elapsed() const
 
 QString ActivationController::start(const QVariantMap& map)
 {
+    if (map.contains(QStringLiteral("programs")) && map.value(QStringLiteral("programs")).metaType().id() != QMetaType::QVariantMap)
+        return tr("Additional programs must be a map of references.");
     Activation session = Activation::fromMap(map);
     session.active = true;
     if (session.kind == Activation::Kind::None)
@@ -132,6 +146,8 @@ QString ActivationController::start(const QVariantMap& map)
             return referenceError;
         session.reference = normalized;
     }
+    const QString programError = normalizeAdditionalPrograms(session);
+    if (!programError.isEmpty()) return programError;
     if (session.kind == Activation::Kind::Contest && session.contestId.isEmpty())
         return tr("A contest needs its name (CONTEST_ID)");
 
@@ -155,23 +171,36 @@ QString ActivationController::start(const QVariantMap& map)
     return {};
 }
 
-void ActivationController::update(const QVariantMap& map)
+QString ActivationController::update(const QVariantMap& map)
 {
     if (!m_session.active)
-        return;
+        return tr("Open a session first");
+    if (map.contains(QStringLiteral("programs")) && map.value(QStringLiteral("programs")).metaType().id() != QMetaType::QVariantMap)
+        return tr("Additional programs must be a map of references.");
     const QDateTime started = m_session.startedAt;
     Activation session = Activation::fromMap(map);
+    if (!map.contains(QStringLiteral("programs"))) session.programs = m_session.programs;
     session.active = true;
+    if (session.kind == Activation::Kind::None)
+        return tr("Choose what kind of session it is");
+    const bool needsReference = session.kind == Activation::Kind::Pota || session.kind == Activation::Kind::Sota
+        || session.kind == Activation::Kind::Wwff || session.kind == Activation::Kind::Iota;
+    if (needsReference && session.reference.isEmpty())
+        return tr("A %1 activation needs its reference").arg(Activation::kindId(session.kind).toUpper());
+    if (session.kind == Activation::Kind::Contest && session.contestId.isEmpty())
+        return tr("A contest needs its name (CONTEST_ID)");
     if (!session.reference.isEmpty()) {
         QString referenceError;
         const QString normalized = normalizeReferenceList(session.reference, &referenceError);
         if (!referenceError.isEmpty()) {
             if (m_ctx.activity)
                 m_ctx.activity(QStringLiteral("ACT"), referenceError, QStringLiteral("error"));
-            return;
+            return referenceError;
         }
         session.reference = normalized;
     }
+    const QString programError = normalizeAdditionalPrograms(session);
+    if (!programError.isEmpty()) return programError;
     session.startedAt = started.isValid() ? started : QDateTime::currentDateTimeUtc();
     m_session = session;
     save();
@@ -181,6 +210,7 @@ void ActivationController::update(const QVariantMap& map)
     m_score.valid = false;
     recount();
     emit changed();
+    return {};
 }
 
 void ActivationController::stop()

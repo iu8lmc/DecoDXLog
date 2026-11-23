@@ -1274,6 +1274,7 @@ RoundedWindow {
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
         else if (what[0] === "historical") historicalQsoDialog.open()
+        else if (what[0] === "multiprogramprobe") Qt.callLater(() => activationDialog.probeMultiProgram())
         else if (what[0] === "historicalprobe") { historicalQsoDialog.open(); Qt.callLater(() => historicalQsoDialog.probeHistoricalEntry()) }
         else if (what[0] === "satellitesplit") {
             newQsoDialog.open()

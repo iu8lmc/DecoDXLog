@@ -55,6 +55,32 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void multiProgramActivationKeepsOwnAndCounterpartReferencesDistinct()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("multiprogramprobe"), output), output.constData());
+        QVERIFY2(output.contains("PROBE multiInvalid blocked=true"), output.constData());
+        QVERIFY2(output.contains("PROBE multiStarted active=true sota=I/LM-001"), output.constData());
+        QVERIFY2(output.contains("PROBE multiInvalidUpdate blocked=true sota=I/LM-001"), output.constData());
+        QVERIFY2(output.contains("PROBE multiSaved count=2 firstError= secondError="), output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(), 2);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,call FROM qso WHERE deleted=0 ORDER BY id"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1AAA"));
+        const auto one = db.record(q.value(0).toLongLong()); QVERIFY(one.has_value());
+        QCOMPARE(one->value("MY_POTA_REF"), QString("IT-0001,IT-0002"));
+        QCOMPARE(one->value("MY_SOTA_REF"), QString("I/LM-001"));
+        QCOMPARE(one->value("MY_WWFF_REF"), QString("IFF-0123"));
+        QCOMPARE(one->value("POTA_REF"), QString("US-1234"));
+        QCOMPARE(one->value("SOTA_REF"), QString("W2/WE-003"));
+        QCOMPARE(one->value("WWFF_REF"), QString("KFF-4655"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1BBB"));
+        const auto two = db.record(q.value(0).toLongLong()); QVERIFY(two.has_value());
+        QCOMPARE(two->value("MY_SOTA_REF"), QString("I/LM-002"));
+        QCOMPARE(two->value("MY_WWFF_REF"), QString("IFF-0123"));
+        QCOMPARE(two->value("MY_SIG"), QString("POTA"));
+        QVERIFY(!q.next());
+    }
     void historicalEntryRequiresExplicitUtcAndIgnoresCurrentSessions()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

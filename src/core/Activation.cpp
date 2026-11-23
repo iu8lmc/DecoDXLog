@@ -3,6 +3,8 @@
 #include <QCoreApplication>
 #include <QDate>
 #include <QTimeZone>
+#include <QRegularExpression>
+#include <QSet>
 
 namespace decolog::core {
 
@@ -48,6 +50,46 @@ Activation::Kind Activation::kindFromId(const QString& id)
             return k.kind;
     }
     return Kind::None;
+}
+
+bool Activation::normalizePrograms(const QVariantMap& input, QVariantMap* normalized, QString* error)
+{
+    if (normalized) normalized->clear();
+    if (error) error->clear();
+    QVariantMap out;
+    static const QMap<QString, QRegularExpression> patterns{
+        {QStringLiteral("pota"), QRegularExpression(QStringLiteral("^[A-Z0-9]{1,4}-[0-9]{4,5}(?:@[A-Z]{2}-[A-Z0-9]{1,3})?$"))},
+        {QStringLiteral("sota"), QRegularExpression(QStringLiteral("^[A-Z0-9]{1,10}/[A-Z0-9]{1,10}-[0-9]{1,6}$"))},
+        {QStringLiteral("wwff"), QRegularExpression(QStringLiteral("^[A-Z0-9]{1,4}FF-[0-9]{4}$"))},
+        {QStringLiteral("iota"), QRegularExpression(QStringLiteral("^(AF|AN|AS|EU|NA|OC|SA)-(?!000)[0-9]{3}$"))}};
+    for (auto it = input.cbegin(); it != input.cend(); ++it) {
+        const QString key = it.key().trimmed().toLower();
+        if (!patterns.contains(key) || out.contains(key) || it.value().metaType().id() != QMetaType::QString) {
+            if (error) *error = QCoreApplication::translate("Activation", "Unsupported or invalid additional program: %1").arg(it.key());
+            return false;
+        }
+        const QString raw = it.value().toString().trimmed().toUpper();
+        if (raw.isEmpty()) continue;
+        const QStringList parts = raw.split(QLatin1Char(','));
+        if (parts.size() > (key == QLatin1String("pota") ? 100 : 1)) {
+            if (error) *error = QCoreApplication::translate("Activation", "Too many references for %1").arg(key.toUpper());
+            return false;
+        }
+        QStringList refs;
+        QSet<QString> seen;
+        for (const QString& part : parts) {
+            const QString ref = part.trimmed();
+            if (!patterns.value(key).match(ref).hasMatch() || seen.contains(ref)) {
+                if (error) *error = QCoreApplication::translate("Activation", "Invalid or duplicate %1 reference: %2").arg(key.toUpper(), ref);
+                return false;
+            }
+            seen.insert(ref);
+            refs << ref;
+        }
+        out.insert(key, refs.join(QLatin1Char(',')));
+    }
+    if (normalized) *normalized = out;
+    return true;
 }
 
 int Activation::requiredQsos() const
@@ -110,6 +152,14 @@ void Activation::applyTo(AdifRecord& record, int serial) const
         break;
     }
 
+    QVariantMap extras;
+    if (normalizePrograms(programs, &extras)) {
+        fill("MY_POTA_REF", extras.value(QStringLiteral("pota")).toString());
+        fill("MY_SOTA_REF", extras.value(QStringLiteral("sota")).toString());
+        fill("MY_WWFF_REF", extras.value(QStringLiteral("wwff")).toString());
+        fill("MY_IOTA", extras.value(QStringLiteral("iota")).toString());
+    }
+
     fill("MY_GRIDSQUARE", myGrid);
     if (serialEnabled && serial > 0) {
         fill("STX", QString::number(serial));
@@ -149,6 +199,7 @@ QVariantMap Activation::toMap() const
         {QStringLiteral("active"), active},
         {QStringLiteral("kind"), kindId(kind)},
         {QStringLiteral("reference"), reference},
+        {QStringLiteral("programs"), programs},
         {QStringLiteral("name"), name},
         {QStringLiteral("contestId"), contestId},
         {QStringLiteral("myGrid"), myGrid},
@@ -173,6 +224,7 @@ Activation Activation::fromMap(const QVariantMap& m)
     a.active = m.value(QStringLiteral("active"), false).toBool();
     a.kind = kindFromId(m.value(QStringLiteral("kind")).toString());
     a.reference = m.value(QStringLiteral("reference")).toString().trimmed().toUpper();
+    a.programs = m.value(QStringLiteral("programs")).toMap();
     a.name = m.value(QStringLiteral("name")).toString().trimmed();
     a.contestId = m.value(QStringLiteral("contestId")).toString().trimmed().toUpper();
     a.myGrid = m.value(QStringLiteral("myGrid")).toString().trimmed().toUpper();
