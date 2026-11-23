@@ -1649,7 +1649,7 @@ RoundedWindow {
         }
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
         else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
-        else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe" || what[0] === "importcancelbusyprobe") importSnapshotProbe.start()
+        else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe" || what[0] === "importcancelbusyprobe" || what[0] === "importlongprobe") importSnapshotProbe.start()
         else if (what[0] === "confirmationreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "clubreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "customreportprobe") { openStats(); activityReportProbe.start() }
@@ -2190,9 +2190,14 @@ RoundedWindow {
             window.pendingImport = file
             window.importPreview = result
             importPreviewDialog.open()
+            if (startupShow.indexOf("importlongprobe:") === 0 && result.ok) importLongProbe.start()
             if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0 || startupShow.indexOf("importcancelbusyprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready " + JSON.stringify(result)); importSnapshotAccept.start() }
         }
     }
+    Timer { id:importLongProbe; interval:500; onTriggered: {
+        importPreviewScroll.contentY = Math.max(0, importPreviewScroll.contentHeight - importPreviewScroll.height)
+        console.warn("PROBE importlong scroll=" + (importPreviewScroll.contentY > 0) + " bottom=" + (importPreviewScroll.contentY + importPreviewScroll.height >= importPreviewScroll.contentHeight - 1) + " buttons=" + (importPreviewActions.y + importPreviewActions.height <= importPreviewDialog.height) + " last=" + (window.importPreview.extraFields.indexOf("APP_VENDOR_FIELD_149") >= 0))
+    } }
     Timer { id:importSnapshotProbe; interval:1000; onTriggered: { decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false); if (startupShow.indexOf("importcancelbusyprobe:") === 0) { const wasBusy=decolog.importPreviewBusy; importPreviewWorking.reject(); console.warn("PROBE importcancel busy="+wasBusy+" cleared="+!decolog.importPreviewBusy); importSnapshotRestart.start() } } }
     Timer { id:importSnapshotRestart; interval:500; onTriggered:decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false) }
     Timer { id:importSnapshotAccept; interval:2000; onTriggered: { if (startupShow.indexOf("importcancelprobe:") === 0) importPreviewDialog.reject(); else importPreviewDialog.accept() } }
@@ -2412,8 +2417,20 @@ RoundedWindow {
         body: ColumnLayout {
             anchors.margins: 16
             spacing: 10
-            Text {
+            Flickable {
+                id: importPreviewScroll
                 Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: width
+                contentHeight: importPreviewContent.implicitHeight
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                Column {
+                    id: importPreviewContent
+                    width: importPreviewScroll.width
+                    spacing: 10
+            Text {
+                width: parent.width
                 wrapMode: Text.Wrap
                 text: window.importPreview.ok
                       ? qsTr("%1 records read from %2. The reviewed snapshot will be imported.\nEstimated result: %3 new · %4 duplicates · %5 rejected.\nQSL status: %6 · incomplete UTC: %7.\nAdditional fields found (review mapping after import): %8")
@@ -2427,21 +2444,23 @@ RoundedWindow {
                 color: Theme.textPrimary
             }
             Text {
-                Layout.fillWidth: true
+                width: parent.width
                 visible: !!window.importPreview.ok && (window.importPreview.mappedFields || []).length > 0
                 wrapMode: Text.Wrap
                 color: Theme.textSecondary
                 text: qsTr("Program-field mappings detected in the source (including records that may be rejected or duplicates):\n%1").arg((window.importPreview.mappedFields || []).join("\n"))
             }
             Text {
-                Layout.fillWidth: true
+                width: parent.width
                 visible: !!window.importPreview.ok && (window.importPreview.missingUtc || 0) > 0
                 text: qsTr("Records with incomplete UTC will be rejected during import.")
                 color: Theme.warningColor
                 wrapMode: Text.Wrap
             }
-            Item { Layout.fillHeight: true }
+                }
+            }
             RowLayout {
+                id: importPreviewActions
                 Layout.fillWidth: true
                 spacing: 8
                 Item { Layout.fillWidth: true }

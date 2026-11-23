@@ -517,6 +517,16 @@ private slots:
         LogDatabase verify; QVERIFY(verify.open(dir.filePath("test.sqlite"))); QCOMPARE(verify.qsoCount(),qint64(1));
         const auto ids=verify.latestIds({},10); QCOMPARE(ids.size(),1); const auto record=verify.record(ids.first()); QVERIFY(record); QCOMPARE(record->value("CALL"),QString("K2EXT"));
     }
+    void importPreviewLongFieldListRemainsScrollable()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const QString path=dir.filePath("many.adi");
+        QFile input(path); QVERIFY(input.open(QIODevice::WriteOnly)); QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW";
+        for (int i=0;i<150;++i) data += QString("<APP_VENDOR_FIELD_%1:1>X").arg(i,3,10,QLatin1Char('0')).toUtf8();
+        data += "<APP_EQSL_QSL_RCVD:1>Y<EOR>\n"; input.write(data); input.close();
+        QByteArray output; QVERIFY2(launch(dir,"importlongprobe:"+path,output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE importlong scroll=true bottom=true buttons=true last=true") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void importPreviewExplainsProgramFieldMappings()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
