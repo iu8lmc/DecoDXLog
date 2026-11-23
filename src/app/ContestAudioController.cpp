@@ -15,6 +15,8 @@ ContestAudioController::ContestAudioController(QObject *parent) : QObject(parent
     connect(m_devices,&QMediaDevices::audioInputsChanged,this,&ContestAudioController::devicesChanged);
     connect(m_devices,&QMediaDevices::audioOutputsChanged,this,&ContestAudioController::devicesChanged);
     m_searchPool.setMaxThreadCount(1);
+    m_playbackTimer.setInterval(250);
+    connect(&m_playbackTimer,&QTimer::timeout,this,[this] { emit changed(); });
     m_checkpoint.setInterval(5000);
     connect(&m_checkpoint,&QTimer::timeout,this,[this] { if (m_recording && !m_file.checkpoint()) finish(false,m_file.error()); });
 }
@@ -49,6 +51,10 @@ bool ContestAudioController::playing() const
 {
     return m_sink && m_sink->state()!=QtAudio::StoppedState && m_sink->state()!=QtAudio::IdleState;
 }
+qint64 ContestAudioController::playbackPositionMs() const
+{
+    return qBound<qint64>(0,m_playbackBaseMs+(m_sink ? m_sink->processedUSecs()/1000 : 0),m_playbackDurationMs);
+}
 void ContestAudioController::chooseOutput(int index)
 {
     if (playing()) return;
@@ -77,20 +83,34 @@ bool ContestAudioController::playForQso(const QUrl &wav, const QString &qsoUtc)
     if (!m_playbackFile->open(QIODevice::ReadOnly) || !m_playbackFile->seek(44+(position*location.sampleRate/1000)*2)) {
         m_message=tr("Cannot open or seek the recording."); m_playbackFile->deleteLater(); m_playbackFile=nullptr; emit changed(); return false;
     }
+    m_playbackBaseMs=position; m_playbackDurationMs=location.durationMs; m_playbackRate=location.sampleRate;
     m_sink=new QAudioSink(device,format,this);
     connect(m_sink,&QAudioSink::stateChanged,this,[this](QtAudio::State state) {
-        if (!m_sink) return;
+        if (!m_sink || m_seeking) return;
         if (state==QtAudio::StoppedState && m_sink->error()!=QtAudio::NoError) m_message=tr("Audio playback stopped unexpectedly.");
-        else if (state==QtAudio::IdleState) m_message=tr("Playback finished.");
+        else if (state==QtAudio::IdleState) { m_message=tr("Playback finished."); m_playbackTimer.stop(); }
         emit changed();
     });
     m_message=tr("Playing from up to ten seconds before the QSO timestamp; timing is approximate.");
-    m_sink->start(m_playbackFile); emit changed(); return true;
+    m_sink->start(m_playbackFile); m_playbackTimer.start(); emit changed(); return true;
+}
+bool ContestAudioController::seekPlayback(int seconds)
+{
+    if (!m_sink || !m_playbackFile || m_playbackDurationMs<=0 || seconds < -3600 || seconds > 3600) return false;
+    const qint64 target=qBound<qint64>(0,playbackPositionMs()+qint64(seconds)*1000,m_playbackDurationMs-1);
+    m_seeking=true; m_sink->stop();
+    if (!m_playbackFile->seek(44+(target*m_playbackRate/1000)*2)) {
+        m_seeking=false; m_message=tr("Cannot seek the recording."); stopPlayback(); return false;
+    }
+    m_playbackBaseMs=target; m_sink->start(m_playbackFile); m_seeking=false;
+    m_message=tr("Playback position changed; timing is approximate."); m_playbackTimer.start(); emit changed(); return true;
 }
 void ContestAudioController::stopPlayback()
 {
+    m_playbackTimer.stop();
     if (m_sink) { auto *sink=m_sink; m_sink=nullptr; sink->stop(); sink->deleteLater(); }
     if (m_playbackFile) { m_playbackFile->close(); m_playbackFile->deleteLater(); m_playbackFile=nullptr; }
+    m_playbackBaseMs=0; m_playbackDurationMs=0; m_playbackRate=0;
     emit changed();
 }
 bool ContestAudioController::findRecordings(const QUrl &folder, const QString &qsoUtc)

@@ -66,6 +66,9 @@ class TestContestAudioController : public QObject {
         decolog::app::ContestAudioController player; player.chooseOutput(outputRow);
         QVERIFY(!player.playForQso(QUrl::fromLocalFile(path),"2026-11-23T12:00:03Z"));
         QVERIFY2(player.playForQso(QUrl::fromLocalFile(path),"2026-11-23T12:00:01Z"),qPrintable(player.message()));
+        QCOMPARE(player.playbackDurationMs(),qint64(2000));
+        QVERIFY(player.seekPlayback(1)); QVERIFY(player.playbackPositionMs() >= 1000);
+        QVERIFY(player.seekPlayback(-10)); QVERIFY(player.playbackPositionMs() < 100);
         QTest::qWait(1700); player.stopPlayback(); source.stop();
         bool signal=false; for (int i=0;i+1<captured.size();i+=2) if (qAbs(qFromLittleEndian<qint16>(captured.constData()+i))>1000) { signal=true; break; }
         QVERIFY2(signal,"No audio observed from QSO playback through virtual output");

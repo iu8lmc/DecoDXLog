@@ -57,7 +57,13 @@ RoundedWindow {
         decolog.contestAudio.chooseOutput(index)
         contestAudioPlay.clicked()
         console.warn("PROBE contestPlayback playing=" + decolog.contestAudio.playing + " qso=" + contestAudioDialog.qsoCall)
-        if (decolog.contestAudio.playing) audioPlaybackProbeStop.start()
+        if (decolog.contestAudio.playing) {
+            contestAudioForward.clicked()
+            const advanced=decolog.contestAudio.playbackPositionMs>0
+            contestAudioBack.clicked()
+            console.warn("PROBE contestSeek advanced=" + advanced + " rewound=" + (decolog.contestAudio.playbackPositionMs<100))
+            audioPlaybackProbeStop.start()
+        }
     }
     Timer { id:audioPlaybackProbeStop; interval:700; onTriggered: {
         contestAudioStopPlayback.clicked()
@@ -1126,6 +1132,13 @@ RoundedWindow {
                 GlassButton { id:contestAudioPlay; text:qsTr("Play for QSO"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing && String(contestAudioDialog.playbackFile).length>0 && contestAudioDialog.qsoUtc.length>0
                     onClicked:decolog.contestAudio.playForQso(contestAudioDialog.playbackFile,contestAudioDialog.qsoUtc) }
                 GlassButton { id:contestAudioStopPlayback; text:qsTr("Stop playback"); enabled:decolog.contestAudio.playing; onClicked:decolog.contestAudio.stopPlayback() }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { id:contestAudioBack; text:qsTr("−10 s"); enabled:decolog.contestAudio.playbackDurationMs>0 && !decolog.contestAudio.recording; onClicked:decolog.contestAudio.seekPlayback(-10) }
+                GlassButton { id:contestAudioForward; text:qsTr("+10 s"); enabled:decolog.contestAudio.playbackDurationMs>0 && !decolog.contestAudio.recording; onClicked:decolog.contestAudio.seekPlayback(10) }
+                Text { Layout.fillWidth:true; color:Theme.textSecondary
+                    text:qsTr("Approx. %1 s / %2 s").arg((decolog.contestAudio.playbackPositionMs/1000).toFixed(1)).arg((decolog.contestAudio.playbackDurationMs/1000).toFixed(1)) }
             }
         }
     }

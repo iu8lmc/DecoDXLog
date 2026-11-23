@@ -25,6 +25,8 @@ class ContestAudioController : public QObject {
     Q_PROPERTY(QStringList outputs READ outputs NOTIFY devicesChanged)
     Q_PROPERTY(int outputIndex READ outputIndex NOTIFY devicesChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY changed)
+    Q_PROPERTY(qint64 playbackPositionMs READ playbackPositionMs NOTIFY changed)
+    Q_PROPERTY(qint64 playbackDurationMs READ playbackDurationMs NOTIFY changed)
     Q_PROPERTY(bool searchBusy READ searchBusy NOTIFY changed)
   public:
     explicit ContestAudioController(QObject *parent=nullptr);
@@ -33,6 +35,8 @@ class ContestAudioController : public QObject {
     QStringList outputs() const;
     int outputIndex() const;
     bool playing() const;
+    qint64 playbackPositionMs() const;
+    qint64 playbackDurationMs() const { return m_playbackDurationMs; }
     bool searchBusy() const { return m_searchBusy; }
     int inputIndex() const;
     bool recording() const { return m_recording; }
@@ -43,6 +47,7 @@ class ContestAudioController : public QObject {
     Q_INVOKABLE void chooseOutput(int index);
     Q_INVOKABLE bool playForQso(const QUrl &wav, const QString &qsoUtc);
     Q_INVOKABLE void stopPlayback();
+    Q_INVOKABLE bool seekPlayback(int seconds);
     Q_INVOKABLE bool recoverFile(const QUrl &partial);
     Q_INVOKABLE bool findRecordings(const QUrl &folder, const QString &qsoUtc);
     Q_INVOKABLE bool start(const QUrl &directory, int limitMiB);
@@ -64,7 +69,10 @@ class ContestAudioController : public QObject {
     QAudioSink *m_sink{nullptr};
     QFile *m_playbackFile{nullptr};
     QMediaDevices *m_devices{nullptr};
-    QTimer m_checkpoint;
+    QTimer m_checkpoint, m_playbackTimer;
+    qint64 m_playbackBaseMs{0}, m_playbackDurationMs{0};
+    int m_playbackRate{0};
+    bool m_seeking{false};
     QThreadPool m_searchPool;
     bool m_searchBusy{false};
     QByteArray m_inputId, m_outputId, m_inputPending;

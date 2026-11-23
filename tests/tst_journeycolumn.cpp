@@ -87,7 +87,7 @@ private slots:
         QVERIFY(writer.start(dir.path(),192000,start,48000)); QCOMPARE(writer.append(QByteArray(192000,'a')).written,qint64(192000));
         QString path; QVERIFY(writer.finish(&path)); QByteArray output;
         QVERIFY2(launch(dir,QStringLiteral("contestaudioplayprobe:")+path,output,5000),output.constData());
-        QVERIFY2(output.contains("PROBE contestPlayback playing=true qso=K1ABC") && output.contains("PROBE contestPlayback stopped=true") &&
+        QVERIFY2(output.contains("PROBE contestPlayback playing=true qso=K1ABC") && output.contains("PROBE contestPlayback stopped=true") && output.contains("PROBE contestSeek advanced=true rewound=true") &&
                  !output.contains("TypeError"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
