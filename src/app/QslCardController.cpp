@@ -75,7 +75,8 @@ struct CardBatchResult {
 // transaction small allows other log operations to obtain the writer lock.
 CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QString& sent,
                                 const QString& via, bool unanswered, const QString& received,
-                                const QString& expectedUuid = {}, bool onlyUnsent = false, int expectedRevision = -1)
+                                const QString& expectedUuid = {}, bool onlyUnsent = false, int expectedRevision = -1,
+                                const QString& expectedIdentity = {})
 {
     CardBatchResult result;
     if (unanswered) {
@@ -89,6 +90,9 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
     QSqlDatabase connection = db.connection();
     if (!connection.transaction()) {
         result.failed = int(ids.size()); result.error = connection.lastError().text(); return result;
+    }
+    if (!expectedIdentity.isEmpty() && db.identity()!=expectedIdentity) {
+        connection.rollback(); result.failed=int(ids.size()); result.error=QObject::tr("Log identity changed before the paper QSL operation"); return result;
     }
     QElapsedTimer held; held.start();
     int inBlock = 0;
@@ -173,6 +177,10 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
                 result.failed += int(ids.size()) - done;
                 if (result.error.isEmpty()) result.error = connection.lastError().text();
                 break;
+            }
+            if (done < ids.size() && !expectedIdentity.isEmpty() && db.identity()!=expectedIdentity) {
+                connection.rollback(); result.failed += int(ids.size()) - done;
+                result.error=QObject::tr("Log identity changed before the paper QSL operation"); break;
             }
             held.restart();
         }
@@ -383,6 +391,10 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
         return 0;
     }
     const QString path = m_ctx.db->path();
+    const QString identity = (path.isEmpty() || path==QLatin1String(":memory:")) ? QString() : m_ctx.db->identity();
+    if (!path.isEmpty() && path!=QLatin1String(":memory:") && identity.isEmpty()) {
+        m_status=tr("Cannot verify log identity"); note(m_status,QStringLiteral("warning")); emit changed(); return 0;
+    }
     auto done = [this, sent, unanswered, received](const CardBatchResult& result) {
         m_operationBusy = false;
         emit operationChanged();
@@ -407,10 +419,10 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
     m_operationBusy = true;
     emit operationChanged();
     QPointer<QslCardController> self(this);
-    m_cardPool.start([self, path, ids, sent, via, unanswered, received, expectedUuid, onlyUnsent, expectedRevision] {
+    m_cardPool.start([self, path, identity, ids, sent, via, unanswered, received, expectedUuid, onlyUnsent, expectedRevision] {
         LogDatabase db;
         CardBatchResult result;
-        if (db.open(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received,expectedUuid,onlyUnsent,expectedRevision);
+        if (db.openExistingReadWrite(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received,expectedUuid,onlyUnsent,expectedRevision,identity);
         else { result.failed = qMax(1, int(ids.size())); result.error = db.lastError(); }
         QMetaObject::invokeMethod(self.data(), [self, path, sent, unanswered, received, result] {
             if (!self) return;

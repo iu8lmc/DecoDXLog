@@ -154,6 +154,19 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),10000);
         QCOMPARE(db.qslStatus(added.id).first().sent,QString("Y"));
     }
+    void plannerQueueRejectsChangedLogIdentityWhileWaiting()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("planner-identity.sqlite")));
+        const auto added=db.insertQso(core::AdifRecord{{"CALL","K1XYZ"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import");
+        QVERIFY(added.id>0); const auto meta=db.meta(added.id); QVERIFY(meta.has_value());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); QVERIFY(q.exec("BEGIN EXCLUSIVE"));
+        QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx);
+        QVERIFY(cards.enqueueIfUnsent(added.id,meta->uuid,meta->revision,"B",db.path()));
+        QTest::qWait(150); QVERIFY(q.exec("UPDATE log_identity SET uuid='different-log-identity' WHERE id=1")); QVERIFY(q.exec("COMMIT"));
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),10000);
+        const auto status=db.qslStatus(added.id); QVERIFY(status.isEmpty() || status.first().sent!=QString("Q"));
+        QVERIFY(cards.status().contains("identity",Qt::CaseInsensitive));
+    }
     void initTestCase()
     {
         // Le impostazioni vanno in un temporaneo: una prova non tocca quelle di
