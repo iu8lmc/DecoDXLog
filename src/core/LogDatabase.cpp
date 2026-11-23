@@ -1410,6 +1410,19 @@ ContestSerialRequest LogDatabase::activeContestSerialRequest(const QString& scop
     return result;
 }
 
+ContestSerialRequest LogDatabase::contestSerialRequest(const QString& scope,const QString& requester,const QString& requestId) const
+{
+    ContestSerialRequest result;
+    if (!validSerialKey(scope) || !validSerialKey(requester) || !validSerialKey(requestId)) { result.error=QStringLiteral("Invalid serial request identity"); return result; }
+    QSqlQuery q(connection()); q.prepare(QStringLiteral("SELECT ")+QLatin1String(serialRequestColumns)+
+        QStringLiteral(" FROM contest_serial_request WHERE scope=? AND requester=? AND request_id=?"));
+    q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+    if (!q.exec()) result.error=q.lastError().text();
+    else if (!q.next()) result.error=QStringLiteral("Unknown serial request");
+    else result=serialRequestRow(q);
+    return result;
+}
+
 ContestSerialRequest LogDatabase::beginContestSerialRequest(const QString& scope,const QString& requester,const QString& requestId,
                                                              const QString& authority,int minimum)
 {

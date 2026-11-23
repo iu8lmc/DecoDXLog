@@ -326,6 +326,7 @@ public:
     ContestSerialRequest beginContestSerialRequest(const QString& scope, const QString& requester, const QString& requestId,
                                                    const QString& authority, int minimum);
     ContestSerialRequest activeContestSerialRequest(const QString& scope, const QString& requester) const;
+    ContestSerialRequest contestSerialRequest(const QString& scope, const QString& requester, const QString& requestId) const;
     ContestSerialRequest acceptContestSerialGrant(const QString& scope, const QString& requester, const QString& requestId,
                                                   const QString& authority, int serial);
     ContestSerialRequest consumeContestSerialGrant(const QString& scope, const QString& requester, const QString& requestId,
