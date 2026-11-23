@@ -37,6 +37,18 @@ RoundedWindow {
         contestAudioDialog.qsoUtc=row.utc || ""
         contestAudioDialog.qsoCall=row.call || ""
         contestAudioDialog.open()
+        Qt.callLater(() => { if (contestAudioDialog.visible && contestAudioDialog.qsoUtc.length && String(contestAudioDialog.folder).length && !decolog.contestAudio.searchBusy) contestAudioFind.clicked() })
+    }
+    function probeContestAudioStale(folder) {
+        contestAudioDialog.open(); contestAudioDialog.folder=folder
+        contestAudioDialog.qsoUtc="2026-11-23T12:00:01Z"; contestAudioDialog.probingFind=true
+        contestAudioFind.clicked()
+        contestAudioDialog.qsoUtc="2026-11-23T12:00:00.500Z"
+    }
+    function probeContestAudioRestore() {
+        contestAudioDialog.probingFind=true
+        console.warn("PROBE contestAudio restored=" + (String(contestAudioDialog.folder).length>0))
+        openAudioForQso({utc:"2026-11-23T12:00:01Z",call:"K1ABC"})
     }
     function probeContestAudioRecovery(path) {
         contestAudioDialog.open()
@@ -181,6 +193,7 @@ RoundedWindow {
         property alias windowY: root.y
         property alias band: root.band
         property alias mode: root.mode
+        property alias audioFolder: contestAudioDialog.folder
     }
 
     Connections {
@@ -1055,12 +1068,16 @@ RoundedWindow {
         Connections {
             target:decolog.contestAudio
             function onRecordingsFound(result) {
-                if (String(result.folder)!==String(contestAudioDialog.folder) || result.qsoUtc!==contestAudioDialog.qsoUtc) return
+                if (String(result.folder)!==String(contestAudioDialog.folder) || result.qsoUtc!==contestAudioDialog.qsoUtc) {
+                    if (contestAudioDialog.visible && contestAudioDialog.qsoUtc.length && String(contestAudioDialog.folder).length)
+                        Qt.callLater(() => { if (!decolog.contestAudio.searchBusy) contestAudioFind.clicked() })
+                    return
+                }
                 contestAudioDialog.foundRecordings=result.matches || []
                 contestAudioDialog.findMessage=result.error ? result.error : qsTr("%1 possible recordings · %2 files checked%3").arg(contestAudioDialog.foundRecordings.length).arg(result.inspected).arg(result.truncated ? qsTr(" · search limited") : "")
                 if (contestAudioDialog.probingFind) {
                     if (contestAudioDialog.foundRecordings.length && audioMatches.itemAt(0)) audioMatches.itemAt(0).selectRecording()
-                    console.warn("PROBE contestFind count=" + contestAudioDialog.foundRecordings.length + " selected=" + (String(contestAudioDialog.playbackFile).length>0))
+                    console.warn("PROBE contestFind count=" + contestAudioDialog.foundRecordings.length + " selected=" + (String(contestAudioDialog.playbackFile).length>0) + " qso=" + result.qsoUtc)
                     contestAudioDialog.probingFind=false
                 }
             }

@@ -112,6 +112,28 @@ private slots:
         QVERIFY2(output.contains("PROBE contestFind count=1 selected=true") && !output.contains("TypeError"),output.constData());
         QVERIFY(QFile::exists(path)); decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
+    void contestAudioRemembersFolderAndFindsAfterRestart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000));
+        QString path; QVERIFY(writer.finish(&path)); QByteArray first,second;
+        QVERIFY2(launch(dir,QStringLiteral("contestaudiofindprobe:")+dir.path(),first,4000),first.constData());
+        QVERIFY2(first.contains("PROBE contestFind count=1 selected=true"),first.constData());
+        QVERIFY2(launch(dir,QStringLiteral("contestaudiorestoreprobe"),second,4000),second.constData());
+        QVERIFY2(second.contains("PROBE contestAudio restored=true") && second.contains("PROBE contestFind count=1 selected=true") && !second.contains("TypeError"),second.constData());
+        QVERIFY(QFile::exists(path)); decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+    void contestAudioRepeatsStaleSearchForNewQso()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000));
+        QString path; QVERIFY(writer.finish(&path)); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("contestaudiostaleprobe:")+dir.path(),output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE contestFind count=1 selected=true qso=2026-11-23T12:00:00.500Z") && !output.contains("TypeError"),output.constData());
+        QVERIFY(QFile::exists(path));
+    }
     void contestReportFindsCandidateInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
