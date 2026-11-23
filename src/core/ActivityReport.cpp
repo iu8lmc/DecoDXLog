@@ -1,4 +1,5 @@
 #include "core/ActivityReport.h"
+#include "core/NewQsoFields.h"
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariantMap>
@@ -10,6 +11,7 @@
 #include <QPageLayout>
 #include <QPageSize>
 #include <QIODevice>
+#include <QSet>
 
 namespace decolog::core::activityreport {
 Result run(const QSqlDatabase& db,int utcYear,const QString& band)
@@ -130,22 +132,88 @@ QByteArray clubCsv(const Result& result)
     }
     return out;
 }
+QString validateCustomSpec(const QStringList& dimensions,const QString& aggregate)
+{
+    const QSet<QString> supported{QStringLiteral("year"),QStringLiteral("band"),QStringLiteral("mode"),QStringLiteral("station"),QStringLiteral("operator"),QStringLiteral("grid"),QStringLiteral("antenna")};
+    if (dimensions.isEmpty() || dimensions.size()>3 || (aggregate!=QLatin1String("qsos") && aggregate!=QLatin1String("calls"))) return QStringLiteral("Choose one to three dimensions and a supported aggregate");
+    QSet<QString> seen;
+    for (const QString& dimension : dimensions) {
+        if (seen.contains(dimension)) return QStringLiteral("Dimensions must be distinct"); seen.insert(dimension);
+        if (supported.contains(dimension)) continue;
+        if (!dimension.startsWith(QLatin1String("custom:"))) return QStringLiteral("Unsupported dimension");
+        const QString field=dimension.mid(7);
+        if (field!=newqso::normalizeAdifName(field) || !newqso::isValidAdifName(field)) return QStringLiteral("Invalid custom ADIF dimension");
+    }
+    return {};
+}
+Result runCustom(const QSqlDatabase& db,int utcYear,const QString& band,const QStringList& dimensions,const QString& aggregate)
+{
+    Result out; out.error=validateCustomSpec(dimensions,aggregate); if (!out.error.isEmpty()) return out;
+    if (!db.isOpen() || utcYear<0 || utcYear>9999 || band.size()>24) { out.error=QStringLiteral("Invalid report request"); return out; }
+    QStringList selections,positions,parameters;
+    auto extra=[](const QString& path) { return QStringLiteral("CASE WHEN json_valid(adif_extra) THEN COALESCE(CAST(json_extract(adif_extra,%1) AS TEXT),'') ELSE '' END").arg(path); };
+    for (int i=0;i<dimensions.size();++i) {
+        const QString& d=dimensions[i]; QString expression;
+        if (d==QLatin1String("year")) expression=QStringLiteral("COALESCE(strftime('%Y',qso_datetime_on),'')");
+        else if (d==QLatin1String("band")) expression=QStringLiteral("COALESCE(band,'')");
+        else if (d==QLatin1String("mode")) expression=QStringLiteral("COALESCE(NULLIF(submode,''),mode,'')");
+        else if (d==QLatin1String("station")) expression=extra(QStringLiteral("'$.STATION_CALLSIGN'"));
+        else if (d==QLatin1String("operator")) expression=extra(QStringLiteral("'$.OPERATOR'"));
+        else if (d==QLatin1String("grid")) expression=extra(QStringLiteral("'$.MY_GRIDSQUARE'"));
+        else if (d==QLatin1String("antenna")) expression=extra(QStringLiteral("'$.MY_ANTENNA'"));
+        else { expression=extra(QStringLiteral("?")); parameters << QStringLiteral("$.")+d.mid(7); }
+        selections << expression+QStringLiteral(" AS d%1").arg(i); positions << QString::number(i+1);
+    }
+    selections << (aggregate==QLatin1String("calls") ? QStringLiteral("COUNT(DISTINCT NULLIF(TRIM(call),''))") : QStringLiteral("COUNT(*)"));
+    QString sql=QStringLiteral("SELECT %1 FROM qso WHERE deleted=0").arg(selections.join(','));
+    if (utcYear) sql+=QStringLiteral(" AND strftime('%Y',qso_datetime_on)=?");
+    if (!band.trimmed().isEmpty()) sql+=QStringLiteral(" AND band=?");
+    sql+=QStringLiteral(" GROUP BY %1 ORDER BY %1 LIMIT 10001").arg(positions.join(','));
+    QSqlQuery q(db); q.prepare(sql); for (const auto& parameter : parameters) q.addBindValue(parameter);
+    if (utcYear) q.addBindValue(QStringLiteral("%1").arg(utcYear,4,10,QLatin1Char('0')));
+    if (!band.trimmed().isEmpty()) q.addBindValue(band.trimmed().toLower());
+    if (!q.exec()) { out.error=q.lastError().text(); return out; }
+    while (q.next()) {
+        if (out.rows.size()==10000) { out.truncated=true; break; }
+        QVariantMap row; for (int i=0;i<dimensions.size();++i) row.insert(QStringLiteral("d%1").arg(i),q.value(i));
+        row.insert(QStringLiteral("value"),q.value(dimensions.size())); out.rows << row;
+    }
+    if (q.lastError().isValid()) { out.rows.clear(); out.error=q.lastError().text(); }
+    return out;
+}
+QByteArray customCsv(const Result& result,const QStringList& dimensions,const QString& aggregate)
+{
+    if (!result.error.isEmpty() || result.truncated || !validateCustomSpec(dimensions,aggregate).isEmpty()) return {};
+    auto escape=[](QString text) { text.replace(QLatin1Char('"'),QStringLiteral("\"\"")); return (QLatin1Char('"')+text+QLatin1Char('"')).toUtf8(); };
+    QByteArray out; for (const QString& dimension : dimensions) out+=escape(dimension)+',';
+    out+=aggregate==QLatin1String("calls") ? "distinct_calls\r\n" : "qso_count\r\n";
+    for (const QVariant& item : result.rows) { const auto row=item.toMap(); for (int i=0;i<dimensions.size();++i) out+=escape(row.value(QStringLiteral("d%1").arg(i)).toString())+','; out+=QByteArray::number(row.value(QStringLiteral("value")).toLongLong())+"\r\n"; }
+    return out;
+}
 bool writePdf(QIODevice* output,const QVariantMap& snapshot,QString* error)
 {
     auto fail=[error](const QString& message) { if (error) *error=message; return false; };
     const QString kind=snapshot.value(QStringLiteral("kind")).toString();
     if (!output || !output->isWritable() || snapshot.value(QStringLiteral("truncated")).toBool() ||
         !snapshot.value(QStringLiteral("error")).toString().isEmpty() ||
-        (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation") && kind!=QLatin1String("club"))) return fail(QStringLiteral("Invalid or incomplete report"));
+        (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation") && kind!=QLatin1String("club") && kind!=QLatin1String("custom"))) return fail(QStringLiteral("Invalid or incomplete report"));
+    const QStringList customDimensions=snapshot.value(QStringLiteral("dimensions")).toStringList();
+    const QString aggregate=snapshot.value(QStringLiteral("aggregate")).toString();
+    if (kind==QLatin1String("custom") && !validateCustomSpec(customDimensions,aggregate).isEmpty()) return fail(QStringLiteral("Invalid custom report"));
     QPdfWriter writer(output); writer.setResolution(72); writer.setPageSize(QPageSize(QPageSize::A4));
     writer.setPageOrientation(QPageLayout::Landscape); writer.setPageMargins(QMarginsF(32,32,32,32),QPageLayout::Point);
     writer.setTitle(QStringLiteral("DecoDXLog report")); writer.setCreator(QStringLiteral("DecoDXLog"));
     QPainter painter; if (!painter.begin(&writer)) return fail(QStringLiteral("Cannot start PDF painter"));
     painter.setRenderHint(QPainter::Antialiasing,true);
-    const QString title=kind==QLatin1String("club") ? QStringLiteral("Annual station activity") : kind==QLatin1String("confirmation") ? QStringLiteral("Observed confirmation times") : QStringLiteral("Recorded station activity");
-    const QStringList keys=kind==QLatin1String("club") ? QStringList{"year","station","operator","count"} : kind==QLatin1String("confirmation") ? QStringList{"service","confirmed","dated","missing","invalid","earlier","averageDays"} : QStringList{"antenna","band","grid","count"};
-    const QStringList headings=kind==QLatin1String("club") ? QStringList{"UTC year","Station","Operator","QSO"} : kind==QLatin1String("confirmation") ? QStringList{"Service","Confirmed","Dated","Missing","Invalid","Earlier","Mean days"} : QStringList{"Antenna","Band","Own grid","QSO"};
-    const QList<qreal> fractions=kind==QLatin1String("club") ? QList<qreal>{0.13,0.30,0.42,0.15} : kind==QLatin1String("confirmation") ? QList<qreal>{0.20,0.14,0.12,0.12,0.12,0.12,0.18} : QList<qreal>{0.39,0.14,0.32,0.15};
+    const QString title=kind==QLatin1String("custom") ? QStringLiteral("Custom QSO report") : kind==QLatin1String("club") ? QStringLiteral("Annual station activity") : kind==QLatin1String("confirmation") ? QStringLiteral("Observed confirmation times") : QStringLiteral("Recorded station activity");
+    QStringList keys=kind==QLatin1String("club") ? QStringList{"year","station","operator","count"} : kind==QLatin1String("confirmation") ? QStringList{"service","confirmed","dated","missing","invalid","earlier","averageDays"} : QStringList{"antenna","band","grid","count"};
+    QStringList headings=kind==QLatin1String("club") ? QStringList{"UTC year","Station","Operator","QSO"} : kind==QLatin1String("confirmation") ? QStringList{"Service","Confirmed","Dated","Missing","Invalid","Earlier","Mean days"} : QStringList{"Antenna","Band","Own grid","QSO"};
+    QList<qreal> fractions=kind==QLatin1String("club") ? QList<qreal>{0.13,0.30,0.42,0.15} : kind==QLatin1String("confirmation") ? QList<qreal>{0.20,0.14,0.12,0.12,0.12,0.12,0.18} : QList<qreal>{0.39,0.14,0.32,0.15};
+    if (kind==QLatin1String("custom")) {
+        keys.clear(); headings=customDimensions; fractions.clear();
+        for (int i=0;i<customDimensions.size();++i) { keys << QStringLiteral("d%1").arg(i); fractions << 0.8/customDimensions.size(); }
+        keys << QStringLiteral("value"); headings << (aggregate==QLatin1String("calls") ? QStringLiteral("Distinct calls") : QStringLiteral("QSO")); fractions << 0.2;
+    }
     const qreal width=writer.width(), height=writer.height(); const qreal footerY=height-12; qreal y=0; int page=0;
     QFont titleFont=painter.font(); titleFont.setPointSize(16); titleFont.setBold(true);
     QFont bodyFont=painter.font(); bodyFont.setPointSize(9);
@@ -154,7 +222,7 @@ bool writePdf(QIODevice* output,const QVariantMap& snapshot,QString* error)
     const QString band=snapshot.value(QStringLiteral("band")).toString().isEmpty() ? QStringLiteral("all") : snapshot.value(QStringLiteral("band")).toString();
     const QString station=snapshot.value(QStringLiteral("station")).toString();
     const QString metadata=QStringLiteral("Snapshot %1 | UTC year: %2 | Band: %3%4").arg(snapshot.value(QStringLiteral("generatedAt")).toString(),year,band,kind==QLatin1String("club") ? QStringLiteral(" | Station: ")+(station.isEmpty()?QStringLiteral("all"):station) : QString());
-    const QString note=kind==QLatin1String("confirmation") ? QStringLiteral("Local recorded states only; missing, invalid and earlier dates are excluded from the mean. Not award credit.") : kind==QLatin1String("club") ? QStringLiteral("Recorded station and operator only; missing values are not inferred. Membership is not verified.") : QStringLiteral("Only recorded per-QSO antenna and own grid are used; missing values are not inferred.");
+    const QString note=kind==QLatin1String("custom") ? QStringLiteral("Groups use recorded QSO values; missing values are not inferred. Counts do not establish award credit.") : kind==QLatin1String("confirmation") ? QStringLiteral("Local recorded states only; missing, invalid and earlier dates are excluded from the mean. Not award credit.") : kind==QLatin1String("club") ? QStringLiteral("Recorded station and operator only; missing values are not inferred. Membership is not verified.") : QStringLiteral("Only recorded per-QSO antenna and own grid are used; missing values are not inferred.");
     auto footer=[&] { painter.setFont(bodyFont); painter.setPen(QColor("#555555")); painter.drawText(QRectF(0,footerY,width,12),Qt::AlignRight|Qt::AlignVCenter,QStringLiteral("Page %1").arg(page)); };
     auto header=[&] {
         ++page; y=0; painter.setPen(QColor("#183344")); painter.setFont(titleFont); painter.drawText(QRectF(0,y,width,24),Qt::AlignLeft|Qt::AlignVCenter,title); y+=27;

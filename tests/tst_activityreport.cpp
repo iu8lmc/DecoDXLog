@@ -8,6 +8,25 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void configurableDimensionsAndAggregatesAreBoundedAndSafe()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const char* call,const char* band,const char* district) { return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND",band},{"MODE","CW"},{"APP_DISTRICT",district}},"fixture",{},true,0,false).id; };
+        QVERIFY(add("K1AAA","20m","North")>0); QVERIFY(add("K1AAA","20m","North")>0); QVERIFY(add("K1BBB","20m","North")>0); QVERIFY(add("K1CCC","40m","South")>0);
+        const QStringList dims{"band","custom:APP_DISTRICT"};
+        const auto count=activityreport::runCustom(db.connection(),2026,{},dims,"qsos"); QVERIFY2(count.error.isEmpty(),qPrintable(count.error));
+        QCOMPARE(count.rows.size(),2); QCOMPARE(count.rows[0].toMap().value("d0").toString(),QString("20m")); QCOMPARE(count.rows[0].toMap().value("d1").toString(),QString("North")); QCOMPARE(count.rows[0].toMap().value("value").toInt(),3);
+        const auto distinct=activityreport::runCustom(db.connection(),2026,"20m",dims,"calls"); QVERIFY(distinct.error.isEmpty()); QCOMPARE(distinct.rows.size(),1); QCOMPARE(distinct.rows[0].toMap().value("value").toInt(),2);
+        const auto three=activityreport::runCustom(db.connection(),2026,"20m",{"year","custom:APP_DISTRICT","custom:APP_MISSING"},"qsos");
+        QVERIFY2(three.error.isEmpty(),qPrintable(three.error)); QCOMPARE(three.rows.size(),1); QCOMPARE(three.rows.first().toMap().value("d0").toString(),QString("2026"));
+        QCOMPARE(three.rows.first().toMap().value("d2").toString(),QString()); QCOMPARE(three.rows.first().toMap().value("value").toInt(),3);
+        QVERIFY(activityreport::customCsv(distinct,dims,"calls").contains("\"20m\",\"North\",2"));
+        QVERIFY(!activityreport::runCustom(db.connection(),2026,{},QStringList{"custom:APP_X');DROP TABLE qso;--"},"qsos").error.isEmpty());
+        QVERIFY(!activityreport::runCustom(db.connection(),2026,{},QStringList{"band","band"},"qsos").error.isEmpty());
+        QVERIFY(!activityreport::runCustom(db.connection(),2026,{},dims,"sql").error.isEmpty()); QCOMPARE(db.qsoCount(),qint64(4));
+        QSqlQuery malformed(db.connection()); QVERIFY(malformed.exec("UPDATE qso SET adif_extra='broken' WHERE call='K1CCC'"));
+        const auto missing=activityreport::runCustom(db.connection(),2026,"40m",dims,"qsos"); QVERIFY(missing.error.isEmpty()); QCOMPARE(missing.rows.first().toMap().value("d1").toString(),QString());
+    }
     void annualClubActivityUsesRecordedStationAndOperator()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
@@ -74,6 +93,7 @@ private slots:
                        "SELECT printf('u%05d',x),'K1AAA','2026-01-01T00:00:00Z','20m','CW','fixture',json_object('MY_ANTENNA',printf('antenna%05d',x)),'2026-01-01','2026-01-01' FROM n"),qPrintable(q.lastError().text()));
         const auto report=activityreport::run(db.connection(),2026,"20m"); QVERIFY2(report.error.isEmpty(),qPrintable(report.error));
         QCOMPARE(report.rows.size(),10000); QVERIFY(report.truncated); QVERIFY(activityreport::csv(report).isEmpty());
+        const auto custom=activityreport::runCustom(db.connection(),2026,"20m",{"antenna"},"qsos"); QVERIFY(custom.error.isEmpty()); QVERIFY(custom.truncated); QCOMPARE(custom.rows.size(),10000); QVERIFY(activityreport::customCsv(custom,{"antenna"},"qsos").isEmpty());
     }
     void reportObservesTheReadSnapshotDuringAnotherWrite()
     {
@@ -85,8 +105,10 @@ private slots:
         QVERIFY(add(writer,"K1BBB")>0);
         const auto before=activityreport::run(reader.connection(),2026,"20m"); QVERIFY2(before.error.isEmpty(),qPrintable(before.error));
         QCOMPARE(before.rows.size(),1); QCOMPARE(before.rows.first().toMap().value("count").toInt(),1);
+        const auto customBefore=activityreport::runCustom(reader.connection(),2026,"20m",{"band"},"qsos"); QVERIFY(customBefore.error.isEmpty()); QCOMPARE(customBefore.rows.first().toMap().value("value").toInt(),1);
         QVERIFY(reader.connection().commit()); const auto after=activityreport::run(reader.connection(),2026,"20m");
         QVERIFY(after.error.isEmpty()); QCOMPARE(after.rows.first().toMap().value("count").toInt(),2);
+        const auto customAfter=activityreport::runCustom(reader.connection(),2026,"20m",{"band"},"qsos"); QVERIFY(customAfter.error.isEmpty()); QCOMPARE(customAfter.rows.first().toMap().value("value").toInt(),2);
     }
 };
 QTEST_GUILESS_MAIN(TestActivityReport)

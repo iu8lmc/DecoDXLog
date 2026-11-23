@@ -24,26 +24,47 @@ RoundedWindow {
     property url reportProbePath:""
     property bool reportProbePdf:false
     property bool reportPdfBusy:false
+    property bool customRestoreProbe:false
+    property var restoredDimensions:[]
+    readonly property var dimensionKeys: {
+        let keys=["","year","band","mode","station","operator","grid","antenna"]
+        for (const field of decolog.newQsoCustomFields) { const key="custom:"+field.name; if (keys.indexOf(key)<0) keys.push(key) }
+        for (const key of restoredDimensions) if (keys.indexOf(key)<0) keys.push(key)
+        return keys
+    }
+    function chosenDimensions() { return [dimension0,dimension1,dimension2].map(x => root.dimensionKeys[x.currentIndex] || "").filter(x => x.length) }
+    function loadDimensions(dims) { restoredDimensions=dims || []; Qt.callLater(function() { dimension0.currentIndex=Math.max(0,root.dimensionKeys.indexOf(restoredDimensions[0] || "")); dimension1.currentIndex=Math.max(0,root.dimensionKeys.indexOf(restoredDimensions[1] || "")); dimension2.currentIndex=Math.max(0,root.dimensionKeys.indexOf(restoredDimensions[2] || "")) }) }
     function beginReportPdf(path) {
         const error=decolog.exportActivityReportPdf(path)
         reportMessage=error
         if (!error.length) reportPdfBusy=true
         else if (reportProbePdf) console.warn("PROBE activityreport pdf start error=" + error)
     }
-    function chosenReportKind() { return reportKind.currentIndex===2 ? "club" : reportKind.currentIndex===1 ? "confirmation" : "activity" }
+    function chosenReportKind() { return reportKind.currentIndex===3 ? "custom" : reportKind.currentIndex===2 ? "club" : reportKind.currentIndex===1 ? "confirmation" : "activity" }
     function runActivityReport() {
         const value=reportYear.text.trim()
         if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }
         activityBusy=true; reportMessage=""; activityReport=({})
-        if (reportKind.currentIndex===2) decolog.requestClubReport(value.length ? Number(value) : 0,reportBand.text,reportStation.text)
+        if (reportKind.currentIndex===3) decolog.requestCustomReport(value.length ? Number(value) : 0,reportBand.text,root.chosenDimensions(),reportAggregate.currentIndex===1 ? "calls" : "qsos")
+        else if (reportKind.currentIndex===2) decolog.requestClubReport(value.length ? Number(value) : 0,reportBand.text,reportStation.text)
         else if (reportKind.currentIndex===1) decolog.requestConfirmationReport(value.length ? Number(value) : 0,reportBand.text)
         else decolog.requestActivityReport(value.length ? Number(value) : 0,reportBand.text)
     }
     function probeReport(path,kind,pdf) {
-        page=2; reportYear.text="2026"; reportBand.text="20m"; reportKind.currentIndex=kind==="club" ? 2 : kind==="confirmation" ? 1 : 0; reportStation.text=kind==="club" ? "9H1SR" : ""
+        page=2; reportYear.text="2026"; reportBand.text="20m"; reportKind.currentIndex=kind==="custom" ? 3 : kind==="club" ? 2 : kind==="confirmation" ? 1 : 0; reportStation.text=kind==="club" ? "9H1SR" : ""
+        if (kind==="custom") {
+            decolog.saveNewQsoPanelSettings(decolog.newQsoVisibleFields,[{name:"APP_DISTRICT",label:"District"}],false)
+            dimension0.currentIndex=root.dimensionKeys.indexOf("band"); dimension1.currentIndex=root.dimensionKeys.indexOf("custom:APP_DISTRICT"); dimension2.currentIndex=0; reportAggregate.currentIndex=1
+        }
         console.warn("PROBE activityreport prior settings " + JSON.stringify(decolog.activityReportSettings()))
-        console.warn("PROBE activityreport saved " + (kind==="club" ? decolog.saveClubReportSettings(2026,"20m",reportStation.text) : decolog.saveSelectedReportSettings(kind || "activity",2026,"20m")))
+        console.warn("PROBE activityreport saved " + (kind==="custom" ? decolog.saveCustomReportSettings(2026,"20m",root.chosenDimensions(),"calls") : kind==="club" ? decolog.saveClubReportSettings(2026,"20m",reportStation.text) : decolog.saveSelectedReportSettings(kind || "activity",2026,"20m")))
         reportProbePath=path; reportProbePdf=!!pdf; runActivityReport()
+    }
+    function probeCustomRestore() {
+        const s=decolog.activityReportSettings(); decolog.saveNewQsoPanelSettings(decolog.newQsoVisibleFields,[],false)
+        page=2; reportKind.currentIndex=3; reportYear.text=String(s.year || ""); reportBand.text=s.band || ""; reportAggregate.currentIndex=s.aggregate==="calls" ? 1 : 0
+        root.loadDimensions(s.dimensions)
+        Qt.callLater(function() { console.warn("PROBE custom restored " + JSON.stringify(root.chosenDimensions())); root.customRestoreProbe=true; root.runActivityReport() })
     }
 
     // Le statistiche si contano su un altro filo e arrivano tutte insieme: su
@@ -114,6 +135,7 @@ RoundedWindow {
         function onActivityReportReady(result) {
             root.activityBusy=false; root.activityReport=result
             root.reportMessage=result.error || ""
+            if (root.customRestoreProbe) { console.warn("PROBE custom restored result " + JSON.stringify(result.rows || [])); root.customRestoreProbe=false }
             if (String(root.reportProbePath).length) {
                 console.warn("PROBE activityreport result " + JSON.stringify(result))
                 if (root.reportProbePdf) { console.warn("PROBE activityreport pdf protected " + decolog.exportActivityReportPdf("file://" + decolog.currentLogInfo().path)); root.beginReportPdf(root.reportProbePath) }
@@ -492,31 +514,41 @@ RoundedWindow {
         ColumnLayout {
             visible:root.page===2; Layout.fillWidth:true; Layout.fillHeight:true; spacing:8
             Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
-                text:(root.activityReport.kind || root.chosenReportKind())==="club" ? qsTr("Annual activity by station callsign and operator recorded in each QSO. Enter the club station callsign to restrict the report; blank station or operator values are not inferred. The log does not establish club membership. Results are a read snapshot.") : (root.activityReport.kind || root.chosenReportKind())==="confirmation" ? qsTr("Confirmed records by service and elapsed UTC calendar days from QSO to recorded receipt date. Missing, invalid or earlier dates are excluded from the average. A QSO can appear under multiple services; this is not official award credit. Results are a read snapshot and may not include later changes.") : qsTr("Activity by reported antenna, band and own grid. Blank values were not recorded in the QSO; current station profiles are not used to fill gaps. Results are a read snapshot and may not include later changes.") }
+                text:(root.activityReport.kind || root.chosenReportKind())==="custom" ? qsTr("Group recorded values by one to three dimensions and count QSO or distinct calls. Custom fields use their stored ADIF text; missing values remain blank. Counts do not establish award credit. Results are a read snapshot.") : (root.activityReport.kind || root.chosenReportKind())==="club" ? qsTr("Annual activity by station callsign and operator recorded in each QSO. Enter the club station callsign to restrict the report; blank station or operator values are not inferred. The log does not establish club membership. Results are a read snapshot.") : (root.activityReport.kind || root.chosenReportKind())==="confirmation" ? qsTr("Confirmed records by service and elapsed UTC calendar days from QSO to recorded receipt date. Missing, invalid or earlier dates are excluded from the average. A QSO can appear under multiple services; this is not official award credit. Results are a read snapshot and may not include later changes.") : qsTr("Activity by reported antenna, band and own grid. Blank values were not recorded in the QSO; current station profiles are not used to fill gaps. Results are a read snapshot and may not include later changes.") }
             RowLayout {
                 Layout.fillWidth:true
-                StyledComboBox { id:reportKind; Layout.preferredWidth:200; model:[qsTr("Station activity"),qsTr("Confirmation times"),qsTr("Annual club activity")]; Accessible.name:qsTr("Report type") }
+                StyledComboBox { id:reportKind; Layout.preferredWidth:200; model:[qsTr("Station activity"),qsTr("Confirmation times"),qsTr("Annual club activity"),qsTr("Custom report")]; Accessible.name:qsTr("Report type") }
                 StyledTextField { id:reportYear; Layout.preferredWidth:150; placeholderText:qsTr("UTC year (all)"); Accessible.name:qsTr("Report UTC year") }
                 StyledTextField { id:reportBand; Layout.preferredWidth:150; placeholderText:qsTr("Band (all)"); Accessible.name:qsTr("Report band") }
                 GlassButton { text:qsTr("Run report"); enabled:!root.activityBusy; onClicked:root.runActivityReport() }
-                GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; const year=value.length ? Number(value) : 0; root.reportMessage=(reportKind.currentIndex===2 ? decolog.saveClubReportSettings(year,reportBand.text,reportStation.text) : decolog.saveSelectedReportSettings(root.chosenReportKind(),year,reportBand.text)) || qsTr("Filters saved in this log.") } }
-                GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; reportKind.currentIndex=s.kind==="club" ? 2 : s.kind==="confirmation" ? 1 : 0; reportStation.text=s.station || ""; root.reportMessage=qsTr("Filters loaded from this log.") } }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; const year=value.length ? Number(value) : 0; root.reportMessage=(reportKind.currentIndex===3 ? decolog.saveCustomReportSettings(year,reportBand.text,root.chosenDimensions(),reportAggregate.currentIndex===1 ? "calls" : "qsos") : reportKind.currentIndex===2 ? decolog.saveClubReportSettings(year,reportBand.text,reportStation.text) : decolog.saveSelectedReportSettings(root.chosenReportKind(),year,reportBand.text)) || qsTr("Filters saved in this log.") } }
+                GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; reportKind.currentIndex=s.kind==="custom" ? 3 : s.kind==="club" ? 2 : s.kind==="confirmation" ? 1 : 0; reportStation.text=s.station || ""; if (s.kind==="custom") { root.loadDimensions(s.dimensions); reportAggregate.currentIndex=s.aggregate==="calls" ? 1 : 0 }; root.reportMessage=qsTr("Filters loaded from this log.") } }
                 GlassButton { text:qsTr("Export CSV…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportFile.open() }
                 GlassButton { text:qsTr("Export PDF…"); enabled:!root.activityBusy && !root.reportPdfBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportPdfFile.open() }
             }
             StyledTextField { id:reportStation; Layout.fillWidth:true; visible:reportKind.currentIndex===2; placeholderText:qsTr("Recorded club station callsign (all if blank)"); Accessible.name:qsTr("Recorded club station callsign") }
+            RowLayout {
+                visible:reportKind.currentIndex===3; Layout.fillWidth:true
+                StyledComboBox { id:dimension0; Layout.fillWidth:true; model:root.dimensionKeys.map(x => x || qsTr("No grouping")); currentIndex:2; Accessible.name:qsTr("First grouping dimension") }
+                StyledComboBox { id:dimension1; Layout.fillWidth:true; model:root.dimensionKeys.map(x => x || qsTr("No grouping")); currentIndex:3; Accessible.name:qsTr("Second grouping dimension") }
+                StyledComboBox { id:dimension2; Layout.fillWidth:true; model:root.dimensionKeys.map(x => x || qsTr("No grouping")); currentIndex:0; Accessible.name:qsTr("Third grouping dimension") }
+                StyledComboBox { id:reportAggregate; Layout.preferredWidth:180; model:[qsTr("Count QSO"),qsTr("Distinct calls")]; Accessible.name:qsTr("Aggregation") }
+            }
             Text { Layout.fillWidth:true; visible:root.activityBusy; text:qsTr("Preparing report…"); color:Theme.secondaryColor }
             Text { Layout.fillWidth:true; visible:root.reportMessage.length>0; text:root.reportMessage; color:Theme.warningColor; wrapMode:Text.Wrap }
             Text { Layout.fillWidth:true; visible:!!root.activityReport.generatedAt; color:Theme.textSecondary; wrapMode:Text.Wrap
                 text:qsTr("Snapshot %1 · year %2 · band %3 · %4 groups%5").arg(root.activityReport.generatedAt || "").arg(root.activityReport.year || qsTr("all")).arg(root.activityReport.band || qsTr("all")).arg((root.activityReport.rows || []).length).arg(root.activityReport.truncated ? qsTr(" · truncated; refine filters before export") : "") }
             Text { Layout.fillWidth:true; visible:root.activityReport.kind==="club"; color:Theme.textSecondary; text:qsTr("Recorded station filter: %1").arg(root.activityReport.station || qsTr("all")) }
-            Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:root.activityReport.kind==="club" ? qsTr("UTC year · recorded station · recorded operator · QSO") : root.activityReport.kind==="confirmation" ? qsTr("Service · confirmed · dated · missing · invalid · earlier · average days") : qsTr("Antenna · band · own grid · QSO") }
+            Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:root.activityReport.kind==="custom" ? (root.activityReport.dimensions || []).join(" · ")+" · "+(root.activityReport.aggregate==="calls" ? qsTr("Distinct calls") : qsTr("QSO")) : root.activityReport.kind==="club" ? qsTr("UTC year · recorded station · recorded operator · QSO") : root.activityReport.kind==="confirmation" ? qsTr("Service · confirmed · dated · missing · invalid · earlier · average days") : qsTr("Antenna · band · own grid · QSO") }
             ListView {
                 id:activityRows
                 Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.activityReport.rows || []
                 ScrollBar.vertical:ScrollBar {}
                 delegate:Text { required property var modelData; width:ListView.view.width; color:Theme.textPrimary; textFormat:Text.PlainText; elide:Text.ElideRight
-                    text:root.activityReport.kind==="club" ? (modelData.year || qsTr("(not recorded)"))+" · "+(modelData.station || qsTr("(not recorded)"))+" · "+(modelData.operator || qsTr("(not recorded)"))+" · "+modelData.count : root.activityReport.kind==="confirmation" ? (modelData.service || qsTr("(not recorded)"))+" · "+modelData.confirmed+" · "+modelData.dated+" · "+modelData.missing+" · "+modelData.invalid+" · "+modelData.earlier+" · "+(modelData.averageDays === undefined ? "—" : Number(modelData.averageDays).toFixed(2)) : (modelData.antenna || qsTr("(not recorded)"))+" · "+(modelData.band || qsTr("(not recorded)"))+" · "+(modelData.grid || qsTr("(not recorded)"))+" · "+modelData.count }
+                    text:root.activityReport.kind==="custom" ? (root.activityReport.dimensions || []).map((_,i) => modelData["d"+i] || qsTr("(not recorded)")).join(" · ")+" · "+modelData.value : root.activityReport.kind==="club" ? (modelData.year || qsTr("(not recorded)"))+" · "+(modelData.station || qsTr("(not recorded)"))+" · "+(modelData.operator || qsTr("(not recorded)"))+" · "+modelData.count : root.activityReport.kind==="confirmation" ? (modelData.service || qsTr("(not recorded)"))+" · "+modelData.confirmed+" · "+modelData.dated+" · "+modelData.missing+" · "+modelData.invalid+" · "+modelData.earlier+" · "+(modelData.averageDays === undefined ? "—" : Number(modelData.averageDays).toFixed(2)) : (modelData.antenna || qsTr("(not recorded)"))+" · "+(modelData.band || qsTr("(not recorded)"))+" · "+(modelData.grid || qsTr("(not recorded)"))+" · "+modelData.count }
             }
         }
     }

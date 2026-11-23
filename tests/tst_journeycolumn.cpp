@@ -64,6 +64,24 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void customReportGroupsAdifFieldsAndExports()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString& call : {QString("K1AAA"),QString("K1AAA"),QString("K1BBB")})
+              QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DISTRICT","North"}},"fixture",{},true,0,false).id>0); }
+        const QString file=dir.filePath("custom.csv"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("customreportprobe:")+file,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport rendered 20m · North · 2"),output.constData());
+        QVERIFY2(output.contains("\"aggregate\":\"calls\"") && output.contains("\"dimensions\":[\"band\",\"custom:APP_DISTRICT\"]"),output.constData());
+        QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("\"band\",\"custom:APP_DISTRICT\",distinct_calls\r\n\"20m\",\"North\",2\r\n"));
+        const QString pdfPath=dir.filePath("custom.pdf"); QByteArray pdfOutput; QVERIFY2(launch(dir,QStringLiteral("custompdfprobe:")+pdfPath,pdfOutput,5000),pdfOutput.constData());
+        QVERIFY2(pdfOutput.contains("PROBE activityreport pdf success=true"),pdfOutput.constData()); QFile pdf(pdfPath); QVERIFY(pdf.open(QIODevice::ReadOnly)); QCOMPARE(pdf.read(5),QByteArray("%PDF-")); pdf.close();
+        const QString pdfCopy=qEnvironmentVariable("DECO_CUSTOM_PDF_COPY"); if (!pdfCopy.isEmpty()) QVERIFY(QFile::copy(pdfPath,pdfCopy));
+        QByteArray restored; QVERIFY2(launch(dir,"customrestoreprobe",restored,5000),restored.constData());
+        QVERIFY2(restored.contains("PROBE custom restored [\"band\",\"custom:APP_DISTRICT\"]") && restored.contains("PROBE custom restored result") && restored.contains("\"d1\":\"North\"") && restored.contains("\"value\":2"),restored.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
+    }
     void activityReportExportsMultipagePdf()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

@@ -12,8 +12,11 @@ struct Result { QVariantList rows; bool truncated{false}; QString error; };
 Result run(const QSqlDatabase& db, int utcYear, const QString& band);
 Result runConfirmations(const QSqlDatabase& db, int utcYear, const QString& band);
 Result runClub(const QSqlDatabase& db, int utcYear, const QString& band, const QString& station);
+QString validateCustomSpec(const QStringList& dimensions, const QString& aggregate);
+Result runCustom(const QSqlDatabase& db, int utcYear, const QString& band, const QStringList& dimensions, const QString& aggregate);
 QByteArray csv(const Result& result);
 QByteArray confirmationsCsv(const Result& result);
 QByteArray clubCsv(const Result& result);
+QByteArray customCsv(const Result& result, const QStringList& dimensions, const QString& aggregate);
 bool writePdf(QIODevice* output, const QVariantMap& snapshot, QString* error = nullptr);
 }

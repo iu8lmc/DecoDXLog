@@ -7690,30 +7690,35 @@ void DecoLogController::requestClubReport(int year,const QString& band,const QSt
 {
     startStationReport(QStringLiteral("club"),year,band,station);
 }
-void DecoLogController::startStationReport(const QString& kind,int year,const QString& requestedBand,const QString& requestedStation)
+void DecoLogController::requestCustomReport(int year,const QString& band,const QStringList& dimensions,const QString& aggregate)
+{
+    startStationReport(QStringLiteral("custom"),year,band,{},dimensions,aggregate);
+}
+void DecoLogController::startStationReport(const QString& kind,int year,const QString& requestedBand,const QString& requestedStation,const QStringList& dimensions,const QString& aggregate)
 {
     const QString path=m_db.path(), band=requestedBand.trimmed().toLower(), station=requestedStation.trimmed().toUpper(); const quint64 generation=++m_activityReportGeneration;
     m_activityReport.clear(); m_activityReportPool.clear();
-    if (!m_db.isOpen() || path.isEmpty() || path==QLatin1String(":memory:") || year<0 || year>9999 || band.size()>24 || station.size()>24) {
+    if (!m_db.isOpen() || path.isEmpty() || path==QLatin1String(":memory:") || year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind==QLatin1String("custom") && !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty())) {
         emit activityReportReady({{QStringLiteral("error"),tr("Choose a file-backed log and valid report filters")}}); return;
     }
     QPointer<DecoLogController> self(this);
-    m_activityReportPool.start([self,path,band,station,year,generation,kind] {
+    m_activityReportPool.start([self,path,band,station,year,generation,kind,dimensions,aggregate] {
         activityreport::Result report; const QString connection=QStringLiteral("activity-report-")+QUuid::createUuid().toString();
         {
             QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
             db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=250")); db.setDatabaseName(path);
-            if (db.open()) report=kind==QLatin1String("club") ? activityreport::runClub(db,year,band,station) : kind==QLatin1String("confirmation") ? activityreport::runConfirmations(db,year,band) : activityreport::run(db,year,band); else report.error=QStringLiteral("Cannot open log for report");
+            if (db.open()) report=kind==QLatin1String("custom") ? activityreport::runCustom(db,year,band,dimensions,aggregate) : kind==QLatin1String("club") ? activityreport::runClub(db,year,band,station) : kind==QLatin1String("confirmation") ? activityreport::runConfirmations(db,year,band) : activityreport::run(db,year,band); else report.error=QStringLiteral("Cannot open log for report");
             db.close();
         }
         QSqlDatabase::removeDatabase(connection); if (!self) return;
         const QString generated=QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-        QMetaObject::invokeMethod(self.data(),[self,path,band,station,year,generation,report,generated,kind] {
+        QMetaObject::invokeMethod(self.data(),[self,path,band,station,year,generation,report,generated,kind,dimensions,aggregate] {
             if (!self || self->m_shuttingDown || generation!=self->m_activityReportGeneration) return;
             if (!self->m_db.isOpen() || self->m_db.path()!=path) {
                 self->m_activityReport.clear(); emit self->activityReportReady({{QStringLiteral("error"),self->tr("The open log changed")}}); return;
             }
             self->m_activityReport={{QStringLiteral("path"),path},{QStringLiteral("band"),band},{QStringLiteral("station"),station},{QStringLiteral("year"),year},{QStringLiteral("kind"),kind},
+                {QStringLiteral("dimensions"),dimensions},{QStringLiteral("aggregate"),aggregate},
                 {QStringLiteral("generatedAt"),generated},{QStringLiteral("rows"),report.rows},
                 {QStringLiteral("truncated"),report.truncated},{QStringLiteral("error"),report.error}};
             emit self->activityReportReady(self->m_activityReport);
@@ -7732,6 +7737,15 @@ QString DecoLogController::saveClubReportSettings(int year,const QString& band,c
 {
     return saveStationReportSettings(QStringLiteral("club"),year,band,station);
 }
+QString DecoLogController::saveCustomReportSettings(int year,const QString& rawBand,const QStringList& dimensions,const QString& aggregate)
+{
+    const QString band=rawBand.trimmed().toLower();
+    if (!m_db.isOpen() || year<0 || year>9999 || band.size()>24 || !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty()) return tr("Invalid report definition");
+    const QJsonObject object{{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),QStringLiteral("custom")},
+        {QStringLiteral("dimensions"),QJsonArray::fromStringList(dimensions)},{QStringLiteral("aggregate"),aggregate}};
+    QSqlQuery q(m_db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES('activity_report_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
+    q.addBindValue(QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact))); return q.exec()?QString():tr("Cannot save report filters");
+}
 QString DecoLogController::saveStationReportSettings(const QString& kind,int year,const QString& rawBand,const QString& rawStation)
 {
     const QString band=rawBand.trimmed().toLower(), station=rawStation.trimmed().toUpper();
@@ -7749,9 +7763,14 @@ QVariantMap DecoLogController::activityReportSettings() const
     if (!doc.isObject()) return {}; const auto o=doc.object(); const int year=o.value(QStringLiteral("year")).toInt(-1); const QString band=o.value(QStringLiteral("band")).toString();
     const QString kind=o.value(QStringLiteral("kind")).toString(QStringLiteral("activity"));
     const QString station=o.value(QStringLiteral("station")).toString();
-    if (year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation") && kind!=QLatin1String("club"))) return {};
+    if (year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation") && kind!=QLatin1String("club") && kind!=QLatin1String("custom"))) return {};
     QVariantMap result{{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),kind}};
     if (kind==QLatin1String("club")) result.insert(QStringLiteral("station"),station);
+    if (kind==QLatin1String("custom")) {
+        const QStringList dims=o.value(QStringLiteral("dimensions")).toVariant().toStringList(); const QString aggregate=o.value(QStringLiteral("aggregate")).toString();
+        if (!activityreport::validateCustomSpec(dims,aggregate).isEmpty()) return {};
+        result.insert(QStringLiteral("dimensions"),dims); result.insert(QStringLiteral("aggregate"),aggregate);
+    }
     return result;
 }
 QString DecoLogController::exportActivityReport(const QUrl& file)
@@ -7765,7 +7784,7 @@ QString DecoLogController::exportActivityReport(const QUrl& file)
         (!target.canonicalFilePath().isEmpty() && target.canonicalFilePath()==source.canonicalFilePath())) return tr("Choose a file other than the log database");
     activityreport::Result report; report.rows=m_activityReport.value(QStringLiteral("rows")).toList();
     const QString kind=m_activityReport.value(QStringLiteral("kind")).toString();
-    const QByteArray bytes=kind==QLatin1String("club") ? activityreport::clubCsv(report) : kind==QLatin1String("confirmation") ? activityreport::confirmationsCsv(report) : activityreport::csv(report);
+    const QByteArray bytes=kind==QLatin1String("custom") ? activityreport::customCsv(report,m_activityReport.value(QStringLiteral("dimensions")).toStringList(),m_activityReport.value(QStringLiteral("aggregate")).toString()) : kind==QLatin1String("club") ? activityreport::clubCsv(report) : kind==QLatin1String("confirmation") ? activityreport::confirmationsCsv(report) : activityreport::csv(report);
     QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !out.commit()) return tr("Cannot write the CSV file");
     return {};
 }
