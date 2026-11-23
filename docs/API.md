@@ -143,7 +143,7 @@ può essere accessibile a processi con privilegi appropriati sul computer.
 L'esempio include `examples/extensions/recent_activity.manifest.json`. Il formato
 sperimentale versione 1 dichiara identificativo, versione, versione API, file
 Python nella stessa cartella e permessi richiesti. L'harness accetta attualmente
-solo `qso.read`, `status.read` e `worked.read`; permessi sconosciuti e TX sono
+solo `qso.read`, `status.read`, `worked.read` e `tracker.read`; permessi sconosciuti e TX sono
 rifiutati. Il manifest non assegna da solo alcun permesso sul server.
 
 ```sh
@@ -154,7 +154,10 @@ python3 tools/extension_harness.py examples/extensions/recent_activity.manifest.
 Il primo comando controlla il manifest e il file; il secondo avvia l'esempio con
 `DECODXLOG_READ_TOKEN` e verifica il risultato. L'harness usa un ambiente ridotto,
 un limite di tempo e controlli sulla dimensione dell'output, e termina il
-processo diretto se si blocca. Non è un gestore di installazione né una sandbox:
+processo diretto se si blocca. Su macOS/Linux avvia una sessione POSIX separata
+e termina il gruppo originale anche dopo l'uscita del processo principale; un
+figlio che crea una nuova sessione può comunque sfuggire. Su Windows termina
+solo il processo diretto. Non è un gestore di installazione né una sandbox:
 non impedisce al programma di accedere ai file o alla rete, avviare altri processi
 o leggere credenziali disponibili all'utente. Usare solo codice attendibile.
 

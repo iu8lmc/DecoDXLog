@@ -2,6 +2,8 @@ import importlib.util
 import pathlib
 import tempfile
 import json
+import os
+import time
 import unittest
 from unittest.mock import patch
 
@@ -12,6 +14,30 @@ spec.loader.exec_module(harness)
 
 
 class ExtensionHarnessTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "POSIX process groups required")
+    def test_timeout_and_normal_exit_stop_descendants(self):
+        base = {"schemaVersion": 1, "apiVersion": 1, "id": "org.example.demo", "version": "1.0.0",
+                "entrypoint": "demo.py", "permissions": ["qso.read"]}
+        with tempfile.TemporaryDirectory() as directory:
+            folder = pathlib.Path(directory)
+            manifest = folder / "manifest.json"
+            manifest.write_text(json.dumps(base))
+            for case in ("timeout", "exit", "crash", "output"):
+                marker = folder / (case + "-marker")
+                ready = folder / (case + "-ready")
+                child = "import pathlib,time; pathlib.Path(%r).write_text('ready'); time.sleep(0.8); pathlib.Path(%r).write_text('alive')" % (str(ready), str(marker))
+                source = "import subprocess,sys,time,json,pathlib\nsubprocess.Popen([sys.executable,'-c',%r])\nwhile not pathlib.Path(%r).exists(): time.sleep(0.01)\n" % (child, str(ready))
+                source += {"timeout": "time.sleep(10)\n", "exit": "print(json.dumps({'scope':'recent_sample'}))\n",
+                           "crash": "raise RuntimeError('crash')\n", "output": "print('x' * (2 * 1024 * 1024), flush=True); time.sleep(10)\n"}[case]
+                (folder / "demo.py").write_text(source)
+                if case != "exit":
+                    with self.assertRaises(ValueError):
+                        harness.run_extension(manifest, "read-only", 12345, 0.3 if case == "timeout" else 3)
+                else:
+                    self.assertEqual(harness.run_extension(manifest, "read-only", 12345, 3)["scope"], "recent_sample")
+                time.sleep(1)
+                self.assertFalse(marker.exists(), "descendant continued after the harness returned")
+
     def test_example_manifest_and_denied_permissions(self):
         manifest = pathlib.Path(__file__).resolve().parents[2] / "examples/extensions/recent_activity.manifest.json"
         result = harness.load_manifest(manifest)

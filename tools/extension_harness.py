@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -81,15 +82,25 @@ def run_extension(manifest_path, token, port, timeout):
             command = [sys.executable, str(entry), "--port", str(port)]
             if expected_scope == "recent_sample":
                 command += ["--limit", "100"]
-            process = subprocess.Popen(command,
-                                       cwd=directory, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err)
-            deadline = time.monotonic() + timeout
-            while process.poll() is None:
-                if time.monotonic() >= deadline or stdout.stat().st_size > MAX_OUTPUT or stderr.stat().st_size > MAX_OUTPUT:
+            process = subprocess.Popen(command, cwd=directory, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
+                                       start_new_session=(os.name == "posix"))
+            try:
+                deadline = time.monotonic() + timeout
+                while process.poll() is None:
+                    if time.monotonic() >= deadline or stdout.stat().st_size > MAX_OUTPUT or stderr.stat().st_size > MAX_OUTPUT:
+                        raise ValueError("extension timed out or exceeded output limit")
+                    time.sleep(0.02)
+            finally:
+                # Kill the session's original process group even if its leader exited;
+                # children can otherwise keep running after success, failure or timeout.
+                if os.name == "posix":
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                elif process.poll() is None:
                     process.kill()
-                    process.wait()
-                    raise ValueError("extension timed out or exceeded output limit")
-                time.sleep(0.02)
+                process.wait()
             if stdout.stat().st_size > MAX_OUTPUT or stderr.stat().st_size > MAX_OUTPUT:
                 raise ValueError("extension exceeded output limit")
             if process.returncode != 0:
