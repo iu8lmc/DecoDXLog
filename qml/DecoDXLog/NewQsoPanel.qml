@@ -604,6 +604,14 @@ GlassPanel {
                         StyledTextField { id: satModeField; Layout.fillWidth: true; uppercase: true; placeholderText: "—" }
                     }
                 }
+                Text {
+                    Layout.fillWidth: true
+                    visible: decolog.activation.state.serialEnabled === true && decolog.activation.state.sharedSerial === true
+                    text: qsTr("Shared serial is assigned on save and is not guaranteed unique across stations. Check the saved QSO before transmitting.")
+                    color: Theme.warningColor
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: 11
+                }
                 RowLayout {
                     Layout.fillWidth: true
                     visible: decolog.activation.state.serialEnabled === true || root.fieldVisible("COMMENT")
@@ -627,7 +635,7 @@ GlassPanel {
                         StyledTextField {
                             Layout.preferredWidth: 70
                             readOnly: true
-                            text: decolog.activation.nextSerial
+                            text: decolog.activation.state.sharedSerial ? qsTr("On save") : decolog.activation.nextSerial
                         }
                     }
                     LabeledField {

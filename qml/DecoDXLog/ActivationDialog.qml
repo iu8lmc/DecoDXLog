@@ -557,6 +557,15 @@ DialogFrame {
             }
         }
 
+        Text {
+            Layout.fillWidth: true
+            visible: !!root.draft.serialEnabled && !!root.draft.sharedSerial
+            text: qsTr("Shared serials are assigned on save. A network split, restart or lost reply can duplicate numbers; uniqueness is not guaranteed.")
+            color: Theme.warningColor
+            wrapMode: Text.WordWrap
+            font.pixelSize: 11
+        }
+
         // ── Le regole di questa edizione e il call history (contest) ────────
         RowLayout {
             Layout.fillWidth: true

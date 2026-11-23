@@ -39,8 +39,12 @@ bool SharedSerials::isServer(const QString& me, const QStringList& others)
 
 int SharedSerials::take(int localNext, bool server, bool online)
 {
-    if (online && server)
-        return qMax(serve(), localNext);
+    if (online && server) {
+        // Advance the allocator before serving: the returned value must be the
+        // value actually recorded as issued, including a higher local counter.
+        note(localNext - 1);
+        return serve();
+    }
     int n = m_reserved > 0 ? m_reserved : qMax(localNext, m_max + 1);
     m_reserved = 0;
     note(n);

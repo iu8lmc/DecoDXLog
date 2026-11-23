@@ -433,6 +433,15 @@ private slots:
         QCOMPARE(runner.highest(), 9);
     }
 
+    void serverRecordsActualIssuedNumberWhenLocalCounterIsAhead()
+    {
+        SharedSerials server;
+        QCOMPARE(server.take(100, true, true), 100);
+        QCOMPARE(server.highest(), 100);
+        QCOMPARE(server.serve(), 101);
+        QVERIFY(server.noteRemote(100));
+    }
+
     void splitNetworkReportsSerialCollision()
     {
         SharedSerials first;

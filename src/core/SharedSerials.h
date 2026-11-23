@@ -4,9 +4,8 @@
 // sequenza unica per regolamento) i PC in rete non possono contare ognuno per
 // conto suo: due QSO nello stesso minuto avrebbero lo stesso numero. Uno dei
 // PC distribuisce i numeri — quello con l'identita' piu' piccola fra quelli
-// presenti, cosi' se sparisce ne subentra un altro senza chiedere niente a
-// nessuno — e gli altri ne chiedono uno in anticipo, per averlo pronto quando
-// il QSO arriva. Senza rete si va avanti da soli: il piu' alto visto piu' uno.
+// presenti. Le assegnazioni sono volatili: una partizione, un riavvio o una
+// risposta persa possono causare collisioni. Non garantiscono unicita globale.
 #pragma once
 
 #include <QString>
