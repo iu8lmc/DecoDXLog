@@ -216,6 +216,11 @@ QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visi
     }
     return out;
 }
+bool watchSnapshotCurrent(const LogDatabase& db, quint64 generation, qint64 dataVersion)
+{
+    return dataVersion >= 0 && db.isOpen() && db.openGeneration() == generation &&
+           db.fileIdentityMatchesOpen() && db.dataVersion() == dataVersion;
+}
 bool watchMatches(const Campaign& c,const EnrichedSpot& spot,const QDateTime& now,qint64 activeProfileId)
 {
     if (!c.watched || c.archived || !now.isValid() || now.timeSpec()==Qt::LocalTime ||

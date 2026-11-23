@@ -2437,16 +2437,20 @@ void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
         if (!hasGoal) continue;
         const QString pendingKey=m_db.path()+QLatin1Char('|')+campaign.id+QLatin1Char('|')+QString::number(campaign.revision)+QLatin1Char('|')+spot.key();
         if (m_dxWatchPending.contains(pendingKey) || m_dxWatchPending.size()>=128 || m_db.path().isEmpty() || m_db.path()==QLatin1String(":memory:")) continue;
+        const qint64 dataVersion=m_db.dataVersion();
+        const quint64 generation=m_db.openGeneration();
+        if (!dxcampaign::watchSnapshotCurrent(m_db,generation,dataVersion)) continue;
         m_dxWatchPending.insert(pendingKey);
         const QString path=m_db.path(); const quint64 logVersion=m_logVersion;
         QPointer<DecoLogController> self(this);
-        m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,pendingKey] {
+        m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey] {
             LogDatabase db; QString error; bool needed=false;
             if (db.open(path)) { const auto result=dxcampaign::goalNeeded(db,campaign,spot,&error); needed=result && *result; }
             if (!self) return;
-            QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,pendingKey,needed] {
+            QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey,needed] {
                 if (!self) return; self->m_dxWatchPending.remove(pendingKey);
                 if (!needed || self->m_shuttingDown || self->m_db.path()!=path || self->m_logVersion!=logVersion ||
+                    !dxcampaign::watchSnapshotCurrent(self->m_db,generation,dataVersion) ||
                     !self->m_cluster || !self->m_cluster->acceptsSpot(spot) ||
                     (self->m_profiles ? self->m_profiles->activeProfileId() : 0)!=profile ||
                     !dxcampaign::watchMatches(campaign,spot,QDateTime::currentDateTimeUtc(),profile)) return;

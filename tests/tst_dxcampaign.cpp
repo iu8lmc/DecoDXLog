@@ -12,6 +12,26 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void externalWriteInvalidatesPendingGoalAlertSnapshot()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("watch.sqlite"));
+        LogDatabase observer; QVERIFY(observer.open(path));
+        LogDatabase writer; QVERIFY(writer.open(path));
+        const quint64 generation = observer.openGeneration();
+        const qint64 version = observer.dataVersion(); QVERIFY(version >= 0);
+        QVERIFY(dxcampaign::watchSnapshotCurrent(observer, generation, version));
+        const auto saved = writer.insertQso({{"CALL", "3Y0J"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                                             {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        QCOMPARE(saved.status, InsertResult::Status::Inserted);
+        // The previous path/generation-only guard accepts this stale result.
+        QCOMPARE(observer.openGeneration(), generation);
+        QVERIFY(!dxcampaign::watchSnapshotCurrent(observer, generation, version));
+        const qint64 refreshed = observer.dataVersion(); QVERIFY(refreshed >= 0);
+        QVERIFY(dxcampaign::watchSnapshotCurrent(observer, generation, refreshed));
+        observer.close();
+        QVERIFY(!dxcampaign::watchSnapshotCurrent(observer, generation, refreshed));
+    }
     void explicitGoalsTrackWorkedAndConfirmedSeparately()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("goals.sqlite"); QString id;

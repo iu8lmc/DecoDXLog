@@ -34,6 +34,7 @@ std::optional<bool> goalNeeded(const LogDatabase& db, const Campaign& campaign, 
 // or times are inferred; future, undated and out-of-period spots are excluded.
 QList<EnrichedSpot> freshSpots(const Campaign& campaign, const QList<EnrichedSpot>& visible,
                                const QDateTime& now, int maxAgeMinutes);
+bool watchSnapshotCurrent(const LogDatabase& db, quint64 generation, qint64 dataVersion);
 bool watchMatches(const Campaign& campaign, const EnrichedSpot& spot, const QDateTime& now, qint64 activeProfileId);
 }
 }
