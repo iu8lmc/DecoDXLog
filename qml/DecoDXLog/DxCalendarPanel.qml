@@ -160,6 +160,36 @@ GlassPanel {
                              start:event.start || "", end:event.end || "", source:root.feedUrl,
                              observedAt:root.calendarObserved, bands:["20m","40m","15m","10m"], modes:["CW","SSB","FT8"], profileId:0, archived:false, revision:0})
     }
+    function reviewCampaignDates(event) { dateReview.review(event) }
+    function probeDateReview() {
+        calendarObserved="2026-01-09T10:00:00Z"
+        visibleEntries=[{entity:"Fixture expedition",title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-10",description:"Updated dates"}]
+        Qt.callLater(function() {
+            const row=list.itemAtIndex(0)
+            if (!row) { console.warn("PROBE dxdates missing calendar row"); return }
+            row.probeReviewDates()
+            const before=root.campaignBackend.dxCampaigns
+            console.warn("PROBE dxdates before " + JSON.stringify(before))
+            const index=before.findIndex(c => c.title === "Spring")
+            dateReview.choose(index)
+            console.warn("PROBE dxdates comparison " + dateComparison.text)
+            cancelDates.clicked(); console.warn("PROBE dxdates cancel " + !dateReview.visible)
+            row.probeReviewDates(); dateReview.choose(index)
+            const changed=Object.assign({},dateReview.selected)
+            root.campaignBackend.saveDxCampaign(changed)
+            applyDates.clicked(); console.warn("PROBE dxdates stale " + dateReview.visible + " " + dateReview.reviewError)
+            dateReview.choose(root.campaignBackend.dxCampaigns.findIndex(c => c.title === "Spring"))
+            applyDates.clicked(); dateProbeResult.start()
+        })
+    }
+    Timer {
+        id:dateProbeResult; interval:200; repeat:true; property int tries:0
+        onTriggered: {
+            if (root.campaignBackend.dxCampaignBusy && ++tries<25) return
+            stop(); console.warn("PROBE dxdates after " + JSON.stringify(root.campaignBackend.dxCampaigns))
+            console.warn("PROBE dxdates matrix " + JSON.stringify(root.campaignBackend.dxCampaignMatrix))
+        }
+    }
     function probeCampaign() {
         calendarObserved="2026-01-01T10:00:00Z"
         visibleEntries=[{entity:"Fixture expedition",title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-07",description:"Synthetic announcement"}]
@@ -202,6 +232,65 @@ GlassPanel {
             const rows=root.campaignBackend.dxCampaignMatrix
             if ((root.campaignBackend.dxCampaignBusy || !rows.length || rows[0].confirmed!==1) && ++tries<20) return
             stop(); console.warn("PROBE dxcampaign new confirmation " + JSON.stringify(rows))
+        }
+    }
+
+    DialogFrame {
+        id:dateReview
+        transientParent:root.Window.window
+        title:qsTr("Review announced dates")
+        info:qsTr("Choose the campaign explicitly")
+        width:760; height:480
+        property var announcement: ({})
+        property var selected: ({})
+        property string observedAt: ""
+        property string logPath: ""
+        property string reviewError: ""
+        function review(event) {
+            announcement={title:event.title || "",call:event.call || "",start:event.start || "",end:event.end || ""}
+            observedAt=root.calendarObserved; logPath=root.campaignBackend.currentLogInfo().path || ""
+            selected=({}); campaignChoice.currentIndex=-1; reviewError=""; open()
+        }
+        function choose(index) {
+            const campaigns=root.campaignBackend.dxCampaigns
+            selected=index>=0 && index<campaigns.length ? campaigns[index] : ({})
+            campaignChoice.currentIndex=index
+        }
+        function apply() {
+            if (!selected.id) { reviewError=qsTr("Choose a campaign first."); return }
+            if (!logPath || logPath!==root.campaignBackend.currentLogInfo().path) { reviewError=qsTr("The open log changed; review again."); return }
+            if (!observedAt) { reviewError=qsTr("The calendar observation time is unavailable. Update the calendar and review again."); return }
+            const updated=Object.assign({},selected,{start:announcement.start,end:announcement.end,source:root.feedUrl,observedAt:observedAt})
+            if (!root.campaignBackend.saveDxCampaign(updated)) { reviewError=root.campaignBackend.dxCampaignError; return }
+            close()
+        }
+        body:ColumnLayout {
+            spacing:10
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor
+                text:qsTr("The feed has no stable event identity. Select the intended campaign and compare the announcement yourself; calls alone do not establish a match.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.textColor
+                text:qsTr("Announcement: %1 · %2 · %3 → %4\nSource: %5 · observed: %6")
+                    .arg(dateReview.announcement.title || "").arg(dateReview.announcement.call || "")
+                    .arg(dateReview.announcement.start || "").arg(dateReview.announcement.end || "")
+                    .arg(root.feedUrl).arg(dateReview.observedAt || qsTr("unknown")) }
+            StyledComboBox {
+                id:campaignChoice; Layout.fillWidth:true
+                model:root.campaignBackend ? root.campaignBackend.dxCampaigns.map(c => c.title + " · " + c.start + " → " + c.end + (c.archived ? " · " + qsTr("archived") : "")) : []
+                currentIndex:-1
+                onActivated:dateReview.choose(currentIndex)
+            }
+            Text { id:dateComparison; Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.textColor
+                text:!dateReview.selected.id ? qsTr("No campaign selected")
+                    : qsTr("Selected: %1 · %2\nCurrent: %3 → %4 · source: %5\nProposed: %6 → %7 · source: %8")
+                        .arg(dateReview.selected.title).arg((dateReview.selected.calls || []).join(", "))
+                        .arg(dateReview.selected.start).arg(dateReview.selected.end).arg(dateReview.selected.source)
+                        .arg(dateReview.announcement.start).arg(dateReview.announcement.end).arg(root.feedUrl) }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:dateReview.reviewError }
+            Item { Layout.fillHeight:true }
+            RowLayout {
+                CalendarButton { id:applyDates; text:qsTr("Apply dates to selected campaign"); enabled:!!dateReview.selected.id; onClicked:dateReview.apply() }
+                CalendarButton { id:cancelDates; text:qsTr("Cancel"); onClicked:dateReview.close() }
+            }
         }
     }
 
@@ -377,6 +466,7 @@ GlassPanel {
             delegate: Rectangle {
                 required property var modelData
                 function probePlan() { planButton.clicked() }
+                function probeReviewDates() { reviewDatesButton.clicked() }
                 width: list.width
                 height: details.implicitHeight + 76
                 radius: 4
@@ -408,7 +498,11 @@ GlassPanel {
                         maximumLineCount: 4
                         elide: Text.ElideRight
                     }
-                    CalendarButton { id:planButton; visible:!!root.campaignBackend; text:qsTr("Plan campaign"); onClicked:root.beginCampaignFromEvent(modelData) }
+                    Row {
+                        spacing:6
+                        CalendarButton { id:planButton; visible:!!root.campaignBackend; text:qsTr("Plan campaign"); onClicked:root.beginCampaignFromEvent(modelData) }
+                        CalendarButton { id:reviewDatesButton; visible:!!root.campaignBackend; text:qsTr("Review date update"); onClicked:root.reviewCampaignDates(modelData) }
+                    }
                 }
             }
             ScrollBar.vertical: ScrollBar {}

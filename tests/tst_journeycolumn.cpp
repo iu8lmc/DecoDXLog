@@ -61,6 +61,28 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void dxCampaignDateReviewChangesOnlyChosenExpedition()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString firstId, secondId;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          dxcampaign::Campaign c; c.title="Spring"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7);
+          c.source="original source"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"};
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); firstId=c.id;
+          c.id.clear(); c.revision=0; c.title="Autumn"; c.start=QDate(2026,10,1); c.end=QDate(2026,10,7);
+          QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); secondId=c.id;
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","ZZ1AAA"},{"QSO_DATE","20260108"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import").id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"dxdatesprobe",output,7000),output.constData());
+        QVERIFY2(output.contains("PROBE dxdates before") && output.contains("PROBE dxdates comparison") && output.contains("2026-01-07") && output.contains("2026-01-10"),output.constData());
+        QVERIFY2(output.contains("PROBE dxdates cancel true") && output.contains("PROBE dxdates stale true") && output.contains("reload before saving"),output.constData());
+        QVERIFY2(output.contains("PROBE dxdates after") && output.contains("PROBE dxdates matrix") && output.contains("\"worked\":1"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+        const auto first=dxcampaign::load(db,firstId), second=dxcampaign::load(db,secondId); QVERIFY(first && second);
+        QCOMPARE(first->end,QDate(2026,1,10)); QCOMPARE(first->revision,3); QCOMPARE(first->calls,QStringList({"ZZ1AAA"}));
+        QCOMPARE(first->source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(first->verifiedAt.toString(Qt::ISODate),QString("2026-01-09T10:00:00Z"));
+        QCOMPARE(second->end,QDate(2026,10,7)); QCOMPARE(second->revision,1); QCOMPARE(second->source,QString("original source")); QCOMPARE(db.qsoCount(),1);
+    }
     void dxCampaignCalendarCreatesEditablePersistentMatrix()
     {
         using namespace decolog::core;
