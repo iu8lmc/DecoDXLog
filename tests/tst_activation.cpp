@@ -200,7 +200,39 @@ private slots:
         r.set("COMMENT", "changed after preview"); QCOMPARE(db.updateQso(inserted.id, r).status, InsertResult::Status::Inserted);
         exported.clear(); QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
         QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY(!exported.at(0).at(0).toBool());
-        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), data);
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), data); file.close();
+        const QString sessionId = act.state().value("sessionUuid").toString();
+        act.stop(); QVERIFY(!act.active());
+        const auto runs = act.closedRuns(0); QCOMPARE(runs.size(), 1);
+        QCOMPARE(runs.at(0).toMap().value("uuid").toString(), sessionId);
+        previewed.clear(); QVERIFY(act.startRunPartitionPreview(sessionId));
+        QTRY_COMPARE_WITH_TIMEOUT(previewed.size(), 1, 5000); QVERIFY(previewed.at(0).at(0).toBool());
+        QVariantMap closedGroup;
+        for (const auto& item : act.previewResult().value("groups").toList()) {
+            const auto g = item.toMap();
+            if (g.value("program") == "POTA" && g.value("reference") == "IT-0001" && g.value("day") == "2026-12-31") closedGroup = g;
+        }
+        QVERIFY(!closedGroup.isEmpty()); exported.clear();
+        QVERIFY(act.startPartitionExport(closedGroup, QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY(exported.at(0).at(0).toBool());
+        LogDatabase reopened; QVERIFY(reopened.open(dir.filePath("log.sqlite")));
+        ActivationController::Context reopenContext; reopenContext.db = &reopened;
+        ActivationController restored(std::move(reopenContext)); restored.load(); QVERIFY(!restored.active());
+        QCOMPARE(restored.closedRuns(0).at(0).toMap().value("uuid").toString(), sessionId);
+        QSignalSpy reopenedPreview(&restored, &ActivationController::previewFinished);
+        QVERIFY(restored.startRunPartitionPreview(sessionId));
+        QTRY_COMPARE_WITH_TIMEOUT(reopenedPreview.size(), 1, 5000); QVERIFY(reopenedPreview.at(0).at(0).toBool());
+        QCOMPARE(restored.previewResult().value("reportedCount").toInt(), 2);
+    }
+    void closedSessionListingIsPaged()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM n WHERE x<102) INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) SELECT printf('run-%d',x),'2026-01-01','2026-01-02','{}','{\"title\":\"Test\"}' FROM n"));
+        ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
+        const auto first = act.closedRuns(0); QCOMPARE(first.size(), 101);
+        QCOMPARE(first.at(0).toMap().value("uuid").toString(), QString("run-102"));
+        const auto second = act.closedRuns(first.at(99).toMap().value("rowid").toLongLong());
+        QCOMPARE(second.size(), 2); QCOMPARE(second.at(1).toMap().value("uuid").toString(), QString("run-1"));
     }
     void simultaneousProgramReferencesStayIndependent()
     {

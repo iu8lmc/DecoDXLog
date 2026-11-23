@@ -70,6 +70,8 @@ public:
     Q_INVOKABLE void cancelPartitionExport();
     QVariantMap previewResult() const { return m_previewResult; }
     Q_INVOKABLE bool startPartitionPreview();
+    Q_INVOKABLE bool startRunPartitionPreview(const QString& uuid);
+    Q_INVOKABLE QVariantList closedRuns(qint64 beforeRowId = 0) const;
     Q_INVOKABLE void cancelPartitionPreview();
 
     // Da chiamare quando il log e' aperto: la sessione sopravvive a una chiusura
@@ -188,6 +190,7 @@ private:
     quint64 m_previewGeneration{0};
     bool m_previewBusy{false};
     QVariantMap m_previewResult;
+    QString m_previewSessionUuid;
     // Il punteggio e i moltiplicatori gia' presi, calcolati una volta per QSO
     // e non una volta per ogni riquadro che li mostra: in gara li leggono
     // quattro finestre e ogni riga del cluster, e ricalcolarli ogni volta

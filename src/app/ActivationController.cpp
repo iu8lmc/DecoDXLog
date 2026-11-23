@@ -95,6 +95,7 @@ ActivationController::~ActivationController()
 void ActivationController::invalidatePreview()
 {
     ++m_previewGeneration;
+    m_previewSessionUuid.clear();
     if (m_previewCancel) m_previewCancel->store(true);
     if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     if (!m_previewResult.isEmpty()) { m_previewResult.clear(); emit previewChanged(); }
@@ -669,7 +670,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     if (ownsTransaction && !db.transaction()) return fail(tr("Cannot open a consistent preview of the log."));
     struct ReadTransaction { QSqlDatabase db; bool committed{false}; ~ReadTransaction() { if (!committed) db.rollback(); } } transaction{db, !ownsTransaction};
     QSqlQuery exists(db);
-    exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=? AND ended_at IS NULL")); exists.addBindValue(uuid);
+    exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=?")); exists.addBindValue(uuid);
     if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
     QSqlQuery q(db); q.setForwardOnly(true);
     q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
@@ -734,18 +735,43 @@ QVariantMap ActivationController::partitionPreview() const
     return scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {});
 }
 
+QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
+{
+    QVariantList rows;
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return rows;
+    QSqlQuery q(m_ctx.db->connection());
+    q.prepare(beforeRowId > 0
+        ? QStringLiteral("SELECT rowid,uuid,started_at,ended_at,last_json FROM activation_run WHERE ended_at IS NOT NULL AND rowid<? ORDER BY rowid DESC LIMIT 101")
+        : QStringLiteral("SELECT rowid,uuid,started_at,ended_at,last_json FROM activation_run WHERE ended_at IS NOT NULL ORDER BY rowid DESC LIMIT 101"));
+    if (beforeRowId > 0) q.addBindValue(beforeRowId);
+    if (!q.exec()) return rows;
+    while (q.next()) {
+        const QVariantMap state = QJsonDocument::fromJson(q.value(4).toByteArray()).object().toVariantMap();
+        rows << QVariantMap{{QStringLiteral("rowid"), q.value(0)}, {QStringLiteral("uuid"), q.value(1)},
+            {QStringLiteral("startedAt"), q.value(2)}, {QStringLiteral("endedAt"), q.value(3)},
+            {QStringLiteral("title"), state.value(QStringLiteral("title"))}};
+    }
+    return rows;
+}
+
 bool ActivationController::startPartitionPreview()
 {
+    return startRunPartitionPreview(m_session.active ? m_session.sessionUuid : QString());
+}
+
+bool ActivationController::startRunPartitionPreview(const QString& requestedUuid)
+{
     if (m_previewBusy) return false;
-    m_previewResult.clear();
-    if (!m_session.active || m_session.sessionUuid.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
+    m_previewResult.clear(); m_previewSessionUuid.clear();
+    if (requestedUuid.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
         m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:")) {
         m_previewResult = {{QStringLiteral("error"), tr("A tracked session and an open file-backed log are required.")}};
         emit previewChanged(); return false;
     }
     const QString path = m_ctx.db->path();
     const QString connectionName = m_ctx.db->connection().connectionName();
-    const QString uuid = m_session.sessionUuid;
+    const QString uuid = requestedUuid;
+    m_previewSessionUuid = uuid;
     const quint64 generation = m_previewGeneration;
     m_previewCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_previewCancel;
@@ -768,8 +794,8 @@ bool ActivationController::startPartitionPreview()
             if (!self) return;
             self->m_previewBusy = false; self->m_previewCancel.reset();
             const bool same = self->m_ctx.db && self->m_ctx.db->isOpen() && self->m_ctx.db->path() == path &&
-                self->m_ctx.db->connection().connectionName() == connectionName && self->m_session.active &&
-                self->m_session.sessionUuid == uuid && self->m_previewGeneration == generation;
+                self->m_ctx.db->connection().connectionName() == connectionName &&
+                self->m_previewSessionUuid == uuid && self->m_previewGeneration == generation;
             self->m_previewResult = !same ? QVariantMap{{QStringLiteral("error"), tr("The log or session changed; recalculate the preview.")}}
                 : cancelled->load() ? QVariantMap{{QStringLiteral("error"), tr("Preview cancelled.")}} : result;
             const bool success = self->m_previewResult.value(QStringLiteral("error")).toString().isEmpty();
@@ -786,7 +812,7 @@ void ActivationController::cancelPartitionExport()
 
 bool ActivationController::startPartitionExport(const QVariantMap& group, const QUrl& destination)
 {
-    if (m_partitionExportBusy || m_previewBusy || !destination.isLocalFile() || !m_session.active ||
+    if (m_partitionExportBusy || m_previewBusy || !destination.isLocalFile() || m_previewSessionUuid.isEmpty() ||
         !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path() == QLatin1String(":memory:")) return false;
     const QString program = group.value(QStringLiteral("program")).toString();
     if (program != QLatin1String("POTA") && program != QLatin1String("WWFF") &&
@@ -805,7 +831,7 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
         const bool sameExistingFile = std::filesystem::equivalent(std::filesystem::path(output.toStdString()), std::filesystem::path(protectedPath.toStdString()), ec);
         if (outInfo.absoluteFilePath() == protectedInfo.absoluteFilePath() || (!ec && sameExistingFile)) return false;
     }
-    const QString uuid = m_session.sessionUuid;
+    const QString uuid = m_previewSessionUuid;
     const QString key = QString::fromUtf8(QJsonDocument(QJsonArray{program, group.value(QStringLiteral("reference")).toString(),
         group.value(QStringLiteral("day")).toString(), group.value(QStringLiteral("operator")).toString(), group.value(QStringLiteral("grid")).toString()}).toJson(QJsonDocument::Compact));
     const QString expected = group.value(QStringLiteral("fingerprint")).toString();

@@ -18,7 +18,11 @@ DialogFrame {
     property bool probeAwaitPreview: false
     property bool probeAwaitExport: false
     property int probeExportStep: 0
+    property bool probeClosedMode: false
     property int previewPage: 0
+    property var historyRows: []
+    property var historyCursors: [0]
+    property int historyPage: 0
     property var exportGroup: ({})
     property string partitionMessage: ""
 
@@ -31,6 +35,9 @@ DialogFrame {
         errorText.text = ""
         partitionMessage = ""
         previewShown = false
+        historyCursors = [0]
+        historyPage = 0
+        historyRows = act.closedRuns(0)
         open()
     }
     function chooseContest() { contestPicker.openPicker() }
@@ -72,7 +79,7 @@ DialogFrame {
     }
     Connections {
         target: root.act
-        function onChanged() { root.previewShown = false }
+        function onChanged() { root.previewShown = false; root.historyCursors = [0]; root.historyPage = 0; root.historyRows = root.act.closedRuns(0) }
         function onPreviewChanged() {
             if (!root.act.previewBusy) {
                 root.partitionPreview = root.act.previewResult
@@ -83,9 +90,19 @@ DialogFrame {
         function onPartitionExportFinished(success, message) {
             errorText.text = success ? "" : message
             root.partitionMessage = success ? qsTr("Partition file saved. Review it before submission.") : ""
+            if (root.probeClosedMode) {
+                console.warn("PROBE closedExport success=" + success + " error=" + message)
+                root.probeClosedMode = false
+                return
+            }
             if (root.probeAwaitExport) {
                 console.warn("PROBE multiExport step=" + root.probeExportStep + " success=" + success + " error=" + message)
-                if (!success || root.probeExportStep >= 2) { root.probeAwaitExport = false; root.act.stop(); return }
+                if (!success || root.probeExportStep >= 2) {
+                    root.probeAwaitExport = false; root.act.stop()
+                    root.probeClosedMode = true
+                    Qt.callLater(() => { const row = historyRepeater.itemAt(0); console.warn("PROBE closedRow exists=" + !!row); if (row) row.probeClick() })
+                    return
+                }
                 root.probeExportStep++
                 const program = root.probeExportStep === 1 ? "SOTA" : "IOTA"
                 const group = (root.partitionPreview.groups || []).find(g => g.program === program)
@@ -95,6 +112,14 @@ DialogFrame {
             }
         }
         function onPreviewFinished(success) {
+            if (root.probeClosedMode) {
+                console.warn("PROBE closedPreview success=" + success + " reported=" + root.partitionPreview.reportedCount)
+                const group = (root.partitionPreview.groups || []).find(g => g.program === "POTA" && g.reference === "IT-0001")
+                const started = group && root.act.startPartitionExport(group, "file://" + decolog.currentLogInfo().path + ".closed.adi")
+                console.warn("PROBE closedExport started=" + !!started)
+                if (!started) root.probeClosedMode = false
+                return
+            }
             if (root.probeAwaitPreview) {
                 root.probeAwaitPreview = false
                 console.warn("PROBE multiPreview reported=" + root.partitionPreview.reportedCount + " groups=" + (root.partitionPreview.groups || []).length + " error=" + (root.partitionPreview.error || ""))
@@ -470,6 +495,41 @@ DialogFrame {
             visible: root.act.active && (Object.keys(root.state.programs || {}).length > 0 || String(root.state.reference || "").indexOf(",") >= 0)
             text: qsTr("The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.")
             color: Theme.warningColor
+        }
+        Note {
+            text: qsTr("Closed tracked sessions: select one to review its reported QSO. Older untracked sessions are not inferred.")
+        }
+        Repeater {
+            id: historyRepeater
+            model: root.historyRows.slice(0, 100)
+            RowLayout {
+                required property var modelData
+                function probeClick() { historyPreviewButton.clicked() }
+                Layout.fillWidth: true
+                Note { text: qsTr("%1 · %2 – %3 UTC").arg(modelData.title || qsTr("Session")).arg(modelData.startedAt).arg(modelData.endedAt) }
+                GlassButton {
+                    id: historyPreviewButton
+                    text: qsTr("Preview")
+                    enabled: !root.act.previewBusy && !root.act.partitionExportBusy
+                    onClicked: root.act.startRunPartitionPreview(modelData.uuid)
+                }
+            }
+        }
+        RowLayout {
+            visible: root.historyPage > 0 || root.historyRows.length > 100
+            GlassButton {
+                text: qsTr("Newer sessions"); enabled: root.historyPage > 0
+                onClicked: { root.historyPage--; root.historyRows = root.act.closedRuns(root.historyCursors[root.historyPage]) }
+            }
+            GlassButton {
+                text: qsTr("Older sessions"); enabled: root.historyRows.length > 100
+                onClicked: {
+                    const cursors = root.historyCursors.slice(0, root.historyPage + 1)
+                    cursors.push(root.historyRows[99].rowid)
+                    root.historyCursors = cursors; root.historyPage++
+                    root.historyRows = root.act.closedRuns(cursors[root.historyPage])
+                }
+            }
         }
         GlassButton {
             id: previewButton

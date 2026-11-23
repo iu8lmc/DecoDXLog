@@ -385,3 +385,12 @@ The same selected-group, background export and stale-preview checks now also sup
 A/B: a synthetic four-programme session with separate counterpart summit/island references could not start SOTA/IOTA exports before this change; afterwards both files are parsed and their own/counterpart fields and existing `MY_SIG` are checked. The two-date/two-operator fixture still checks POTA/WWFF and stale-preview rejection. `tst_activation` passed 22 tests. The offscreen desktop probe produced POTA, SOTA and IOTA files, verified two different summit groups and parsed the resulting files, on macOS arm64/Qt 6.11.2.
 
 No official importer, actual island activation, RF, large-log performance or Windows/Linux test was performed. Formal programme eligibility, duplicates, catalogue validity, detailed site/operator periods, complete file review and the other open G06 requirements remain outstanding; the same snapshot and metadata limitations documented above apply. All desktop roadmap streams remain in scope.
+
+
+## 2026-11-23 — G06 review and export closed tracked sessions
+
+The activation dialog now lists closed tracked sessions in pages of 100 and allows an operator to run the existing background grouping and POTA/WWFF/SOTA/IOTA partition export for a selected session. The scanner checks that the selected journal exists, and the selected UUID and preview generation are retained independently of the currently active session; the existing revision fingerprint and consistent export snapshot checks still apply. Legacy sessions without a tracked UUID are not reconstructed or attributed.
+
+A/B: before this change the closed-session listing and preview entry point did not exist. A synthetic fixture closes a multi-programme session, previews and exports it, then opens an independent connection and previews it again; another fixture lists 102 sessions across two pages. The offscreen application probe closes a session, activates its history-row Preview button, and produces and parses a two-QSO POTA file from that closed session. `tst_activation` passed 23 tests and the focused desktop probe passed on macOS arm64/Qt 6.11.2. No physical UI or external service was used.
+
+The history only covers sessions created with tracking; editable/imported session identifiers are not proof of membership. The history does not yet expose site/operator periods or catalogue/eligibility validation. The grouping, output snapshot and importer limitations recorded in preceding milestones remain. Other desktop roadmap requirements remain open.

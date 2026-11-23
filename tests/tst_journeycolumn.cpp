@@ -67,6 +67,12 @@ private slots:
         QVERIFY2(output.contains("PROBE multiPreview reported=2 groups=6 error="), output.constData());
         QVERIFY2(output.contains("PROBE multiExport started=true"), output.constData());
         QVERIFY2(output.contains("PROBE multiExport step=0 success=true error="), output.constData());
+        QVERIFY2(output.contains("PROBE closedRow exists=true"), output.constData());
+        QVERIFY2(output.contains("PROBE closedPreview success=true reported=2"), output.constData());
+        QVERIFY2(output.contains("PROBE closedExport started=true"), output.constData());
+        QVERIFY2(output.contains("PROBE closedExport success=true error="), output.constData());
+        QFile closed(dir.filePath("test.sqlite.closed.adi")); QVERIFY(closed.open(QIODevice::ReadOnly));
+        QCOMPARE(decolog::core::adif::parse(closed.readAll()).records.size(), 2);
         QFile partition(dir.filePath("test.sqlite.probe.adi")); QVERIFY(partition.open(QIODevice::ReadOnly));
         const auto exported = decolog::core::adif::parse(partition.readAll()).records; QCOMPARE(exported.size(), 2);
         for (const auto& row : exported) { QCOMPARE(row.value("MY_POTA_REF"), QString("IT-0001"));
