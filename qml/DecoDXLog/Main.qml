@@ -34,7 +34,7 @@ RoundedWindow {
                 stop()
                 const parts=startupShow.split(":")
                 predictDialog.open()
-                Qt.callLater(() => predictDialog.probeRigDraft(parts[1],parts[2],parts[3]))
+                Qt.callLater(() => predictDialog.probeRigDraft(parts[1],parts[2],parts[3],parts[0] === "trackerrigsaveprobe"))
             }
         }
     }
@@ -1335,7 +1335,7 @@ RoundedWindow {
             Qt.callLater(function () { newQsoDialog.probeSatelliteSplit() })
         }
         else if (what[0] === "rigsplitprobe") rigSplitProbeTimer.start()
-        else if (what[0] === "trackerrigprobe") trackerRigProbeTimer.start()
+        else if (what[0] === "trackerrigprobe" || what[0] === "trackerrigsaveprobe") trackerRigProbeTimer.start()
         else if (what[0] === "historicalrigprobe") historicalRigProbeTimer.start()
         else if (what[0] === "predictprobe") { predictDialog.open(); Qt.callLater(() => predictDialog.probe(what[1], what[2], what[3])) }
         else if (what[0] === "predictlist") { predictDialog.open(); Qt.callLater(() => predictDialog.probeList(what[1], what[2])) }

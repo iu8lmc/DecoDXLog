@@ -37,17 +37,25 @@ class Tracker(socketserver.BaseRequestHandler):
         else: reply='Huh?\n'
         sock.sendto(reply.encode(),self.client_address)
 
+save = '--save' in sys.argv[2:]
 with tempfile.TemporaryDirectory(prefix='decolog-tracker-rig-') as tmp, RigServer(('127.0.0.1',0),Rig) as rig, socketserver.ThreadingUDPServer(('127.0.0.1',0),Tracker) as tracker:
     rig.commands=[]; tracker.commands=[]
     threading.Thread(target=rig.serve_forever,daemon=True).start(); threading.Thread(target=tracker.serve_forever,daemon=True).start()
     root=pathlib.Path(tmp); env=os.environ.copy(); env.update(QT_QPA_PLATFORM='offscreen',QT_QUICK_BACKEND='software',DECODXLOG_DATA_ROOT=str(root/'data'),DECODXLOG_GRAB_MS='8000')
-    args=[sys.argv[1],'--software-renderer','--settings',str(root/'settings'),'--db',str(root/'test.sqlite'),'--port','0', '--rig',f'127.0.0.1:{rig.server_address[1]}','--show',f'trackerrigprobe:127.0.0.1:{tracker.server_address[1]}:OSCAR-7','--grab',str(root/'screen.png')]
+    args=[sys.argv[1],'--software-renderer','--settings',str(root/'settings'),'--db',str(root/'test.sqlite'),'--port','0', '--rig',f'127.0.0.1:{rig.server_address[1]}','--show',f'{"trackerrigsaveprobe" if save else "trackerrigprobe"}:127.0.0.1:{tracker.server_address[1]}:OSCAR-7','--grab',str(root/'screen.png')]
     result=subprocess.run(args,env=env,capture_output=True,text=True,timeout=25); output=result.stdout+result.stderr
     rig.shutdown(); tracker.shutdown()
     expected=['GET_MODE','GET_TLE OSCAR-7','GET_SAT OSCAR-7','GET_DOPPLER OSCAR-7','GET_TLE OSCAR-7','GET_MODE']
-    if result.returncode or 'PROBE trackerRig selections=true tracker=true connected=true tx=145.998596 rx=435.004184' not in output or tracker.commands != expected:
+    if result.returncode or 'PROBE trackerRig selections=true tracker=true connected=true' not in output or tracker.commands != expected:
         raise SystemExit(f'Probe failed: {output}; rig={rig.commands}; tracker={tracker.commands}')
-    with sqlite3.connect(root/'test.sqlite') as db: assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0]==0
+    with sqlite3.connect(root/'test.sqlite') as db:
+        rows=db.execute('SELECT call,freq,band,freq_rx,band_rx,prop_mode,sat_name,mode FROM qso WHERE deleted=0').fetchall()
+        if save:
+            assert rows==[('K1AAA',145.998596,'2m',435.004184,'70cm','SAT','OSCAR-7','CW')], rows
+            assert 'PROBE predictDraftInvalid kept=true' in output and 'PROBE predictDraftSaved=true' in output, output
+        else: assert not rows, rows
+    if 'PROBE trackerRig selections=true tracker=true connected=true tx=145.998596 rx=435.004184' not in output:
+        raise SystemExit(f'Tracker draft frequencies changed: {output}')
     writes=[c for c in rig.commands if c.split(' ',1)[0] in {'F','I','S','T','M'}]
     if writes: raise SystemExit(f'Unexpected rig writes: {writes}')
-    print(f'PASS tracker draft: rig queries={len(rig.commands)}; writes=0; QSO=0; PREDICT read-only')
+    print(f'PASS tracker draft: rig queries={len(rig.commands)}; writes=0; QSO={len(rows)}; PREDICT read-only')

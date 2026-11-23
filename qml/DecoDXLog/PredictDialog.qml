@@ -100,9 +100,9 @@ DialogFrame {
         downlinkField.text = "435.000000"
         requestButton.clicked()
     }
-    function probeRigDraft(host, port, name) {
+    function probeRigDraft(host, port, name, save) {
         probingRigDraft = true
-        probeDraft(host, port, name, false)
+        probeDraft(host, port, name, !!save)
     }
     function calculateCorrection() {
         if (!root.resultValid || root.sample.satellite !== satelliteField.text.trim()) {
