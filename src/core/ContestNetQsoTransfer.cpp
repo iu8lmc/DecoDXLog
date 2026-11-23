@@ -1,5 +1,6 @@
 #include "core/ContestNetQsoTransfer.h"
 #include <QCryptographicHash>
+#include <QJsonArray>
 #include <QRegularExpression>
 #include <cmath>
 
@@ -32,6 +33,25 @@ QJsonObject Encoder::frame(int index) const {
             {"fingerprint",QString::fromLatin1(m_row.contentHash.toHex())},{"sha256",QString::fromLatin1(m_payloadHash.toHex())},
             {"size",int(m_row.adifPayload.size())},{"count",count()},{"index",index},
             {"data",QString::fromLatin1(m_row.adifPayload.mid(index*chunkSize,chunkSize).toBase64())}};
+}
+QList<QJsonObject> Encoder::framesForRequest(const QJsonObject& request) const {
+    if (!ok() || request.value("version")!=QJsonValue(1) || request.value("transfer").toString()!=m_transfer
+        || request.value("sha256").toString()!=QString::fromLatin1(m_payloadHash.toHex()) || !request.value("indices").isArray()) return {};
+    const auto indices=request.value("indices").toArray();
+    if (indices.isEmpty() || indices.size()>32) return {};
+    QList<QJsonObject> frames; int previous=-1;
+    for (const auto& value:indices) {
+        int index; if (!number(value,0,count()-1,&index) || index<=previous) return {};
+        previous=index; frames.append(frame(index));
+    }
+    return frames;
+}
+QJsonObject Receiver::missingRequest(int fromIndex) const {
+    if (m_failed || m_complete || m_chunks.isEmpty() || fromIndex<0 || fromIndex>=m_chunks.size()) return {};
+    QJsonArray indices;
+    for (int i=fromIndex;i<m_chunks.size() && indices.size()<32;++i) if (m_chunks[i].isEmpty()) indices.append(i);
+    if (indices.isEmpty()) return {};
+    return {{"version",1},{"transfer",m_transfer},{"sha256",QString::fromLatin1(m_payloadHash.toHex())},{"indices",indices}};
 }
 bool Receiver::accept(const QString& sender,const QJsonObject& f) {
     auto reject=[this](const char* why) { m_error=QString::fromLatin1(why); return false; };

@@ -5,6 +5,7 @@
 #include "core/LogDatabase.h"
 
 #include <QSignalSpy>
+#include <QJsonArray>
 #include <QTest>
 #include <QUdpSocket>
 #include <QTemporaryDir>
@@ -143,6 +144,42 @@ private slots:
         QTRY_COMPARE(accepted,encoder.count()-1); QVERIFY(!receiver.complete());
         QVERIFY(send(1)); QTRY_COMPARE(accepted,encoder.count()); QVERIFY(!receiver.complete());
         QVERIFY(send(0)); QTRY_VERIFY(receiver.complete()); QCOMPARE(receiver.row().adifPayload,row.adifPayload);
+    }
+    void qsoTransferRequestsMissingFragments()
+    {
+        AdifRecord record{{"CALL","K1AAA"},{"COMMENT",QString(40000,QLatin1Char('r'))}};
+        ContestNetInventoryRow row; row.uuid="qso"; row.revision=2; row.adifPayload=adif::writeRecord(record).toUtf8(); row.contentHash=ContestNetInventory::fingerprint(record);
+        contestqso::Encoder sender("transfer","log",row); QVERIFY(sender.ok());
+        contestqso::Receiver receiver("node","transfer"); QVERIFY(receiver.accept("node",sender.frame(sender.count()-1)));
+        auto req=receiver.missingRequest(0); QVERIFY(!req.isEmpty()); auto frames=sender.framesForRequest(req); QCOMPARE(frames.size(),32);
+        auto bad=req; bad.insert("sha256",QString(64,QLatin1Char('0'))); QVERIFY(sender.framesForRequest(bad).isEmpty());
+        for (const auto& frame:frames) QVERIFY(receiver.accept("node",frame));
+        QVERIFY(!receiver.complete());
+        while (!receiver.complete()) {
+            req=receiver.missingRequest(0); frames=sender.framesForRequest(req); QVERIFY(!frames.isEmpty());
+            for (const auto& frame:frames) QVERIFY(receiver.accept("node",frame));
+        }
+        QVERIFY(receiver.missingRequest(0).isEmpty()); QCOMPARE(receiver.row().adifPayload,row.adifPayload);
+        bad=req; bad.insert("indices",QJsonArray{0,0}); QVERIFY(sender.framesForRequest(bad).isEmpty());
+        bad=req; bad.insert("indices",QJsonArray{1.5}); QVERIFY(sender.framesForRequest(bad).isEmpty());
+        bad=req; bad.insert("indices",QJsonArray{sender.count()}); QVERIFY(sender.framesForRequest(bad).isEmpty());
+    }
+    void qsoTransferMissingRequestOverUdp()
+    {
+        AdifRecord record{{"CALL","K1AAA"},{"COMMENT",QString(1800,QLatin1Char('u'))}};
+        ContestNetInventoryRow row; row.uuid="qso"; row.revision=1; row.adifPayload=adif::writeRecord(record).toUtf8(); row.contentHash=ContestNetInventory::fingerprint(record);
+        contestqso::Encoder encoder("transfer","log",row); QVERIFY(encoder.ok()); contestqso::Receiver receiver("sender","transfer");
+        QUdpSocket source, destination; QVERIFY(source.bind(QHostAddress::LocalHost,0)); QVERIFY(destination.bind(QHostAddress::LocalHost,0));
+        auto first=ContestNet::pack("FIELD","sender","qso_chunk_v1",encoder.frame(0)); QCOMPARE(source.writeDatagram(first,QHostAddress::LocalHost,destination.localPort()),qint64(first.size()));
+        QTRY_VERIFY(destination.hasPendingDatagrams()); QByteArray data(int(destination.pendingDatagramSize()),0); destination.readDatagram(data.data(),data.size());
+        QString from,type; QJsonObject body; QVERIFY(ContestNet::unpack(data,"FIELD",&from,&type,&body)); QVERIFY(receiver.accept(from,body)); QVERIFY(!receiver.complete());
+        auto request=ContestNet::pack("FIELD","receiver","qso_missing_v1",receiver.missingRequest(0)); QCOMPARE(destination.writeDatagram(request,QHostAddress::LocalHost,source.localPort()),qint64(request.size()));
+        QTRY_VERIFY(source.hasPendingDatagrams()); data.resize(int(source.pendingDatagramSize())); source.readDatagram(data.data(),data.size());
+        QVERIFY(ContestNet::unpack(data,"FIELD",&from,&type,&body)); QCOMPARE(from,QString("receiver")); QCOMPARE(type,QString("qso_missing_v1"));
+        const auto frames=encoder.framesForRequest(body); QCOMPARE(frames.size(),encoder.count()-1);
+        for (const auto& frame:frames) { const auto packet=ContestNet::pack("FIELD","sender","qso_chunk_v1",frame); QCOMPARE(source.writeDatagram(packet,QHostAddress::LocalHost,destination.localPort()),qint64(packet.size())); }
+        for (int i=0;i<frames.size();++i) { QTRY_VERIFY(destination.hasPendingDatagrams()); data.resize(int(destination.pendingDatagramSize())); destination.readDatagram(data.data(),data.size()); QVERIFY(ContestNet::unpack(data,"FIELD",&from,&type,&body)); QVERIFY(receiver.accept(from,body)); }
+        QVERIFY(receiver.complete()); QCOMPARE(receiver.row().adifPayload,row.adifPayload);
     }
     void qsoTransferAcceptsInventorySnapshot()
     {

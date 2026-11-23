@@ -11,6 +11,7 @@ public:
     QString error() const { return m_error; }
     int count() const;
     QJsonObject frame(int index) const;
+    QList<QJsonObject> framesForRequest(const QJsonObject& request) const;
 private:
     QString m_transfer, m_log, m_error;
     ContestNetInventoryRow m_row;
@@ -21,6 +22,7 @@ public:
     Receiver(const QString& sender, const QString& transfer) : m_sender(sender), m_transfer(transfer) {}
     bool accept(const QString& sender, const QJsonObject& frame);
     bool complete() const { return m_complete; }
+    QJsonObject missingRequest(int fromIndex) const;
     ContestNetInventoryRow row() const { return m_complete ? m_row : ContestNetInventoryRow{}; }
     QString sourceLog() const { return m_complete ? m_log : QString{}; }
     QString error() const { return m_error; }
