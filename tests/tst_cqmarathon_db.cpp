@@ -4,12 +4,31 @@
 #include <QTest>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QSqlQuery>
 
 using namespace decolog::core;
 
 class TestCqMarathonDb : public QObject {
     Q_OBJECT
 private slots:
+    void warnsWhenRecordedOperatingGridsDiffer()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto& item : {qMakePair("K1AAA","JM75FV"),qMakePair("K2BBB","JN58TD"),qMakePair("K3CCC","")}) {
+            AdifRecord record{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},
+                              {"DXCC","291"},{"CQZ","5"},{"MY_GRIDSQUARE",item.second}};
+            QCOMPARE(db.insertQso(record,"test").status,InsertResult::Status::Inserted);
+        }
+        const auto result=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1});
+        QCOMPARE(result.locationGrids,QStringList({"JM75","JN58"}));
+        QCOMPARE(result.locationMissing,1); QCOMPARE(result.locationInvalid,0);
+        QVERIFY(result.warnings.join('\n').contains("Multiple recorded own grid squares"));
+        QCOMPARE(result.selected.size(),1);
+        QSqlQuery update(db.connection()); QVERIFY(update.exec("UPDATE qso SET adif_extra='{\"MY_GRIDSQUARE\":7}' WHERE call='K3CCC'"));
+        const auto invalid=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1});
+        QCOMPARE(invalid.locationMissing,0); QCOMPARE(invalid.locationInvalid,1);
+        const auto json=invalid.toJson().object(); QCOMPARE(json.value("locationGrids").toArray().size(),2);
+    }
     void waeRegionsAreDistinctFromParentDxcc()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

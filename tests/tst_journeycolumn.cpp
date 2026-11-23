@@ -13,6 +13,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include "core/LogDatabase.h"
+#include "core/CqMarathon.h"
 #include "core/Activation.h"
 #include "core/ContestAudioFile.h"
 #include "core/QslPlanner.h"
@@ -68,6 +69,15 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonReviewShowsOperatingGridEvidence()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","JM75FV"), qMakePair("K2BBB","JN58TD"),qMakePair("K3CCC","")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"},{"MY_GRIDSQUARE",item.second}},"fixture",{},true,profile,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"marathonreviewprobe:"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("Recorded own grid squares: JM75, JN58 · missing: 1 · invalid: 0") && !output.contains("TypeError"),output.constData());
+    }
     void marathonReviewedJsonRoundTripRejectsChangedLog()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
@@ -77,6 +87,16 @@ private slots:
         const QString path=dir.filePath("review.json"); QByteArray output;
         QVERIFY2(launch(dir,"marathonroundtripprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
         QVERIFY2(output.contains("saved= before=1,1 loaded= after=2,3") && !output.contains("TypeError"),output.constData());
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); auto base=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1,profile}).toJson().object();
+          base.remove("locationGrids"); base.remove("locationMissing"); base.remove("locationInvalid");
+          for (const QString& key : {QStringLiteral("selected"),QStringLiteral("zoneCandidates"),QStringLiteral("entityAlternatives"),QStringLiteral("zoneAlternatives")}) {
+              QJsonArray rows; for (const auto& value : base.value(key).toArray()) { auto row=value.toObject(); row.remove("myGrid"); rows.append(row); } base.insert(key,rows); }
+          const auto identity=db.identity().toUtf8(); const auto raw=QByteArray::number(identity.size())+':'+identity+QJsonDocument(base).toJson(QJsonDocument::Compact);
+          const auto oldSnapshot=QString::fromLatin1(QCryptographicHash::hash(raw,QCryptographicHash::Sha256).toHex());
+          QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); auto review=QJsonDocument::fromJson(file.readAll()).object(); file.close(); review.insert("previewSnapshot",oldSnapshot);
+          QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate)); QVERIFY(file.write(QJsonDocument(review).toJson())>0); }
+        QVERIFY2(launch(dir,"marathonimportprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("error= before=1,1 after=2,3") && !output.contains("TypeError"),output.constData());
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery update(db.connection()); QVERIFY(update.exec("UPDATE qso SET call='K3CHANGED' WHERE call='K3CCC'")); }
         QVERIFY2(launch(dir,"marathonimportprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
         QVERIFY2(output.contains("error=Review file does not match the current log and preview before=1,1 after=1,1") && !output.contains("TypeError"),output.constData());

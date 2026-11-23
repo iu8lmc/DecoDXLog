@@ -20,6 +20,8 @@ struct Entry {
     QString region; // recorded ADIF REGION, never inferred from the callsign
     int entityCode{0}; // preliminary Marathon entity; original DXCC remains unchanged
     QString entityBasis;
+    QString myGrid; // per-QSO ADIF evidence, not the current station profile
+    bool invalidExtra{false};
 };
 
 struct Rules {
@@ -37,6 +39,9 @@ struct Result {
     QList<Entry> zoneAlternatives; // all eligible contacts with valid recorded zone
     QStringList exclusions;
     QStringList warnings; // potential data conflicts; candidate eligibility is unchanged
+    QStringList locationGrids; // distinct recorded four-character own grids
+    int locationMissing{0};
+    int locationInvalid{0};
     bool reviewed{false};
     bool isValid(QString* error = nullptr) const;
     QJsonDocument toJson() const;

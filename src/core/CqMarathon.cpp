@@ -1,5 +1,6 @@
 #include "core/CqMarathon.h"
 #include "core/CqMarathonEntityCodes.h"
+#include "core/Maidenhead.h"
 #include "core/Modes.h"
 
 #include <QJsonArray>
@@ -142,6 +143,11 @@ Result select(const QList<Entry>& entries, const Rules& rules)
                 result.exclusions << QStringLiteral("QSO %1: maritime mobile designation; location requires review").arg(entry.qsoId); continue;
             }
         }
+        const QString ownGrid=entry.myGrid.trimmed().toUpper();
+        if (entry.invalidExtra) ++result.locationInvalid;
+        else if (ownGrid.isEmpty()) ++result.locationMissing;
+        else if (ownGrid.size()<4 || !maidenhead::toLatLon(ownGrid)) ++result.locationInvalid;
+        else if (!result.locationGrids.contains(ownGrid.left(4))) result.locationGrids << ownGrid.left(4);
         if (entry.cqZone >= 1 && entry.cqZone <= 40) result.zoneAlternatives << entry;
         const bool newZone = entry.cqZone >= 1 && entry.cqZone <= 40 && !zones.contains(entry.cqZone);
         if (newZone) {
@@ -193,6 +199,9 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         result.selected << candidate;
         ++entityCount[candidate.entityCode];
     }
+    result.locationGrids.sort();
+    if (result.locationGrids.size()>1)
+        result.warnings << QStringLiteral("Multiple recorded own grid squares (%1); verify single operating location and grid boundaries").arg(result.locationGrids.join(QStringLiteral(", ")));
     return result;
 }
 
@@ -274,7 +283,17 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         const auto timestamp=QDateTime::fromString(query.value(6).toString(),Qt::ISODateWithMs);
         if (timestamp.isValid() && timestamp.timeSpec()!=Qt::LocalTime) entry.timestamp=timestamp.toUTC();
         entry.stationProfileId = query.value(7).toLongLong();
-        entry.region = QJsonDocument::fromJson(query.value(8).toByteArray()).object().value(QStringLiteral("REGION")).toString();
+        const QByteArray extra=query.value(8).toByteArray();
+        if (!extra.isEmpty()) {
+            QJsonParseError parseError; const auto doc=QJsonDocument::fromJson(extra,&parseError);
+            if (parseError.error!=QJsonParseError::NoError || !doc.isObject()) entry.invalidExtra=true;
+            else {
+                const auto object=doc.object(); const auto grid=object.value(QStringLiteral("MY_GRIDSQUARE"));
+                entry.region=object.value(QStringLiteral("REGION")).toString();
+                if (!grid.isUndefined() && !grid.isString()) entry.invalidExtra=true;
+                else entry.myGrid=grid.toString();
+            }
+        }
         entries << entry;
     }
     return entries;
@@ -288,6 +307,7 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("call"), entry.call},
                                 {QStringLiteral("dxcc"), entry.dxcc},
                                 {QStringLiteral("region"), entry.region},
+                                {QStringLiteral("myGrid"), entry.myGrid},
                                 {QStringLiteral("entityCode"), entry.entityCode},
                                 {QStringLiteral("entityBasis"), entry.entityBasis},
                                 {QStringLiteral("cqZone"), entry.cqZone},
@@ -316,6 +336,9 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("zoneCandidates"), zones},
                                      {QStringLiteral("entityAlternatives"), entityAlternativesJson},
                                      {QStringLiteral("zoneAlternatives"), zoneAlternativesJson},
+                                     {QStringLiteral("locationGrids"), QJsonArray::fromStringList(locationGrids)},
+                                     {QStringLiteral("locationMissing"), locationMissing},
+                                     {QStringLiteral("locationInvalid"), locationInvalid},
                                      {QStringLiteral("entityListVersion"), rules.year == 2026 ? QStringLiteral("DX Marathon v1.1; list as of 2023") : QString()},
                                      {QStringLiteral("officialRulesVerified"), false},
                                      {QStringLiteral("warnings"), warnings},

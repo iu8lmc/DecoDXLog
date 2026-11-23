@@ -44,6 +44,7 @@ DialogFrame {
     property var marathonWorkingEntities: []
     property var marathonWorkingZones: []
     property string marathonExportMessage: ""
+    property string marathonImportNotice: ""
     onMarathonYearChanged: marathonPreview=({})
     onMarathonCategoryChanged: marathonPreview=({})
     onMarathonMaxPerEntityChanged: marathonPreview=({})
@@ -527,7 +528,7 @@ DialogFrame {
     }
     function probeMarathonReview(profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
-        Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); const c=marathonEntityRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")+" entity="+(c ? c.text : "missing")) })
+        Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); const c=marathonEntityRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")+" entity="+(c ? c.text : "missing")+" location="+marathonLocationSummary.text) })
     }
     function probeMarathonAlternatives(profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
@@ -555,6 +556,7 @@ DialogFrame {
                      marathonPreview.maxPerEntity,marathonPreview.stationProfileId,marathonPreview.snapshot)
         if (result.error) return result.error
         marathonWorkingEntities=result.selected; marathonWorkingZones=result.zoneCandidates
+        marathonImportNotice=result.notice || ""
         return ""
     }
     function probeMarathonReviewedRoundTrip(path,profile) {
@@ -642,11 +644,15 @@ DialogFrame {
     FileDialog { id:marathonImportDialog; title:qsTr("Open CQ DX Marathon reviewed JSON"); fileMode:FileDialog.OpenFile
         nameFilters:[qsTr("JSON files (*.json)"),qsTr("All files (*)")]
         onAccepted: { const error=root.loadMarathonReviewed(selectedFile)
-            root.marathonExportMessage=error.length ? qsTr("Import failed: %1").arg(error) : qsTr("Reviewed choices restored") } }
+            root.marathonExportMessage=error.length ? qsTr("Import failed: %1").arg(error) : (root.marathonImportNotice || qsTr("Reviewed choices restored")) } }
     DialogFrame { id:marathonReview; title:qsTr("CQ DX Marathon candidate review"); dialogKey:"marathonReview"; width:740; height:650; dotColor:Theme.secondaryColor
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
                 text:qsTr("Preliminary data, not official credit. The 2026 list v1.1 is described as of 2023. JSON includes reviewed choices; review ADIF includes all alternatives. Review the entry in the official tool.") }
+            Text { id:marathonLocationSummary; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                text:qsTr("Recorded own grid squares: %1 · missing: %2 · invalid: %3. Different squares require review; matching squares do not prove a single location.")
+                    .arg((root.marathonPreview.locationGrids || []).join(", ") || qsTr("none"))
+                    .arg(root.marathonPreview.locationMissing || 0).arg(root.marathonPreview.locationInvalid || 0) }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
             ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonWorkingEntities; ScrollBar.vertical:PanelScrollBar {}
                 delegate:RowLayout { required property var modelData; required property int index; width:marathonEntityRows.width

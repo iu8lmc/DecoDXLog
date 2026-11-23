@@ -69,11 +69,27 @@ QString marathonSnapshot(const cqmarathon::Result& result, const QString& identi
     const QByteArray data=QByteArray::number(id.size())+':'+id+result.toJson().toJson(QJsonDocument::Compact);
     return QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex());
 }
+// Snapshot representation immediately before own-grid evidence was added.
+// Re-check the current location summary after restoring such a review.
+QString marathonLegacySnapshot(const cqmarathon::Result& result, const QString& identity)
+{
+    auto object=result.toJson().object();
+    object.remove(QStringLiteral("locationGrids")); object.remove(QStringLiteral("locationMissing")); object.remove(QStringLiteral("locationInvalid"));
+    for (const QString& key : {QStringLiteral("selected"),QStringLiteral("zoneCandidates"),QStringLiteral("entityAlternatives"),QStringLiteral("zoneAlternatives")}) {
+        QJsonArray rows; for (const auto& value : object.value(key).toArray()) { auto row=value.toObject(); row.remove(QStringLiteral("myGrid")); rows.append(row); }
+        object.insert(key,rows);
+    }
+    QJsonArray warnings; for (const auto& value : object.value(QStringLiteral("warnings")).toArray())
+        if (!value.toString().startsWith(QLatin1String("Multiple recorded own grid squares ("))) warnings.append(value);
+    object.insert(QStringLiteral("warnings"),warnings);
+    const QByteArray id=identity.toUtf8(); const QByteArray data=QByteArray::number(id.size())+':'+id+QJsonDocument(object).toJson(QJsonDocument::Compact);
+    return QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex());
+}
 QVariantList marathonRows(const QList<cqmarathon::Entry>& entries)
 {
     QVariantList list;
     for (const auto& entry : entries) list << QVariantMap{{QStringLiteral("qsoId"),entry.qsoId}, {QStringLiteral("call"),entry.call},
-        {QStringLiteral("dxcc"),entry.dxcc}, {QStringLiteral("region"),entry.region}, {QStringLiteral("entityCode"),entry.entityCode},
+        {QStringLiteral("dxcc"),entry.dxcc}, {QStringLiteral("region"),entry.region}, {QStringLiteral("myGrid"),entry.myGrid}, {QStringLiteral("entityCode"),entry.entityCode},
         {QStringLiteral("entityBasis"),entry.entityBasis}, {QStringLiteral("cqZone"),entry.cqZone}, {QStringLiteral("band"),entry.band},
         {QStringLiteral("mode"),entry.mode}, {QStringLiteral("timestamp"),entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
     return list;
@@ -3157,6 +3173,9 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                        {QStringLiteral("zoneCandidateCount"), result.zoneCandidates.size()},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("warnings"), result.warnings},
+                       {QStringLiteral("locationGrids"), result.locationGrids},
+                       {QStringLiteral("locationMissing"), result.locationMissing},
+                       {QStringLiteral("locationInvalid"), result.locationInvalid},
                        {QStringLiteral("snapshot"), marathonSnapshot(result,m_db.identity())},
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))},
                        {QStringLiteral("edition"), rules.year},
@@ -3230,9 +3249,12 @@ QVariantMap DecoLogController::loadReviewedCqMarathonExport(const QUrl& file, in
     auto result=cqmarathon::select(entries,{year,category,maxPerEntity,stationProfileId});
     if (!result.isValid(&error)) return fail(error);
     if (snapshot.isEmpty() || snapshot!=marathonSnapshot(result,m_db.identity())) return fail(tr("The preview changed; refresh it before importing"));
-    if (!cqmarathon::restoreReviewChoices(result,json.object(),snapshot,&error)) return fail(error);
+    const QString savedSnapshot=json.object().value(QStringLiteral("previewSnapshot")).toString();
+    const bool legacy=savedSnapshot!=snapshot && savedSnapshot==marathonLegacySnapshot(result,m_db.identity());
+    if (!cqmarathon::restoreReviewChoices(result,json.object(),legacy ? savedSnapshot : snapshot,&error)) return fail(error);
     return {{QStringLiteral("error"),QString()}, {QStringLiteral("selected"),marathonRows(result.selected)},
-            {QStringLiteral("zoneCandidates"),marathonRows(result.zoneCandidates)}};
+            {QStringLiteral("zoneCandidates"),marathonRows(result.zoneCandidates)},
+            {QStringLiteral("notice"), legacy ? tr("Restored an older review; recheck the current operating-location evidence") : QString()}};
 }
 
 QString DecoLogController::exportCqMarathonReviewAdif(const QUrl& file,int year,qint64 stationProfileId)
