@@ -748,6 +748,8 @@ if(DECODXLOG_BUILD_TESTS)
             ${CMAKE_SOURCE_DIR}/tests/python/test_tracker_extension.py)
         add_test(NAME extension_harness COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/python/test_extension_harness.py)
+        add_test(NAME extension_manager COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/python/test_extension_manager.py)
         add_test(NAME recent_activity_extension COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/python/test_recent_activity.py)
         add_test(NAME clublog_live50_simulation COMMAND ${Python3_EXECUTABLE}

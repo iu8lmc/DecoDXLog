@@ -95,6 +95,10 @@ class ExtensionHarnessTests(unittest.TestCase):
         manifest = pathlib.Path(__file__).resolve().parents[2] / "examples/extensions/tracker_status.manifest.json"
         result = harness.load_manifest(manifest)
         self.assertEqual(result["permissions"], ["tracker.read"])
+        self.assertEqual(result["dependencies"], ["recent_activity.py"])
+        for deps in (["../unsafe.py"], ["tracker_status.py"], ["recent_activity.py", "recent_activity.py"]):
+            with self.assertRaises(ValueError):
+                harness.validate_manifest({**result, "dependencies": deps})
 
     def test_manifest_version_and_unknown_permission_rejected(self):
         base = {"schemaVersion": 1, "apiVersion": 1, "id": "org.example.demo", "version": "1.0.0",

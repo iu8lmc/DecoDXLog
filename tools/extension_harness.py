@@ -18,7 +18,7 @@ REQUIRED = frozenset({"schemaVersion", "apiVersion", "id", "version", "entrypoin
 
 
 def validate_manifest(value):
-    if not isinstance(value, dict) or set(value) != REQUIRED:
+    if not isinstance(value, dict) or not REQUIRED.issubset(value) or set(value) - REQUIRED - {"dependencies"}:
         raise ValueError("unsupported manifest fields")
     if type(value["schemaVersion"]) is not int or value["schemaVersion"] != 1:
         raise ValueError("unsupported manifest schema")
@@ -31,6 +31,11 @@ def validate_manifest(value):
     entry = value["entrypoint"]
     if not isinstance(entry, str) or not re.fullmatch(r"[A-Za-z0-9_-]+\.py", entry):
         raise ValueError("entrypoint must be a Python file in the manifest directory")
+    dependencies = value.get("dependencies", [])
+    if (not isinstance(dependencies, list) or len(dependencies) > 16 or
+            any(not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_-]+\.py", name) for name in dependencies) or
+            len(set(dependencies)) != len(dependencies) or entry in dependencies):
+        raise ValueError("invalid extension dependencies")
     permissions = value["permissions"]
     if (not isinstance(permissions, list) or not permissions or
             any(not isinstance(p, str) or p not in ALLOWED_PERMISSIONS for p in permissions) or
@@ -57,6 +62,10 @@ def load_manifest(path):
     entry = (directory / value["entrypoint"]).resolve(strict=True)
     if entry.parent != directory or not entry.is_file():
         raise ValueError("entrypoint must be a file in the manifest directory")
+    for name in value.get("dependencies", []):
+        dependency = (directory / name).resolve(strict=True)
+        if dependency.parent != directory or not dependency.is_file():
+            raise ValueError("dependency must be a file in the manifest directory")
     return value
 
 

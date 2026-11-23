@@ -174,3 +174,18 @@ l'esempio del rapporto. Il campo `freshForReview` riflette solo freschezza della
 lettura e del TLE, non visibilità del satellite o opportunità di trasmettere.
 La chiave di sola lettura è ancora condivisa e concede anche le altre letture:
 il manifest non limita autonomamente i permessi del processo.
+
+### Experimental local extension management
+
+For trusted Python examples, `tools/extension_manager.py` manages a **dedicated** local directory; it is separate from the application and does not access the log database. Python 3 and a configured local read-only API token are required. For example:
+
+```sh
+python3 tools/extension_manager.py --root /path/to/extension-directory install examples/extensions/tracker_status.manifest.json
+python3 tools/extension_manager.py --root /path/to/extension-directory list
+DECODXLOG_READ_TOKEN=your_read_only_token python3 tools/extension_manager.py --root /path/to/extension-directory run org.decodxlog.example.tracker-status --port 9876
+python3 tools/extension_manager.py --root /path/to/extension-directory remove org.decodxlog.example.tracker-status
+```
+
+Replace the directory, token and port with your own values; avoid putting real tokens in shell history. An update installs a new manifest version and switches the active version after files are prepared. Reinstalling identical content is idempotent; changed content requires a new version. Prior versions remain until removal, which deletes the managed extension directory, including its retained versions. The manager refuses to remove a directory without its ownership marker. Manifests may declare up to 16 local Python `dependencies`; the manager copies the entrypoint and dependencies and checks their hashes before running. Hashes detect accidental local changes, not a malicious operator able to alter both files and metadata.
+
+This is experimental developer tooling for trusted code, not an in-app installer, operating-system sandbox or independent per-extension permissions. The manifest is advisory: the API's shared read-only credential remains the enforcement boundary and permits its existing read capabilities. The tool does not support arbitrary packages or assets, concurrent management by multiple processes, crash-durable transactional upgrades on all filesystems, or recovery of a partially created installation. Keep the extension directory separate from the log and backups. Its subprocess timeout and process-group cleanup follow the developer harness; they do not prevent filesystem/network access or all descendant escape. The sample report remains limited to recent QSO; the tracker example is read-only and does not control CAT, rotor or TX.

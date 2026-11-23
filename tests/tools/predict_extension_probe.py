@@ -92,6 +92,18 @@ with tempfile.TemporaryDirectory(prefix="decolog-tracker-extension-") as tmp:
             manifest = pathlib.Path(ROOT) / "examples/extensions/tracker_status.manifest.json"
             check = subprocess.run([sys.executable, str(harness), str(manifest), "--port", str(port)], env=env, capture_output=True, text=True, timeout=12)
             assert check.returncode == 0 and json.loads(check.stdout)["scope"] == "tracker_snapshot", check.stderr
+            manager = pathlib.Path(ROOT) / "tools/extension_manager.py"
+            managed_root = root / "extensions"
+            base = [sys.executable, str(manager), "--root", str(managed_root)]
+            installed = subprocess.run(base + ["install", str(manifest)], env=env, capture_output=True, text=True, timeout=8)
+            assert installed.returncode == 0, installed.stderr
+            extension_id = json.loads(installed.stdout)["id"]
+            managed = subprocess.run(base + ["run", extension_id, "--port", str(port)], env=env, capture_output=True, text=True, timeout=12)
+            assert managed.returncode == 0 and json.loads(managed.stdout)["scope"] == "tracker_snapshot", managed.stderr
+            removed = subprocess.run(base + ["remove", extension_id], env=env, capture_output=True, text=True, timeout=8)
+            assert removed.returncode == 0, removed.stderr
+            absent = subprocess.run(base + ["run", extension_id, "--port", str(port)], env=env, capture_output=True, text=True, timeout=8)
+            assert absent.returncode != 0 and TOKEN not in absent.stdout + absent.stderr, absent.stdout
             deadline = time.monotonic() + 12
             while time.monotonic() < deadline:
                 state = read_status(port)
