@@ -180,7 +180,7 @@ Result compare(const QSqlDatabase &db, const QString &contestId, QDate fromA, QD
         "AND CASE WHEN json_valid(adif_extra) AND json_type(adif_extra,'$.CONTEST_ID')='text' THEN UPPER(TRIM(json_extract(adif_extra,'$.CONTEST_ID'))) ELSE '' END=? LIMIT 100001"));
     q.addBindValue(a0); q.addBindValue(a1); q.addBindValue(b0); q.addBindValue(b1); q.addBindValue(contest);
     if (!q.exec()) { out.error=q.lastError().text(); return out; }
-    QMap<QPair<QString,QString>,QPair<int,int>> counts; int scanned=0;
+    QMap<QPair<QString,QString>,QPair<int,int>> counts; QMap<int,QPair<int,int>> days; int scanned=0;
     while (q.next()) {
         if (++scanned>100000) { out.error=QStringLiteral("More than 100,000 QSO match; narrow the periods."); out.rows.clear(); out.totalA=out.totalB=0; return out; }
         const QString raw=q.value(0).toString(); const auto timestamp=QDateTime::fromString(raw,Qt::ISODateWithMs);
@@ -190,6 +190,8 @@ Result compare(const QSqlDatabase &db, const QString &contestId, QDate fromA, QD
         if (!a && !b) continue;
         if (a) ++out.totalA;
         if (b) ++out.totalB;
+        if (a) ++days[int(fromA.daysTo(day))+1].first;
+        if (b) ++days[int(fromB.daysTo(day))+1].second;
         const QList<QPair<QString,QString>> dims{{QStringLiteral("band"),q.value(1).toString().trimmed().toLower()},
             {QStringLiteral("operator"),q.value(2).toString().trimmed().toUpper()},
             {QStringLiteral("radio"),q.value(3).toString().trimmed()},
@@ -204,6 +206,13 @@ Result compare(const QSqlDatabase &db, const QString &contestId, QDate fromA, QD
     for (auto it=counts.cbegin();it!=counts.cend();++it)
         out.rows << QVariantMap{{QStringLiteral("dimension"),it.key().first},{QStringLiteral("value"),it.key().second},
             {QStringLiteral("a"),it.value().first},{QStringLiteral("b"),it.value().second},{QStringLiteral("delta"),it.value().second-it.value().first}};
+    for (auto it=days.cbegin();it!=days.cend();++it) {
+        const auto dateA=fromA.addDays(it.key()-1), dateB=fromB.addDays(it.key()-1);
+        out.rows << QVariantMap{{QStringLiteral("dimension"),QStringLiteral("day")},{QStringLiteral("day"),it.key()},
+            {QStringLiteral("dateA"),dateA<=toA ? dateA.toString(Qt::ISODate) : QString()},
+            {QStringLiteral("dateB"),dateB<=toB ? dateB.toString(Qt::ISODate) : QString()},
+            {QStringLiteral("a"),it.value().first},{QStringLiteral("b"),it.value().second},{QStringLiteral("delta"),it.value().second-it.value().first}};
+    }
     return out;
 }
 }

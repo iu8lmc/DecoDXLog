@@ -162,6 +162,8 @@ RoundedWindow {
             contestComparison.errorText=result.error || ""
             if (contestComparison.probing) {
                 console.warn("PROBE contestComparison a=" + result.totalA + " b=" + result.totalB + " rows=" + (result.rows || []).length + " error=" + contestComparison.errorText)
+                const day=(result.rows || []).find(row => row.dimension === "day" && row.day === 1)
+                console.warn("PROBE contestDay " + (day ? contestComparison.dayLabel(day) + " a=" + day.a + " b=" + day.b : "missing"))
                 const a=contestComparison.goal(result.totalA,comparisonGoalA.value), b=contestComparison.goal(result.totalB,comparisonGoalB.value)
                 console.warn("PROBE contestGoals a=" + result.totalA + "/" + comparisonGoalA.value + ":" + a.percent + ":" + a.remaining + " b=" + result.totalB + "/" + comparisonGoalB.value + ":" + b.percent + ":" + b.remaining)
                 comparisonGoalB.value=0; comparisonGoalA.value=1
@@ -1147,12 +1149,13 @@ RoundedWindow {
                 { goalsLoaded=false; goalMessage=qsTr("Cannot save or load these goals; reload them for the current log.") }
         }
         function goal(total,target) { return {percent:target>0 ? Math.round(total*100/target) : 0, remaining:Math.max(0,target-total)} }
+        function dayLabel(row) { return qsTr("Day %1 · A %2 · B %3").arg(row.day).arg(row.dateA || "—").arg(row.dateB || "—") }
         Connections { target:comparisonA; function onFromIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalA.value=0 } function onToIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalA.value=0 } }
         Connections { target:comparisonB; function onFromIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalB.value=0 } function onToIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalB.value=0 } }
         ColumnLayout {
             anchors.fill:parent; spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Missing operator or own radio stays unknown. Overlapping dates count in both periods. QSO goals are optional; load and save them explicitly in this log. These are logged activity counts, not scores, credit or eligibility.") }
+                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Days align by position in the selected ranges; only days with activity are listed. Counts do not measure operating time. Missing operator or own radio stays unknown. Overlapping dates count in both periods. QSO goals are optional; load and save them explicitly in this log. These are logged activity counts, not scores, credit or eligibility.") }
             RowLayout { Layout.fillWidth:true
                 Text { text:qsTr("Contest ID"); color:Theme.textSecondary }
                 StyledTextField { id:comparisonContest; Layout.fillWidth:true; enabled:!decolog.activation.contestReportBusy; placeholderText:qsTr("Recorded CONTEST_ID"); onTextChanged: { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalA.value=0; comparisonGoalB.value=0 } }
@@ -1197,8 +1200,8 @@ RoundedWindow {
                 id:comparisonRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:contestComparison.result.rows || []
                 ScrollBar.vertical:PanelScrollBar {}
                 delegate:RowLayout { required property var modelData; width:comparisonRows.width
-                    Text { Layout.fillWidth:true; color:Theme.textPrimary; text:(modelData.dimension === "radio" ? qsTr("Own radio") : modelData.dimension === "operator" ? qsTr("Operator") : modelData.dimension === "hour" ? qsTr("UTC hour") : qsTr("Band")) + ": " + (modelData.value || qsTr("unknown")) }
-                    Text { color:Theme.textSecondary; text:qsTr("A %1 · B %2 · Δ %3").arg(modelData.a).arg(modelData.b).arg(modelData.delta) }
+                    Text { Layout.fillWidth:true; color:Theme.textPrimary; text:modelData.dimension === "day" ? contestComparison.dayLabel(modelData) : (modelData.dimension === "radio" ? qsTr("Own radio") : modelData.dimension === "operator" ? qsTr("Operator") : modelData.dimension === "hour" ? qsTr("UTC hour") : qsTr("Band")) + ": " + (modelData.value || qsTr("unknown")) }
+                    Text { color:Theme.textSecondary; text:modelData.dimension === "day" && (!modelData.dateA || !modelData.dateB) ? qsTr("A %1 · B %2 · Δ —").arg(modelData.dateA ? modelData.a : "—").arg(modelData.dateB ? modelData.b : "—") : qsTr("A %1 · B %2 · Δ %3").arg(modelData.a).arg(modelData.b).arg(modelData.delta) }
                 }
             }
         }

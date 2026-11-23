@@ -117,6 +117,32 @@ class TestContestComparison : public QObject {
         QVERIFY(find("radio","Remote rig").isEmpty()); QCOMPARE(db.qsoCount(),qint64(4));
         QVERIFY(!contestcomparison::compare(db.connection(),"",QDate(2024,1,1),QDate(2024,1,1),QDate(2025,1,1),QDate(2025,1,1)).error.isEmpty());
     }
+    void comparesActivityByUtcDateWithoutInferringOperatingTime()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const QString &call,const QString &date,const QString &time) {
+            return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE",date},{"TIME_ON",time},{"BAND","20m"},{"MODE","CW"},{"CONTEST_ID","CQ-WW-CW"}},"fixture",{},true,0,false).id;
+        };
+        QVERIFY(add("K1AAA","20241123","235959")>0); QVERIFY(add("K1BBB","20241124","000000")>0);
+        QVERIFY(add("K1CCC","20251123","000000")>0);
+        const auto r=contestcomparison::compare(db.connection(),"CQ-WW-CW",QDate(2024,11,23),QDate(2024,11,24),QDate(2025,11,22),QDate(2025,11,23));
+        QVERIFY2(r.error.isEmpty(),qPrintable(r.error));
+        auto day=[&](int value) { for (const auto &v:r.rows) { const auto row=v.toMap(); if (row.value("dimension")=="day" && row.value("day").toInt()==value) return row; } return QVariantMap{}; };
+        QCOMPARE(day(1).value("a").toInt(),1); QCOMPARE(day(1).value("b").toInt(),0);
+        QCOMPARE(day(2).value("a").toInt(),1); QCOMPARE(day(2).value("b").toInt(),1);
+        QCOMPARE(day(2).value("dateA").toString(),QString("2024-11-24")); QCOMPARE(day(2).value("dateB").toString(),QString("2025-11-23"));
+        QCOMPARE(r.totalA,2); QCOMPARE(r.totalB,1); QCOMPARE(db.qsoCount(),qint64(3));
+        const auto unequal=contestcomparison::compare(db.connection(),"CQ-WW-CW",QDate(2024,11,23),QDate(2024,11,24),QDate(2025,11,22),QDate(2025,11,22));
+        QVERIFY(unequal.error.isEmpty()); bool found=false;
+        for (const auto &v:unequal.rows) { const auto row=v.toMap(); if (row.value("dimension")=="day" && row.value("day").toInt()==2) {
+            found=true; QCOMPARE(row.value("dateA").toString(),QString("2024-11-24")); QVERIFY(row.value("dateB").toString().isEmpty()); QCOMPARE(row.value("b").toInt(),0);
+        } } QVERIFY(found);
+        const auto overlap=contestcomparison::compare(db.connection(),"CQ-WW-CW",QDate(2024,11,23),QDate(2024,11,24),QDate(2024,11,24),QDate(2024,11,24));
+        QVERIFY(overlap.error.isEmpty()); QCOMPARE(overlap.totalA,2); QCOMPARE(overlap.totalB,1);
+        bool overlapFound=false; for (const auto &v:overlap.rows) { const auto row=v.toMap(); if (row.value("dimension")=="day" && row.value("day").toInt()==1) {
+            overlapFound=true; QCOMPARE(row.value("a").toInt(),1); QCOMPARE(row.value("b").toInt(),1); QCOMPARE(row.value("dateB").toString(),QString("2024-11-24"));
+        } } QVERIFY(overlapFound);
+    }
 };
 QTEST_GUILESS_MAIN(TestContestComparison)
 #include "tst_contestcomparison.moc"

@@ -194,7 +194,7 @@ private slots:
             QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE",date},{"TIME_ON","120000"},
                 {"BAND","20m"},{"MODE","CW"},{"CONTEST_ID","CQ-WW-CW"},{"OPERATOR","K1OP"}},"fixture",{},true,0,false).id>0); }
         QByteArray output; QVERIFY2(launch(dir,"contestcomparisonprobe",output,4500),output.constData());
-        QVERIFY2(output.contains("PROBE contestComparison a=2 b=1 rows=4 error=") &&
+        QVERIFY2(output.contains("PROBE contestComparison a=2 b=1 rows=5 error=") && output.contains("PROBE contestDay Day 1 · A 2024-11-23 · B 2025-11-22 a=2 b=1") &&
                  output.contains("PROBE contestGoals a=2/5:40:3 b=1/1:100:0") && output.contains("PROBE contestGoals edge=true") && !output.contains("TypeError"),output.constData());
         QByteArray stale; QVERIFY2(launch(dir,"contestcomparisonstaleprobe",stale,4500),stale.constData());
         QVERIFY2(stale.contains("PROBE contestComparison stale=true") && !stale.contains("TypeError"),stale.constData());
