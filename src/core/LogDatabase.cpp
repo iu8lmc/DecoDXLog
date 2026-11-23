@@ -990,19 +990,25 @@ bool LogDatabase::writeQsl(qint64 qsoId, const QList<QslState>& states, bool kee
         r.prepare(QStringLiteral("SELECT service, sent, sent_date, rcvd, rcvd_date, remote_id, last_error, via "
                                  "FROM qsl_status WHERE qso_id = ?"));
         r.addBindValue(qsoId);
-        if (r.exec()) {
-            while (r.next()) {
-                QslState st;
-                st.service = r.value(0).toString();
-                st.sent = r.value(1).toString();
-                st.sentDate = r.value(2).toString();
-                st.rcvd = r.value(3).toString();
-                st.rcvdDate = r.value(4).toString();
-                st.remoteId = r.value(5).toString();
-                st.lastError = r.value(6).toString();
-                st.via = r.value(7).toString();
-                remote.insert(st.service, st);
-            }
+        if (!r.exec()) {
+            m_lastError = r.lastError().text();
+            return false;
+        }
+        while (r.next()) {
+            QslState st;
+            st.service = r.value(0).toString();
+            st.sent = r.value(1).toString();
+            st.sentDate = r.value(2).toString();
+            st.rcvd = r.value(3).toString();
+            st.rcvdDate = r.value(4).toString();
+            st.remoteId = r.value(5).toString();
+            st.lastError = r.value(6).toString();
+            st.via = r.value(7).toString();
+            remote.insert(st.service, st);
+        }
+        if (r.lastError().isValid()) {
+            m_lastError = r.lastError().text();
+            return false;
         }
     }
 
