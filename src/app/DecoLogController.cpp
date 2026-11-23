@@ -4006,6 +4006,12 @@ QString DecoLogController::saveNewQsoPanelSettings(const QStringList& visibleFie
             return tr("%1 is managed by DecoDXLog and cannot be replaced by a custom field.").arg(checked.field);
         case newqso::CustomFieldError::TooMany:
             return tr("You can add at most %1 custom ADIF fields.").arg(newqso::kMaxCustomFields);
+        case newqso::CustomFieldError::InvalidType:
+            return tr("Invalid type for custom field %1.").arg(checked.field);
+        case newqso::CustomFieldError::InvalidChoices:
+            return tr("Provide unique, non-empty allowed values for %1.").arg(checked.field);
+        case newqso::CustomFieldError::InvalidUnit:
+            return tr("The unit for %1 is too long.").arg(checked.field);
         case newqso::CustomFieldError::None:
             break;
         }
@@ -4139,6 +4145,8 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     // tornano nell'export ADIF senza perdere nulla.
     const QVariantMap customFields = fields.value(QStringLiteral("custom_fields")).toMap();
     const QStringList standardPanelFields = newqso::standardFields();
+    QHash<QString,QVariantMap> customDefinitions;
+    for (const QVariant& definition : newQsoCustomFields()) { const auto map=definition.toMap(); customDefinitions.insert(map.value(QStringLiteral("name")).toString(),map); }
     for (auto it = customFields.cbegin(); it != customFields.cend(); ++it) {
         const QString name = newqso::normalizeAdifName(it.key());
         if (!newqso::isValidAdifName(name))
@@ -4147,6 +4155,10 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
             return tr("The ADIF field %1 is managed by DecoDXLog.").arg(name);
         if (standardPanelFields.contains(name))
             return tr("Use the standard %1 field instead of a custom field.").arg(name);
+        if (customDefinitions.contains(name)) {
+            const QString error=newqso::validateCustomValue(customDefinitions.value(name),it.value().toString(),QLocale());
+            if (!error.isEmpty()) return tr("%1: %2").arg(name,error);
+        }
         r.set(name, it.value().toString().trimmed());
     }
     if (historical)

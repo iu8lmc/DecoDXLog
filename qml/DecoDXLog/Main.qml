@@ -1633,6 +1633,7 @@ RoundedWindow {
         }
         else if (what[0] === "call") decolog.lookupCall = what[1]
         else if (what[0] === "newqsofields") newQsoFieldsTimer.start()
+        else if (what[0] === "typedfieldsprobe") typedFieldsProbe.start()
         else if (what[0] === "awards") {
             // awards:<id>[:map|:missing|:unconfirmed]
             if (what[2] === "map") awardsDialog.showMap = true
@@ -1711,6 +1712,23 @@ RoundedWindow {
     Timer { id: cwMacrosTimer; interval: 800
            onTriggered: { const it = window.panelItem("cw"); if (it) it.showMacros(parseInt(startupShow.split(":")[1] || "-1")) } }
     Timer { id: combo2Timer; interval: 900; onTriggered: newQsoDialog.showBandCombo() }
+    Timer {
+        id:typedFieldsProbe; interval:1000
+        onTriggered: {
+            const panel=window.panelItem("newqso"); if (panel && panel.item) panel.item.probeTypedSetup()
+            typedFieldsSaveProbe.start()
+        }
+    }
+    Timer {
+        id:typedFieldsSaveProbe; interval:700
+        onTriggered: {
+            const now=decolog.utcNow()
+            const base={call:"K1TYP",date:now.date,time:now.time,band:"20m",mode:"CW",rst_sent:"599",rst_rcvd:"599"}
+            base.custom_fields={APP_TYPED_POWER:"not-a-number"}; const invalid=decolog.logManualQso(base)
+            base.custom_fields={APP_TYPED_POWER:"12"}; const valid=decolog.logManualQso(base)
+            console.warn("PROBE typed result " + JSON.stringify({settings:decolog.newQsoCustomFields,invalid:invalid,valid:valid}))
+        }
+    }
     Timer {
         id: newQsoFieldsTimer
         interval: 700

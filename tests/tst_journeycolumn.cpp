@@ -62,6 +62,16 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void typedCustomFieldsValidateBeforeSavingQso()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,"typedfieldsprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE typed editor number W") && output.contains("\"type\":\"number\"") && output.contains("\"unit\":\"W\""),output.constData());
+        QVERIFY2(output.contains("\"invalid\":\"APP_TYPED_POWER:") && output.contains("\"valid\":\"\""),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(1));
+        const auto record=db.record(1); QVERIFY(record); QCOMPARE(record->value("APP_TYPED_POWER"),QString("12"));
+        QVERIFY(db.exportAdif(QList<qint64>{1}).contains("<app_typed_power:2>12"));
+    }
     void watchedCampaignCanAlertOnlyForOpenGoals()
     {
         using namespace decolog::core;

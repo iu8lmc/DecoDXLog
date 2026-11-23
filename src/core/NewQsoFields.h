@@ -9,6 +9,7 @@
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
+#include <QLocale>
 
 namespace decolog::core::newqso {
 
@@ -21,6 +22,9 @@ enum class CustomFieldError {
     StandardField,
     ProtectedField,
     TooMany,
+    InvalidType,
+    InvalidChoices,
+    InvalidUnit,
 };
 
 struct CustomFieldsResult {
@@ -46,6 +50,8 @@ bool isProtectedAdifField(const QString& name);
 // righe vuote. I nomi dei campi standard vanno abilitati, non duplicati come
 // campi liberi.
 CustomFieldsResult validateCustomFields(const QVariantList& fields);
+// Returns an explanatory error; the caller retains the original ADIF text.
+QString validateCustomValue(const QVariantMap& definition, const QString& value, const QLocale& locale);
 
 QString encodeCustomFields(const QVariantList& fields);
 QVariantList decodeCustomFields(const QString& json, bool* legacyIota = nullptr);

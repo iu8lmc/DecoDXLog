@@ -92,6 +92,31 @@ private slots:
         QCOMPARE(stored->value(QStringLiteral("RDA")), QStringLiteral("MO-01"));
         QVERIFY(db.exportAdif(QList<qint64>{inserted.id}).contains("<rda:5>MO-01"));
     }
+    void typedDefinitionsAndValuesKeepOriginalAdifText()
+    {
+        const QVariantList fields{QVariantMap{{"name","APP_TEST_NUMBER"},{"label","Power"},{"type","number"},{"unit","W"}},
+                                  QVariantMap{{"name","APP_TEST_DATE"},{"type","date"}},
+                                  QVariantMap{{"name","APP_TEST_BOOL"},{"type","boolean"}},
+                                  QVariantMap{{"name","APP_TEST_LIST"},{"type","list"},{"choices",QStringList{"A","B"}}}};
+        const auto result=newqso::validateCustomFields(fields); QVERIFY(result.ok());
+        QCOMPARE(newqso::decodeCustomFields(newqso::encodeCustomFields(fields)),result.fields);
+        QVERIFY(newqso::validateCustomValue(result.fields[0].toMap(),"12,5",QLocale(QLocale::Italian)).isEmpty());
+        QVERIFY(!newqso::validateCustomValue(result.fields[0].toMap(),"12x",QLocale::c()).isEmpty());
+        QVERIFY(!newqso::validateCustomValue(result.fields[1].toMap(),"2026-02-30",QLocale::c()).isEmpty());
+        QVERIFY(newqso::validateCustomValue(result.fields[1].toMap(),"2026-02-28",QLocale::c()).isEmpty());
+        QVERIFY(newqso::validateCustomValue(result.fields[2].toMap(),"Y",QLocale::c()).isEmpty());
+        QVERIFY(!newqso::validateCustomValue(result.fields[2].toMap(),"maybe",QLocale::c()).isEmpty());
+        QVERIFY(newqso::validateCustomValue(result.fields[3].toMap(),"A",QLocale::c()).isEmpty());
+        QVERIFY(!newqso::validateCustomValue(result.fields[3].toMap(),"C",QLocale::c()).isEmpty());
+        QVERIFY(newqso::validateCustomValue(result.fields[1].toMap(),"",QLocale::c()).isEmpty());
+        QVERIFY(!newqso::validateCustomFields({QVariantMap{{"name","APP_TEST"},{"type","script"}}}).ok());
+        QVERIFY(!newqso::validateCustomFields({QVariantMap{{"name","APP_TEST"},{"type","list"},{"choices",QStringList{"A","A"}}}}).ok());
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto qso=db.insertQso(AdifRecord{{"CALL","K1NUM"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_TEST_NUMBER","12,5"}},"manual",{},true);
+        QVERIFY(qso.id>0); const QString adif=db.exportAdif(QList<qint64>{qso.id}); QVERIFY(adif.contains("<app_test_number:4>12,5"));
+        LogDatabase imported; QVERIFY(imported.open(":memory:")); QCOMPARE(imported.importAdif(adif.toUtf8()).inserted,1);
+        QVERIFY(imported.record(1)); QCOMPARE(imported.record(1)->value("APP_TEST_NUMBER"),QString("12,5"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestNewQsoFields)

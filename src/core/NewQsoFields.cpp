@@ -4,6 +4,8 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QVariantMap>
+#include <QDate>
+#include <cmath>
 
 namespace decolog::core::newqso {
 
@@ -118,11 +120,43 @@ CustomFieldsResult validateCustomFields(const QVariantList& fields)
             return result;
         }
 
+        const QString type=item.value(QStringLiteral("type"),QStringLiteral("text")).toString().trimmed().toLower();
+        const QStringList types{QStringLiteral("text"),QStringLiteral("number"),QStringLiteral("date"),QStringLiteral("boolean"),QStringLiteral("list")};
+        if (!types.contains(type)) { result.error=CustomFieldError::InvalidType; result.field=name; return result; }
+        const QString unit=item.value(QStringLiteral("unit")).toString().trimmed();
+        if (unit.size()>40) { result.error=CustomFieldError::InvalidUnit; result.field=name; return result; }
+        QStringList choices; QSet<QString> unique;
+        if (type==QLatin1String("list")) {
+            for (const QVariant& v : item.value(QStringLiteral("choices")).toList()) {
+                const QString choice=v.toString().trimmed();
+                if (choice.isEmpty() || choice.size()>100 || unique.contains(choice) || choices.size()>=100) { result.error=CustomFieldError::InvalidChoices; result.field=name; return result; }
+                unique.insert(choice); choices << choice;
+            }
+            if (choices.isEmpty()) { result.error=CustomFieldError::InvalidChoices; result.field=name; return result; }
+        }
         seen.insert(name);
-        result.fields << QVariantMap{{QStringLiteral("name"), name},
-                                     {QStringLiteral("label"), label.isEmpty() ? name : label}};
+        QVariantMap normalized{{QStringLiteral("name"),name},{QStringLiteral("label"),label.isEmpty()?name:label}};
+        if (type!=QLatin1String("text")) normalized.insert(QStringLiteral("type"),type);
+        if (!unit.isEmpty()) normalized.insert(QStringLiteral("unit"),unit);
+        if (!choices.isEmpty()) normalized.insert(QStringLiteral("choices"),choices);
+        result.fields << normalized;
     }
     return result;
+}
+
+QString validateCustomValue(const QVariantMap& definition,const QString& value,const QLocale& locale)
+{
+    const QString text=value.trimmed(); if (text.isEmpty()) return {};
+    const QString type=definition.value(QStringLiteral("type"),QStringLiteral("text")).toString();
+    if (type==QLatin1String("text")) return {};
+    if (type==QLatin1String("number")) {
+        QLocale strict=locale; strict.setNumberOptions(strict.numberOptions()|QLocale::RejectGroupSeparator);
+        bool ok=false; const double n=strict.toDouble(text,&ok); return ok && std::isfinite(n) ? QString() : QStringLiteral("Invalid number for the current locale");
+    }
+    if (type==QLatin1String("date")) { const QDate d=QDate::fromString(text,Qt::ISODate); return d.isValid() && d.toString(Qt::ISODate)==text ? QString() : QStringLiteral("Use a valid date YYYY-MM-DD"); }
+    if (type==QLatin1String("boolean")) return text==QLatin1String("Y") || text==QLatin1String("N") ? QString() : QStringLiteral("Use Y or N");
+    if (type==QLatin1String("list")) return definition.value(QStringLiteral("choices")).toStringList().contains(text) ? QString() : QStringLiteral("Choose an allowed value");
+    return QStringLiteral("Unsupported custom field type");
 }
 
 QString encodeCustomFields(const QVariantList& fields)

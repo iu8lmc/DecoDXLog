@@ -37,6 +37,7 @@ GlassPanel {
     }
     // Entry point shared by the header button and the isolated UI smoke test.
     function showFieldSettings() { fieldsDialog.open() }
+    function probeTypedSetup() { fieldsDialog.open(); fieldsDialog.probeTyped() }
 
     title: qsTr("New QSO")
     dotColor: Theme.accentColor
@@ -674,10 +675,11 @@ GlassPanel {
                             property string adifName: String(modelData.name)
                             property alias fieldValue: customInput.text
                             Layout.fillWidth: true
-                            label: String(modelData.label || modelData.name)
+                            label: String(modelData.label || modelData.name) + (modelData.unit ? " (" + modelData.unit + ")" : "")
                             StyledTextField {
                                 id: customInput
                                 Layout.fillWidth: true
+                                placeholderText: modelData.type === "date" ? qsTr("YYYY-MM-DD") : modelData.type === "boolean" ? qsTr("Y or N") : modelData.type === "list" ? (modelData.choices || []).join(" / ") : ""
                                 Accessible.name: qsTr("%1 (%2) value").arg(String(modelData.label || modelData.name)).arg(String(modelData.name))
                             }
                         }
