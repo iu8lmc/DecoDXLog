@@ -693,6 +693,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         if (!date.isValid()) { ++missingDate; continue; }
         const QString day = date.toString(Qt::ISODate);
         const QString op = extra.value(QStringLiteral("OPERATOR")).toString().trimmed().toUpper();
+        const QString stationCall = extra.value(QStringLiteral("STATION_CALLSIGN")).toString().trimmed();
         const QString grid = extra.value(QStringLiteral("MY_GRIDSQUARE")).toString().trimmed().toUpper();
         bool found = false;
         for (const auto& pair : fields) {
@@ -705,6 +706,9 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (!groups.contains(key)) groups.insert(key, {{QStringLiteral("program"), pair.first}, {QStringLiteral("reference"), reference},
                     {QStringLiteral("day"), day}, {QStringLiteral("operator"), op}, {QStringLiteral("grid"), grid}, {QStringLiteral("count"), 0}});
                 groups[key][QStringLiteral("count")] = groups[key].value(QStringLiteral("count")).toInt() + 1;
+                if (stationCall.isEmpty()) groups[key][QStringLiteral("missingStationCall")] = groups[key].value(QStringLiteral("missingStationCall")).toInt() + 1;
+                if (op.isEmpty()) groups[key][QStringLiteral("missingOperator")] = groups[key].value(QStringLiteral("missingOperator")).toInt() + 1;
+                if (stationCall.isEmpty() && op.isEmpty()) groups[key][QStringLiteral("missingCallIdentity")] = groups[key].value(QStringLiteral("missingCallIdentity")).toInt() + 1;
                 const QByteArray identity = QJsonDocument(QJsonArray{q.value(3).toString(), QString::number(q.value(4).toLongLong())}).toJson(QJsonDocument::Compact);
                 hashes[key] = QCryptographicHash::hash(hashes.value(key) + identity, QCryptographicHash::Sha256);
                 if (selectedIds && key == selectedKey) selectedIds->append(q.value(2).toLongLong());

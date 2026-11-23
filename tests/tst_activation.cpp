@@ -95,6 +95,27 @@ private slots:
         QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
         QVERIFY(db.connection().rollback());
     }
+    void previewDistinguishesMissingCallIdentities()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db = &db;
+        ActivationController act(std::move(ctx)); QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        const QList<AdifRecord> inputs{
+            AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20261231"},{"TIME_ON","230000"},{"BAND","20m"},{"MODE","CW"}},
+            AdifRecord{{"CALL","K1BBB"},{"QSO_DATE","20261231"},{"TIME_ON","230100"},{"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","9H1AA"}},
+            AdifRecord{{"CALL","K1CCC"},{"QSO_DATE","20261231"},{"TIME_ON","230200"},{"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","9H1AA"},{"OPERATOR","9H1AA"}}};
+        for (auto record : inputs) { act.session().applyTo(record, 0); QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted); }
+        const auto groups = act.partitionPreview().value("groups").toList(); QCOMPARE(groups.size(), 2);
+        for (const auto& item : groups) {
+            const auto group = item.toMap();
+            if (group.value("operator").toString().isEmpty()) {
+                QCOMPARE(group.value("count").toInt(), 2); QCOMPARE(group.value("missingOperator").toInt(), 2);
+                QCOMPARE(group.value("missingStationCall").toInt(), 1); QCOMPARE(group.value("missingCallIdentity").toInt(), 1);
+            } else {
+                QCOMPARE(group.value("count").toInt(), 1); QCOMPARE(group.value("missingCallIdentity").toInt(), 0);
+                QCOMPARE(group.value("missingStationCall").toInt(), 0); QCOMPARE(group.value("missingOperator").toInt(), 0);
+            }
+        }
+    }
     void previewScalesPastFormerLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
@@ -169,6 +190,10 @@ private slots:
             if (group.value("program") == "IOTA") iota = group;
         }
         QVERIFY(!chosen.isEmpty()); QVERIFY(!wwff.isEmpty()); QVERIFY(!sota.isEmpty()); QVERIFY(!iota.isEmpty());
+        QCOMPARE(chosen.value("missingStationCall").toInt(), 1);
+        QCOMPARE(chosen.value("missingCallIdentity").toInt(), 0);
+        QCOMPARE(wwff.value("missingStationCall").toInt(), 1);
+        QCOMPARE(wwff.value("missingOperator").toInt(), 0);
         QVERIFY(!act.startPartitionExport(chosen, QUrl::fromLocalFile(dir.filePath("log.sqlite"))));
         const QString path = dir.filePath("park.adi"); QSignalSpy exported(&act, &ActivationController::partitionExportFinished);
         QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));

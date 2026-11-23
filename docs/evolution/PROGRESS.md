@@ -394,3 +394,12 @@ The activation dialog now lists closed tracked sessions in pages of 100 and allo
 A/B: before this change the closed-session listing and preview entry point did not exist. A synthetic fixture closes a multi-programme session, previews and exports it, then opens an independent connection and previews it again; another fixture lists 102 sessions across two pages. The offscreen application probe closes a session, activates its history-row Preview button, and produces and parses a two-QSO POTA file from that closed session. `tst_activation` passed 23 tests and the focused desktop probe passed on macOS arm64/Qt 6.11.2. No physical UI or external service was used.
 
 The history only covers sessions created with tracking; editable/imported session identifiers are not proof of membership. The history does not yet expose site/operator periods or catalogue/eligibility validation. The grouping, output snapshot and importer limitations recorded in preceding milestones remain. Other desktop roadmap requirements remain open.
+
+
+## 2026-11-23 — G06 station and operator presence in group review
+
+The grouping preview reports, for each programme/reference/day/operator/grid group, how many QSO have an empty `STATION_CALLSIGN`, an empty `OPERATOR`, or both empty. These counts overlap and are advisory: records are not removed and callsigns and programme eligibility are not validated. The UI explains that POTA asks for at least one station/operator callsign, while WWFF distinguishes station callsign and operator, as described by the [POTA ADIF guide](https://docs.pota.app/docs/activator_reference/ADIF_for_POTA_reference.html) and [WWFF log guidance](https://wwff.co/rules-faq/confirming-and-sending-log/).
+
+A/B: the previous grouping gave zero for the missing station-call field because it did not report it; the revised synthetic fixture reports one while recognizing the available operator. A second fixture compares records with neither identity, station only, and both, and verifies the counts separately. `tst_activation` passed 24 tests, and the focused offscreen desktop multiprogram/closed-session probe passed after rebuilding on macOS arm64/Qt 6.11.2. The test input and interactions were synthetic.
+
+These warnings do not replace field-format checks, duplicate and programme eligibility rules, catalogue validation, individual-QSO exclusion explanations, or importer acceptance. No external importer, physical UI, radio/RF or other platform was tested. The outstanding G06 and other desktop roadmap work remains open.

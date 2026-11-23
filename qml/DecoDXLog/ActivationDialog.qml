@@ -558,6 +558,11 @@ DialogFrame {
             visible: root.previewShown && !root.partitionPreview.error
             text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
         }
+        Note {
+            visible: root.previewShown && !root.partitionPreview.error
+            text: qsTr("Review missing station and operator calls. POTA requires at least one; WWFF identifies the station and the individual operator separately. Counts do not validate callsigns or eligibility.")
+            color: Theme.warningColor
+        }
         Repeater {
             model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.groups || []).slice(root.previewPage * 100, (root.previewPage + 1) * 100) : []
             RowLayout {
@@ -567,6 +572,8 @@ DialogFrame {
                     text: qsTr("%1 · %2 · %3 UTC · operator %4 · grid %5: %6 QSO")
                         .arg(modelData.program).arg(modelData.reference).arg(modelData.day)
                         .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
+                        + qsTr(" · missing station call: %1; missing operator: %2; missing both: %3")
+                            .arg(modelData.missingStationCall || 0).arg(modelData.missingOperator || 0).arg(modelData.missingCallIdentity || 0)
                 }
                 GlassButton {
                     visible: ["POTA", "WWFF", "SOTA", "IOTA"].indexOf(modelData.program) >= 0
