@@ -35,6 +35,13 @@ private:
     bool m_complete{false}, m_failed{false};
 };
 struct ApplyResult { bool ok{false}; bool inserted{false}; qint64 id{0}; QString error; };
+struct Review {
+    bool ok{false}; QString error, logIdentity, sourceLog, uuid; QByteArray fileIdentity, localHash, remoteHash, remotePayloadHash;
+    qint64 id{0}; int localRevision{0}, remoteRevision{0}; bool localDeleted{false}, remoteDeleted{false};
+};
+Review reviewExisting(LogDatabase& db, const QString& expectedLogIdentity, const Receiver& receiver);
+// Requires an explicit choice after presenting this review to the operator.
+ApplyResult applyReviewed(LogDatabase& db, const QString& expectedLogIdentity, const Receiver& receiver, const Review& review);
 // Call only after explicit review and peer authorization. Never overwrites.
 ApplyResult applyMissing(LogDatabase& db, const QString& expectedLogIdentity, const Receiver& receiver);
 }

@@ -216,6 +216,34 @@ private slots:
         LogDatabase duplicate; QVERIFY(duplicate.open(dir.filePath("duplicate.sqlite"))); QVERIFY(duplicate.insertQso(record,"fixture").id>0);
         result=contestqso::applyMissing(duplicate,duplicate.identity(),receiver); QVERIFY(!result.ok); QCOMPARE(duplicate.latestIds(QString(),100).size(),1);
     }
+    void reviewedQsoChangesRejectStaleLocalState()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("source.sqlite"); LogDatabase source,target;
+        QVERIFY(source.open(path)); QVERIFY(target.open(dir.filePath("target.sqlite")));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT","original"}};
+        const auto initial=source.insertQso(record,"fixture"); QVERIFY(initial.id>0);
+        auto receive=[&](const QString& transfer) {
+            ContestNetInventory inventory; if (!inventory.begin(path)) return contestqso::Receiver("node",transfer);
+            const auto page=inventory.next(10); contestqso::Receiver receiver("node",transfer); if (!page.ok || page.rows.isEmpty()) return receiver;
+            contestqso::Encoder encoder(transfer,inventory.logIdentity(),page.rows.first()); for (int i=0;i<encoder.count();++i) receiver.accept("node",encoder.frame(i)); return receiver;
+        };
+        auto original=receive("initial"); QVERIFY(original.complete()); const auto add=contestqso::applyMissing(target,target.identity(),original); QVERIFY(add.ok);
+        record.set("COMMENT","remote edit"); QVERIFY(source.updateQso(initial.id,record).status==InsertResult::Status::Inserted);
+        auto remote=receive("edit"); QVERIFY(remote.complete()); auto review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY2(review.ok,qPrintable(review.error));
+        QslState qsl; qsl.service="lotw"; qsl.sent="Y"; QVERIFY(target.setQslState(add.id,qsl));
+        auto staleQsl=contestqso::applyReviewed(target,target.identity(),remote,review); QVERIFY(!staleQsl.ok);
+        review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY(review.ok);
+        QSqlQuery fault(target.connection()); QVERIFY(fault.exec("CREATE TRIGGER reject_review BEFORE UPDATE OF comment ON qso BEGIN SELECT RAISE(ABORT, 'injected'); END"));
+        auto failed=contestqso::applyReviewed(target,target.identity(),remote,review); QVERIFY(!failed.ok); QCOMPARE(target.record(add.id)->value("COMMENT"),QString("original"));
+        QVERIFY(fault.exec("DROP TRIGGER reject_review"));
+        auto local=*target.record(add.id); local.set("COMMENT","local edit"); QVERIFY(target.updateQso(add.id,local).status==InsertResult::Status::Inserted);
+        auto changed=contestqso::applyReviewed(target,target.identity(),remote,review); QVERIFY(!changed.ok); QCOMPARE(target.record(add.id)->value("COMMENT"),QString("local edit"));
+        review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY(review.ok); changed=contestqso::applyReviewed(target,target.identity(),remote,review);
+        QVERIFY2(changed.ok,qPrintable(changed.error)); QCOMPARE(target.record(add.id)->value("COMMENT"),QString("remote edit"));
+        QVERIFY(source.softDeleteQso(initial.id)); auto deletion=receive("delete"); QVERIFY(deletion.complete()); QVERIFY(deletion.row().deleted);
+        review=contestqso::reviewExisting(target,target.identity(),deletion); QVERIFY(review.ok); changed=contestqso::applyReviewed(target,target.identity(),deletion,review);
+        QVERIFY2(changed.ok,qPrintable(changed.error)); QVERIFY(target.meta(add.id)->deleted);
+    }
     void qsoTransferRejectsMalformedFragments()
     {
         AdifRecord record{{"CALL","9H1SR"},{"COMMENT",QString(700,QLatin1Char('b'))}};

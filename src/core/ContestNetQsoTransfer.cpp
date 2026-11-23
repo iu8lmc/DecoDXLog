@@ -139,4 +139,63 @@ ApplyResult applyMissing(LogDatabase& db,const QString& expectedLogIdentity,cons
     result.ok=true; result.inserted=true; result.id=inserted.id; return result;
 }
 
+Review reviewExisting(LogDatabase& db,const QString& expected,const Receiver& receiver) {
+    Review review;
+    if (!receiver.complete() || !db.isOpen() || expected.isEmpty() || db.identity()!=expected || !db.fileIdentityMatchesOpen()) {
+        review.error=QStringLiteral("Unverified transfer or changed destination log"); return review;
+    }
+    auto connection=db.connection(); QSqlQuery query(connection);
+    if (!query.exec(QStringLiteral("BEGIN"))) { review.error=query.lastError().text(); return review; }
+    auto fail=[&](const QString& error) { connection.rollback(); Review r; r.error=error; return r; };
+    const auto incoming=receiver.row();
+    query.prepare(QStringLiteral("SELECT id FROM qso WHERE uuid=?")); query.addBindValue(incoming.uuid);
+    if (!query.exec()) return fail(query.lastError().text());
+    if (!query.next()) return fail(QStringLiteral("Local QSO not found"));
+    const auto id=query.value(0).toLongLong(); QString error;
+    const auto meta=db.meta(id); const auto record=db.recordChecked(id,&error);
+    if (!meta || !record) return fail(error.isEmpty()?QStringLiteral("Cannot read local QSO"):error);
+    if (!db.fileIdentityMatchesOpen() || db.identity()!=expected) return fail(QStringLiteral("Destination log changed"));
+    review.logIdentity=expected; review.fileIdentity=db.openFileIdentity(); review.sourceLog=receiver.sourceLog(); review.uuid=incoming.uuid;
+    review.id=id; review.localRevision=meta->revision; review.localDeleted=meta->deleted; review.localHash=ContestNetInventory::fingerprint(*record);
+    review.remoteRevision=incoming.revision; review.remoteDeleted=incoming.deleted; review.remoteHash=incoming.contentHash;
+    review.remotePayloadHash=QCryptographicHash::hash(incoming.adifPayload,QCryptographicHash::Sha256);
+    if (!connection.commit()) return fail(connection.lastError().text());
+    review.ok=true; return review;
+}
+ApplyResult applyReviewed(LogDatabase& db,const QString& expected,const Receiver& receiver,const Review& review) {
+    ApplyResult result;
+    if (!review.ok || !receiver.complete() || !db.isOpen() || expected.isEmpty() || review.logIdentity!=expected
+        || db.identity()!=expected || !db.fileIdentityMatchesOpen() || db.openFileIdentity()!=review.fileIdentity) {
+        result.error=QStringLiteral("Review, transfer or destination log changed"); return result;
+    }
+    const auto incoming=receiver.row();
+    if (receiver.sourceLog()!=review.sourceLog || incoming.uuid!=review.uuid || incoming.revision!=review.remoteRevision
+        || incoming.deleted!=review.remoteDeleted || incoming.contentHash!=review.remoteHash
+        || QCryptographicHash::hash(incoming.adifPayload,QCryptographicHash::Sha256)!=review.remotePayloadHash) {
+        result.error=QStringLiteral("Received QSO changed since review"); return result;
+    }
+    if (review.localDeleted) { result.error=QStringLiteral("Restoring deleted QSO requires separate review"); return result; }
+    auto connection=db.connection(); QSqlQuery q(connection);
+    if (!q.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.error=q.lastError().text(); return result; }
+    auto fail=[&](const QString& message) { connection.rollback(); ApplyResult r; r.error=message; return r; };
+    if (db.identity()!=expected || !db.fileIdentityMatchesOpen()) return fail(QStringLiteral("Destination log changed"));
+    QString error; const auto meta=db.meta(review.id); const auto local=db.recordChecked(review.id,&error);
+    if (!meta || !local || meta->uuid!=review.uuid || meta->revision!=review.localRevision || meta->deleted!=review.localDeleted
+        || ContestNetInventory::fingerprint(*local)!=review.localHash)
+        return fail(error.isEmpty()?QStringLiteral("Local QSO changed since review"):error);
+    if (incoming.deleted) {
+        if (!db.softDeleteQso(review.id)) return fail(QStringLiteral("Cannot delete QSO"));
+    } else {
+        const auto parsed=adif::parse(incoming.adifPayload);
+        if (parsed.records.size()!=1 || ContestNetInventory::fingerprint(parsed.records.first())!=incoming.contentHash) return fail(QStringLiteral("Invalid transferred ADIF"));
+        const auto update=db.updateQso(review.id,parsed.records.first(),-1,QStringLiteral("contestnet review"));
+        if (update.status!=InsertResult::Status::Inserted) return fail(update.message.isEmpty()?QStringLiteral("Cannot update QSO"):update.message);
+        const auto saved=db.recordChecked(review.id,&error);
+        if (!saved || ContestNetInventory::fingerprint(*saved)!=incoming.contentHash) return fail(error.isEmpty()?QStringLiteral("Stored QSO differs from reviewed ADIF"):error);
+    }
+    if (db.identity()!=expected || !db.fileIdentityMatchesOpen()) return fail(QStringLiteral("Destination log changed"));
+    if (!connection.commit()) return fail(connection.lastError().text());
+    result.ok=true; result.id=review.id; return result;
+}
+
 }
