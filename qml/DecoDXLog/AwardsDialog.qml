@@ -90,6 +90,7 @@ DialogFrame {
     }
 
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
+    function pendingDetailText(p) { return p.service + ": " + (p.dateStatus === "valid" ? qsTr("recorded sent %1 · %2 days ago (UTC)").arg(p.date).arg(p.days) : p.dateStatus === "future" ? qsTr("recorded sent date %1 is in the future; verify").arg(p.date) : p.dateStatus === "missing" ? qsTr("sent date not recorded") : qsTr("invalid sent date: %1").arg(p.rawDate)) }
     function probeQslPlanRestore() { openAt("dxcc"); plannerProbeRestore.start() }
     function probeAlternativePages() { openAt("dxcc"); plannerPagesStart.start() }
     Timer {
@@ -130,6 +131,7 @@ DialogFrame {
             stop()
             const plan = decolog.qslPlan
             console.warn("PROBE qslplan " + JSON.stringify(plan))
+            for (const c of plan.candidates) { if ((c.pendingDetails || []).length) { console.warn("PROBE qslplan pending " + root.pendingDetailText(c.pendingDetails[0])); break } }
             console.warn("PROBE qslplan status " + qslPlanStatus.text)
             const first = qslPlanCandidates.itemAtIndex(0)
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
@@ -298,6 +300,8 @@ DialogFrame {
                                 .arg(!modelData.managerObservedAt ? qsTr("route age unknown")
                                     : Date.now() - Date.parse(modelData.managerObservedAt) > 180 * 86400000
                                       ? qsTr("route evidence older than 180 days; verify") : qsTr("verify route")) }
+                        Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; visible:(modelData.pendingDetails || []).length>0
+                            text:(modelData.pendingDetails || []).map(p => root.pendingDetailText(p)).join("\n") }
                         RowLayout {
                             GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
                             GlassButton { text: qsTr("View all alternatives"); onClicked: alternativesDialog.showCandidate(modelData) }

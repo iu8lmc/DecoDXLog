@@ -4,6 +4,8 @@
 #include <QSharedPointer>
 
 namespace decolog::core::qslplanner {
+struct PendingDetail { QString service, date, rawDate, dateStatus; int days{-1}; };
+PendingDetail pendingSince(const QslState& state, QDate today);
 struct RouteCost {
     QString amount;       // decimal string; not a currency conversion
     QString currency;     // three-letter code supplied by operator
@@ -37,6 +39,7 @@ struct Candidate {
     QDateTime managerObservedAt;
     QString paperChannel; // B or D only when explicitly recorded
     QStringList pendingServices;
+    QList<PendingDetail> pendingDetails;
     QList<Benefit> benefits;
     int priorityRank{0}; // zero means an alternative after the greedy coverage pass
     QList<QPair<QString,QString>> marginalBenefits;

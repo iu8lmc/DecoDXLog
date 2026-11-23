@@ -6,6 +6,19 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void pendingDatesAreReportedWithoutGuessing()
+    {
+        const QDate today(2026,11,23);
+        auto state=[](const QString &date) { QslState s; s.service="card"; s.sent="Y"; s.sentDate=date; return s; };
+        auto dated=qslplanner::pendingSince(state("20261015"),today); QCOMPARE(dated.dateStatus,QString("valid")); QCOMPARE(dated.date,QString("2026-10-15")); QCOMPARE(dated.days,39);
+        QCOMPARE(qslplanner::pendingSince(state(""),today).dateStatus,QString("missing"));
+        QCOMPARE(qslplanner::pendingSince(state("20260230"),today).dateStatus,QString("invalid"));
+        QCOMPARE(qslplanner::pendingSince(state("20261124"),today).dateStatus,QString("future"));
+        LogDatabase db; QVERIFY(db.open(":memory:")); const auto id=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"}},"fixture").id; QVERIFY(id>0);
+        auto card=state("20261015"); QVERIFY(db.setCardState(id,card)); auto plan=qslplanner::build(db,{}, {"dxcc"});
+        QCOMPARE(plan.candidates.size(),1); QCOMPARE(plan.candidates[0].pendingDetails.size(),1); QCOMPARE(plan.candidates[0].pendingDetails[0].date,QString("2026-10-15"));
+        card.rcvd="Y"; QVERIFY(db.setCardState(id,card)); plan=qslplanner::build(db,{}, {"dxcc"}); QVERIFY(plan.candidates.isEmpty());
+    }
     void sharedAlternativesArePagedWithoutDroppingRecords()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

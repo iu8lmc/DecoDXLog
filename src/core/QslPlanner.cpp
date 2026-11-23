@@ -10,6 +10,16 @@
 #include <queue>
 
 namespace decolog::core::qslplanner {
+PendingDetail pendingSince(const QslState& state,QDate today)
+{
+    PendingDetail out; out.service=state.service; out.rawDate=state.sentDate.trimmed();
+    if (out.rawDate.isEmpty()) { out.dateStatus=QStringLiteral("missing"); return out; }
+    const QDate date=QDate::fromString(out.rawDate,QStringLiteral("yyyyMMdd"));
+    if (!today.isValid() || !date.isValid() || date.toString(QStringLiteral("yyyyMMdd"))!=out.rawDate) { out.dateStatus=QStringLiteral("invalid"); return out; }
+    out.date=date.toString(Qt::ISODate);
+    if (date>today) { out.dateStatus=QStringLiteral("future"); return out; }
+    out.dateStatus=QStringLiteral("valid"); out.days=int(date.daysTo(today)); return out;
+}
 int Benefit::alternativeCount(qint64 self, bool pendingOnly) const
 {
     if (!group) return 0;
@@ -119,6 +129,7 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             }
         }
     }
+    const QDate today=QDateTime::currentDateTimeUtc().date();
     for (auto it=candidates.begin(); it!=candidates.end(); ++it) {
         Candidate& candidate=it.value();
         const auto record=db.record(candidate.qsoId);
@@ -136,8 +147,10 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             }
         }
         for (const QslState& state : db.qslStatus(candidate.qsoId)) {
-            if (state.sent.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0 && state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)!=0)
+            if (state.sent.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0 && state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)!=0) {
                 candidate.pendingServices.append(state.service);
+                candidate.pendingDetails.append(pendingSince(state,today));
+            }
             if (state.service==QLatin1String("card")) {
                 const QString via=state.via.trimmed().toUpper();
                 if (via==QLatin1String("B") || via==QLatin1String("D")) candidate.paperChannel=via;

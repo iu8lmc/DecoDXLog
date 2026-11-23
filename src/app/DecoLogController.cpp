@@ -2504,6 +2504,11 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         QVariantList ungrouped; for (qint64 id : plan.ungroupedPaperQsoIds) ungrouped << id;
         for (const auto& candidate : plan.candidates) {
             QVariantList benefits;
+            QVariantList pendingDetails;
+            for (const auto& pending : candidate.pendingDetails) pendingDetails << QVariantMap{
+                {QStringLiteral("service"),pending.service},{QStringLiteral("date"),pending.date},
+                {QStringLiteral("rawDate"),pending.rawDate},{QStringLiteral("dateStatus"),pending.dateStatus},
+                {QStringLiteral("days"),pending.days}};
             QStringList marginal;
             for (const auto& key : candidate.marginalBenefits) marginal << key.first.toUpper()+QLatin1Char(' ')+key.second;
             for (const auto& benefit : candidate.benefits) {
@@ -2522,7 +2527,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
                 {QStringLiteral("manager"),candidate.manager},{QStringLiteral("managerSource"),candidate.managerSource},
                 {QStringLiteral("paperChannel"),candidate.paperChannel},
                 {QStringLiteral("managerObservedAt"),candidate.managerObservedAt.toString(Qt::ISODate)},
-                {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("benefits"),benefits},
+                {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("pendingDetails"),pendingDetails},{QStringLiteral("benefits"),benefits},
                 {QStringLiteral("priorityRank"),candidate.priorityRank},{QStringLiteral("marginalBenefits"),marginal},
                 {QStringLiteral("pendingMarginalCount"),candidate.pendingMarginalCount}};
         }
