@@ -904,6 +904,11 @@ QVariantMap ActivationController::partitionPreview() const
     return scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {}, true, {}, nullptr, m_sotaCatalogue->path(), m_potaCatalogue->path());
 }
 
+QString ActivationController::sessionReviewToken(const QString& uuid) const
+{
+    return m_ctx.db && m_ctx.db->isOpen() ? m_ctx.db->activationRunToken(uuid) : QString();
+}
+
 QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
 {
     QVariantList rows;
@@ -918,7 +923,8 @@ QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
         const QVariantMap state = QJsonDocument::fromJson(q.value(4).toByteArray()).object().toVariantMap();
         rows << QVariantMap{{QStringLiteral("rowid"), q.value(0)}, {QStringLiteral("uuid"), q.value(1)},
             {QStringLiteral("startedAt"), q.value(2)}, {QStringLiteral("endedAt"), q.value(3)},
-            {QStringLiteral("title"), state.value(QStringLiteral("title"))}};
+            {QStringLiteral("title"), state.value(QStringLiteral("title"))},
+            {QStringLiteral("reviewToken"), m_ctx.db->activationRunToken(q.value(1).toString())}};
     }
     return rows;
 }

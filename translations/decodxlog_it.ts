@@ -6829,6 +6829,7 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>QsoDetailDialog</name>
+    <message><source>The session could not be checked; reload and review it before saving.</source><translation>Impossibile verificare la sessione; ricaricala e controllala prima di salvare.</translation></message>
     <message><source>Keep the existing association</source><translation>Mantieni l'associazione esistente</translation></message>
     <message><source>Active session: %1</source><translation>Sessione attiva: %1</translation></message>
     <message><source>Optional: choose a recorded session only after checking its dates and your records. Selection does not prove the QSO belongs to it.</source><translation>Facoltativo: scegli una sessione registrata solo dopo averne verificato le date e consultato i tuoi registri. La scelta non dimostra che il QSO ne faccia parte.</translation></message>

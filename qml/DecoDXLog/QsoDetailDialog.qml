@@ -19,6 +19,7 @@ DialogFrame {
     property bool edited: false
     property bool recalculationApplied: false
     property bool activationReviewApplied: false
+    property string activationReviewToken: ""
     property string detailLogPath: ""
     // Cresce a ogni tasto scritto in un campo: chi guarda cosa e' cambiato lo rilegge.
     property int editRev: 0
@@ -39,6 +40,7 @@ DialogFrame {
         activationReview.values = activationReview.keys.map(k => String(root.field(k)))
         removeActivationLink.checked = false
         activationReview.selectedUuid = ""
+        activationReview.selectedToken = ""
         activationReview.cursors = [0]; activationReview.page = 0; activationReview.loadSessions()
         activationReview.open()
     }
@@ -57,7 +59,7 @@ DialogFrame {
     function probeActivationAssignment() {
         root.openActivationReview()
         console.warn("PROBE activation assignment sessions " + activationReview.sessionRows.length)
-        if (activationReview.sessionRows.length > 1) activationReview.selectedUuid = activationReview.sessionRows[1].uuid
+        if (activationReview.sessionRows.length > 1) sessionChoice.activated(1)
         activationReview.values = ["IT-0002", "", "", "", "JM76", "", ""]
         activationReview.applyDraft(); root.save()
         console.warn("PROBE activation assignment saved " + (root.field("APP_DECOLOG_ACTIVATION_UUID") === "tracked-session" && !errorText.text))
@@ -140,6 +142,7 @@ DialogFrame {
         detailLogPath = decolog.currentLogInfo().path || ""
         recalculationApplied = false
         activationReviewApplied = false
+        activationReviewToken = ""
         decolog.recordUiLatency("qso.detail.record", Date.now() - started)
         started = Date.now()
         fields = Object.assign({}, detail.fields || {})
@@ -194,7 +197,9 @@ DialogFrame {
         // Un'ora di fine senza data di fine vale per lo stesso giorno.
         if (fields.TIME_OFF && !fields.QSO_DATE_OFF && fields.QSO_DATE)
             fields.QSO_DATE_OFF = fields.QSO_DATE
-        const error = recalculationApplied || activationReviewApplied
+        const error = activationReviewToken
+            ? decolog.saveQsoActivationGuarded(qsoId, fields, profileId, Object.keys(touchedFields), detail.uuid, detail.revision, detailLogPath, activationReviewToken)
+            : recalculationApplied || activationReviewApplied
             ? decolog.saveQsoGuarded(qsoId, fields, profileId, Object.keys(touchedFields), detail.uuid, detail.revision, detailLogPath)
             : decolog.saveQso(qsoId, fields, profileId, Object.keys(touchedFields))
         errorText.text = error
@@ -220,22 +225,25 @@ DialogFrame {
         property var sessionRows: []
         property bool hasNextPage: false
         property string selectedUuid: ""
+        property string selectedToken: ""
         function loadSessions() {
             const runs = decolog.activation.closedRuns(cursors[page])
             hasNextPage = runs.length > 100
             const rows = [{label: qsTr("Keep the existing association"), uuid: ""}]
             if (page === 0 && decolog.activation.active && decolog.activation.state.sessionUuid)
-                rows.push({label: qsTr("Active session: %1").arg(decolog.activation.title), uuid: String(decolog.activation.state.sessionUuid)})
-            for (const run of runs.slice(0,100)) rows.push({label: (run.title || run.uuid) + " · " + run.startedAt + " → " + run.endedAt, uuid: String(run.uuid), rowid: run.rowid})
+                rows.push({label: qsTr("Active session: %1").arg(decolog.activation.title), uuid: String(decolog.activation.state.sessionUuid), token: decolog.activation.sessionReviewToken(decolog.activation.state.sessionUuid)})
+            for (const run of runs.slice(0,100)) rows.push({label: (run.title || run.uuid) + " · " + run.startedAt + " → " + run.endedAt, uuid: String(run.uuid), token: run.reviewToken, rowid: run.rowid})
             sessionRows = rows; sessionChoice.currentIndex = 0
         }
         background: Rectangle { color: Theme.panelColor; border.color: Theme.warningColor; radius: 6 }
         function applyDraft() {
+            if (!removeActivationLink.checked && selectedUuid && !selectedToken) { errorText.text=qsTr("The session could not be checked; reload and review it before saving."); return }
             for (let i=0; i<keys.length; ++i) root.setField(keys[i], String(values[i]).trim().toUpperCase())
             if (removeActivationLink.checked) root.setField("APP_DECOLOG_ACTIVATION_UUID", "")
             else if (selectedUuid) root.setField("APP_DECOLOG_ACTIVATION_UUID", selectedUuid)
             root.setField("APP_DECOLOG_ACTIVATION_REVIEW", "")
             root.setField("APP_DECOLOG_ACTIVATION_REVIEWED_AT", new Date().toISOString())
+            root.activationReviewToken = !removeActivationLink.checked && selectedUuid ? selectedToken : ""
             root.activationReviewApplied=true; root.formRev++; close()
         }
         contentItem: ColumnLayout {
@@ -248,7 +256,7 @@ DialogFrame {
             CheckBox { id: removeActivationLink; visible: !!root.field("APP_DECOLOG_ACTIVATION_UUID"); text: qsTr("Remove this session association") }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; text: qsTr("Optional: choose a recorded session only after checking its dates and your records. Selection does not prove the QSO belongs to it.") }
             ComboBox { id: sessionChoice; Layout.fillWidth: true; model: activationReview.sessionRows; textRole: "label"
-                onActivated: { activationReview.selectedUuid = activationReview.sessionRows[index].uuid; if (activationReview.selectedUuid) removeActivationLink.checked=false } }
+                onActivated: { activationReview.selectedUuid = activationReview.sessionRows[index].uuid; activationReview.selectedToken = activationReview.sessionRows[index].token || ""; if (activationReview.selectedUuid) removeActivationLink.checked=false } }
             RowLayout {
                 GlassButton { id: activationPreviousPage; text: qsTr("Previous sessions"); enabled: activationReview.page > 0; onClicked: { activationReview.page--; activationReview.loadSessions() } }
                 Text { text: qsTr("Page %1").arg(activationReview.page + 1); color: Theme.textSecondary }

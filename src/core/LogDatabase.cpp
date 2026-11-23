@@ -1419,9 +1419,31 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
     return result;
 }
 
+QString LogDatabase::activationRunToken(const QString& uuid) const
+{
+    if (uuid.isEmpty()) return {};
+    QSqlDatabase db=connection(); QSqlQuery scope(db);
+    if (!scope.exec(QStringLiteral("SAVEPOINT activation_token"))) return {};
+    struct Release { QSqlDatabase db; ~Release() { QSqlQuery q(db); q.exec(QStringLiteral("RELEASE SAVEPOINT activation_token")); } } release{db};
+    QSqlQuery run(db); run.prepare(QStringLiteral("SELECT uuid,started_at,ended_at,initial_json,last_json FROM activation_run WHERE uuid=?")); run.addBindValue(uuid);
+    if (!run.exec() || !run.next()) return {};
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    QJsonArray row; for (int i=0;i<5;++i) row.append(QJsonValue::fromVariant(run.value(i)));
+    hash.addData(QJsonDocument(row).toJson(QJsonDocument::Compact));
+    QSqlQuery events(db); events.prepare(QStringLiteral("SELECT id,changed_at,event,state_json FROM activation_run_change WHERE session_uuid=? ORDER BY id")); events.addBindValue(uuid);
+    if (!events.exec()) return {};
+    while (events.next()) {
+        QJsonArray event; for (int i=0;i<4;++i) event.append(QJsonValue::fromVariant(events.value(i)));
+        const QByteArray encoded=QJsonDocument(event).toJson(QJsonDocument::Compact);
+        hash.addData(QByteArray::number(encoded.size())); hash.addData(":"); hash.addData(encoded);
+    }
+    if (events.lastError().isValid()) return {};
+    return QString::fromLatin1(hash.result().toHex());
+}
+
 InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 stationProfileId,
                                           const QString& expectedUuid, int expectedRevision,
-                                          const QSet<QString>& touchedFields)
+                                          const QSet<QString>& touchedFields, const QString& activationToken)
 {
     InsertResult result;
     result.id = id;
@@ -1454,6 +1476,9 @@ InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 
             db.rollback();
             result.message = QStringLiteral("The selected activation session is unavailable; reload and review before saving.");
             return result;
+        }
+        if (!activationToken.isEmpty() && activationRunToken(activationUuid)!=activationToken) {
+            db.rollback(); result.message=QStringLiteral("The selected activation session changed; reload and review before saving."); return result;
         }
     }
     mergeUneditedQslFields(record, *current, touchedFields);
