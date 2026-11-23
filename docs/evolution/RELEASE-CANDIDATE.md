@@ -7,3 +7,5 @@ A local macOS arm64 ad-hoc test DMG has been mounted and exercised with an isola
 The common release gate passed locally on macOS arm64 (117 CTest groups, with individual opt-in and platform skips); see `PROGRESS.md` for limits. This does not replace clean packaged-platform acceptance.
 
 A local macOS arm64 ad-hoc test DMG also opened a synthetic schema-29-like log and preserved the compared QSO, QSL, attachment and API data through schema 30; see `PROGRESS.md` for the fixture and limits.
+
+A separate locally built historical 1.17.61 source revision created a synthetic schema-11 log that the macOS arm64 test DMG migrated to schema 30, including a verified legacy API replay; see `PROGRESS.md` for coverage and limitations.
