@@ -71,6 +71,10 @@ private slots:
                 QCOMPARE(inserted.status, InsertResult::Status::Inserted); last = inserted.id;
             }
             q.prepare("UPDATE qso SET qso_datetime_on='invalid' WHERE id=?"); q.addBindValue(last); QVERIFY(q.exec());
+            AdifRecord warning{{"CALL", "K1WARN"}, {"QSO_DATE", "20261101"}, {"TIME_ON", "120100"},
+                               {"BAND", "20m"}, {"MODE", "CW"}, {"MY_SOTA_REF", "not-a-summit"},
+                               {"APP_DECOLOG_ACTIVATION_UUID", "fixture-session"}};
+            QCOMPARE(db.insertQso(warning, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
         }
         QByteArray output;
         QVERIFY2(launch(dir, QStringLiteral("exclusionprobe"), output), output.constData());
@@ -79,6 +83,7 @@ private slots:
         QVERIFY2(output.contains("PROBE exclusions back=K0AAA page=0"), output.constData());
         QVERIFY2(output.contains("no operator programme reference"), output.constData());
         QVERIFY2(output.contains("missing or invalid UTC date"), output.constData());
+        QVERIFY2(output.contains("reference does not match local syntax; verify it"), output.constData());
         QVERIFY2(!output.contains("TypeError: Cannot read property 'length' of undefined"), output.constData());
     }
     void multiProgramActivationKeepsOwnAndCounterpartReferencesDistinct()

@@ -107,6 +107,22 @@ private slots:
         QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
         QVERIFY(db.connection().rollback());
     }
+    void previewWarnsAboutLocallyUnrecognizedOperatorReference()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db = &db;
+        ActivationController act(std::move(ctx)); QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        AdifRecord r{{"CALL","K1ABC"},{"QSO_DATE","20261231"},{"TIME_ON","230000"},{"BAND","20m"},{"MODE","CW"},
+                     {"MY_SOTA_REF","not-a-summit"},{"SOTA_REF","W2/WE-003"}};
+        act.session().applyTo(r, 0); QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        bool foundPota = false, foundSota = false;
+        for (const auto& value : act.partitionPreview().value("groups").toList()) {
+            const auto group = value.toMap();
+            if (group.value("program") == "POTA") { foundPota = true; QVERIFY(!group.value("referenceSyntaxWarning").toBool()); }
+            if (group.value("program") == "SOTA") { foundSota = true; QVERIFY(group.value("referenceSyntaxWarning").toBool());
+                QCOMPARE(group.value("reference").toString(), QString("NOT-A-SUMMIT")); }
+        }
+        QVERIFY(foundPota); QVERIFY(foundSota); QCOMPARE(db.record(1)->value("SOTA_REF"), QString("W2/WE-003"));
+    }
     void previewDistinguishesMissingCallIdentities()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db = &db;

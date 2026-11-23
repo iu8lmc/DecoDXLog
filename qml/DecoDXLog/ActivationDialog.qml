@@ -123,6 +123,8 @@ DialogFrame {
             if (root.probeExclusionMode) {
                 root.probeExclusionMode = false
                 Qt.callLater(() => {
+                    const group = groupRepeater.itemAt(0)
+                    if (group) console.warn("PROBE referenceWarning text=" + group.probeText())
                     const first = exclusionRepeater.itemAt(0)
                     if (!first) return
                     console.warn("PROBE exclusions total=" + root.partitionPreview.excluded.length + " first=" + first.modelData.call + " reason=" + first.modelData.reason + " text=" + first.text)
@@ -608,16 +610,21 @@ DialogFrame {
             color: Theme.warningColor
         }
         Repeater {
+            id: groupRepeater
             model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.groups || []).slice(root.previewPage * 100, (root.previewPage + 1) * 100) : []
             RowLayout {
                 required property var modelData
+                function probeText() { return groupNote.text }
                 Layout.fillWidth: true
                 Note {
+                    id: groupNote
                     text: qsTr("%1 · %2 · %3 UTC · operator %4 · grid %5: %6 QSO")
                         .arg(modelData.program).arg(modelData.reference).arg(modelData.day)
                         .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
                         + qsTr(" · missing station call: %1; missing operator: %2; missing both: %3")
                             .arg(modelData.missingStationCall || 0).arg(modelData.missingOperator || 0).arg(modelData.missingCallIdentity || 0)
+                        + (modelData.referenceSyntaxWarning ? qsTr(" · reference does not match local syntax; verify it") : "")
+                    color: modelData.referenceSyntaxWarning ? Theme.warningColor : Theme.textSecondary
                 }
                 GlassButton {
                     visible: ["POTA", "WWFF", "SOTA", "IOTA"].indexOf(modelData.program) >= 0

@@ -421,3 +421,12 @@ A new offscreen app fixture creates a separate synthetic log containing one clos
 A/B: before this increment the new desktop probe did not run and its baseline surfaced two `ActivationDialog.qml` TypeErrors caused by reading `.length` on undefined preview arrays before a result existed. Those bindings now use empty-array fallbacks. The revised desktop exclusion probe and existing multiprogram/closed-session probe passed; `tst_activation` passed 24 tests. Tests ran offscreen with programmatic actions on macOS arm64/Qt 6.11.2. This checks the QML delegate text and controls, not physical interaction or visual inspection of the screenshot.
 
 Grouping exclusions remain limited to invalid date and missing operator references; per-programme eligibility, catalogues, concurrent writes, large-log performance, official importer acceptance, RF and the remaining desktop roadmap work are still open.
+
+
+## 2026-11-23 — G06 local reference syntax warning
+
+Each group now applies the existing programme-specific local structural syntax check to its operator reference and shows an advisory warning when the local pattern does not recognize it. The group remains visible and exportable and the underlying QSO is not altered. The warning is not proof of invalidity: the local patterns can be narrower than real programme formats, and they do not consult any reference catalogue. [ADIF 3.1.8](https://www.adif.org/318/ADIF_318.htm) defines separate programme data types, but this incremental warning is not a complete ADIF or programme validation.
+
+A/B: an imported-like `MY_SOTA_REF=not-a-summit` was previously grouped without a syntax warning; the new test confirms the warning while retaining a valid POTA group and the counterpart SOTA reference. The offscreen application fixture includes a malformed reported summit and checks that the group delegate displays the warning. `tst_activation` passed 25 tests, and both existing desktop probes passed; the modified warning fixture was rerun and passed on macOS arm64/Qt 6.11.2. All data and interactions were synthetic.
+
+The warning does not validate reference existence, timing, location, eligible QSO, duplicates or recipient acceptance. Programmatic UI inspection is not physical operation; catalogues, official importer testing, RF and the remaining desktop roadmap work stay open.

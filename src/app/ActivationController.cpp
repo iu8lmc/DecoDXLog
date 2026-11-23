@@ -708,8 +708,13 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (reference.isEmpty() || seen.contains(reference)) continue;
                 seen.insert(reference); found = true;
                 const QString key = QString::fromUtf8(QJsonDocument(QJsonArray{pair.first, reference, day, op, grid}).toJson(QJsonDocument::Compact));
-                if (!groups.contains(key)) groups.insert(key, {{QStringLiteral("program"), pair.first}, {QStringLiteral("reference"), reference},
-                    {QStringLiteral("day"), day}, {QStringLiteral("operator"), op}, {QStringLiteral("grid"), grid}, {QStringLiteral("count"), 0}});
+                if (!groups.contains(key)) {
+                    QVariantMap checked;
+                    const bool syntaxMatches = Activation::normalizePrograms({{pair.first.toLower(), reference}}, &checked);
+                    groups.insert(key, {{QStringLiteral("program"), pair.first}, {QStringLiteral("reference"), reference},
+                        {QStringLiteral("day"), day}, {QStringLiteral("operator"), op}, {QStringLiteral("grid"), grid},
+                        {QStringLiteral("count"), 0}, {QStringLiteral("referenceSyntaxWarning"), !syntaxMatches}});
+                }
                 groups[key][QStringLiteral("count")] = groups[key].value(QStringLiteral("count")).toInt() + 1;
                 if (stationCall.isEmpty()) groups[key][QStringLiteral("missingStationCall")] = groups[key].value(QStringLiteral("missingStationCall")).toInt() + 1;
                 if (op.isEmpty()) groups[key][QStringLiteral("missingOperator")] = groups[key].value(QStringLiteral("missingOperator")).toInt() + 1;

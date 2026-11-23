@@ -19,3 +19,5 @@ Closed tracked sessions are listed in pages and can be selected for the same gro
 The grouping also counts records with empty `STATION_CALLSIGN`, empty `OPERATOR`, and both empty. These are presence checks on the QSO itself, not callsign validation or eligibility decisions. The counts can overlap and the QSO are not excluded automatically.
 
 The preview lists reported-session QSO excluded from every programme group because their UTC date is unreadable or because no operator programme reference is present, with QSO ID, call and reason. These are grouping exclusions only; contacts with absent/incorrect session metadata cannot be identified this way, and programme eligibility is not assessed.
+
+Each operator-reference group shows a warning if its reference does not match DecoDXLog's current local structural syntax check. It is advisory: the reference remains available for review and export, and the personal record is unchanged. This check is not a catalogue lookup, may flag legitimate formats outside its local pattern, and does not establish whether a reference exists or was valid at the time.
