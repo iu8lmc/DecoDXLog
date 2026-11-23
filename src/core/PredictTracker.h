@@ -17,6 +17,7 @@ class PredictTracker : public QObject {
     Q_INVOKABLE bool requestSatellites(const QString &host, int port);
     Q_INVOKABLE QVariantMap correctedFrequencies(double txMHz, double rxMHz) const;
     QVariantMap snapshot() const { return m_snapshot; }
+    QVariantMap publicStatus() const;
     bool busy() const { return m_busy; }
     QStringList satellites() const { return m_satellites; }
   signals:

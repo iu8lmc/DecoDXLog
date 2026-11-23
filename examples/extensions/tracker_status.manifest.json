@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "org.decodxlog.example.tracker-status",
+  "version": "1.0.0",
+  "entrypoint": "tracker_status.py",
+  "permissions": ["tracker.read"]
+}

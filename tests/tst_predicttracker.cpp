@@ -70,6 +70,16 @@ class TestPredictTracker : public QObject {
         QVERIFY(!done.takeFirst().at(0).toBool());
         QVERIFY(tracker.satellites().isEmpty());
     }
+    void publicStatusStartsWithoutSnapshot()
+    {
+        PredictTracker tracker;
+        const auto state=tracker.publicStatus();
+        QCOMPARE(state.value("available").toBool(),false);
+        QCOMPARE(state.value("fresh").toBool(),false);
+        QCOMPARE(state.value("orbitalFresh").toBool(),false);
+        QCOMPARE(state.value("busy").toBool(),false);
+        QVERIFY(!state.contains("satellite"));
+    }
     void exposesSnapshotAndBusyToDesktop()
     {
         PredictTracker tracker;
@@ -135,6 +145,9 @@ class TestPredictTracker : public QObject {
         QVERIFY2(done.first().at(0).toBool(), qPrintable(done.first().at(1).toString()));
         const auto snapshot = tracker.snapshot();
         QCOMPARE(snapshot.value("satellite").toString(), QString("FO-29"));
+        QVERIFY(tracker.publicStatus().value("available").toBool());
+        QVERIFY(tracker.publicStatus().value("fresh").toBool());
+        QVERIFY(tracker.publicStatus().value("orbitalFresh").toBool());
         QCOMPARE(snapshot.value("azimuth").toDouble(), 203.75);
         QCOMPARE(snapshot.value("elevation").toDouble(), -60.01);
         QCOMPARE(snapshot.value("doppler100MHz").toDouble(), 961.742249);
@@ -157,12 +170,14 @@ class TestPredictTracker : public QObject {
         QVERIFY(qAbs(receding.value("rxMHz").toDouble() - 434.99581642121685) < 1e-9);
         QTest::qWait(11000);
         QVERIFY(!tracker.correctedFrequencies(146, 435).value("ok").toBool());
+        QVERIFY(!tracker.publicStatus().value("fresh").toBool());
         epoch = "18001.00000000";
         done.clear();
         QVERIFY(tracker.request("127.0.0.1", server.localPort(), "FO-29"));
         QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
         QVERIFY(done.first().at(0).toBool());
         QVERIFY(!tracker.correctedFrequencies(146, 435).value("ok").toBool());
+        QVERIFY(!tracker.publicStatus().value("orbitalFresh").toBool());
     }
     void rejectsInvalidNamesAndTrackingModeChange()
     {

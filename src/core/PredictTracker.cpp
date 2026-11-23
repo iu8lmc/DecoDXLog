@@ -11,6 +11,28 @@ PredictTracker::PredictTracker(QObject *parent) : QObject(parent)
     m_timeout.setInterval(1200);
     connect(&m_timeout, &QTimer::timeout, this, [this] { fail(QStringLiteral("PREDICT request timed out")); });
 }
+QVariantMap PredictTracker::publicStatus() const
+{
+    const QDateTime now=QDateTime::currentDateTimeUtc();
+    const QDateTime received=m_snapshot.value(QStringLiteral("receivedAt")).toDateTime();
+    const QDateTime epoch=m_snapshot.value(QStringLiteral("tleEpoch")).toDateTime();
+    const bool available=!m_snapshot.isEmpty() && received.isValid();
+    const bool fresh=available && !m_busy && received<=now && received.msecsTo(now)<=10000;
+    const bool orbitalFresh=epoch.isValid() && epoch<=now && epoch.secsTo(now)<=14*86400;
+    QVariantMap result{{QStringLiteral("source"),QStringLiteral("predict_udp")},{QStringLiteral("available"),available},
+        {QStringLiteral("busy"),m_busy},{QStringLiteral("fresh"),fresh},{QStringLiteral("orbitalFresh"),orbitalFresh}};
+    if (available) {
+        result.insert(QStringLiteral("satellite"),m_snapshot.value(QStringLiteral("satellite")));
+        result.insert(QStringLiteral("azimuth"),m_snapshot.value(QStringLiteral("azimuth")));
+        result.insert(QStringLiteral("elevation"),m_snapshot.value(QStringLiteral("elevation")));
+        result.insert(QStringLiteral("doppler100MHz"),m_snapshot.value(QStringLiteral("doppler100MHz")));
+        result.insert(QStringLiteral("nextEventUnix"),m_snapshot.value(QStringLiteral("nextEventUnix")));
+        result.insert(QStringLiteral("receivedAt"),received.toUTC().toString(Qt::ISODateWithMs));
+        result.insert(QStringLiteral("tleEpoch"),epoch.toUTC().toString(Qt::ISODateWithMs));
+    }
+    return result;
+}
+
 QVariantMap PredictTracker::correctedFrequencies(double txMHz, double rxMHz) const
 {
     const auto failResult = [](const QString &error) {

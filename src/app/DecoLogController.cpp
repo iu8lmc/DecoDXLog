@@ -3762,13 +3762,21 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
             {QStringLiteral("apiVersion"), 1},
             {QStringLiteral("permissionModel"), request.readOnly ? QStringLiteral("read-only-token") : QStringLiteral("shared-token")},
             {QStringLiteral("operations"), request.readOnly
-                ? QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read")}
-                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("qso.write")}},
+                ? QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read")}
+                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.write")}},
             {QStringLiteral("events"), false},
             {QStringLiteral("txControl"), false},
             {QStringLiteral("perExtensionPermissions"), false},
             {QStringLiteral("durableAtomicIdempotency"), false},
         });
+    }
+
+    if (path == QLatin1String("/api/v1/tracker")) {
+        if (request.method != "GET")
+            return HttpResponse::error(405, QStringLiteral("use GET"));
+        if (!m_predictTracker)
+            return HttpResponse::error(503, QStringLiteral("tracker unavailable"));
+        return HttpResponse::json(200,QJsonObject::fromVariantMap(m_predictTracker->publicStatus()));
     }
 
     if (path == QLatin1String("/api/v1/status")) {

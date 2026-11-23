@@ -721,6 +721,11 @@ if(DECODXLOG_BUILD_TESTS)
     set_target_properties(clublog_oqrs_probe PROPERTIES WIN32_EXECUTABLE OFF)
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME predict_extension_integration COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/tools/predict_extension_probe.py $<TARGET_FILE:decolog> ${CMAKE_SOURCE_DIR})
+        set_tests_properties(predict_extension_integration PROPERTIES TIMEOUT 45)
+        add_test(NAME tracker_extension COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/python/test_tracker_extension.py)
         add_test(NAME extension_harness COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/python/test_extension_harness.py)
         add_test(NAME recent_activity_extension COMMAND ${Python3_EXECUTABLE}

@@ -12,7 +12,7 @@ import time
 
 MAX_MANIFEST = 16 * 1024
 MAX_OUTPUT = 1024 * 1024
-ALLOWED_PERMISSIONS = frozenset({"qso.read", "status.read", "worked.read"})
+ALLOWED_PERMISSIONS = frozenset({"qso.read", "status.read", "worked.read", "tracker.read"})
 REQUIRED = frozenset({"schemaVersion", "apiVersion", "id", "version", "entrypoint", "permissions"})
 
 
@@ -62,8 +62,13 @@ def load_manifest(path):
 def run_extension(manifest_path, token, port, timeout):
     manifest_path = pathlib.Path(manifest_path).resolve(strict=True)
     manifest = load_manifest(manifest_path)
-    if "qso.read" not in manifest["permissions"]:
-        raise ValueError("this report requires qso.read")
+    permissions = set(manifest["permissions"])
+    if "qso.read" in permissions and "tracker.read" not in permissions:
+        expected_scope = "recent_sample"
+    elif "tracker.read" in permissions and "qso.read" not in permissions:
+        expected_scope = "tracker_snapshot"
+    else:
+        raise ValueError("the harness requires one supported example capability")
     if not token or not 1 <= port <= 65535 or not 0.1 <= timeout <= 60:
         raise ValueError("invalid token, port or timeout")
     env = {k: os.environ[k] for k in ("PATH", "SYSTEMROOT", "WINDIR") if k in os.environ}
@@ -73,7 +78,10 @@ def run_extension(manifest_path, token, port, timeout):
         stdout = pathlib.Path(directory) / "stdout"
         stderr = pathlib.Path(directory) / "stderr"
         with stdout.open("w+b") as out, stderr.open("w+b") as err:
-            process = subprocess.Popen([sys.executable, str(entry), "--port", str(port), "--limit", "100"],
+            command = [sys.executable, str(entry), "--port", str(port)]
+            if expected_scope == "recent_sample":
+                command += ["--limit", "100"]
+            process = subprocess.Popen(command,
                                        cwd=directory, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err)
             deadline = time.monotonic() + timeout
             while process.poll() is None:
@@ -91,7 +99,7 @@ def run_extension(manifest_path, token, port, timeout):
             if token.encode("utf-8") in raw_output:
                 raise ValueError("extension output contains a credential")
             output = json.loads(raw_output)
-    if not isinstance(output, dict) or output.get("scope") != "recent_sample":
+    if not isinstance(output, dict) or output.get("scope") != expected_scope:
         raise ValueError("unsupported extension output")
     return output
 

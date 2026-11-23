@@ -522,6 +522,10 @@ private slots:
         const auto readCaps=readRequest("GET",QStringLiteral("/api/v1/capabilities"));
         QCOMPARE(readCaps.first,200); QCOMPARE(readCaps.second.value("permissionModel").toString(),QString("read-only-token"));
         QVERIFY(!readCaps.second.value("operations").toArray().contains("qso.write"));
+        QVERIFY(readCaps.second.value("operations").toArray().contains("tracker.read"));
+        const auto tracker=readRequest("GET",QStringLiteral("/api/v1/tracker"));
+        QCOMPARE(tracker.first,200); QVERIFY(!tracker.second.value("available").toBool());
+        QCOMPARE(readRequest("POST",QStringLiteral("/api/v1/tracker")).first,403);
         QCOMPARE(readRequest("GET",QStringLiteral("/api/v1/qsos")).first,200);
         QCOMPARE(readRequest("POST",QStringLiteral("/api/v1/qso")).first,403);
         QCOMPARE(countCall(QStringLiteral("W1BAD")),0);

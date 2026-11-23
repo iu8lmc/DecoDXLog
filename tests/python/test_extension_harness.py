@@ -51,6 +51,11 @@ class ExtensionHarnessTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 harness.load_manifest(manifest)
 
+    def test_tracker_manifest_is_read_only(self):
+        manifest = pathlib.Path(__file__).resolve().parents[2] / "examples/extensions/tracker_status.manifest.json"
+        result = harness.load_manifest(manifest)
+        self.assertEqual(result["permissions"], ["tracker.read"])
+
     def test_manifest_version_and_unknown_permission_rejected(self):
         base = {"schemaVersion": 1, "apiVersion": 1, "id": "org.example.demo", "version": "1.0.0",
                 "entrypoint": "demo.py", "permissions": ["qso.read"]}

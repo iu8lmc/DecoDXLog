@@ -217,7 +217,8 @@ void LocalApiServer::readFrom(QTcpSocket* socket)
         const QString path = request.path.endsWith(QLatin1Char('/')) ? request.path.chopped(1) : request.path;
         const bool permitted = request.method == "GET" &&
             (path == QLatin1String("/api/v1/capabilities") || path == QLatin1String("/api/v1/status") ||
-             path == QLatin1String("/api/v1/worked") || path == QLatin1String("/api/v1/qsos"));
+             path == QLatin1String("/api/v1/worked") || path == QLatin1String("/api/v1/qsos") ||
+             path == QLatin1String("/api/v1/tracker"));
         if (!permitted) {
             answer(socket, HttpResponse::error(403, QStringLiteral("read-only token")));
             return;
