@@ -820,6 +820,7 @@ public:
 
     Q_INVOKABLE void importAdif(const QUrl& file);
     Q_INVOKABLE void previewImport(const QUrl& file, bool fromClubLog = false, const QString& stationCall = {});
+    Q_INVOKABLE void cancelImportPreview();
     Q_INVOKABLE bool undoLastImport(qint64 expectedBatchId = 0, const QString& expectedBatchUuid = {},
                                      qint64 expectedJournalRevision = -1);
     Q_INVOKABLE bool previewImportUndo();
@@ -1259,6 +1260,9 @@ private:
     quint64 m_importPreviewGeneration{0};
     QString m_importPreviewLogPath;
     QUrl m_importPreviewFile;
+    QByteArray m_importPreviewAdif;
+    QString m_importPreviewIdentity;
+    quint64 m_importPreviewLogGeneration{0};
     qint64 m_importPreviewProfile{0};
     quint64 m_importPreviewLogVersion{0};
     QThreadPool m_statsViewPool;

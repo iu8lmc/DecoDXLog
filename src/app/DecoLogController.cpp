@@ -5522,7 +5522,8 @@ QVariantList DecoLogController::dxccInLog() const
 void DecoLogController::importAdif(const QUrl& url)
 {
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
-    if (m_importPreviewFile == url && (m_importPreviewLogPath != m_db.path()
+    const bool reviewed = m_importPreviewFile == url && !m_importPreviewAdif.isEmpty();
+    if (reviewed && (m_importPreviewLogPath != m_db.path() || m_importPreviewIdentity != m_db.identity() || m_importPreviewLogGeneration != m_db.openGeneration()
         || m_importPreviewLogVersion != m_logVersion
         || m_importPreviewProfile != (m_profiles ? m_profiles->activeProfileId() : 0))) {
         addActivity(QStringLiteral("IMPORT"), tr("Logbook or station changed; preview the import again"), QStringLiteral("warning"));
@@ -5533,19 +5534,22 @@ void DecoLogController::importAdif(const QUrl& url)
                     QStringLiteral("warning"));
         return;
     }
-    QFile file(path);
-    if (!file.open(QIODevice::ReadOnly)) {
-        addActivity(QStringLiteral("IMPORT"), tr("Cannot read %1: %2").arg(path, file.errorString()), QStringLiteral("error"));
-        return;
+    if (!reviewed) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            addActivity(QStringLiteral("IMPORT"), tr("Cannot read %1: %2").arg(path, file.errorString()), QStringLiteral("error"));
+            return;
+        }
     }
-    file.close();
+    const QByteArray reviewedAdif=reviewed ? m_importPreviewAdif : QByteArray();
+    m_importPreviewAdif.clear(); m_importPreviewFile=QUrl();
     const qint64 profile = m_profiles ? m_profiles->activeProfileId() : 0;
     const qint64 startedAt = QDateTime::currentMSecsSinceEpoch();
-    const QString dbPath = m_db.path();
+    const QString dbPath = m_db.path(), dbIdentity=m_db.identity();
     // Un log di prova in memoria non si apre da un altro filo: li' si importa qui.
     if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:")) {
         QString error;
-        const QByteArray adif = migration::asAdif(path, &error);
+        const QByteArray adif = reviewed ? reviewedAdif : migration::asAdif(path, &error);
         ImportResult result = adif.isEmpty() ? ImportResult{} : m_db.importAdif(adif, QStringLiteral("import"), profile);
         if (adif.isEmpty()) {
             result.invalid = 1;
@@ -5565,15 +5569,17 @@ void DecoLogController::importAdif(const QUrl& url)
     const int digital = m_db.dedupWindowSeconds(false);
     const int manual = m_db.dedupWindowSeconds(true);
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, path, dbPath, profile, digital, manual, startedAt] {
+    m_importPool.start([self, path, dbPath, dbIdentity, reviewedAdif, profile, digital, manual, startedAt] {
         ImportResult result;
         // ADIF com'e'; un CSV o un database di N1MM convertiti prima.
         QString readError;
-        const QByteArray adif = migration::asAdif(path, &readError);
+        const QByteArray adif = reviewedAdif.isEmpty() ? migration::asAdif(path, &readError) : reviewedAdif;
         LogDatabase db;
         if (adif.isEmpty() || !db.open(dbPath)) {
             result.invalid = 1;
             result.errors << (adif.isEmpty() ? readError : db.lastError());
+        } else if (dbIdentity.isEmpty() || db.identity()!=dbIdentity) {
+            result.invalid=1; result.errors << tr("Log identity changed; import cancelled.");
         } else {
             db.setDedupWindows(digital, manual);
             int lastPercent = -1;
@@ -5614,7 +5620,7 @@ void DecoLogController::importAdif(const QUrl& url)
     });
 }
 
-static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb)
+static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QByteArray* snapshot)
 {
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
     QFile file(path);
@@ -5674,23 +5680,30 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb)
         out.insert(QStringLiteral("estimatedDuplicates"), estimate.duplicates);
         out.insert(QStringLiteral("estimatedInvalid"), estimate.invalid);
     }
+    if (snapshot) *snapshot=adif;
     return out;
+}
+
+void DecoLogController::cancelImportPreview()
+{
+    ++m_importPreviewGeneration; m_importPreviewFile=QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear();
 }
 
 void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const QString& stationCall)
 {
-    const QString dbPath = m_db.path();
+    const QString dbPath = m_db.path(), dbIdentity=m_db.identity(); const quint64 dbGeneration=m_db.openGeneration();
     const int digital = m_db.dedupWindowSeconds(false);
     const int manual = m_db.dedupWindowSeconds(true);
     const quint64 generation = ++m_importPreviewGeneration;
     const quint64 logVersion = m_logVersion;
     const qint64 profile = m_profiles ? m_profiles->activeProfileId() : 0;
-    m_importPreviewFile = QUrl();
+    m_importPreviewFile = QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, url, dbPath, digital, manual, generation, logVersion, profile, fromClubLog, stationCall] {
+    m_importPool.start([self, url, dbPath, dbIdentity, dbGeneration, digital, manual, generation, logVersion, profile, fromClubLog, stationCall] {
         QVariantMap result;
+        QByteArray snapshot;
         LogDatabase db;
-        if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:") || !db.open(dbPath)) {
+        if (dbPath.isEmpty() || dbIdentity.isEmpty() || dbPath == QLatin1String(":memory:") || !db.open(dbPath) || db.identity()!=dbIdentity) {
             result = {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Cannot open logbook for preview")}};
         } else {
             db.setDedupWindows(digital, manual);
@@ -5718,19 +5731,20 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
                     if (!valid) error = QObject::tr("Cannot prepare the temporary Club Log download for preview");
                 }
             }
-            result = valid ? makeImportPreview(url, db)
+            result = valid ? makeImportPreview(url, db, &snapshot)
                            : QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), error}};
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, url, dbPath, generation, logVersion, profile, result] {
+        QMetaObject::invokeMethod(self.data(), [self, url, dbPath, dbIdentity, dbGeneration, generation, logVersion, profile, result, snapshot] {
             if (!self || generation != self->m_importPreviewGeneration) return;
-            if (self->m_db.path() != dbPath || self->m_logVersion != logVersion
+            if (self->m_db.path() != dbPath || self->m_db.identity()!=dbIdentity || self->m_db.openGeneration()!=dbGeneration || self->m_logVersion != logVersion
                 || (self->m_profiles ? self->m_profiles->activeProfileId() : 0) != profile) {
                 emit self->importPreviewReady(url, {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Logbook changed; preview again")}});
                 return;
             }
             if (result.value(QStringLiteral("ok")).toBool()) {
                 self->m_importPreviewFile = url; self->m_importPreviewLogPath = dbPath;
+                self->m_importPreviewAdif=snapshot; self->m_importPreviewIdentity=dbIdentity; self->m_importPreviewLogGeneration=dbGeneration;
                 self->m_importPreviewLogVersion = logVersion; self->m_importPreviewProfile = profile;
             }
             emit self->importPreviewReady(url, result);

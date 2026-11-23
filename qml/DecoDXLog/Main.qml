@@ -1612,6 +1612,7 @@ RoundedWindow {
         }
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
         else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe") importSnapshotProbe.start()
         else if (what[0] === "confirmationreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "clubreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "customreportprobe") { openStats(); activityReportProbe.start() }
@@ -2040,8 +2041,11 @@ RoundedWindow {
             window.pendingImport = file
             window.importPreview = result
             importPreviewDialog.open()
+            if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready"); importSnapshotAccept.start() }
         }
     }
+    Timer { id:importSnapshotProbe; interval:1000; onTriggered:decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false) }
+    Timer { id:importSnapshotAccept; interval:2000; onTriggered: { if (startupShow.indexOf("importcancelprobe:") === 0) importPreviewDialog.reject(); else importPreviewDialog.accept() } }
     Connections {
         target: decolog.qsl
         function onClubLogDownloadReady(file, stationCall) { decolog.previewImport(file, true, stationCall) }
@@ -2245,6 +2249,7 @@ RoundedWindow {
         width: 600
         height: 300
         onAccepted: decolog.importAdif(window.pendingImport)
+        onRejected: decolog.cancelImportPreview()
         body: ColumnLayout {
             anchors.margins: 16
             spacing: 10
@@ -2252,7 +2257,7 @@ RoundedWindow {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
                 text: window.importPreview.ok
-                      ? qsTr("%1 records read from %2.\nEstimated result: %3 new · %4 duplicates · %5 rejected.\nQSL status: %6 · incomplete UTC: %7.\nExtra fields are preserved: %8")
+                      ? qsTr("%1 records read from %2. The reviewed snapshot will be imported.\nEstimated result: %3 new · %4 duplicates · %5 rejected.\nQSL status: %6 · incomplete UTC: %7.\nExtra fields are preserved: %8")
                           .arg(window.importPreview.read).arg(window.importPreview.kind || "file")
                           .arg(window.importPreview.estimatedInserted || 0)
                           .arg(window.importPreview.estimatedDuplicates || 0)
