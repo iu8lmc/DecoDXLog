@@ -4012,6 +4012,8 @@ QString DecoLogController::saveNewQsoPanelSettings(const QStringList& visibleFie
             return tr("Provide unique, non-empty allowed values for %1.").arg(checked.field);
         case newqso::CustomFieldError::InvalidUnit:
             return tr("The unit for %1 is too long.").arg(checked.field);
+        case newqso::CustomFieldError::InvalidCondition:
+            return tr("The condition for %1 must refer to a different configured custom field and have a value.").arg(checked.field);
         case newqso::CustomFieldError::None:
             break;
         }
@@ -4145,8 +4147,8 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     // tornano nell'export ADIF senza perdere nulla.
     const QVariantMap customFields = fields.value(QStringLiteral("custom_fields")).toMap();
     const QStringList standardPanelFields = newqso::standardFields();
-    QHash<QString,QVariantMap> customDefinitions;
-    for (const QVariant& definition : newQsoCustomFields()) { const auto map=definition.toMap(); customDefinitions.insert(map.value(QStringLiteral("name")).toString(),map); }
+    const QString customError=newqso::validateCustomValues(newQsoCustomFields(),customFields,QLocale());
+    if (!customError.isEmpty()) return customError;
     for (auto it = customFields.cbegin(); it != customFields.cend(); ++it) {
         const QString name = newqso::normalizeAdifName(it.key());
         if (!newqso::isValidAdifName(name))
@@ -4155,10 +4157,6 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
             return tr("The ADIF field %1 is managed by DecoDXLog.").arg(name);
         if (standardPanelFields.contains(name))
             return tr("Use the standard %1 field instead of a custom field.").arg(name);
-        if (customDefinitions.contains(name)) {
-            const QString error=newqso::validateCustomValue(customDefinitions.value(name),it.value().toString(),QLocale());
-            if (!error.isEmpty()) return tr("%1: %2").arg(name,error);
-        }
         r.set(name, it.value().toString().trimmed());
     }
     if (historical)

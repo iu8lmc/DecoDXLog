@@ -676,6 +676,7 @@ GlassPanel {
                             property alias fieldValue: customInput.text
                             Layout.fillWidth: true
                             label: String(modelData.label || modelData.name) + (modelData.unit ? " (" + modelData.unit + ")" : "")
+                                   + (modelData.requiredIf ? " · " + qsTr("required if %1 = %2").arg(modelData.requiredIf.field).arg(modelData.requiredIf.equals) : "")
                             StyledTextField {
                                 id: customInput
                                 Layout.fillWidth: true

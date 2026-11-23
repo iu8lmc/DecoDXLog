@@ -27,7 +27,7 @@ DialogFrame {
         customModel.clear()
         if (!useDefaults) {
             for (const field of decolog.newQsoCustomFields)
-                customModel.append({ fieldName: field.name, fieldLabel: field.label, fieldType:field.type || "text", fieldUnit:field.unit || "", fieldChoices:(field.choices || []).join(", ") })
+                customModel.append({ fieldName: field.name, fieldLabel: field.label, fieldType:field.type || "text", fieldUnit:field.unit || "", fieldChoices:(field.choices || []).join(", "), fieldDepends:(field.requiredIf || {}).field || "", fieldExpected:(field.requiredIf || {}).equals || "" })
         }
         settingsError.text = ""
         Qt.callLater(function() {
@@ -52,7 +52,7 @@ DialogFrame {
         for (let i = 0; i < customRepeater.count; ++i) {
             const item = customRepeater.itemAt(i)
             if (item)
-                custom.push({ name: item.fieldNameText, label: item.fieldLabelText, type:item.selectedType, unit:item.unitText, choices:item.choicesText.split(",").map(x => x.trim()).filter(x => x.length) })
+                custom.push({ name: item.fieldNameText, label: item.fieldLabelText, type:item.selectedType, unit:item.unitText, choices:item.choicesText.split(",").map(x => x.trim()).filter(x => x.length), requiredIf:{field:item.dependsText, equals:item.expectedText} })
         }
         const error = decolog.saveNewQsoPanelSettings(visible, custom, enterToLogToggle.checked)
         settingsError.text = error
@@ -62,7 +62,8 @@ DialogFrame {
 
     onOpened: reload()
     function probeTyped() {
-        customModel.clear(); customModel.append({fieldName:"APP_TYPED_POWER",fieldLabel:"Power",fieldType:"number",fieldUnit:"W",fieldChoices:""})
+        customModel.clear(); customModel.append({fieldName:"APP_TYPED_POWER",fieldLabel:"Power",fieldType:"number",fieldUnit:"W",fieldChoices:"",fieldDepends:"",fieldExpected:""})
+        customModel.append({fieldName:"APP_TYPED_NOTE",fieldLabel:"Note",fieldType:"text",fieldUnit:"",fieldChoices:"",fieldDepends:"APP_TYPED_POWER",fieldExpected:"12"})
         Qt.callLater(function() { const row=customRepeater.itemAt(0); if (!row) { console.warn("PROBE typed missing field"); return }; console.warn("PROBE typed editor " + row.selectedType + " " + row.unitText); root.save() })
     }
 
@@ -128,7 +129,7 @@ DialogFrame {
             GlassButton {
                 text: qsTr("Add field")
                 enabled: customModel.count < 12
-                onClicked: customModel.append({ fieldName: "", fieldLabel: "", fieldType:"text", fieldUnit:"", fieldChoices:"" })
+                onClicked: customModel.append({ fieldName: "", fieldLabel: "", fieldType:"text", fieldUnit:"", fieldChoices:"",fieldDepends:"",fieldExpected:"" })
             }
         }
 
@@ -171,10 +172,14 @@ DialogFrame {
                         required property string fieldType
                         required property string fieldUnit
                         required property string fieldChoices
+                        required property string fieldDepends
+                        required property string fieldExpected
                         property alias fieldNameText: nameField.text
                         property alias fieldLabelText: labelField.text
                         property alias unitText: unitField.text
                         property alias choicesText: choicesField.text
+                        property alias dependsText: dependsField.text
+                        property alias expectedText: expectedField.text
                         readonly property string selectedType: typeChoice.keys[typeChoice.currentIndex] || "text"
                         Layout.fillWidth: true
                         spacing: 8
@@ -222,6 +227,11 @@ DialogFrame {
                                 currentIndex:Math.max(0,keys.indexOf(customRow.fieldType)); Accessible.name:qsTr("Custom field type") }
                             StyledTextField { id:unitField; Layout.preferredWidth:100; text:customRow.fieldUnit; placeholderText:qsTr("Unit"); Accessible.name:qsTr("Custom field unit") }
                             StyledTextField { id:choicesField; Layout.fillWidth:true; text:customRow.fieldChoices; visible:customRow.selectedType==="list"; placeholderText:qsTr("Allowed values, comma separated"); Accessible.name:qsTr("Custom field allowed values") }
+                        }
+                        RowLayout {
+                            Layout.fillWidth:true
+                            StyledTextField { id:dependsField; Layout.fillWidth:true; text:customRow.fieldDepends; uppercase:true; placeholderText:qsTr("Required if custom field…"); Accessible.name:qsTr("Required if custom field") }
+                            StyledTextField { id:expectedField; Layout.fillWidth:true; text:customRow.fieldExpected; placeholderText:qsTr("…equals this value"); Accessible.name:qsTr("Required if field equals") }
                         }
                     }
                 }

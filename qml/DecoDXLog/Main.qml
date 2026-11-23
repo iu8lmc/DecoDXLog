@@ -1725,8 +1725,9 @@ RoundedWindow {
             const now=decolog.utcNow()
             const base={call:"K1TYP",date:now.date,time:now.time,band:"20m",mode:"CW",rst_sent:"599",rst_rcvd:"599"}
             base.custom_fields={APP_TYPED_POWER:"not-a-number"}; const invalid=decolog.logManualQso(base)
-            base.custom_fields={APP_TYPED_POWER:"12"}; const valid=decolog.logManualQso(base)
-            console.warn("PROBE typed result " + JSON.stringify({settings:decolog.newQsoCustomFields,invalid:invalid,valid:valid}))
+            base.custom_fields={APP_TYPED_POWER:"12"}; const missing=decolog.logManualQso(base)
+            base.custom_fields={APP_TYPED_POWER:"12",APP_TYPED_NOTE:"portable"}; const valid=decolog.logManualQso(base)
+            console.warn("PROBE typed result " + JSON.stringify({settings:decolog.newQsoCustomFields,invalid:invalid,missing:missing,valid:valid}))
         }
     }
     Timer {

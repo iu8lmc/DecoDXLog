@@ -139,7 +139,22 @@ CustomFieldsResult validateCustomFields(const QVariantList& fields)
         if (type!=QLatin1String("text")) normalized.insert(QStringLiteral("type"),type);
         if (!unit.isEmpty()) normalized.insert(QStringLiteral("unit"),unit);
         if (!choices.isEmpty()) normalized.insert(QStringLiteral("choices"),choices);
+        const QVariantMap condition=item.value(QStringLiteral("requiredIf")).toMap();
+        const QString dependency=normalizeAdifName(condition.value(QStringLiteral("field")).toString());
+        const QString expected=condition.value(QStringLiteral("equals")).toString().trimmed();
+        if (!dependency.isEmpty() || !expected.isEmpty()) {
+            if (!isValidAdifName(dependency) || dependency==name || expected.isEmpty() || expected.size()>100) {
+                result.error=CustomFieldError::InvalidCondition; result.field=name; return result;
+            }
+            normalized.insert(QStringLiteral("requiredIf"),QVariantMap{{QStringLiteral("field"),dependency},{QStringLiteral("equals"),expected}});
+        }
         result.fields << normalized;
+    }
+    for (const QVariant& value : result.fields) {
+        const auto item=value.toMap(); const auto condition=item.value(QStringLiteral("requiredIf")).toMap();
+        if (!condition.isEmpty() && !seen.contains(condition.value(QStringLiteral("field")).toString())) {
+            result.error=CustomFieldError::InvalidCondition; result.field=item.value(QStringLiteral("name")).toString(); return result;
+        }
     }
     return result;
 }
@@ -157,6 +172,25 @@ QString validateCustomValue(const QVariantMap& definition,const QString& value,c
     if (type==QLatin1String("boolean")) return text==QLatin1String("Y") || text==QLatin1String("N") ? QString() : QStringLiteral("Use Y or N");
     if (type==QLatin1String("list")) return definition.value(QStringLiteral("choices")).toStringList().contains(text) ? QString() : QStringLiteral("Choose an allowed value");
     return QStringLiteral("Unsupported custom field type");
+}
+
+QString validateCustomValues(const QVariantList& definitions,const QVariantMap& values,const QLocale& locale)
+{
+    QVariantMap normalized;
+    for (auto it=values.cbegin();it!=values.cend();++it) {
+        const QString name=normalizeAdifName(it.key());
+        if (normalized.contains(name)) return QStringLiteral("%1: Duplicate field").arg(name);
+        normalized.insert(name,it.value().toString().trimmed());
+    }
+    for (const QVariant& value : definitions) {
+        const QVariantMap definition=value.toMap(); const QString name=definition.value(QStringLiteral("name")).toString();
+        const QString text=normalized.value(name).toString(); const auto condition=definition.value(QStringLiteral("requiredIf")).toMap();
+        if (!condition.isEmpty() && normalized.value(condition.value(QStringLiteral("field")).toString()).toString()==condition.value(QStringLiteral("equals")).toString() && text.isEmpty())
+            return QStringLiteral("%1: Required when %2 equals %3").arg(name,condition.value(QStringLiteral("field")).toString(),condition.value(QStringLiteral("equals")).toString());
+        const QString error=validateCustomValue(definition,text,locale);
+        if (!error.isEmpty()) return QStringLiteral("%1: %2").arg(name,error);
+    }
+    return {};
 }
 
 QString encodeCustomFields(const QVariantList& fields)

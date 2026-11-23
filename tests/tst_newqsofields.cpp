@@ -117,6 +117,21 @@ private slots:
         LogDatabase imported; QVERIFY(imported.open(":memory:")); QCOMPARE(imported.importAdif(adif.toUtf8()).inserted,1);
         QVERIFY(imported.record(1)); QCOMPARE(imported.record(1)->value("APP_TEST_NUMBER"),QString("12,5"));
     }
+    void conditionalRequirementsAreValidatedForMissingFields()
+    {
+        QVariantList defs{QVariantMap{{"name","APP_OPERATOR"},{"type","list"},{"choices",QStringList{"SOLO","TEAM"}}},
+                          QVariantMap{{"name","APP_TEAM"},{"requiredIf",QVariantMap{{"field","app_operator"},{"equals","TEAM"}}}}};
+        const auto checked=newqso::validateCustomFields(defs); QVERIFY(checked.ok());
+        QCOMPARE(newqso::decodeCustomFields(newqso::encodeCustomFields(defs)),checked.fields);
+        QVERIFY(newqso::validateCustomValues(checked.fields,{{"APP_OPERATOR","SOLO"}},QLocale::c()).isEmpty());
+        QVERIFY(!newqso::validateCustomValues(checked.fields,{{"APP_OPERATOR","TEAM"}},QLocale::c()).isEmpty());
+        QVERIFY(newqso::validateCustomValues(checked.fields,{{"app_operator","TEAM"},{"APP_TEAM","Club"}},QLocale::c()).isEmpty());
+        QVERIFY(newqso::validateCustomValues(checked.fields,{},QLocale::c()).isEmpty());
+        defs[1]=QVariantMap{{"name","APP_TEAM"},{"requiredIf",QVariantMap{{"field","APP_UNKNOWN"},{"equals","TEAM"}}}};
+        QVERIFY(!newqso::validateCustomFields(defs).ok());
+        defs[1]=QVariantMap{{"name","APP_TEAM"},{"requiredIf",QVariantMap{{"field","APP_TEAM"},{"equals","X"}}}};
+        QVERIFY(!newqso::validateCustomFields(defs).ok());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestNewQsoFields)

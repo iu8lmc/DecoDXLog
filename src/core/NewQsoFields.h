@@ -25,6 +25,7 @@ enum class CustomFieldError {
     InvalidType,
     InvalidChoices,
     InvalidUnit,
+    InvalidCondition,
 };
 
 struct CustomFieldsResult {
@@ -52,6 +53,7 @@ bool isProtectedAdifField(const QString& name);
 CustomFieldsResult validateCustomFields(const QVariantList& fields);
 // Returns an explanatory error; the caller retains the original ADIF text.
 QString validateCustomValue(const QVariantMap& definition, const QString& value, const QLocale& locale);
+QString validateCustomValues(const QVariantList& definitions, const QVariantMap& values, const QLocale& locale);
 
 QString encodeCustomFields(const QVariantList& fields);
 QVariantList decodeCustomFields(const QString& json, bool* legacyIota = nullptr);
