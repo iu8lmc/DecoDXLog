@@ -11,7 +11,7 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
-    void selfAuthorityDoesNotCreateAnUnanswerableRequest()
+    void selfAuthoritySharesDurableSequenceAndRecovers()
     {
         using namespace decolog::core; using decolog::app::NetController;
         QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -19,7 +19,28 @@ private slots:
         LogDatabase db; QVERIFY(db.open(dir.filePath("self.sqlite"))); QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const int port=probe.localPort(); probe.close();
         NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("self"); net.setGroup("FIELD"); net.setPort(port); net.setTarget(QHostAddress::LocalHost);
         QVERIFY(net.configureDurableSerialAuthority("event","self").isEmpty()); net.setEnabled(true);
-        QVERIFY(!net.requestDurableSerial(1).isEmpty()); QTest::qWait(200); QVERIFY(!db.activeContestSerialRequest("event","self").ok); net.setEnabled(false);
+        QVERIFY(net.requestDurableSerial(10).isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(!net.durableSerialGrantForQso().isEmpty(),4000);
+        auto grant=net.durableSerialGrantForQso(); QCOMPARE(grant.value("serial").toInt(),10); const auto requestId=grant.value("requestId").toString();
+        const auto peer=db.reserveContestSerial("event","remote","req-peer",1); QVERIFY(peer.ok); QCOMPARE(peer.serial,11);
+        net.setEnabled(false); db.close(); QVERIFY(db.open(dir.filePath("self.sqlite")));
+        QVERIFY(net.configureDurableSerialAuthority("event","self").isEmpty()); net.setEnabled(true); QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("Experimental grant: 10"),4000);
+        grant=net.durableSerialGrantForQso(); QCOMPARE(grant.value("requestId").toString(),requestId);
+        QVERIFY(db.consumeContestSerialGrant("event","self",requestId,"test-use").ok);
+        QVERIFY(net.requestDurableSerial(1).isEmpty()); QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialGrantForQso().value("serial").toInt()==12,4000); net.setEnabled(false);
+    }
+    void selfAuthorityRecoversReservationBeforeGrant()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path()); QCoreApplication::setOrganizationName("DecoNetSelfRestartTest"); QCoreApplication::setApplicationName("SelfRestart"); QSettings().setValue("net/enabled",false);
+        const QString path=dir.filePath("self.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.beginContestSerialRequest("event","self","saved-request","self",5).ok); const auto held=db.reserveContestSerial("event","self","saved-request",5); QVERIFY(held.ok); QCOMPARE(held.serial,5); }
+        LogDatabase db; QVERIFY(db.open(path)); QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const int port=probe.localPort(); probe.close();
+        NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("self"); net.setGroup("FIELD"); net.setPort(port); net.setTarget(QHostAddress::LocalHost);
+        QVERIFY(net.configureDurableSerialAuthority("event","self").isEmpty()); net.setEnabled(true);
+        QTRY_VERIFY_WITH_TIMEOUT(!net.durableSerialGrantForQso().isEmpty(),4000); const auto grant=net.durableSerialGrantForQso();
+        QCOMPARE(grant.value("requestId").toString(),QString("saved-request")); QCOMPARE(grant.value("serial").toInt(),5);
+        const auto peer=db.reserveContestSerial("event","remote","peer",1); QVERIFY(peer.ok); QCOMPARE(peer.serial,6); net.setEnabled(false);
     }
     void retryDoesNotCreateNewRequestAfterExternalConsumption()
     {
@@ -51,8 +72,6 @@ private slots:
         QVERIFY(net.configureDurableSerialAuthority("event","other-authority").isEmpty());
         QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("different authority"),4000); QCOMPARE(sent.size(),1);
         QVERIFY(net.configureDurableSerialAuthority("new-event","authority").isEmpty()); const auto count=sent.size(); QTest::qWait(800); QCOMPARE(sent.size(),count);
-        QVERIFY(!db.activeContestSerialRequest("new-event","client-a").ok);
-        QVERIFY(net.configureDurableSerialAuthority("new-event","client-a").isEmpty()); QVERIFY(!net.requestDurableSerial(1).isEmpty());
         QVERIFY(!db.activeContestSerialRequest("new-event","client-a").ok); net.setEnabled(false);
     }
     void twoControllersRecoverRequestAfterAuthorityStarts()
@@ -144,7 +163,7 @@ private slots:
         };
         { NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("authority"); net.setGroup("FIELD"); net.setPort(port); net.setTarget(QHostAddress::LocalHost);
           QVERIFY(net.configureDurableSerialAuthority("event","authority").isEmpty()); QSignalSpy grants(&net,&NetController::durableSerialGrantReady);
-          net.setEnabled(true); QVERIFY(net.running()); const auto body=contestserial::requestFrame(req);
+          net.setEnabled(true); QVERIFY(net.running()); QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("No saved serial request"),4000); const auto body=contestserial::requestFrame(req);
           QVERIFY(transmit(1,body)); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),1,10000);
           const auto first=grants.at(0).at(0).toJsonObject(); QCOMPARE(first.value("serial").toInt(),10);
           QVERIFY(transmit(2,body)); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),2,10000); QCOMPARE(grants.at(1).at(0).toJsonObject().value("serial").toInt(),10);
@@ -152,7 +171,7 @@ private slots:
         db.close(); QVERIFY(db.open(path));
         { NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("authority"); net.setGroup("FIELD"); net.setPort(port); net.setTarget(QHostAddress::LocalHost);
           QVERIFY(net.configureDurableSerialAuthority("event","authority").isEmpty()); QSignalSpy grants(&net,&NetController::durableSerialGrantReady);
-          net.setEnabled(true); QVERIFY(transmit(4,contestserial::requestFrame(req))); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),1,10000);
+          net.setEnabled(true); QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("No saved serial request"),4000); QVERIFY(transmit(4,contestserial::requestFrame(req))); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),1,10000);
           QCOMPARE(grants.at(0).at(0).toJsonObject().value("serial").toInt(),10);
           QVERIFY(!net.configureDurableSerialAuthority("event", "").isEmpty());
           QVERIFY(net.configureDurableSerialAuthority("event", "other-authority").isEmpty());

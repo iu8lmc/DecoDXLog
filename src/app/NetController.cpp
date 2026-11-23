@@ -107,8 +107,6 @@ QString NetController::requestDurableSerialImpl(int minimum, const QString& expe
     if (minimum < 1) return tr("Enter a positive minimum serial.");
     if (!m_net.running() || m_durableScope.isEmpty() || m_durableAuthority.isEmpty())
         return tr("Enable the network and configure the contest scope and authority first.");
-    if (m_durableAuthority==m_id)
-        return tr("This experimental requester needs a different authority station.");
     if (m_durableBusy) return tr("Serial operation in progress; retry shortly.");
     if (!m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen())
         return tr("Open the original file-backed log before requesting a serial.");
@@ -134,6 +132,11 @@ QString NetController::requestDurableSerialImpl(int minimum, const QString& expe
             }
             else if (request.ok && (request.authority!=authority || request.minimum!=minimum)) {
                 request.ok=false; request.error=QStringLiteral("An active request has different authority or minimum");
+            }
+            if (request.ok && request.state==QLatin1String("pending") && authority==requester) {
+                const auto reservation=db.reserveContestSerial(scope,requester,request.requestId,request.minimum);
+                if (!reservation.ok) { request.ok=false; request.error=reservation.error; }
+                else request=db.acceptContestSerialGrant(scope,requester,request.requestId,authority,reservation.serial);
             }
         } else request.error=QStringLiteral("Cannot open the original log");
         if (!self) return;
@@ -174,7 +177,7 @@ QString NetController::requestDurableSerialImpl(int minimum, const QString& expe
 void NetController::resumeDurableSerialRequest()
 {
     if (m_durableBusy || !m_net.running() || m_durableScope.isEmpty() || m_durableAuthority.isEmpty() ||
-        m_durableAuthority==m_id || !m_ctx.db || !m_ctx.db->isOpen() ||
+        !m_ctx.db || !m_ctx.db->isOpen() ||
         m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) return;
     const QString path=m_ctx.db->path(), identity=m_ctx.db->identity();
     const QByteArray fileIdentity=m_ctx.db->openFileIdentity();
