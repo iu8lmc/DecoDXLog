@@ -16,6 +16,8 @@ DialogFrame {
     readonly property var schedule: decolog.predictPassSchedule
     property bool scheduleVisible: false
     property bool probingSchedule: false
+    property bool probingScheduleNext: false
+    property var selectedPass: ({})
     readonly property var sample: tracker.snapshot
     property var correction: ({})
     property bool probing: false
@@ -34,7 +36,7 @@ DialogFrame {
     property bool resultValid: false
     property bool discardPending: false
     property bool passValid: false
-    readonly property var plannedPass: planner.pass
+    readonly property var plannedPass: selectedPass
     readonly property double passEpochMs: plannedPass.tleEpoch ? new Date(plannedPass.tleEpoch).getTime() : NaN
     readonly property double passAgeDays: isFinite(passEpochMs) ? (Date.now() - passEpochMs) / 86400000 : NaN
     readonly property double epochMs: sample.tleEpoch ? new Date(sample.tleEpoch).getTime() : NaN
@@ -124,6 +126,13 @@ DialogFrame {
         satelliteQso.open()
         correctionStatus.text = qsTr("Review the draft before saving; no radio command was sent.")
     }
+    function selectSchedulePass(index) {
+        if (!root.scheduleVisible || root.schedule.busy || index < 0 || index >= root.schedule.passes.length)
+            return
+        root.selectedPass = root.schedule.passes[index]
+        root.passValid = true
+        status.text = qsTr("Pass selected for review; no radio command sent.")
+    }
     function requestPass(start) {
         autoRefresh.checked = false
         refreshTimer.stop()
@@ -152,6 +161,7 @@ DialogFrame {
         root.planner.cancel()
         root.schedule.cancel()
         root.scheduleVisible = false
+        root.selectedPass = ({})
         root.passValid = false
     }
     Timer {
@@ -179,13 +189,24 @@ DialogFrame {
                              + " rendered=" + scheduleRepeater.count + " old=" + (root.schedule.passes.length > 0 &&
                              (Date.now() - new Date(root.schedule.passes[0].tleEpoch).getTime()) / 86400000 > 14))
                 root.probingSchedule = false
+                if (success && root.schedule.passes.length >= 2) {
+                    scheduleRepeater.itemAt(1).selectPass()
+                    console.warn("PROBE selectedSchedule aos=" + root.plannedPass.aos + " next=" + nextPassButton.enabled)
+                    root.probingScheduleNext = true
+                    nextPassButton.clicked()
+                }
             }
         }
     }
     Connections {
         target: root.planner
         function onFinished(success, error) {
+            root.selectedPass = success ? root.planner.pass : ({})
             root.passValid = success && root.visible
+            if (root.probingScheduleNext) {
+                console.warn("PROBE selectedScheduleNext success=" + success + " aos=" + (root.plannedPass.aos || 0))
+                root.probingScheduleNext = false
+            }
             status.text = success ? qsTr("Pass received") : qsTr("Tracker error: %1").arg(error)
             if (root.probingPass) {
                 ++root.probePassCount
@@ -341,7 +362,7 @@ DialogFrame {
         RowLayout {
             Layout.fillWidth: true
             GlassButton { id: firstPassButton; text: qsTr("Predict next pass"); enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && portField.acceptableInput; onClicked: root.requestPass(Math.floor(Date.now() / 1000)) }
-            GlassButton { id: nextPassButton; text: qsTr("Following pass"); enabled: root.passValid && !root.tracker.busy && !root.planner.busy && !root.schedule.busy; onClicked: root.requestPass(Number(root.plannedPass.los) + 60) }
+            GlassButton { id: nextPassButton; text: qsTr("Following pass"); enabled: root.passValid && !root.tracker.busy && !root.planner.busy && !root.schedule.busy; onClicked: root.requestPass(Number(root.plannedPass.los) + 1) }
             GlassButton { text: qsTr("Cancel prediction"); visible: root.planner.busy; onClicked: root.planner.cancel() }
         }
         RowLayout {
@@ -356,6 +377,8 @@ DialogFrame {
                     autoRefresh.checked = false
                     refreshTimer.stop()
                     root.scheduleVisible = true
+                    root.selectedPass = ({})
+                    root.passValid = false
                     scheduleStatus.text = qsTr("Predicting passes…")
                     if (!root.schedule.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim(), Math.floor(Date.now() / 1000), scheduleCount.value)) {
                         root.scheduleVisible = false
@@ -373,21 +396,33 @@ DialogFrame {
         Repeater {
             id: scheduleRepeater
             model: root.scheduleVisible ? root.schedule.passes : []
-            Text {
+            RowLayout {
                 required property var modelData
-                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
-                text: qsTr("UTC %1 – %2 · maximum sampled elevation %3° · TLE epoch %4")
-                    .arg(new Date(Number(modelData.aos) * 1000).toISOString())
-                    .arg(new Date(Number(modelData.los) * 1000).toISOString())
-                    .arg(modelData.maxElevation)
-                    .arg(new Date(modelData.tleEpoch).toISOString())
+                required property int index
+                Layout.fillWidth: true
+                function selectPass() { selectPassButton.clicked() }
+                Text {
+                    Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
+                    text: qsTr("UTC %1 – %2 · maximum sampled elevation %3° · TLE epoch %4")
+                        .arg(new Date(Number(modelData.aos) * 1000).toISOString())
+                        .arg(new Date(Number(modelData.los) * 1000).toISOString())
+                        .arg(modelData.maxElevation)
+                        .arg(new Date(modelData.tleEpoch).toISOString())
+                }
+                GlassButton {
+                    id: selectPassButton
+                    text: root.passValid && Number(root.plannedPass.aos) === Number(modelData.aos) ? qsTr("Selected") : qsTr("Select")
+                    Accessible.name: qsTr("Select pass %1").arg(index + 1)
+                    enabled: !root.schedule.busy && !root.planner.busy && !root.tracker.busy
+                    onClicked: root.selectSchedulePass(index)
+                }
             }
         }
         Text {
             id: passSummary
             Layout.fillWidth: true
             visible: root.passValid
-            text: root.passValid ? qsTr("Pass UTC: %1 – %2 · maximum sampled elevation %3°")
+            text: root.passValid ? qsTr("Selected pass UTC: %1 – %2 · maximum sampled elevation %3°")
                   .arg(new Date(Number(root.plannedPass.aos) * 1000).toISOString())
                   .arg(new Date(Number(root.plannedPass.los) * 1000).toISOString())
                   .arg(root.plannedPass.maxElevation) : ""
