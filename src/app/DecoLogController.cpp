@@ -2326,7 +2326,7 @@ void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
         QPointer<DecoLogController> self(this);
         m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,pendingKey] {
             LogDatabase db; QString error; bool needed=false;
-            if (db.open(path)) { const auto cells=dxcampaign::matrix(db,campaign,&error); needed=error.isEmpty() && dxcampaign::watchGoalNeeded(campaign,cells,spot); }
+            if (db.open(path)) { const auto result=dxcampaign::goalNeeded(db,campaign,spot,&error); needed=result && *result; }
             if (!self) return;
             QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,pendingKey,needed] {
                 if (!self) return; self->m_dxWatchPending.remove(pendingKey);

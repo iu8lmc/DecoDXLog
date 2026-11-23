@@ -172,6 +172,32 @@ bool watchGoalNeeded(const Campaign& c,const QList<Cell>& cells,const EnrichedSp
     for (const Cell& cell : cells) if (cell.band==band && cell.mode==mode) return !cell.target.isEmpty() && cell.needed;
     return false;
 }
+std::optional<bool> goalNeeded(const LogDatabase& db,const Campaign& c,const EnrichedSpot& spot,QString* error)
+{
+    if (!db.isOpen()) { fail(error,QStringLiteral("Log is not open")); return {}; }
+    if (!valid(c,error)) return {};
+    const QString band=spot.spot.band.trimmed().toLower(), mode=matrixMode(c,spot.spot.mode);
+    QString target;
+    for (const Goal& goal : c.goals) if (goal.band==band && goal.mode==mode) { target=goal.target; break; }
+    if (target.isEmpty() || !c.bands.contains(band) || mode.isEmpty()) { if (error) error->clear(); return false; }
+    QStringList placeholders; for (int i=0;i<c.calls.size();++i) placeholders << QStringLiteral("?");
+    QString sql=QStringLiteral("SELECT band,mode,IFNULL(submode,''),qso_datetime_on FROM qso WHERE deleted=0 AND call IN (%1) AND qso_datetime_on>=? AND qso_datetime_on<? AND (?=0 OR station_profile_id=?)").arg(placeholders.join(','));
+    if (target==QLatin1String("confirmed")) sql+=QStringLiteral(" AND EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id=qso.id AND s.service IN ('lotw','card') AND s.rcvd='Y')");
+    QSqlQuery q(db.connection()); q.prepare(sql); for (const auto& call : c.calls) q.addBindValue(call);
+    q.addBindValue(c.start.toString(Qt::ISODate)+QStringLiteral("T00:00:00")); q.addBindValue(c.end.addDays(1).toString(Qt::ISODate)+QStringLiteral("T00:00:00"));
+    q.addBindValue(c.stationProfileId); q.addBindValue(c.stationProfileId);
+    if (!q.exec()) { fail(error,q.lastError().text()); return {}; }
+    while (q.next()) {
+        if (q.value(0).toString().toLower()!=band) continue;
+        const QString raw=(q.value(2).toString().isEmpty()?q.value(1).toString():q.value(2).toString()).trimmed().toUpper();
+        const QDateTime at=QDateTime::fromString(q.value(3).toString(),Qt::ISODate);
+        if (at.isValid() && at.timeSpec()!=Qt::LocalTime && at.toUTC().date()>=c.start && at.toUTC().date()<=c.end && matrixMode(c,raw)==mode) {
+            if (error) error->clear(); return false;
+        }
+    }
+    if (q.lastError().isValid()) { fail(error,q.lastError().text()); return {}; }
+    if (error) error->clear(); return true;
+}
 QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visible,
                                const QDateTime& now,int maxAgeMinutes)
 {

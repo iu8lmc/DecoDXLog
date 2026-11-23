@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
+#include <QElapsedTimer>
 #include <QTest>
 using namespace decolog::core;
 class TestDxCampaign : public QObject {
@@ -92,6 +93,42 @@ private slots:
         spot.spot.mode="LSB"; QVERIFY(dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
         spot.spot.band="40m"; QVERIFY(!dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
         c.watchGoalsOnly=true; QVERIFY(dxcampaign::save(db,c,&error)); saved=dxcampaign::load(db,c.id); QVERIFY(saved); QVERIFY(saved->watchGoalsOnly);
+    }
+    void focusedGoalCheckAgreesWithMatrixOnLargeLog()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;
+        c.title="Large fixture"; c.calls={"3Y0J"}; c.start=QDate(2026,1,1); c.end=QDate(2026,12,31);
+        c.source="fixture"; c.verifiedAt=QDateTime::fromString("2026-01-01T00:00:00Z",Qt::ISODate);
+        c.bands={"20m","40m"}; c.modes={"SSB","USB","CW"}; c.goals={{"20m","USB","worked"},{"40m","CW","confirmed"},{"20m","SSB","confirmed"}};
+        QVERIFY(db.connection().transaction());
+        for (int i=0;i<4000;++i) {
+            const auto at=QDateTime(QDate(2026,1,2),QTime(0,0),QTimeZone::UTC).addSecs(i*180);
+            QVERIFY(db.insertQso(AdifRecord{{"CALL","3Y0J"},{"QSO_DATE",at.date().toString("yyyyMMdd")},{"TIME_ON",at.time().toString("hhmm")},{"BAND",i%2?"40m":"20m"},{"MODE",i%2?"CW":"USB"}},"import").id>0);
+        }
+        QVERIFY(db.connection().commit());
+        QCOMPARE(db.qsoCount(),qint64(4000));
+        EnrichedSpot spot; spot.spot.band="20m"; spot.spot.mode="USB"; QString error;
+        for (const auto& item : QList<QPair<QString,QString>>{{"20m","USB"},{"20m","LSB"},{"40m","CW"},{"40m","USB"}}) {
+            spot.spot.band=item.first; spot.spot.mode=item.second;
+            const auto focused=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY2(focused,qPrintable(error));
+            QCOMPARE(*focused,dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        }
+        c.stationProfileId=999; spot.spot.band="20m"; spot.spot.mode="USB";
+        const auto otherProfile=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY(otherProfile && *otherProfile);
+        QCOMPARE(*otherProfile,dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot)); c.stationProfileId=0;
+        spot.spot.band="40m"; spot.spot.mode="CW"; QElapsedTimer absentTimer; absentTimer.start();
+        for (int i=0;i<10;++i) QVERIFY(dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        const qint64 absentFull=absentTimer.nsecsElapsed(); absentTimer.restart();
+        for (int i=0;i<10;++i) { const auto value=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY(value && *value); }
+        qInfo("Open confirmation scan 4000 QSO, 10 runs: matrix=%lld us focused=%lld us",absentFull/1000,absentTimer.nsecsElapsed()/1000);
+        QslState card; card.service="card"; card.rcvd="Y"; QVERIFY(db.setCardState(2,card));
+        spot.spot.band="40m"; spot.spot.mode="CW"; const auto confirmed=dxcampaign::goalNeeded(db,c,spot,&error);
+        QVERIFY2(confirmed,qPrintable(error)); QCOMPARE(*confirmed,dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot)); QVERIFY(!*confirmed);
+        spot.spot.band="20m"; spot.spot.mode="USB"; QElapsedTimer timer; timer.start();
+        for (int i=0;i<10;++i) QVERIFY(!dxcampaign::watchGoalNeeded(c,dxcampaign::matrix(db,c),spot));
+        const qint64 full=timer.nsecsElapsed(); timer.restart();
+        for (int i=0;i<10;++i) { const auto value=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY(value && !*value); }
+        qInfo("Goal scan 4000 QSO, 10 runs: matrix=%lld us focused=%lld us",full/1000,timer.nsecsElapsed()/1000);
     }
     void matrixRespectsProfileAndRejectsInvalidChanges()
     {
