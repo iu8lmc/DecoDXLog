@@ -26,7 +26,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 24;
+constexpr int kSchemaVersion = 25;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -62,6 +62,20 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestReportArchivePersistsExactBytesAndDeduplicates()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("archive.sqlite");
+        const QByteArray data="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\r\nCall: K1ABC\r\n****** Not In Log ******\r\nunknown line\r\n";
+        qint64 id=0;
+        { LogDatabase db; QVERIFY(db.open(path)); QString error;
+          id=db.archiveContestReport(data,"report.rpt",&error); QVERIFY2(id>0,qPrintable(error));
+          QCOMPARE(db.archiveContestReport(data,"other.rpt",&error),id);
+          QCOMPARE(db.qsoCount(),qint64(0)); }
+        { LogDatabase db; QVERIFY(db.open(path)); const auto reports=db.contestReports(20);
+          QCOMPARE(reports.size(),1); QCOMPARE(reports.first().id,id);
+          QCOMPARE(db.contestReportBytes(id),data); QCOMPARE(reports.first().ownCall,QString("K1ABC"));
+          QString error; QCOMPARE(db.archiveContestReport("bad input","bad.txt",&error),qint64(0)); QVERIFY(!error.isEmpty()); }
+    }
     void contestSerialReservationsSurviveRestartAndRetry()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("serials.sqlite");
@@ -118,10 +132,10 @@ private slots:
             const auto qso=db.insertQso(AdifRecord{{"CALL","K1OLD"},{"QSO_DATE","20260101"},
                 {"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true); QVERIFY(qso.id>0);
             QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE contest_serial_reservation"));
-            QVERIFY(q.exec("DELETE FROM schema_version WHERE version=24"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=24"));
         }
         {
-            LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),24); QCOMPARE(db.qsoCount(),qint64(1));
+            LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),qint64(1));
             QSqlQuery q(db.connection());
             QVERIFY(q.exec("CREATE TRIGGER reject_serial BEFORE INSERT ON contest_serial_reservation BEGIN SELECT RAISE(ABORT,'injected'); END"));
             const auto failed=db.reserveContestSerial("contest", "node", "request", 1); QVERIFY(!failed.ok); QVERIFY(failed.error.contains("injected"));
@@ -129,6 +143,18 @@ private slots:
             QVERIFY(q.exec("DROP TRIGGER reject_serial"));
             const auto retry=db.reserveContestSerial("contest", "node", "request", 1); QVERIFY2(retry.ok,qPrintable(retry.error)); QCOMPARE(retry.serial,1);
         }
+    }
+    void contestReportArchiveMigrationAndFailureAreSafe()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("old.sqlite");
+        const QByteArray data="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n";
+        { LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},
+             {"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"test",{},true).id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE contest_report_archive")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=25")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),qint64(1));
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("CREATE TRIGGER reject_report BEFORE INSERT ON contest_report_archive BEGIN SELECT RAISE(ABORT,'injected'); END"));
+          QString error; QCOMPARE(db.archiveContestReport(data,"file.rpt",&error),qint64(0)); QVERIFY(error.contains("injected")); QVERIFY(db.contestReports().isEmpty());
+          QVERIFY(q.exec("DROP TRIGGER reject_report")); QVERIFY2(db.archiveContestReport(data,"file.rpt",&error)>0,qPrintable(error)); QCOMPARE(db.qsoCount(),qint64(1)); }
     }
     void guardedEditRejectsStaleRevisionAndMergesConcurrentQsl()
     {

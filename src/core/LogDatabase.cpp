@@ -5,8 +5,10 @@
 
 #include "core/Bands.h"
 #include "core/LogMigration.h"
+#include "core/ContestReport.h"
 
 #include <QFile>
+#include <QFileInfo>
 #include <QElapsedTimer>
 #include <QCryptographicHash>
 #include <QSaveFile>
@@ -460,6 +462,9 @@ bool LogDatabase::migrate()
               "scope TEXT NOT NULL, requester TEXT NOT NULL, request_id TEXT NOT NULL, "
               "minimum INTEGER NOT NULL CHECK(minimum > 0), serial INTEGER NOT NULL CHECK(serial > 0), "
               "created_at TEXT NOT NULL, PRIMARY KEY(scope,requester,request_id), UNIQUE(scope,serial))")}, nullptr},
+        {25, {QStringLiteral("CREATE TABLE IF NOT EXISTS contest_report_archive ("
+              "id INTEGER PRIMARY KEY, sha256 TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, "
+              "contest TEXT NOT NULL, own_call TEXT NOT NULL, original BLOB NOT NULL, imported_at TEXT NOT NULL)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1219,6 +1224,50 @@ InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 
         db.rollback();
     }
     return result;
+}
+
+qint64 LogDatabase::archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error)
+{
+    if (error) error->clear();
+    const auto parsed = contestreport::parseCqWw(bytes);
+    if (!parsed.error.isEmpty()) { if (error) *error=parsed.error; return 0; }
+    QSqlDatabase db=connection(); QSqlQuery begin(db);
+    if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) { if (error) *error=begin.lastError().text(); return 0; }
+    const auto fail=[&](const QString& message) { db.rollback(); if (error) *error=message; return qint64(0); };
+    const QString hash=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+    QSqlQuery existing(db); existing.prepare(QStringLiteral("SELECT id,original FROM contest_report_archive WHERE sha256=?"));
+    existing.addBindValue(hash);
+    if (!existing.exec()) return fail(existing.lastError().text());
+    qint64 id=0;
+    if (existing.next()) {
+        if (existing.value(1).toByteArray()!=bytes) return fail(QStringLiteral("Report hash collision"));
+        id=existing.value(0).toLongLong();
+    } else {
+        QSqlQuery insert(db);
+        insert.prepare(QStringLiteral("INSERT INTO contest_report_archive(sha256,filename,contest,own_call,original,imported_at) VALUES(?,?,?,?,?,?)"));
+        insert.addBindValue(hash); insert.addBindValue(QFileInfo(filename).fileName().left(255));
+        insert.addBindValue(parsed.contest); insert.addBindValue(parsed.ownCall); insert.addBindValue(bytes); insert.addBindValue(nowIso());
+        if (!insert.exec()) return fail(insert.lastError().text());
+        id=insert.lastInsertId().toLongLong();
+    }
+    if (!db.commit()) return fail(db.lastError().text());
+    return id;
+}
+
+QList<ArchivedContestReport> LogDatabase::contestReports(int limit) const
+{
+    QList<ArchivedContestReport> reports; QSqlQuery q(connection());
+    q.prepare(QStringLiteral("SELECT id,sha256,filename,contest,own_call,imported_at FROM contest_report_archive ORDER BY id DESC LIMIT ?"));
+    q.addBindValue(qBound(1,limit,500));
+    if (q.exec()) while (q.next()) reports.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),
+                                                   q.value(3).toString(),q.value(4).toString(),q.value(5).toString()});
+    return reports;
+}
+
+QByteArray LogDatabase::contestReportBytes(qint64 id) const
+{
+    QSqlQuery q(connection()); q.prepare(QStringLiteral("SELECT original FROM contest_report_archive WHERE id=?"));
+    q.addBindValue(id); return q.exec() && q.next() ? q.value(0).toByteArray() : QByteArray();
 }
 
 ContestSerialReservation LogDatabase::reserveContestSerial(const QString& scope, const QString& requester,

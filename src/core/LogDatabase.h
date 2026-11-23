@@ -30,6 +30,15 @@ struct InsertResult {
     QString message;
 };
 
+struct ArchivedContestReport {
+    qint64 id{0};
+    QString sha256;
+    QString filename;
+    QString contest;
+    QString ownCall;
+    QString importedAt;
+};
+
 struct ContestSerialReservation {
     bool ok{false};
     bool replayed{false};
@@ -287,6 +296,11 @@ public:
     InsertResult updateQsoGuarded(qint64 id, AdifRecord record, qint64 stationProfileId,
                                   const QString& expectedUuid, int expectedRevision,
                                   const QSet<QString>& touchedFields);
+
+    // Preserves the complete original report bytes, without changing QSO.
+    qint64 archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error = nullptr);
+    QList<ArchivedContestReport> contestReports(int limit = 100) const;
+    QByteArray contestReportBytes(qint64 id) const;
 
     // A persistent allocator on this log only. Scope and requester identities
     // must be agreed by the network protocol; this does not elect a server.
