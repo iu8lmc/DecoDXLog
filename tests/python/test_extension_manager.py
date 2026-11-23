@@ -72,6 +72,37 @@ class ManagerTests(unittest.TestCase):
             self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
             manager.install(root,path); self.assertEqual(manager.list_installed(root)[0]['version'],'2.0.0')
 
+    def test_preflight_rejects_crashing_update_before_activation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); src=base/'src'; src.mkdir(); root=base/'installed'; entry=src/'recent_activity.py'
+            original=(ROOT/'examples/extensions/recent_activity.py').read_bytes(); entry.write_bytes(original)
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.activity','version':'1.0.0','entrypoint':entry.name,'permissions':['qso.read']}
+            path=src/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            legacy_root=base/'unverified'; manager.install(legacy_root,path)
+            server=ThreadingHTTPServer(('127.0.0.1',0),Api); thread=Thread(target=server.serve_forever,daemon=True); thread.start()
+            try:
+                manifest['version']='2.0.0'; path.write_text(json.dumps(manifest)); entry.write_text("raise RuntimeError('broken')\n")
+                new_root=base/'new-failed'
+                with self.assertRaises(ValueError): manager.install(new_root,path,token='read-token',port=server.server_port,timeout=3)
+                self.assertEqual(manager.list_installed(new_root),[])
+                manager.install(legacy_root,path)
+                self.assertEqual(manager.list_installed(legacy_root)[0]['version'],'2.0.0')
+                with self.assertRaises(ValueError): manager.run(legacy_root,manifest['id'],'read-token',server.server_port,3)
+                with self.assertRaises(ValueError): manager.install(root,path,token='read-token',port=server.server_port,timeout=3)
+                self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
+                self.assertEqual(manager.run(root,manifest['id'],'read-token',server.server_port,3)['sampleSize'],2)
+                entry.write_text("import pathlib; pathlib.Path(__file__).write_text('# modified'); print('{\"scope\":\"recent_sample\"}')\n")
+                with self.assertRaises(ValueError): manager.install(root,path,token='read-token',port=server.server_port,timeout=3)
+                self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
+                entry.write_bytes(original+b'\n# updated\n')
+                with self.assertRaises(ValueError): manager.install(root,path,token='wrong-token',port=server.server_port,timeout=3)
+                self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
+                manager.install(root,path,token='read-token',port=server.server_port,timeout=3)
+                self.assertEqual(manager.list_installed(root)[0]['version'],'2.0.0')
+                self.assertEqual(manager.run(root,manifest['id'],'read-token',server.server_port,3)['sampleSize'],2)
+            finally:
+                server.shutdown(); server.server_close(); thread.join()
+
     def test_dependencies_are_copied_and_changes_detected(self):
         with tempfile.TemporaryDirectory() as temp:
             root=pathlib.Path(temp)/'installed'

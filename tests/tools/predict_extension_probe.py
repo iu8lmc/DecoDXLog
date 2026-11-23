@@ -95,7 +95,7 @@ with tempfile.TemporaryDirectory(prefix="decolog-tracker-extension-") as tmp:
             manager = pathlib.Path(ROOT) / "tools/extension_manager.py"
             managed_root = root / "extensions"
             base = [sys.executable, str(manager), "--root", str(managed_root)]
-            installed = subprocess.run(base + ["install", str(manifest)], env=env, capture_output=True, text=True, timeout=8)
+            installed = subprocess.run(base + ["install", str(manifest), "--verify-port", str(port)], env=env, capture_output=True, text=True, timeout=12)
             assert installed.returncode == 0, installed.stderr
             extension_id = json.loads(installed.stdout)["id"]
             managed = subprocess.run(base + ["run", extension_id, "--port", str(port)], env=env, capture_output=True, text=True, timeout=12)

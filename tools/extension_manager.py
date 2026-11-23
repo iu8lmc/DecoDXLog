@@ -71,7 +71,7 @@ def _atomic_file(path, data):
         if os.path.exists(name): os.unlink(name)
 
 
-def install(root, manifest_path):
+def install(root, manifest_path, token='', port=None, timeout=10):
     manifest_path = pathlib.Path(manifest_path)
     _regular(manifest_path, harness.MAX_MANIFEST)
     manifest = harness.load_manifest(manifest_path)
@@ -86,26 +86,44 @@ def install(root, manifest_path):
         except (SyntaxError, ValueError) as exc:
             raise ValueError('invalid extension Python source') from exc
     manifest_bytes = (json.dumps(manifest, sort_keys=True, ensure_ascii=False, indent=2)+'\n').encode()
-    folder = _directory(_root(root, create=True), manifest['id'], create=True)
-    version = folder / manifest['version']
-    if version.is_symlink():
-        raise ValueError('extension version must not be a symlink')
-    if version.exists():
-        if (not version.is_dir() or _regular(version/'manifest.json', harness.MAX_MANIFEST) != manifest_bytes or
-                any(_regular(version/name, MAX_ENTRY) != data for name, data in files.items())):
-            raise ValueError('installed version differs; use a new version')
-    else:
-        stage = pathlib.Path(tempfile.mkdtemp(prefix='.install-', dir=folder))
-        try:
-            (stage/'manifest.json').write_bytes(manifest_bytes)
-            for name, data in files.items():
-                (stage/name).write_bytes(data)
-            os.rename(stage, version)
-        finally:
-            if stage.exists(): shutil.rmtree(stage)
-    pointer = {'version':manifest['version'], 'sha256':{name:hashlib.sha256(data).hexdigest() for name, data in files.items()}}
-    _atomic_file(folder/'current.json', (json.dumps(pointer, sort_keys=True)+'\n').encode())
-    return manifest
+    base = _root(root, create=True)
+    new_folder = not (base / manifest['id']).exists() and not (base / manifest['id']).is_symlink()
+    folder = _directory(base, manifest['id'], create=True)
+    try:
+        def preflight(directory):
+            if port is None:
+                return
+            harness.run_extension(directory/'manifest.json', token, port, timeout)
+            if (_regular(directory/'manifest.json', harness.MAX_MANIFEST) != manifest_bytes or
+                    any(_regular(directory/name, MAX_ENTRY) != data for name, data in files.items())):
+                raise ValueError('extension changed during preflight')
+
+        version = folder / manifest['version']
+        if version.is_symlink():
+            raise ValueError('extension version must not be a symlink')
+        if version.exists():
+            if (not version.is_dir() or _regular(version/'manifest.json', harness.MAX_MANIFEST) != manifest_bytes or
+                    any(_regular(version/name, MAX_ENTRY) != data for name, data in files.items())):
+                raise ValueError('installed version differs; use a new version')
+            preflight(version)
+        else:
+            stage = pathlib.Path(tempfile.mkdtemp(prefix='.install-', dir=folder))
+            try:
+                (stage/'manifest.json').write_bytes(manifest_bytes)
+                for name, data in files.items():
+                    (stage/name).write_bytes(data)
+                preflight(stage)
+                os.rename(stage, version)
+            finally:
+                if stage.exists(): shutil.rmtree(stage)
+        pointer = {'version':manifest['version'], 'sha256':{name:hashlib.sha256(data).hexdigest() for name, data in files.items()}}
+        _atomic_file(folder/'current.json', (json.dumps(pointer, sort_keys=True)+'\n').encode())
+        return manifest
+    except Exception:
+        # Only remove a directory created by this call before its first activation.
+        if new_folder and not (folder/'current.json').exists():
+            shutil.rmtree(folder)
+        raise
 
 
 def _current(root, identity):
@@ -160,12 +178,14 @@ def main():
     parser.add_argument('--root', required=True, type=pathlib.Path, help='dedicated local extension directory')
     commands = parser.add_subparsers(dest='command', required=True)
     add = commands.add_parser('install'); add.add_argument('manifest', type=pathlib.Path)
+    add.add_argument('--verify-port', type=int, help='run the candidate with the read-only token before activation')
+    add.add_argument('--timeout', type=float, default=10)
     commands.add_parser('list')
     delete = commands.add_parser('remove'); delete.add_argument('id')
     execute = commands.add_parser('run'); execute.add_argument('id'); execute.add_argument('--port', type=int, required=True); execute.add_argument('--timeout', type=float, default=10)
     args = parser.parse_args()
     try:
-        if args.command == 'install': result = install(args.root, args.manifest)
+        if args.command == 'install': result = install(args.root, args.manifest, os.environ.get('DECODXLOG_READ_TOKEN',''), args.verify_port, args.timeout)
         elif args.command == 'list': result = list_installed(args.root)
         elif args.command == 'remove': remove(args.root, args.id); result = {'removed':args.id}
         else: result = run(args.root, args.id, os.environ.get('DECODXLOG_READ_TOKEN',''), args.port, args.timeout)
