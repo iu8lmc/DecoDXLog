@@ -14,6 +14,7 @@
 #include <QTest>
 #include "core/LogDatabase.h"
 #include "core/Activation.h"
+#include "core/ContestAudioFile.h"
 #include "core/QslPlanner.h"
 #include "core/DxCampaign.h"
 #include "core/ActivityReport.h"
@@ -76,6 +77,18 @@ private slots:
                  !output.contains("TypeError"),output.constData());
         const auto recordings=QDir(dir.path()).entryInfoList({"contest-audio-*.wav"},QDir::Files);
         QCOMPARE(recordings.size(),1); QVERIFY(recordings.first().size()>44);
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+    void contestAudioPlaybackControlsWhenConfigured()
+    {
+        if (qEnvironmentVariable("DECOLOG_TEST_LOOPBACK") != QLatin1String("BlackHole 2ch")) QSKIP("Set DECOLOG_TEST_LOOPBACK=BlackHole 2ch");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'a')).written,qint64(64000));
+        QString path; QVERIFY(writer.finish(&path)); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("contestaudioplayprobe:")+path,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE contestPlayback playing=true qso=K1ABC") && output.contains("PROBE contestPlayback stopped=true") &&
+                 !output.contains("TypeError"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
     void contestReportFindsCandidateInActualApp()

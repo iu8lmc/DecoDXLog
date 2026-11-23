@@ -8,6 +8,7 @@ namespace decolog::core {
 class ContestAudioFile {
   public:
     struct WriteResult { qint64 written{0}; bool limitReached{false}; QString error; };
+    struct Location { qint64 offsetMs{0}; qint64 durationMs{0}; QDateTime startUtc; QString error; };
     bool start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc);
     WriteResult append(const QByteArray &data);
     bool checkpoint(); // flushes userspace buffers; not a power-loss durability guarantee
@@ -17,6 +18,7 @@ class ContestAudioFile {
     QString error() const { return m_error; }
     qint64 bytesWritten() const { return m_bytes; }
     static bool recover(const QString &partialPath, QString *outputPath, QString *error);
+    static Location locate(const QString &wavPath, const QDateTime &qsoUtc);
   private:
     QFile m_file;
     QString m_path, m_error;

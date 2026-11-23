@@ -33,6 +33,25 @@ RoundedWindow {
         console.warn("PROBE contestAudio started=" + decolog.contestAudio.recording + " dialog=" + contestAudioDialog.visible)
         if (decolog.contestAudio.recording) audioProbeStop.start()
     }
+    function openAudioForQso(row) {
+        contestAudioDialog.qsoUtc=row.utc || ""
+        contestAudioDialog.qsoCall=row.call || ""
+        contestAudioDialog.open()
+    }
+    function probeContestAudioPlayback(path) {
+        openAudioForQso({utc:"2026-11-23T12:00:01Z", call:"K1ABC"})
+        contestAudioDialog.playbackFile=path
+        const index=decolog.contestAudio.outputs.indexOf("BlackHole 2ch")
+        if (index < 0) { console.warn("PROBE contestPlayback outputMissing"); return }
+        decolog.contestAudio.chooseOutput(index)
+        contestAudioPlay.clicked()
+        console.warn("PROBE contestPlayback playing=" + decolog.contestAudio.playing + " qso=" + contestAudioDialog.qsoCall)
+        if (decolog.contestAudio.playing) audioPlaybackProbeStop.start()
+    }
+    Timer { id:audioPlaybackProbeStop; interval:700; onTriggered: {
+        contestAudioStopPlayback.clicked()
+        console.warn("PROBE contestPlayback stopped=" + !decolog.contestAudio.playing)
+    } }
     Timer { id:audioProbeStop; interval:1100; onTriggered: {
         contestAudioStop.clicked()
         console.warn("PROBE contestAudio stopped=" + !decolog.contestAudio.recording + " path=" + decolog.contestAudio.lastPath)
@@ -810,6 +829,8 @@ RoundedWindow {
                             font.bold: modelData.bold === true
                         }
                     }
+                    GlassButton { text:qsTr("Audio…"); buttonHeight:24; fontPixelSize:11
+                        onClicked:root.openAudioForQso(modelData) }
                     Text {
                         Layout.fillWidth: true
                         text: modelData.country || ""
@@ -868,9 +889,9 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
 
     FileDialog {
         id: contestReportExportFile
@@ -1004,8 +1025,11 @@ RoundedWindow {
 
     DialogFrame {
         id:contestAudioDialog
-        dialogKey:"contestAudio"; width:620; height:330; title:qsTr("Contest session audio"); dotColor:Theme.primaryColor
+        dialogKey:"contestAudio"; width:700; height:500; title:qsTr("Contest session audio"); dotColor:Theme.primaryColor
         property url folder: ""
+        property url playbackFile: ""
+        property string qsoUtc: ""
+        property string qsoCall: ""
         ColumnLayout {
             anchors.fill:parent; spacing:10
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
@@ -1031,8 +1055,25 @@ RoundedWindow {
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
                 text:decolog.contestAudio.message + (decolog.contestAudio.recording ? qsTr(" · %1 bytes").arg(decolog.contestAudio.bytesWritten) : "") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:decolog.contestAudio.lastPath }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Review QSO %1 at %2. Choose the recording covering its UTC time; playback starts up to 10 seconds earlier. Timing is approximate and does not prove an association.").arg(contestAudioDialog.qsoCall || "—").arg(contestAudioDialog.qsoUtc || "—") }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { text:qsTr("Choose recording…"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing; onClicked:contestAudioPlaybackFile.open() }
+                Text { Layout.fillWidth:true; text:contestAudioDialog.playbackFile ? String(contestAudioDialog.playbackFile) : qsTr("No recording selected"); color:Theme.textSecondary; elide:Text.ElideMiddle }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                Text { text:qsTr("Playback output"); color:Theme.textSecondary }
+                StyledComboBox { Layout.fillWidth:true; model:decolog.contestAudio.outputs; currentIndex:decolog.contestAudio.outputIndex
+                    enabled:!decolog.contestAudio.playing; onActivated:decolog.contestAudio.chooseOutput(currentIndex) }
+                GlassButton { id:contestAudioPlay; text:qsTr("Play for QSO"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing && String(contestAudioDialog.playbackFile).length>0 && contestAudioDialog.qsoUtc.length>0
+                    onClicked:decolog.contestAudio.playForQso(contestAudioDialog.playbackFile,contestAudioDialog.qsoUtc) }
+                GlassButton { id:contestAudioStopPlayback; text:qsTr("Stop playback"); enabled:decolog.contestAudio.playing; onClicked:decolog.contestAudio.stopPlayback() }
+            }
         }
     }
+    FileDialog { id:contestAudioPlaybackFile; title:qsTr("Choose contest recording"); fileMode:FileDialog.OpenFile; nameFilters:[qsTr("WAV audio (*.wav)")]; onAccepted:contestAudioDialog.playbackFile=selectedFile }
     FolderDialog { id:contestAudioFolder; title:qsTr("Choose audio recording folder"); onAccepted:contestAudioDialog.folder=selectedFolder }
 
     DialogFrame {

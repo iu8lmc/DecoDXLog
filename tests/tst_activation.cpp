@@ -23,6 +23,18 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void recentContestQsoIncludesFullUtcForAudioReview()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;
+        ActivationController act(std::move(ctx)); QVERIFY(act.start({{"kind","contest"},{"contestId","CQ-WW-CW"}}).isEmpty());
+        const auto at=QDateTime::currentDateTimeUtc().addSecs(2);
+        const auto id=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE",at.toString("yyyyMMdd")},{"TIME_ON",at.toString("HHmmss")},
+            {"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id; QVERIFY(id>0);
+        const auto recent=act.recentQsos(10); QCOMPARE(recent.size(),1);
+        const auto row=recent.first().toMap(); QCOMPARE(row.value("id").toLongLong(),id);
+        QCOMPARE(QDateTime::fromString(row.value("utc").toString(),Qt::ISODate).toSecsSinceEpoch(),at.toSecsSinceEpoch());
+        QVERIFY(row.value("utc").toString().endsWith('Z'));
+    }
     void contestReportCandidateSearchIsReadOnlyAndBoundToLog()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

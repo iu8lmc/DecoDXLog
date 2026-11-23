@@ -3,6 +3,7 @@
 #include <QAudioDevice>
 #include <QAudioFormat>
 #include <QAudioSink>
+#include <QAudioSource>
 #include <QMediaDevices>
 #include <QBuffer>
 #include <QtEndian>
@@ -44,6 +45,30 @@ class TestContestAudioController : public QObject {
         const auto pcm=wav.readAll().mid(44); QVERIFY(pcm.size()>4000);
         bool signal=false; for (int i=0;i+1<pcm.size();i+=2) if (qAbs(qFromLittleEndian<qint16>(pcm.constData()+i))>1000) { signal=true; break; }
         QVERIFY2(signal,"Virtual loopback recording contains no test signal");
+    }
+    void playsQsoThroughVirtualOutputWhenConfigured()
+    {
+        const QString name=qEnvironmentVariable("DECOLOG_TEST_LOOPBACK");
+        if (name.isEmpty()) QSKIP("Set DECOLOG_TEST_LOOPBACK to an isolated virtual audio device");
+        const auto inputs=QMediaDevices::audioInputs(), outputs=QMediaDevices::audioOutputs();
+        QAudioDevice input; int outputRow=-1;
+        for (const auto &item:inputs) if (item.description()==name) { input=item; break; }
+        for (int i=0;i<outputs.size();++i) if (outputs[i].description()==name) { outputRow=i+1; break; }
+        QVERIFY(!input.isNull()); QVERIFY(outputRow>0);
+        QAudioFormat format; format.setSampleRate(16000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
+        QVERIFY(input.isFormatSupported(format)); QTemporaryDir dir; QVERIFY(dir.isValid());
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QByteArray samples;
+        for (int i=0;i<32000;++i) { char b[2]; qToLittleEndian<qint16>((i%100<50)?12000:-12000,b); samples.append(b,2); }
+        QCOMPARE(writer.append(samples).written,qint64(samples.size())); QString path; QVERIFY(writer.finish(&path));
+        QAudioSource source(input,format); QIODevice *stream=source.start(); QVERIFY(stream); QByteArray captured;
+        connect(stream,&QIODevice::readyRead,&source,[&] { captured+=stream->readAll(); });
+        decolog::app::ContestAudioController player; player.chooseOutput(outputRow);
+        QVERIFY(!player.playForQso(QUrl::fromLocalFile(path),"2026-11-23T12:00:03Z"));
+        QVERIFY2(player.playForQso(QUrl::fromLocalFile(path),"2026-11-23T12:00:01Z"),qPrintable(player.message()));
+        QTest::qWait(1700); player.stopPlayback(); source.stop();
+        bool signal=false; for (int i=0;i+1<captured.size();i+=2) if (qAbs(qFromLittleEndian<qint16>(captured.constData()+i))>1000) { signal=true; break; }
+        QVERIFY2(signal,"No audio observed from QSO playback through virtual output");
     }
     void capturesStreamAndStopsAtLimit()
     {

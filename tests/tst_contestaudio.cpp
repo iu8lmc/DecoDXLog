@@ -43,6 +43,19 @@ class TestContestAudio : public QObject {
         QFile file(recovered); QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll().mid(44),QByteArray::fromHex("01020304"));
     }
+    void locatesQsoOnlyWithinValidatedRecording()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile file;
+        const QDateTime start=QDateTime::fromString("2026-11-23T12:00:00.000Z",Qt::ISODateWithMs);
+        QVERIFY(file.start(dir.path(),64000,start)); QCOMPARE(file.append(QByteArray(32000,'x')).written,qint64(32000));
+        QString path; QVERIFY(file.finish(&path));
+        auto middle=ContestAudioFile::locate(path,start.addMSecs(500)); QVERIFY2(middle.error.isEmpty(),qPrintable(middle.error));
+        QCOMPARE(middle.offsetMs,qint64(500)); QCOMPARE(middle.durationMs,qint64(1000));
+        QVERIFY(!ContestAudioFile::locate(path,start.addMSecs(-1)).error.isEmpty());
+        QVERIFY(!ContestAudioFile::locate(path,start.addMSecs(1000)).error.isEmpty());
+        QFile altered(path); QVERIFY(altered.open(QIODevice::ReadWrite)); QVERIFY(altered.seek(40)); altered.write("bad!"); altered.close();
+        QVERIFY(!ContestAudioFile::locate(path,start).error.isEmpty());
+    }
     void decodesPcmThroughExternalPlayer()
     {
         const QString ffmpeg=QStandardPaths::findExecutable("ffmpeg");

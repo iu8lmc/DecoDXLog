@@ -1500,6 +1500,7 @@ QVariantList ActivationController::recentQsos(int limit) const
         out << QVariantMap{{QStringLiteral("id"), q.value(0).toLongLong()},
                            {QStringLiteral("call"), q.value(1).toString()},
                            {QStringLiteral("time"), when.toString(QStringLiteral("hh:mm"))},
+                           {QStringLiteral("utc"), q.value(2).toString()},
                            {QStringLiteral("band"), q.value(3).toString()},
                            {QStringLiteral("mode"), q.value(4).toString()},
                            {QStringLiteral("rstSent"), q.value(5).toString()},

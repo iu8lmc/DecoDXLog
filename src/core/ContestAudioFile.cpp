@@ -3,6 +3,7 @@
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QUuid>
+#include <QTimeZone>
 #include <QtEndian>
 #include <limits>
 
@@ -102,4 +103,28 @@ bool ContestAudioFile::recover(const QString &path, QString *outputPath, QString
     if (actual != expectedHeader) { if (error) *error=QStringLiteral("Unexpected WAV format"); return false; }
     return finalize(f,path,outputPath,error);
 }
+ContestAudioFile::Location ContestAudioFile::locate(const QString &path, const QDateTime &qsoUtc)
+{
+    Location result;
+    static const QRegularExpression name(QStringLiteral("^contest-audio-([0-9]{8}T[0-9]{9}Z)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.wav$"));
+    const QFileInfo info(path); const auto match=name.match(info.fileName());
+    if (info.isSymLink() || !info.isFile() || !match.hasMatch() || !qsoUtc.isValid()) {
+        result.error=QStringLiteral("Invalid recording or QSO timestamp"); return result;
+    }
+    const auto parsed=QDateTime::fromString(match.captured(1),QStringLiteral("yyyyMMdd'T'HHmmsszzz'Z'"));
+    if (!parsed.isValid()) { result.error=QStringLiteral("Invalid recording timestamp"); return result; }
+    result.startUtc=QDateTime(parsed.date(),parsed.time(),QTimeZone::UTC);
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) { result.error=file.errorString(); return result; }
+    const qint64 size=file.size()-44;
+    if (size < 0 || size > maximumDataBytes || size%2 || file.read(44)!=header(quint32(size))) {
+        result.error=QStringLiteral("Invalid or incomplete contest WAV"); return result;
+    }
+    result.durationMs=size*1000/32000;
+    result.offsetMs=result.startUtc.msecsTo(qsoUtc.toUTC());
+    if (result.offsetMs<0 || result.offsetMs>=result.durationMs)
+        result.error=QStringLiteral("QSO time is outside this recording");
+    return result;
+}
+
 }
