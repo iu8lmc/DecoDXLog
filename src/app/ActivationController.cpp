@@ -7,8 +7,11 @@
 #include "core/Contests.h"
 #include "core/LogDatabase.h"
 #include "core/Spots.h"
+#include "core/SotaCatalogue.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QStandardPaths>
 #include <QCryptographicHash>
 #include <QSaveFile>
 #include <filesystem>
@@ -82,7 +85,12 @@ ActivationController::ActivationController(Context context, QObject* parent)
     , m_ctx(std::move(context))
 {
     connect(this, &ActivationController::changed, this, &ActivationController::invalidatePreview);
+    const QString testRoot = qEnvironmentVariable("DECODXLOG_DATA_ROOT");
+    const QString base = testRoot.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) : testRoot;
+    m_sotaCatalogue = new core::SotaCatalogue(QDir(base).filePath(QStringLiteral("sota-catalogue.sqlite")), this);
 }
+
+QObject* ActivationController::sotaCatalogue() const { return m_sotaCatalogue; }
 
 ActivationController::~ActivationController()
 {

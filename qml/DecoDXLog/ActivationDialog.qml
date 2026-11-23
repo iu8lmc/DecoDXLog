@@ -27,6 +27,9 @@ DialogFrame {
     property int historyPage: 0
     property var exportGroup: ({})
     property string partitionMessage: ""
+    property string sotaMessage: ""
+    property var sotaLookup: ({})
+    property bool probeSotaMode: false
 
     // `kind` apre gia' sul tipo giusto: "contest" quando si arriva dal contest.
     function openDialog(kind) {
@@ -53,6 +56,11 @@ DialogFrame {
         if (String(value).trim().length) programs[key] = value
         else delete programs[key]
         root.set("programs", programs)
+    }
+    function probeSotaCatalogue() {
+        root.openDialog("pota")
+        root.probeSotaMode = true
+        sotaImportDialog.importPath("file://" + decolog.currentLogInfo().path + ".sota.csv")
     }
     function probeExclusions() {
         root.openDialog("pota")
@@ -210,6 +218,30 @@ DialogFrame {
         onAccepted: {
             if (!root.act.startPartitionExport(root.exportGroup, selectedFile))
                 errorText.text = qsTr("Cannot start the export. Recalculate the preview and choose a different file.")
+        }
+    }
+
+    FileDialog {
+        id: sotaImportDialog
+        title: qsTr("Import SOTA summit list CSV")
+        nameFilters: [qsTr("CSV files (*.csv)"), qsTr("All files (*)")]
+        function importPath(path) {
+            root.sotaMessage = ""
+            if (!root.act.sotaCatalogue.importFile(path)) root.sotaMessage = qsTr("Cannot start the catalogue import.")
+        }
+        onAccepted: importPath(selectedFile)
+    }
+    Connections {
+        target: root.act.sotaCatalogue
+        function onFinished(success, message) {
+            root.sotaMessage = success ? qsTr("SOTA catalogue imported. File origin was not independently verified.") : message
+            root.sotaLookup = ({})
+            if (root.probeSotaMode) {
+                root.probeSotaMode = false
+                sotaSearchRef.text = "I/LM-001"; sotaSearchDate.text = "2026-11-23"
+                sotaCheckButton.clicked()
+                console.warn("PROBE sotaImport success=" + success + " status=" + root.sotaLookup.status + " name=" + root.sotaLookup.name + " version=" + root.sotaLookup.version + " error=" + message)
+            }
         }
     }
 
@@ -525,6 +557,32 @@ DialogFrame {
             visible: root.act.active && (Object.keys(root.state.programs || {}).length > 0 || String(root.state.reference || "").indexOf(",") >= 0)
             text: qsTr("The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.")
             color: Theme.warningColor
+        }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.borderSoft }
+        Note {
+            text: root.act.sotaCatalogue.info.status === "available"
+                ? qsTr("Offline SOTA catalogue · list date %1 · %2 summits · imported %3 · file %4 · SHA-256 %5. Local file origin is unverified.")
+                    .arg(root.act.sotaCatalogue.info.version).arg(root.act.sotaCatalogue.info.count)
+                    .arg(root.act.sotaCatalogue.info.importedAt).arg(root.act.sotaCatalogue.info.fileName).arg(root.act.sotaCatalogue.info.sha256)
+                : qsTr("No offline SOTA catalogue installed. Download the official list, then import the CSV.")
+        }
+        RowLayout {
+            GlassButton { text: qsTr("Open SOTA list source"); onClicked: Qt.openUrlExternally("https://www.sotadata.org.uk/summitslist.csv") }
+            GlassButton { text: root.act.sotaCatalogue.busy ? qsTr("Cancel SOTA import") : qsTr("Import SOTA CSV…");
+                onClicked: { if (root.act.sotaCatalogue.busy) root.act.sotaCatalogue.cancel(); else sotaImportDialog.open() } }
+        }
+        Note { visible: root.sotaMessage.length > 0; text: root.sotaMessage }
+        RowLayout {
+            Layout.fillWidth: true
+            StyledTextField { id: sotaSearchRef; Layout.fillWidth: true; placeholderText: qsTr("Summit reference, e.g. I/LM-001"); uppercase: true }
+            StyledTextField { id: sotaSearchDate; Layout.preferredWidth: 130; placeholderText: "YYYY-MM-DD"; text: new Date().toISOString().slice(0, 10) }
+            GlassButton { id: sotaCheckButton; text: qsTr("Check offline"); onClicked: root.sotaLookup = root.act.sotaCatalogue.lookupIso(sotaSearchRef.text, sotaSearchDate.text) }
+        }
+        Note {
+            visible: !!root.sotaLookup.status
+            text: qsTr("SOTA lookup: %1 · %2 · %3–%4. Catalogue presence and dates do not prove activation eligibility.")
+                .arg(({active: qsTr("in list for this date"), outsideValidity: qsTr("outside listed dates"), notFound: qsTr("not found in imported list"), unavailable: qsTr("catalogue unavailable"), invalidDate: qsTr("invalid date")})[root.sotaLookup.status] || root.sotaLookup.status || "").arg(root.sotaLookup.name || "—")
+                .arg(root.sotaLookup.validFrom || "—").arg(root.sotaLookup.validTo || "—")
         }
         Note {
             text: qsTr("Closed tracked sessions: select one to review its reported QSO. Older untracked sessions are not inferred.")

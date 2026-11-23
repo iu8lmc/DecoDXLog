@@ -21,13 +21,14 @@
 #include <QVariantMap>
 #include <functional>
 
-namespace decolog::core { class LogDatabase; }
+namespace decolog::core { class LogDatabase; class SotaCatalogue; }
 
 namespace decolog::app {
 
 class ActivationController : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool active READ active NOTIFY changed)
+    Q_PROPERTY(QObject* sotaCatalogue READ sotaCatalogue CONSTANT)
     Q_PROPERTY(bool previewBusy READ previewBusy NOTIFY previewChanged)
     Q_PROPERTY(bool partitionExportBusy READ partitionExportBusy NOTIFY partitionExportChanged)
     Q_PROPERTY(QVariantMap previewResult READ previewResult NOTIFY previewChanged)
@@ -64,6 +65,7 @@ public:
 
     explicit ActivationController(Context context, QObject* parent = nullptr);
     ~ActivationController() override;
+    QObject* sotaCatalogue() const;
     bool previewBusy() const { return m_previewBusy; }
     bool partitionExportBusy() const { return m_partitionExportBusy; }
     Q_INVOKABLE bool startPartitionExport(const QVariantMap& group, const QUrl& destination);
@@ -182,6 +184,7 @@ signals:
 
 private:
     void invalidatePreview();
+    core::SotaCatalogue* m_sotaCatalogue{nullptr};
     QThreadPool m_previewPool;
     QThreadPool m_partitionExportPool;
     std::shared_ptr<std::atomic_bool> m_partitionExportCancel;

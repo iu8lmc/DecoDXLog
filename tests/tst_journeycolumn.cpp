@@ -55,6 +55,15 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void sotaCatalogueCanBeImportedAndCheckedInDesktop()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile fixture(dir.filePath("test.sqlite.sota.csv"));
+        QVERIFY(fixture.open(QIODevice::WriteOnly));
+        fixture.write("SOTA Summits List (Date=22/11/2026)\nSummitCode,AssociationName,RegionName,SummitName,AltM,AltFt,GridRef1,GridRef2,Longitude,Latitude,Points,BonusPoints,ValidFrom,ValidTo,ActivationCount,ActivationDate,ActivationCall\nI/LM-001,Italy,Lombardy,Monte Test,100,328,0,0,9,45,2,0,01/01/2020,31/12/2030,0,,\n"); fixture.close();
+        QByteArray output; QVERIFY2(launch(dir, QStringLiteral("sotacatalogueprobe"), output), output.constData());
+        QVERIFY2(output.contains("PROBE sotaImport success=true status=active name=Monte Test version=2026-11-22 error="), output.constData());
+        QVERIFY(QFileInfo::exists(dir.filePath("data/sota-catalogue.sqlite")));
+    }
     void activationExclusionsAreShownAndPaged()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
