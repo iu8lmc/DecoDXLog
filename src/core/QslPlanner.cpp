@@ -10,6 +10,27 @@
 #include <queue>
 
 namespace decolog::core::qslplanner {
+int Benefit::alternativeCount(qint64 self, bool pendingOnly) const
+{
+    if (!group) return 0;
+    const auto& ids=pendingOnly ? group->pendingIds : group->ids;
+    return int(ids.size()) - (std::binary_search(ids.cbegin(),ids.cend(),self) ? 1 : 0);
+}
+QList<qint64> Benefit::alternativePage(qint64 self, int offset, int limit, bool pendingOnly) const
+{
+    QList<qint64> out; if (!group || limit<=0) return out;
+    const auto& ids=pendingOnly ? group->pendingIds : group->ids;
+    offset=qMax(0,offset); limit=qMin(limit,100);
+    const auto selfIt=std::lower_bound(ids.cbegin(),ids.cend(),self);
+    const qsizetype selfIndex=selfIt!=ids.cend() && *selfIt==self ? selfIt-ids.cbegin() : -1;
+    qsizetype index=offset;
+    if (selfIndex>=0 && index>=selfIndex) ++index;
+    while (index<ids.size() && out.size()<limit) {
+        if (index!=selfIndex) out.append(ids.at(index));
+        ++index;
+    }
+    return out;
+}
 namespace {
 QString costKey(const QString& manager, const QString& channel)
 {
@@ -81,6 +102,7 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
     for (const auto& award : results) available.insert(award.id);
     for (const QString& goal : goals) if (!available.contains(goal)) { result.error=QStringLiteral("Unknown award: ")+goal; return result; }
     QHash<qint64,Candidate> candidates;
+    QHash<QPair<QString,QString>,QSharedPointer<AlternativeGroup>> alternativeGroups;
     for (const auto& award : results) {
         if (!goals.contains(award.id)) continue;
         for (const AwardItem& item : award.items) {
@@ -88,16 +110,17 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             const auto alternatives=contributions.qsoIds.value(award.id).value(item.key);
             if (alternatives.isEmpty()) continue;
             ++result.uniqueBenefits;
+            const auto group=QSharedPointer<AlternativeGroup>::create();
+            group->ids=alternatives.values(); std::sort(group->ids.begin(),group->ids.end());
+            alternativeGroups.insert({award.id,item.key},group);
             for (qint64 id : alternatives) {
-                Benefit benefit{award.id,item.key,awards::creditsFor(award.id,filter),alternatives,{}};
-                benefit.alternativeQsoIds.remove(id);
+                Benefit benefit{award.id,item.key,awards::creditsFor(award.id,filter),group};
                 Candidate& candidate=candidates[id]; candidate.qsoId=id; candidate.benefits.append(benefit);
-                candidate.alternativeQsoIds.unite(alternatives);
             }
         }
     }
     for (auto it=candidates.begin(); it!=candidates.end(); ++it) {
-        Candidate& candidate=it.value(); candidate.alternativeQsoIds.remove(candidate.qsoId);
+        Candidate& candidate=it.value();
         const auto record=db.record(candidate.qsoId);
         if (!record) { result.error=QStringLiteral("QSO unavailable while planning"); result.candidates.clear(); return result; }
         candidate.call=record->value(QStringLiteral("CALL"));
@@ -119,22 +142,16 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         }
         std::sort(candidate.benefits.begin(),candidate.benefits.end(),[](const Benefit& a,const Benefit& b) { return a.award==b.award ? a.key<b.key : a.award<b.award; });
     }
-    for (auto it=candidates.begin(); it!=candidates.end(); ++it) {
-        Candidate& candidate=it.value();
-        for (Benefit& benefit : candidate.benefits) {
-            for (qint64 alternate : benefit.alternativeQsoIds) {
-                const auto other=candidates.constFind(alternate);
-                if (other==candidates.cend()) continue;
-                for (const QString& service : other->pendingServices) {
-                    if (benefit.acceptedServices.contains(service)) {
-                        benefit.pendingAlternativeQsoIds.insert(alternate);
-                        break;
-                    }
-                }
+    for (auto it=alternativeGroups.begin(); it!=alternativeGroups.end(); ++it) {
+        const QStringList accepted=awards::creditsFor(it.key().first,filter);
+        for (qint64 id : it.value()->ids) {
+            const auto candidate=candidates.constFind(id); if (candidate==candidates.cend()) continue;
+            for (const QString& service : candidate->pendingServices) {
+                if (accepted.contains(service)) { it.value()->pendingIds.append(id); break; }
             }
         }
-        result.candidates.append(candidate);
     }
+    for (auto it=candidates.cbegin(); it!=candidates.cend(); ++it) result.candidates.append(it.value());
     std::sort(result.candidates.begin(),result.candidates.end(),[](const Candidate& a,const Candidate& b) { return a.qsoId<b.qsoId; });
     // Greedy coverage: maximize still-uncovered award/items; on ties, prefer
     // already sent/unconfirmed accepted services, then the lower QSO ID.

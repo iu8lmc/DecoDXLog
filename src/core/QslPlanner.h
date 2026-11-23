@@ -1,6 +1,7 @@
 #pragma once
 #include "core/Awards.h"
 #include "core/LogDatabase.h"
+#include <QSharedPointer>
 
 namespace decolog::core::qslplanner {
 struct RouteCost {
@@ -14,12 +15,17 @@ std::optional<RouteCost> routeCost(const LogDatabase& db, const QString& manager
 bool saveRouteCost(LogDatabase& db, const QString& manager, const QString& channel,
                    const RouteCost& cost, QString* error = nullptr);
 bool clearRouteCost(LogDatabase& db, const QString& manager, const QString& channel, QString* error = nullptr);
+struct AlternativeGroup {
+    QList<qint64> ids;
+    QList<qint64> pendingIds;
+};
 struct Benefit {
     QString award;
     QString key;
     QStringList acceptedServices;
-    QSet<qint64> alternativeQsoIds;
-    QSet<qint64> pendingAlternativeQsoIds;
+    QSharedPointer<AlternativeGroup> group;
+    QList<qint64> alternativePage(qint64 self, int offset, int limit, bool pendingOnly = false) const;
+    int alternativeCount(qint64 self, bool pendingOnly = false) const;
 };
 struct Candidate {
     qint64 qsoId{0};
@@ -30,7 +36,6 @@ struct Candidate {
     QString paperChannel; // B or D only when explicitly recorded
     QStringList pendingServices;
     QList<Benefit> benefits;
-    QSet<qint64> alternativeQsoIds;
     int priorityRank{0}; // zero means an alternative after the greedy coverage pass
     QList<QPair<QString,QString>> marginalBenefits;
     int pendingMarginalCount{0};

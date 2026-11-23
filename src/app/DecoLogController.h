@@ -37,6 +37,7 @@
 #include "core/QslOcrAcquisition.h"
 #include "core/PredictTracker.h"
 #include "core/PredictPassPlanner.h"
+#include "core/QslPlanner.h"
 #include "core/Callbook.h"
 #include "core/CallbookProfileVerifier.h"
 #include "core/Countries.h"
@@ -523,6 +524,7 @@ public:
     QVariantMap qslPlan() const { return m_qslPlan; }
     bool qslPlanBusy() const { return m_qslPlanBusy; }
     Q_INVOKABLE void buildQslPlan(const QStringList& goals);
+    Q_INVOKABLE QVariantMap qslPlanAlternativePage(qint64 id, const QString& award, const QString& key, int offset) const;
     Q_INVOKABLE QString saveQslRouteCost(const QString& manager, const QString& channel, const QVariantMap& cost);
     Q_INVOKABLE QString clearQslRouteCost(const QString& manager, const QString& channel);
     // Gli elementi di un award per la tabella. `view`: "all", "unconfirmed" o
@@ -1000,6 +1002,7 @@ private:
     QSet<QString> m_primaryProfileAttempted;
     core::AwardFilter m_awardFilter;
     QVariantMap m_qslPlan;
+    std::shared_ptr<const core::qslplanner::Plan> m_qslPlanSnapshot;
     bool m_qslPlanBusy{false};
     quint64 m_qslPlanGeneration{0};
     QThreadPool m_qslPlanPool;

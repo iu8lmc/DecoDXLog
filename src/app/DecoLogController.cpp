@@ -223,6 +223,7 @@ DecoLogController::DecoLogController(QObject* parent)
         if (!m_qslPlanBusy && m_qslPlan.isEmpty()) return;
         ++m_qslPlanGeneration;
         m_qslPlanPool.clear();
+        m_qslPlanSnapshot.reset();
         m_qslPlanBusy = false;
         m_qslPlan.insert(QStringLiteral("stale"), true);
         emit qslPlanChanged();
@@ -2261,6 +2262,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
 {
     const QSet<QString> goals(requested.cbegin(), requested.cend());
     if (goals.isEmpty() || !m_db.isOpen() || m_db.path().isEmpty() || m_db.path() == QLatin1String(":memory:")) {
+        m_qslPlanSnapshot.reset(); m_qslPlanPool.clear();
         m_qslPlan = {{QStringLiteral("error"), tr("Choose at least one award and open a log")}};
         m_qslPlanBusy = false; ++m_qslPlanGeneration; emit qslPlanChanged(); return;
     }
@@ -2269,7 +2271,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
     for (const auto& entity : m_countries.entities()) names.insert(entity.dxcc,entity.name);
     const AwardCalculator calc=awardCalculator(names);
     const quint64 generation=++m_qslPlanGeneration;
-    m_qslPlan.clear(); m_qslPlanBusy=true; emit qslPlanChanged();
+    m_qslPlanSnapshot.reset(); m_qslPlan.clear(); m_qslPlanBusy=true; emit qslPlanChanged();
     QPointer<DecoLogController> self(this);
     m_qslPlanPool.clear();
     m_qslPlanPool.start([self,path,filter,goals,calc,generation] {
@@ -2294,37 +2296,56 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
             QStringList marginal;
             for (const auto& key : candidate.marginalBenefits) marginal << key.first.toUpper()+QLatin1Char(' ')+key.second;
             for (const auto& benefit : candidate.benefits) {
-                auto sortedIds=[](const QSet<qint64>& values) {
-                    QList<qint64> ids=values.values(); std::sort(ids.begin(),ids.end());
+                auto toVariants=[](const QList<qint64>& ids) {
                     QVariantList result; for (qint64 id : ids) result << id; return result;
                 };
                 benefits << QVariantMap{{QStringLiteral("award"),benefit.award},{QStringLiteral("key"),benefit.key},
                     {QStringLiteral("services"),benefit.acceptedServices},
-                    {QStringLiteral("alternatives"),sortedIds(benefit.alternativeQsoIds)},
-                    {QStringLiteral("pendingAlternatives"),sortedIds(benefit.pendingAlternativeQsoIds)}};
+                    {QStringLiteral("alternatives"),toVariants(benefit.alternativePage(candidate.qsoId,0,5))},
+                    {QStringLiteral("alternativeCount"),benefit.alternativeCount(candidate.qsoId)},
+                    {QStringLiteral("pendingAlternatives"),toVariants(benefit.alternativePage(candidate.qsoId,0,5,true))},
+                    {QStringLiteral("pendingAlternativeCount"),benefit.alternativeCount(candidate.qsoId,true)}};
             }
-            QVariantList alternatives;
-            QList<qint64> ids=candidate.alternativeQsoIds.values(); std::sort(ids.begin(),ids.end());
-            for (qint64 id : ids) alternatives << id;
             rows << QVariantMap{{QStringLiteral("id"),candidate.qsoId},{QStringLiteral("call"),candidate.call},
                 {QStringLiteral("manager"),candidate.manager},{QStringLiteral("managerSource"),candidate.managerSource},
                 {QStringLiteral("managerObservedAt"),candidate.managerObservedAt.toString(Qt::ISODate)},
                 {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("benefits"),benefits},
                 {QStringLiteral("priorityRank"),candidate.priorityRank},{QStringLiteral("marginalBenefits"),marginal},
-                {QStringLiteral("pendingMarginalCount"),candidate.pendingMarginalCount},
-                {QStringLiteral("alternatives"),alternatives}};
+                {QStringLiteral("pendingMarginalCount"),candidate.pendingMarginalCount}};
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(),[self,path,generation,plan,rows,routes,ungrouped] {
+        const auto snapshot=std::make_shared<const qslplanner::Plan>(std::move(plan));
+        QMetaObject::invokeMethod(self.data(),[self,path,generation,snapshot,rows,routes,ungrouped] {
             if (!self || generation!=self->m_qslPlanGeneration) return;
             self->m_qslPlanBusy=false;
             if (self->m_db.path()!=path) self->m_qslPlan={{QStringLiteral("stale"),true}};
-            else self->m_qslPlan={{QStringLiteral("error"),plan.error},{QStringLiteral("uniqueBenefits"),plan.uniqueBenefits},
+            else { self->m_qslPlanSnapshot=snapshot; self->m_qslPlan={{QStringLiteral("error"),snapshot->error},{QStringLiteral("uniqueBenefits"),snapshot->uniqueBenefits},
                                  {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},
-                                 {QStringLiteral("ungroupedPaperQsoIds"),ungrouped},{QStringLiteral("stale"),false}};
+                                 {QStringLiteral("ungroupedPaperQsoIds"),ungrouped},{QStringLiteral("stale"),false}}; }
             emit self->qslPlanChanged();
         },Qt::QueuedConnection);
     });
+}
+
+QVariantMap DecoLogController::qslPlanAlternativePage(qint64 id, const QString& award, const QString& key, int offset) const
+{
+    if (!m_qslPlanSnapshot || m_qslPlan.value(QStringLiteral("stale")).toBool()) return {{QStringLiteral("error"),tr("Plan is no longer current")}};
+    const auto& candidates=m_qslPlanSnapshot->candidates;
+    const auto candidate=std::lower_bound(candidates.cbegin(),candidates.cend(),id,
+        [](const qslplanner::Candidate& c,qint64 value) { return c.qsoId<value; });
+    if (candidate==candidates.cend() || candidate->qsoId!=id) return {{QStringLiteral("error"),tr("QSO is not in the plan")}};
+    for (const auto& benefit : candidate->benefits) {
+        if (benefit.award!=award || benefit.key!=key) continue;
+        const int count=benefit.alternativeCount(id); offset=qBound(0,offset,qMax(0,count-1));
+        QVariantList rows;
+        for (qint64 alternate : benefit.alternativePage(id,offset,50)) {
+            const auto& pending=benefit.group->pendingIds;
+            rows << QVariantMap{{QStringLiteral("id"),alternate},
+                                {QStringLiteral("pending"),std::binary_search(pending.cbegin(),pending.cend(),alternate)}};
+        }
+        return {{QStringLiteral("ids"),rows},{QStringLiteral("total"),count},{QStringLiteral("offset"),offset}};
+    }
+    return {{QStringLiteral("error"),tr("Benefit is not in the plan")}};
 }
 
 QString DecoLogController::saveQslRouteCost(const QString& manager, const QString& channel, const QVariantMap& values)
@@ -2335,7 +2356,7 @@ QString DecoLogController::saveQslRouteCost(const QString& manager, const QStrin
         values.value(QStringLiteral("observedDate")).toString().trimmed()};
     QString error;
     if (!qslplanner::saveRouteCost(m_db,manager,channel,cost,&error)) return error;
-    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
+    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanSnapshot.reset(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
     emit qslPlanChanged(); return {};
 }
 
@@ -2343,7 +2364,7 @@ QString DecoLogController::clearQslRouteCost(const QString& manager, const QStri
 {
     QString error;
     if (!qslplanner::clearRouteCost(m_db,manager,channel,&error)) return error;
-    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
+    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanSnapshot.reset(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
     emit qslPlanChanged(); return {};
 }
 

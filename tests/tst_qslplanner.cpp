@@ -6,6 +6,26 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void sharedAlternativesArePagedWithoutDroppingRecords()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (int i=0;i<125;++i) {
+            const auto result=db.insertQso(AdifRecord{{"CALL",QString("K%1AA").arg(i)},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"}},"import");
+            QVERIFY(result.id>0);
+        }
+        const auto plan=qslplanner::build(db,{}, {"dxcc"}); QCOMPARE(plan.candidates.size(),125);
+        const auto& first=plan.candidates.first(); const auto& last=plan.candidates.last();
+        QCOMPARE(first.benefits.first().group.data(),last.benefits.first().group.data());
+        QCOMPARE(first.benefits.first().alternativeCount(first.qsoId),124);
+        const auto firstPage=first.benefits.first().alternativePage(first.qsoId,0,100);
+        const auto lastPage=first.benefits.first().alternativePage(first.qsoId,100,100);
+        QCOMPARE(firstPage.size(),100); QCOMPARE(lastPage.size(),24); QVERIFY(!firstPage.contains(first.qsoId));
+        QVERIFY(firstPage.last()<lastPage.first());
+        const auto& middle=plan.candidates.at(49); const auto& benefit=middle.benefits.first();
+        const auto pageA=benefit.alternativePage(middle.qsoId,0,50), pageB=benefit.alternativePage(middle.qsoId,50,50);
+        QCOMPARE(pageA.size(),50); QCOMPARE(pageB.size(),50); QVERIFY(!pageA.contains(middle.qsoId));
+        QVERIFY(!pageB.contains(middle.qsoId)); QVERIFY(pageA.last()<pageB.first());
+    }
     void routeCostIsScopedValidatedAndPersistent()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");
@@ -75,24 +95,26 @@ private slots:
         AwardFilter filter; auto plan=qslplanner::build(db,filter,{"dxcc","waz"});
         QCOMPARE(plan.candidates.size(),3); QCOMPARE(plan.uniqueBenefits,3);
         QCOMPARE(plan.candidates[0].benefits.size(),2);
-        QVERIFY(plan.candidates[0].alternativeQsoIds.contains(b));
         QCOMPARE(plan.candidates[0].benefits[0].award,QString("dxcc"));
-        QCOMPARE(plan.candidates[0].benefits[0].alternativeQsoIds,QSet<qint64>({b}));
+        QCOMPARE(plan.candidates[0].benefits[0].alternativePage(a,0,100),QList<qint64>({b}));
+        QCOMPARE(plan.candidates[0].benefits[0].group.data(),plan.candidates[1].benefits[0].group.data());
         QCOMPARE(plan.candidates[0].benefits[1].award,QString("waz"));
-        QCOMPARE(plan.candidates[0].benefits[1].alternativeQsoIds,QSet<qint64>({b,c}));
+        QCOMPARE(plan.candidates[0].benefits[1].alternativePage(a,0,100),QList<qint64>({b,c}));
+        QCOMPARE(plan.candidates[0].benefits[1].alternativePage(a,1,1),QList<qint64>({c}));
+        QCOMPARE(plan.candidates[1].benefits[1].alternativePage(b,0,100),QList<qint64>({a,c}));
         QCOMPARE(plan.candidates[0].priorityRank,1); QCOMPARE(plan.candidates[0].marginalBenefits.size(),2);
         QCOMPARE(plan.candidates[1].priorityRank,0); QCOMPARE(plan.candidates[2].priorityRank,2);
         QCOMPARE(plan.candidates[2].marginalBenefits.size(),1);
         QCOMPARE(plan.candidates[0].manager,QString("M0ABC"));
         QslState unaccepted; unaccepted.service="eqsl"; unaccepted.sent="Y"; QVERIFY(db.setQslState(c,unaccepted));
         plan=qslplanner::build(db,filter,{"dxcc","waz"});
-        QVERIFY(plan.candidates[0].benefits[1].pendingAlternativeQsoIds.isEmpty());
+        QVERIFY(plan.candidates[0].benefits[1].alternativePage(a,0,100,true).isEmpty());
         QslState state; state.service="card"; state.sent="Y"; QVERIFY(db.setQslState(b,state));
         plan=qslplanner::build(db,filter,{"dxcc","waz"});
         QVERIFY(plan.candidates[1].pendingServices.contains("card"));
         QCOMPARE(plan.candidates[1].priorityRank,1); QCOMPARE(plan.candidates[1].pendingMarginalCount,2);
         QCOMPARE(plan.candidates[0].priorityRank,0); QCOMPARE(plan.candidates[2].priorityRank,2);
-        QCOMPARE(plan.candidates[0].benefits[0].pendingAlternativeQsoIds,QSet<qint64>({b}));
+        QCOMPARE(plan.candidates[0].benefits[0].alternativePage(a,0,100,true),QList<qint64>({b}));
         state.rcvd="Y"; QVERIFY(db.setCardState(b,state));
         plan=qslplanner::build(db,filter,{"dxcc","waz"});
         QCOMPARE(plan.uniqueBenefits,1); QCOMPARE(plan.candidates.size(),1); QCOMPARE(plan.candidates[0].qsoId,c);

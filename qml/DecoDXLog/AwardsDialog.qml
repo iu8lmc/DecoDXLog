@@ -70,7 +70,10 @@ DialogFrame {
     }
     Connections {
         target: decolog
-        function onQslPlanChanged() { if (decolog.qslPlan.stale) root.schedulePlannerRefresh() }
+        function onQslPlanChanged() {
+            if (decolog.qslPlanBusy || decolog.qslPlan.stale) alternativesDialog.close()
+            if (decolog.qslPlan.stale) root.schedulePlannerRefresh()
+        }
     }
 
     function togglePlannerGoal(id, enabled) {
@@ -79,6 +82,7 @@ DialogFrame {
         if (enabled && at < 0) selected.push(id)
         if (!enabled && at >= 0) selected.splice(at, 1)
         plannerGoals = selected
+        alternativesDialog.close()
         plannerSettings.goalsJson = JSON.stringify(selected)
         plannerSelectionDirty = true
         schedulePlannerRefresh()
@@ -86,6 +90,23 @@ DialogFrame {
 
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
     function probeQslPlanRestore() { openAt("dxcc"); plannerProbeRestore.start() }
+    function probeAlternativePages() { openAt("dxcc"); plannerPagesStart.start() }
+    Timer {
+        id: plannerPagesStart; interval: 1000
+        onTriggered: { openPlannerButton.clicked(); plannerRefresh.stop(); root.plannerGoals=["dxcc"]; root.plannerSelectionDirty=false; buildPlannerButton.clicked(); plannerPagesReady.start() }
+    }
+    Timer {
+        id: plannerPagesReady; interval: 200; repeat: true; property int tries: 0
+        onTriggered: {
+            if ((decolog.qslPlanBusy || !decolog.qslPlan.candidates || !decolog.qslPlan.candidates.length) && ++tries<30) return
+            stop(); alternativesDialog.showCandidate(decolog.qslPlan.candidates[0])
+            console.warn("PROBE qslpages first " + JSON.stringify(alternativesDialog.page))
+            nextAlternatives.clicked(); console.warn("PROBE qslpages next " + JSON.stringify(alternativesDialog.page))
+            nextAlternatives.clicked(); console.warn("PROBE qslpages last " + JSON.stringify(alternativesDialog.page))
+            decolog.awardBand="40m"
+            console.warn("PROBE qslpages invalidated " + !alternativesDialog.visible + " " + JSON.stringify(decolog.qslPlanAlternativePage(1,"dxcc","291",0)))
+        }
+    }
     Timer {
         id: plannerProbeRestore; interval: 1000
         onTriggered: { console.warn("PROBE qslplan restored " + JSON.stringify(root.plannerGoals)); openPlannerButton.clicked(); plannerProbeRestoreResult.start() }
@@ -189,7 +210,7 @@ DialogFrame {
                 GlassButton {
                     text: qsTr("Clear")
                     enabled: root.plannerGoals.length > 0
-                    onClicked: { root.plannerGoals = []; plannerSettings.goalsJson = "[]"; root.plannerSelectionDirty = true; plannerRefresh.stop() }
+                    onClicked: { root.plannerGoals = []; alternativesDialog.close(); plannerSettings.goalsJson = "[]"; root.plannerSelectionDirty = true; plannerRefresh.stop() }
                 }
             }
             Text {
@@ -252,7 +273,9 @@ DialogFrame {
                         Text { id: candidateBenefits; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
                             text: modelData.benefits.map(b => b.award.toUpperCase() + " " + b.key + " [" + b.services.join(", ") + "] · "
                                 + qsTr("alternatives: %1").arg(b.alternatives.join(", ") || qsTr("none"))
-                                + (b.pendingAlternatives.length ? " · " + qsTr("sent/unconfirmed alternatives: %1").arg(b.pendingAlternatives.join(", ")) : "")).join("\n") }
+                                + (b.alternativeCount > b.alternatives.length ? qsTr(" (first %1 of %2)").arg(b.alternatives.length).arg(b.alternativeCount) : "")
+                                + (b.pendingAlternatives.length ? " · " + qsTr("sent/unconfirmed alternatives: %1").arg(b.pendingAlternatives.join(", ")) : "")
+                                + (b.pendingAlternativeCount > b.pendingAlternatives.length ? qsTr(" (first %1 of %2)").arg(b.pendingAlternatives.length).arg(b.pendingAlternativeCount) : "")).join("\n") }
                         Text { id: candidateRoute; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
                             text: qsTr("Sent/unconfirmed services: %1 · route source: %2 · observed: %3 · %4")
                                 .arg(modelData.pending.join(", ") || qsTr("none recorded"))
@@ -261,11 +284,59 @@ DialogFrame {
                                 .arg(!modelData.managerObservedAt ? qsTr("route age unknown")
                                     : Date.now() - Date.parse(modelData.managerObservedAt) > 180 * 86400000
                                       ? qsTr("route evidence older than 180 days; verify") : qsTr("verify route")) }
-                        GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
+                        RowLayout {
+                            GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
+                            GlassButton { text: qsTr("View all alternatives"); onClicked: alternativesDialog.showCandidate(modelData) }
+                        }
                     }
                 }
             }
             GlassButton { id: paperQueueButton; text: qsTr("Open paper QSL queue"); onClicked: root.openPaperQueue() }
+        }
+    }
+
+    DialogFrame {
+        id: alternativesDialog
+        transientParent: qslPlanner
+        title: qsTr("QSO alternatives")
+        info: qsTr("Potential alternatives for one benefit")
+        width: 650; height: 430
+        property var candidate: ({})
+        property var page: ({})
+        property int offset: 0
+        function showCandidate(c) { candidate=c; offset=0; benefitChoice.currentIndex=0; open(); refresh() }
+        function refresh() {
+            const benefits=candidate.benefits || []
+            const choice=benefitChoice.currentIndex
+            if (choice < 0 || choice >= benefits.length) { page=({}); return }
+            const benefit=benefits[choice]
+            page=decolog.qslPlanAlternativePage(candidate.id,benefit.award,benefit.key,offset)
+        }
+        body: ColumnLayout {
+            spacing: 8
+            Text { Layout.fillWidth: true; color: Theme.textSecondary; text: qsTr("Alternatives for %1").arg(alternativesDialog.candidate.call || "") }
+            StyledComboBox {
+                id: benefitChoice; Layout.fillWidth: true
+                model: (alternativesDialog.candidate.benefits || []).map(b => b.award.toUpperCase() + " " + b.key)
+                onActivated: { alternativesDialog.offset=0; alternativesDialog.refresh() }
+            }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: alternativesDialog.page.error || (!alternativesDialog.page.total ? qsTr("No alternatives")
+                    : qsTr("%1 alternatives · page starts at %2").arg(alternativesDialog.page.total).arg((alternativesDialog.page.offset || 0) + 1)) }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: alternativesDialog.page.ids || []
+                delegate: RowLayout {
+                    required property var modelData
+                    width: ListView.view.width
+                    Text { Layout.fillWidth: true; color: Theme.textPrimary; text: qsTr("QSO #%1").arg(modelData.id) + (modelData.pending ? " · " + qsTr("sent/unconfirmed on an accepted service") : "") }
+                    GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
+                }
+            }
+            RowLayout {
+                GlassButton { text: qsTr("Previous"); enabled: alternativesDialog.offset > 0; onClicked: { alternativesDialog.offset=Math.max(0,alternativesDialog.offset-50); alternativesDialog.refresh() } }
+                GlassButton { id: nextAlternatives; text: qsTr("Next"); enabled: alternativesDialog.offset+50 < (alternativesDialog.page.total || 0); onClicked: { alternativesDialog.offset+=50; alternativesDialog.refresh() } }
+            }
         }
     }
 

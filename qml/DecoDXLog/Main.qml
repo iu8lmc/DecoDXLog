@@ -1276,6 +1276,7 @@ RoundedWindow {
         else if (what[0] === "historical") historicalQsoDialog.open()
         else if (what[0] === "qslplanprobe") Qt.callLater(() => awardsDialog.probeQslPlan())
         else if (what[0] === "qslplanrestoreprobe") Qt.callLater(() => awardsDialog.probeQslPlanRestore())
+        else if (what[0] === "qslpagesprobe") Qt.callLater(() => awardsDialog.probeAlternativePages())
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
         else if (what[0] === "potacatalogueprobe") Qt.callLater(() => activationDialog.probePotaCatalogue())
         else if (what[0] === "sotaupdateprobe") Qt.callLater(() => activationDialog.probeSotaUpdate())

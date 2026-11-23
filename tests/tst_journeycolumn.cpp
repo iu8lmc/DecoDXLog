@@ -60,6 +60,21 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void qslAlternativesDesktopPagesAndInvalidates()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (int i=0;i<125;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL",QString("K%1AA").arg(i)},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"}},"import").id>0);
+          QslState card; card.service="card"; card.sent="Y"; QVERIFY(db.setCardState(60,card)); }
+        QByteArray output; QVERIFY2(launch(dir,"qslpagesprobe",output,7000),output.constData());
+        QVERIFY2(output.contains("PROBE qslpages first") && output.contains("\"total\":124") && output.contains("\"offset\":0"),output.constData());
+        QVERIFY2(output.contains("PROBE qslpages next") && output.contains("\"offset\":50"),output.constData());
+        QVERIFY2(output.contains("\"id\":60,\"pending\":true"),output.constData());
+        QVERIFY2(output.contains("PROBE qslpages last") && output.contains("\"offset\":100"),output.constData());
+        QVERIFY2(output.contains("PROBE qslpages invalidated true") && output.contains("Plan is no longer current"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+    }
     void qslPlannerDesktopShowsBenefitsAndInvalidation()
     {
         using namespace decolog::core;
