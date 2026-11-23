@@ -109,6 +109,7 @@ public:
     Q_INVOKABLE bool reviewQsoComparison(const QString& uuid);
     Q_INVOKABLE QString applyReviewedMissingQso();
     Q_INVOKABLE QString applyReviewedExistingQso();
+    Q_INVOKABLE QVariantMap qsoLongFieldPage(int fieldIndex, const QString& part, int offset);
     bool qsoReviewBusy() const { return m_qsoReviewBusy; }
     QVariantMap qsoReview() const { return m_qsoReview; }
     bool qsoComparisonBusy() const { return m_qsoComparisonBusy; }
@@ -210,6 +211,7 @@ private:
     QVariantMap m_qsoReview;
     std::shared_ptr<core::contestqso::Receiver> m_reviewedMissing;
     core::contestqso::Review m_reviewedExisting;
+    QHash<QString,int> m_reviewedLongOffsets;
     bool qsoComparisonCurrent() const;
     QVariantMap m_qsoComparisonSummary;
     QVariantList m_qsoComparisonRows;

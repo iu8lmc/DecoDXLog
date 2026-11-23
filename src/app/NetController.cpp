@@ -40,7 +40,7 @@ NetController::NetController(Context context, QObject* parent)
             !m_qsoComparisonRemoteWatcher || !m_qsoComparisonRemoteWatcher->fileIdentityMatchesOpen() ||
             m_qsoComparisonRemoteWatcher->dataVersion()!=m_qsoComparisonRemoteVersion) {
             m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true);
-            ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; emit qsoReviewChanged(); emit qsoComparisonChanged();
+            ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged(); emit qsoComparisonChanged();
         }
     });
     m_durableRetry.setInterval(2000);
@@ -100,7 +100,7 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
 {
     if (m_qsoComparisonBusy || !remoteFile.isLocalFile() || remoteFile.toLocalFile().isEmpty() || !m_ctx.db ||
         !m_ctx.db->isOpen() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) return false;
-    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; emit qsoReviewChanged();
+    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged();
     const QString localPath=m_ctx.db->path(), remotePath=remoteFile.toLocalFile(), identity=m_ctx.db->identity(), stamp=m_ctx.db->changeStamp();
     const QByteArray localFileIdentity=m_ctx.db->openFileIdentity(), remoteFileIdentity=fileidentity::read(remotePath);
     if (identity.isEmpty() || stamp.isEmpty() || remoteFileIdentity.isEmpty()) return false;
@@ -197,7 +197,7 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
 
 void NetController::cancelQsoComparison()
 {
-    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; emit qsoReviewChanged();
+    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged();
     if (m_qsoComparisonCancel) m_qsoComparisonCancel->store(true);
     if (!m_qsoComparisonBusy) {
         m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear();
@@ -224,7 +224,7 @@ bool NetController::reviewQsoComparison(const QString& uuid)
     const QString local=m_qsoComparisonPath, remote=m_qsoComparisonRemotePath, localId=m_qsoComparisonIdentity;
     const QString remoteId=m_qsoComparisonSummary.value(QStringLiteral("remoteIdentity")).toString();
     const QByteArray localFile=m_qsoComparisonFileIdentity, remoteFile=m_qsoComparisonRemoteFileIdentity;
-    const quint64 generation=++m_qsoReviewGeneration; m_qsoReviewBusy=true; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; emit qsoReviewChanged();
+    const quint64 generation=++m_qsoReviewGeneration; m_qsoReviewBusy=true; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged();
     QPointer<NetController> self(this);
     m_qsoComparisonPool.start([self,local,remote,localId,remoteId,localFile,remoteFile,selected,uuid,generation] {
         QVariantMap output; QString error; ContestNetInventory a,b;
@@ -293,11 +293,45 @@ bool NetController::reviewQsoComparison(const QString& uuid)
             self->m_qsoReviewBusy=false;
             if (!self->qsoComparisonCurrent()) self->m_qsoReview={{QStringLiteral("error"),self->tr("A log changed; compare again.")}};
             else if (!error.isEmpty()) self->m_qsoReview={{QStringLiteral("error"),error}};
-            else { self->m_qsoReview=output; self->m_reviewedMissing=candidate; self->m_reviewedExisting=existingReview; }
+            else {
+                self->m_qsoReview=output; self->m_reviewedMissing=candidate; self->m_reviewedExisting=existingReview;
+                self->m_reviewedLongOffsets.clear(); const auto fields=output.value(QStringLiteral("fields")).toList();
+                for (int i=0;i<fields.size();++i) {
+                    const auto field=fields.at(i).toMap();
+                    for (const auto& part:{QStringLiteral("name"),QStringLiteral("local"),QStringLiteral("remote")})
+                        if (field.value(part).toString().size()>2048) self->m_reviewedLongOffsets.insert(QString::number(i)+QLatin1Char(':')+part,0);
+                }
+                self->m_qsoReview.insert(QStringLiteral("longRemaining"),self->m_reviewedLongOffsets.size());
+            }
             emit self->qsoReviewChanged();
         },Qt::QueuedConnection);
     });
     return true;
+}
+
+QVariantMap NetController::qsoLongFieldPage(int fieldIndex,const QString& part,int offset)
+{
+    if (m_qsoReviewBusy || !qsoComparisonCurrent() || (part!=QLatin1String("name") && part!=QLatin1String("local") && part!=QLatin1String("remote"))) return {};
+    const auto fields=m_qsoReview.value(QStringLiteral("fields")).toList();
+    if (fieldIndex<0 || fieldIndex>=fields.size()) return {};
+    const auto key=QString::number(fieldIndex)+QLatin1Char(':')+part;
+    if (!m_reviewedLongOffsets.contains(key)) return {};
+    int expected=m_reviewedLongOffsets.value(key);
+    if (offset==0) expected=0;
+    if (offset!=expected || offset<0) return {};
+    const QString value=fields.at(fieldIndex).toMap().value(part).toString();
+    if (offset>=value.size()) return {};
+    int end=qMin(offset+2048,int(value.size()));
+    if (end<value.size() && value.at(end-1).isHighSurrogate() && value.at(end).isLowSurrogate()) --end;
+    const QString text=value.mid(offset,end-offset); const bool done=end==value.size();
+    m_reviewedLongOffsets[key]=done?-1:end;
+    int remaining=0; for (auto it=m_reviewedLongOffsets.cbegin();it!=m_reviewedLongOffsets.cend();++it) if (it.value()!=-1) ++remaining;
+    const bool ready=remaining==0;
+    m_qsoReview.insert(QStringLiteral("longRemaining"),remaining);
+    m_qsoReview.insert(QStringLiteral("canInsert"),ready && bool(m_reviewedMissing) && m_qsoReview.value(QStringLiteral("kind"))==QLatin1String("remoteOnly"));
+    m_qsoReview.insert(QStringLiteral("canApply"),ready && bool(m_reviewedMissing) && m_reviewedExisting.ok);
+    emit qsoReviewChanged();
+    return {{QStringLiteral("text"),text},{QStringLiteral("next"),end},{QStringLiteral("done"),done},{QStringLiteral("total"),value.size()}};
 }
 
 QString NetController::applyReviewedMissingQso()
@@ -308,7 +342,7 @@ QString NetController::applyReviewedMissingQso()
     const auto result=contestqso::applyMissing(*m_ctx.db,m_qsoComparisonIdentity,*m_reviewedMissing);
     if (!result.ok) return result.error;
     m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true);
-    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; emit qsoReviewChanged(); emit qsoComparisonChanged();
+    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged(); emit qsoComparisonChanged();
     if (result.inserted && m_ctx.reviewedQsoInserted) m_ctx.reviewedQsoInserted(result.id);
     return {};
 }
@@ -323,7 +357,7 @@ QString NetController::applyReviewedExistingQso()
     const auto result=contestqso::applyReviewed(*m_ctx.db,m_qsoComparisonIdentity,*m_reviewedMissing,m_reviewedExisting);
     if (!result.ok) return result.error;
     m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true);
-    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; emit qsoReviewChanged(); emit qsoComparisonChanged();
+    ++m_qsoReviewGeneration; m_qsoReview.clear(); m_reviewedMissing.reset(); m_reviewedExisting={}; m_reviewedLongOffsets.clear(); emit qsoReviewChanged(); emit qsoComparisonChanged();
     if (m_ctx.reviewedQsoChanged) m_ctx.reviewedQsoChanged(result.id,deleted,oldCall);
     return {};
 }

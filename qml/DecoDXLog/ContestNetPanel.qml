@@ -14,6 +14,17 @@ GlassPanel {
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
     function probeReview() { const rows=root.net.qsoComparisonRows; if (!rows.length || !root.net.reviewQsoComparison(rows[0].uuid)) return false; qsoDetailsDialog.open(); return true }
     function probeApply(accept) { if (!root.net.qsoReview.canApply) return false; qsoApplyDialog.open(); if (accept) qsoApplyDialog.confirmApply(); else qsoApplyDialog.close(); return true }
+    function probeLongReview() {
+        const fields=root.net.qsoReview.fields || []
+        for (let i=0;i<fields.length;i++) for (const part of ["name","local","remote"]) {
+            if ((fields[i][part] || "").length>2048) {
+                if (!qsoLongDialog.begin(i,part)) return false
+                while (!qsoLongDialog.pageDone) if (!qsoLongDialog.nextPage()) return false
+                qsoLongDialog.close()
+            }
+        }
+        return root.net.qsoReview.canInsert === true
+    }
     function probeImport(accept) { if (!root.net.qsoReview.canInsert) return false; qsoImportDialog.open(); if (accept) qsoImportDialog.confirmImport(); else qsoImportDialog.close(); return true }
     function probeReviewState() { return {visible:qsoDetailsDialog.visible,title:qsoDetailsDialog.title,fields:(root.net.qsoReview.fields || []).length,ok:root.net.qsoReview.ok || false} }
     function probeComparisonState() { const rows=root.net.qsoComparisonRows, first=qsoComparisonList.itemAtIndex(0); return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:rows.length,firstFields:rows.length ? (rows[0].fields || []).length : 0,fieldShown:first ? first.fieldTextAt(0) : ""} }
@@ -317,7 +328,7 @@ GlassPanel {
             Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
                 text:qsTr("Fields are shown up to 2048 characters. Long values are marked; attachments and local metadata are not shown.") }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; visible:root.net.qsoReview.hasLongFields === true
-                text:qsTr("Import and apply are unavailable when a field exceeds the visible limit.") }
+                text:qsTr("Open and read every page of each long field before importing or applying. Remaining: %1").arg(root.net.qsoReview.longRemaining || 0) }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.warningColor
                 text:root.net.qsoReviewBusy ? qsTr("Reading QSO snapshots…") : root.net.qsoReview.error || (root.net.qsoComparisonSummary.stale ? qsTr("A log changed; compare again.") : "") }
             Rectangle {
@@ -325,13 +336,22 @@ GlassPanel {
                 ListView {
                     anchors.fill:parent; anchors.margins:6; clip:true; spacing:8; model:root.net.qsoReview.fields || []
                     ScrollBar.vertical:PanelScrollBar {}
-                    delegate:Text {
+                    delegate:Column {
+                        id:fullFieldRow
                         required property var modelData
-                        width:ListView.view.width-12; color:Theme.textPrimary; wrapMode:Text.WrapAnywhere; textFormat:Text.PlainText
+                        required property int index
+                        width:ListView.view.width-12; spacing:4
                         function preview(value) { const t=value || ""; return t.length>2048 ? t.slice(0,2048)+"…" : t }
-                        text:qsTr("%1: current %2 · selected %3").arg(modelData.name)
-                            .arg(modelData.localPresent ? preview(modelData.local) : qsTr("not present"))
-                            .arg(modelData.remotePresent ? preview(modelData.remote) : qsTr("not present"))
+                        Text { width:parent.width; color:Theme.textPrimary; wrapMode:Text.WrapAnywhere; textFormat:Text.PlainText
+                            text:qsTr("%1: current %2 · selected %3").arg(fullFieldRow.preview(fullFieldRow.modelData.name))
+                                .arg(fullFieldRow.modelData.localPresent ? fullFieldRow.preview(fullFieldRow.modelData.local) : qsTr("not present"))
+                                .arg(fullFieldRow.modelData.remotePresent ? fullFieldRow.preview(fullFieldRow.modelData.remote) : qsTr("not present")) }
+                        Row {
+                            spacing:6
+                            GlassButton { visible:(fullFieldRow.modelData.name || "").length>2048; text:qsTr("Read field name…"); onClicked:qsoLongDialog.begin(fullFieldRow.index,"name") }
+                            GlassButton { visible:(fullFieldRow.modelData.local || "").length>2048; text:qsTr("Read current value…"); onClicked:qsoLongDialog.begin(fullFieldRow.index,"local") }
+                            GlassButton { visible:(fullFieldRow.modelData.remote || "").length>2048; text:qsTr("Read selected value…"); onClicked:qsoLongDialog.begin(fullFieldRow.index,"remote") }
+                        }
                     }
                 }
             }
@@ -342,6 +362,37 @@ GlassPanel {
                     visible:root.net.qsoReview.canApply === true; enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale
                     onClicked:qsoApplyDialog.open() }
                 GlassButton { text:qsTr("Close"); onClicked:qsoDetailsDialog.close() }
+            }
+        }
+    }
+    DialogFrame {
+        id:qsoLongDialog
+        transientParent:root.Window.window
+        title:qsTr("Read long field")
+        width:760; height:520
+        property int fieldIndex:-1
+        property string fieldPart:""
+        property int nextOffset:0
+        property int total:0
+        property bool pageDone:false
+        property string pageText:""
+        function begin(index,part) { fieldIndex=index; fieldPart=part; nextOffset=0; pageDone=false; const ok=nextPage(); if (ok) open(); return ok }
+        function nextPage() {
+            const page=root.net.qsoLongFieldPage(fieldIndex,fieldPart,nextOffset)
+            if (page.next === undefined) { pageText=qsTr("A log changed; compare again."); return false }
+            pageText=page.text; nextOffset=page.next; total=page.total; pageDone=page.done; return true
+        }
+        body:ColumnLayout {
+            spacing:8
+            Text { Layout.fillWidth:true; color:Theme.textSecondary; text:qsTr("Read through position %1 of %2").arg(qsoLongDialog.nextOffset).arg(qsoLongDialog.total) }
+            ScrollView {
+                Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                TextArea { readOnly:true; selectByMouse:true; wrapMode:TextEdit.WrapAnywhere; textFormat:TextEdit.PlainText; text:qsoLongDialog.pageText }
+            }
+            RowLayout {
+                GlassButton { text:qsTr("Restart"); onClicked:qsoLongDialog.begin(qsoLongDialog.fieldIndex,qsoLongDialog.fieldPart) }
+                GlassButton { text:qsTr("Next page"); enabled:!qsoLongDialog.pageDone; onClicked:qsoLongDialog.nextPage() }
+                GlassButton { text:qsTr("Close"); onClicked:qsoLongDialog.close() }
             }
         }
     }

@@ -103,6 +103,16 @@ private slots:
         QVERIFY2(output.contains("PROBE netimport true") && !output.contains("TypeError"),output.constData());
         LogDatabase local; QVERIFY(local.open(localPath)); QCOMPARE(local.qsoCount(),qint64(accept?1:0)); if (accept) QVERIFY(local.idForUuid(uuid)>0);
     }
+    void stationNetworkReviewsLongFieldBeforeImport()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const auto localPath=dir.filePath("test.sqlite"),remotePath=dir.filePath("remote.sqlite");
+        const auto longValue=QString(2047,'x')+QString::fromUtf8("😀")+QStringLiteral("x");
+        { LogDatabase remote; QVERIFY(remote.open(remotePath)); const auto q=remote.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",longValue}},"fixture"); QVERIFY(q.id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"netlongprobe:"+remotePath,output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE netlong true") && output.contains("PROBE netimport true") && !output.contains("TypeError"),output.constData());
+        LogDatabase local; QVERIFY(local.open(localPath)); const auto ids=local.latestIds("K1AAA",10); QCOMPARE(ids.size(),1); QCOMPARE(local.record(ids.first())->value("COMMENT"),longValue);
+    }
     void stationNetworkApplyConfirmation_data()
     {
         QTest::addColumn<bool>("accept"); QTest::addColumn<bool>("deletion");

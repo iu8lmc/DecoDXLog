@@ -2273,6 +2273,14 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Open and read every page of each long field before importing or applying. Remaining: %1</source><translation>Apri e leggi tutte le pagine di ogni campo lungo prima di importare o applicare. Rimanenti: %1</translation></message>
+    <message><source>Read field name…</source><translation>Leggi il nome del campo…</translation></message>
+    <message><source>Read current value…</source><translation>Leggi il valore corrente…</translation></message>
+    <message><source>Read selected value…</source><translation>Leggi il valore selezionato…</translation></message>
+    <message><source>Read long field</source><translation>Leggi campo lungo</translation></message>
+    <message><source>Read through position %1 of %2</source><translation>Letto fino alla posizione %1 di %2</translation></message>
+    <message><source>Restart</source><translation>Ricomincia</translation></message>
+    <message><source>Next page</source><translation>Pagina successiva</translation></message>
     <message><source>Import and apply are unavailable when a field exceeds the visible limit.</source><translation>Importazione e applicazione non sono disponibili se un campo supera il limite visibile.</translation></message>
     <message><source>Review deletion…</source><translation>Esamina cancellazione…</translation></message>
     <message><source>Review selected changes…</source><translation>Esamina le modifiche selezionate…</translation></message>

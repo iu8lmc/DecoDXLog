@@ -105,12 +105,25 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
         QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("LongReview"); QSettings().setValue("net/enabled",false);
         const auto localPath=dir.filePath("local.sqlite"), remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
-        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(2050,'x')}};
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(2047,'x')+QString::fromUtf8("😀")+QStringLiteral("x")},{"NAME",QString(2050,'n')}};
         const auto q=remote.insertQso(record,"fixture"); QVERIFY(q.id>0); NetController::Context ctx; ctx.db=&local; NetController net(ctx);
         QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
         QVERIFY(net.reviewQsoComparison(remote.meta(q.id)->uuid)); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoReviewBusy(),10000);
         QVERIFY(net.qsoReview().value("ok").toBool()); QVERIFY(net.qsoReview().value("hasLongFields").toBool()); QVERIFY(!net.qsoReview().value("canInsert").toBool());
         QVERIFY(!net.applyReviewedMissingQso().isEmpty()); QCOMPARE(local.qsoCount(),qint64(0));
+        int index=-1; const auto fields=net.qsoReview().value("fields").toList(); for (int i=0;i<fields.size();++i) if (fields[i].toMap().value("name")=="COMMENT") index=i; QVERIFY(index>=0);
+        QVERIFY(net.qsoLongFieldPage(index,"remote",2048).isEmpty());
+        const auto first=net.qsoLongFieldPage(index,"remote",0); QCOMPARE(first.value("text").toString(),QString(2047,'x')); QVERIFY(!first.value("done").toBool());
+        QVERIFY(!net.qsoReview().value("canInsert").toBool());
+        const auto last=net.qsoLongFieldPage(index,"remote",first.value("next").toInt()); QCOMPARE(last.value("text").toString(),QString::fromUtf8("😀x")); QVERIFY(last.value("done").toBool());
+        QVERIFY(!net.qsoReview().value("canInsert").toBool()); int nameIndex=-1;
+        for (int i=0;i<fields.size();++i) if (fields[i].toMap().value("name")=="NAME") nameIndex=i; QVERIFY(nameIndex>=0);
+        const auto nameFirst=net.qsoLongFieldPage(nameIndex,"remote",0); QVERIFY(!nameFirst.isEmpty());
+        const auto nameLast=net.qsoLongFieldPage(nameIndex,"remote",nameFirst.value("next").toInt()); QVERIFY(nameLast.value("done").toBool());
+        QVERIFY(net.qsoReview().value("canInsert").toBool());
+        QVERIFY(!net.qsoLongFieldPage(nameIndex,"remote",0).isEmpty()); QVERIFY(!net.qsoReview().value("canInsert").toBool());
+        QVERIFY(net.qsoLongFieldPage(nameIndex,"remote",2048).value("done").toBool());
+        QVERIFY(net.qsoReview().value("canInsert").toBool()); QVERIFY(net.applyReviewedMissingQso().isEmpty()); QCOMPARE(local.qsoCount(),qint64(1));
     }
     void offlineQsoComparisonCancelsWithoutPublishingPartialRows()
     {
