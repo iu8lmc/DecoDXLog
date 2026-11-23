@@ -1,12 +1,32 @@
 #include "core/QslPlanner.h"
 #include <QTemporaryDir>
 #include <QFile>
+#include <QLibrary>
+#include <QSqlDriver>
+#include <cstring>
 #include <QSqlQuery>
 #include <QTest>
 using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void planFailsWhenQslStatusCannotBeRead()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("System SQLite authorizer test is opt-in");
+        LogDatabase db; QVERIFY(db.open(":memory:")); const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"QSL_VIA","M0ABC"}},"fixture"); QVERIFY(qso.id>0);
+        QslState state; state.service="card"; state.sent="Y"; state.via="D"; QVERIFY(db.setCardState(qso.id,state));
+        const auto normal=qslplanner::build(db,{}, {"dxcc"}); QVERIFY(normal.error.isEmpty()); QCOMPARE(normal.candidates.size(),1); QCOMPARE(normal.candidates.first().paperChannel,QString("D")); QVERIFY(normal.candidates.first().pendingServices.contains("card"));
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int(*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int(*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); QVariant handle=db.connection().driver()->handle();
+        if (!setAuthorizer || QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native authorizer unavailable");
+        void* nativeDb=*static_cast<void**>(handle.data()); QVERIFY(nativeDb);
+        const auto deny=+[](void*,int action,const char* table,const char* column,const char*,const char*) { return action==20 && table && column && std::strcmp(table,"qsl_status")==0 && std::strcmp(column,"last_error")==0 ? 1 : 0; };
+        QCOMPARE(setAuthorizer(nativeDb,deny,nullptr),0); const auto failed=qslplanner::build(db,{}, {"dxcc"}); QCOMPARE(setAuthorizer(nativeDb,nullptr,nullptr),0);
+        QVERIFY(!failed.error.isEmpty()); QVERIFY(failed.candidates.isEmpty()); QVERIFY(failed.paperRoutes.isEmpty());
+    }
     void legacyRouteCostWritesAfterLogReplacement()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"), clone=dir.filePath("clone.sqlite"); LogDatabase db; QVERIFY(db.open(path));

@@ -8,6 +8,7 @@
 #include <QRegularExpression>
 #include <algorithm>
 #include <queue>
+#include <utility>
 
 namespace decolog::core::qslplanner {
 namespace {
@@ -245,7 +246,11 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
                 candidate.managerObservedAt=QDateTime::fromString(entry.acquiredAt,Qt::ISODate);
             }
         }
-        for (const QslState& state : db.qslStatus(candidate.qsoId)) {
+        QList<QslState> states; QString statusError;
+        if (!db.readQslStatus(candidate.qsoId,&states,&statusError)) {
+            result=Plan{}; result.error=QStringLiteral("Cannot read QSL status while planning: %1").arg(statusError); return result;
+        }
+        for (const QslState& state : std::as_const(states)) {
             if (state.sent.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0 && state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)!=0) {
                 candidate.pendingServices.append(state.service);
                 candidate.pendingDetails.append(pendingSince(state,today));
