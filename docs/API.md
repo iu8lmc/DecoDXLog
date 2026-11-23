@@ -103,3 +103,23 @@ un arresto o errore tra le due scritture può impedire il replay della risposta
 originale. Non usare questo meccanismo come garanzia esattamente-una-volta.
 L'API resta spenta per impostazione predefinita e, quando attiva, ascolta solo su
 `127.0.0.1`.
+
+## Esempio di rapporto in sola lettura
+
+`examples/extensions/recent_activity.py` è un programma Python 3 autonomo che
+usa esclusivamente l'API HTTP locale, senza aprire SQLite. Crea la chiave in
+sola lettura nelle impostazioni, rendila disponibile al processo come variabile
+`DECODXLOG_READ_TOKEN`, quindi esegui ad esempio:
+
+```sh
+python3 examples/extensions/recent_activity.py --port 12061 --limit 100
+```
+
+Sostituisci la porta con quella configurata. Il programma richiede che l'API
+confermi la chiave in sola lettura e rifiuta quella completa; la chiave non va
+passata come argomento e non viene stampata. Il risultato JSON raggruppa per
+banda e modo **solo il campione degli ultimi QSO** richiesto (massimo 500), non
+l'intero log e non un calcolo di credito diploma. Una risposta troppo grande,
+una versione incompatibile o una connessione non disponibile producono errore.
+Il processo gira separatamente ma non è sandboxato; la variabile di ambiente
+può essere accessibile a processi con privilegi appropriati sul computer.

@@ -719,6 +719,8 @@ if(DECODXLOG_BUILD_TESTS)
     set_target_properties(clublog_oqrs_probe PROPERTIES WIN32_EXECUTABLE OFF)
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME recent_activity_extension COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/python/test_recent_activity.py)
         add_test(NAME clublog_live50_simulation COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/test_clublog_live50_simulation.py
             $<TARGET_FILE:clublog_live50> $<TARGET_FILE:clublog_stage_existing>)
@@ -954,7 +956,7 @@ if(DECODXLOG_BUILD_TESTS)
     # finestra: la prova sa dove sta l'eseguibile, e lo vuole compilato.
     qt_add_executable(tst_udppipeline tests/tst_udppipeline.cpp)
     target_link_libraries(tst_udppipeline PRIVATE decolog_core Qt6::Test)
-    target_compile_definitions(tst_udppipeline PRIVATE DECODXLOG_APP="$<TARGET_FILE:decolog>")
+    target_compile_definitions(tst_udppipeline PRIVATE DECODXLOG_APP="$<TARGET_FILE:decolog>" DECODXLOG_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     set_target_properties(tst_udppipeline PROPERTIES WIN32_EXECUTABLE OFF)
     add_dependencies(tst_udppipeline decolog)
     add_test(NAME udppipeline COMMAND tst_udppipeline)

@@ -26,6 +26,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTcpServer>
 #include <QUdpSocket>
 
@@ -524,6 +525,34 @@ private slots:
         QCOMPARE(readRequest("GET",QStringLiteral("/api/v1/qsos")).first,200);
         QCOMPARE(readRequest("POST",QStringLiteral("/api/v1/qso")).first,403);
         QCOMPARE(countCall(QStringLiteral("W1BAD")),0);
+        const QString python=QStandardPaths::findExecutable(QStringLiteral("python3"));
+        if (!python.isEmpty()) {
+        const auto qsoCountBefore=scalar(QStringLiteral("SELECT COUNT(*) FROM qso"));
+        QProcess report;
+        QProcessEnvironment reportEnv=QProcessEnvironment::systemEnvironment();
+        reportEnv.insert("DECODXLOG_READ_TOKEN","fedcba9876543210fedcba9876543210");
+        report.setProcessEnvironment(reportEnv);
+        report.start(python,{QStringLiteral(DECODXLOG_SOURCE_DIR) + "/examples/extensions/recent_activity.py",
+                            "--port",QString::number(m_apiPort),"--limit","20"});
+        QVERIFY(report.waitForStarted(5000)); QVERIFY(report.waitForFinished(15000));
+        QCOMPARE(report.exitCode(),0);
+        const auto summary=QJsonDocument::fromJson(report.readAllStandardOutput()).object();
+        QCOMPARE(summary.value("scope").toString(),QString("recent_sample"));
+        QVERIFY(summary.value("sampleSize").toInt()>0);
+        QVERIFY(summary.value("byBand").toObject().value("20m").toInt()>0);
+        QCOMPARE(countCall(QStringLiteral("W1BAD")),0);
+        QProcess privilegedReport;
+        reportEnv.insert("DECODXLOG_READ_TOKEN","0123456789abcdef0123456789abcdef");
+        privilegedReport.setProcessEnvironment(reportEnv);
+        privilegedReport.start(python,{QStringLiteral(DECODXLOG_SOURCE_DIR) + "/examples/extensions/recent_activity.py",
+                                      "--port",QString::number(m_apiPort),"--limit","20"});
+        QVERIFY(privilegedReport.waitForStarted(5000)); QVERIFY(privilegedReport.waitForFinished(15000));
+        QCOMPARE(privilegedReport.exitCode(),1);
+        QVERIFY(!privilegedReport.readAllStandardError().contains("0123456789abcdef"));
+        QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM qso")),qsoCountBefore);
+        } else {
+            qWarning("Python unavailable; real-app extension subprocess was not exercised");
+        }
         // Senza chiave, niente.
         QNetworkReply* anonymous = net.get(QNetworkRequest(QUrl(QStringLiteral("http://127.0.0.1:%1/api/v1/status").arg(m_apiPort))));
         QSignalSpy done(anonymous, &QNetworkReply::finished);
