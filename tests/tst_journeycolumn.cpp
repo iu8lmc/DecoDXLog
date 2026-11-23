@@ -94,6 +94,20 @@ private slots:
         QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("service,confirmed,dated,missing_date,invalid_date,earlier_date,average_days\r\n\"card\",2,1,1,0,0,2.00\r\n"));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }
+    void clubReportFiltersRecordedStationAndExports()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString& call : {QString("K1AAA"),QString("K1BBB")})
+              QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","9H1SR"},{"OPERATOR","9H1AA"}},"fixture",{},true).id>0);
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1CCC"},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","9H9ZZ"},{"OPERATOR","9H1AA"}},"fixture",{},true).id>0); }
+        const QString file=dir.filePath("club.csv"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("clubreportprobe:")+file,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport rendered 2026 · 9H1SR · 9H1AA · 2"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"kind\":\"club\",\"station\":\"9H1SR\",\"year\":2026}"),output.constData());
+        QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("utc_year,station_callsign,operator,qso_count\r\n\"2026\",\"9H1SR\",\"9H1AA\",2\r\n"));
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
+    }
     void typedCustomFieldsValidateBeforeSavingQso()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;

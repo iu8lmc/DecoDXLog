@@ -572,9 +572,12 @@ public:
     Q_INVOKABLE void requestStats(const QString& mode, int year);
     Q_INVOKABLE void requestActivityReport(int year, const QString& band);
     Q_INVOKABLE void requestConfirmationReport(int year, const QString& band);
-    void startStationReport(const QString& kind, int year, const QString& band);
+    Q_INVOKABLE void requestClubReport(int year, const QString& band, const QString& station);
+    void startStationReport(const QString& kind, int year, const QString& band, const QString& station = {});
     Q_INVOKABLE QString saveActivityReportSettings(int year, const QString& band);
     Q_INVOKABLE QString saveSelectedReportSettings(const QString& kind, int year, const QString& band);
+    Q_INVOKABLE QString saveClubReportSettings(int year, const QString& band, const QString& station);
+    QString saveStationReportSettings(const QString& kind, int year, const QString& band, const QString& station);
     Q_INVOKABLE QVariantMap activityReportSettings() const;
     Q_INVOKABLE QString exportActivityReport(const QUrl& file);
     Q_INVOKABLE QStringList statsYears() const;

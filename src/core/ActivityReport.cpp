@@ -88,4 +88,40 @@ QByteArray confirmationsCsv(const Result& result)
     }
     return out;
 }
+Result runClub(const QSqlDatabase& db,int utcYear,const QString& band,const QString& station)
+{
+    Result out; const QString selectedStation=station.trimmed().toUpper();
+    if (!db.isOpen() || utcYear<0 || utcYear>9999 || band.size()>24 || selectedStation.size()>24) { out.error=QStringLiteral("Invalid report request"); return out; }
+    QString sql=QStringLiteral("WITH reported AS (SELECT COALESCE(strftime('%Y',qso_datetime_on),'') AS report_year, COALESCE(band,'') AS report_band, "
+        "CASE WHEN json_valid(adif_extra) AND json_type(adif_extra,'$.STATION_CALLSIGN')='text' THEN json_extract(adif_extra,'$.STATION_CALLSIGN') ELSE '' END AS station, "
+        "CASE WHEN json_valid(adif_extra) AND json_type(adif_extra,'$.OPERATOR')='text' THEN json_extract(adif_extra,'$.OPERATOR') ELSE '' END AS operator "
+        "FROM qso WHERE deleted=0) SELECT report_year,station,operator,COUNT(*) FROM reported WHERE 1=1");
+    if (utcYear) sql+=QStringLiteral(" AND report_year=?");
+    if (!band.trimmed().isEmpty()) sql+=QStringLiteral(" AND report_band=?");
+    if (!selectedStation.isEmpty()) sql+=QStringLiteral(" AND UPPER(TRIM(station))=?");
+    sql+=QStringLiteral(" GROUP BY report_year,station,operator ORDER BY report_year,station,operator LIMIT 10001");
+    QSqlQuery q(db); q.prepare(sql);
+    if (utcYear) q.addBindValue(QStringLiteral("%1").arg(utcYear,4,10,QLatin1Char('0')));
+    if (!band.trimmed().isEmpty()) q.addBindValue(band.trimmed().toLower());
+    if (!selectedStation.isEmpty()) q.addBindValue(selectedStation);
+    if (!q.exec()) { out.error=q.lastError().text(); return out; }
+    while (q.next()) {
+        if (out.rows.size()==10000) { out.truncated=true; break; }
+        out.rows << QVariantMap{{QStringLiteral("year"),q.value(0)},{QStringLiteral("station"),q.value(1)},
+                               {QStringLiteral("operator"),q.value(2)},{QStringLiteral("count"),q.value(3)}};
+    }
+    if (q.lastError().isValid()) { out.rows.clear(); out.error=q.lastError().text(); }
+    return out;
+}
+QByteArray clubCsv(const Result& result)
+{
+    if (!result.error.isEmpty() || result.truncated) return {};
+    auto escape=[](QString text) { text.replace(QLatin1Char('"'),QStringLiteral("\"\"")); return (QLatin1Char('"')+text+QLatin1Char('"')).toUtf8(); };
+    QByteArray out="utc_year,station_callsign,operator,qso_count\r\n";
+    for (const QVariant& item : result.rows) {
+        const auto row=item.toMap(); out+=escape(row.value(QStringLiteral("year")).toString())+','+escape(row.value(QStringLiteral("station")).toString())+','+
+            escape(row.value(QStringLiteral("operator")).toString())+','+QByteArray::number(row.value(QStringLiteral("count")).toLongLong())+"\r\n";
+    }
+    return out;
+}
 }

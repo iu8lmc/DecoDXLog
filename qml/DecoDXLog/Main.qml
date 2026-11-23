@@ -1605,6 +1605,7 @@ RoundedWindow {
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
         else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "confirmationreportprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "clubreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "cards") { openCards(what[1])
                                        if (what[2] === "menu" && cardsWindow.item)
                                            cardsWindow.item.showCardMenu()
@@ -1716,7 +1717,7 @@ RoundedWindow {
     Timer { id: combo2Timer; interval: 900; onTriggered: newQsoDialog.showBandCombo() }
     Timer {
         id:activityReportProbe; interval:1000
-        onTriggered: { if (statsWindow.item) statsWindow.item.probeReport("file://" + startupShow.split(":")[1],startupShow.split(":")[0]==="confirmationreportprobe" ? "confirmation" : "activity"); else console.warn("PROBE activityreport missing window") }
+        onTriggered: { if (statsWindow.item) { const name=startupShow.split(":")[0]; statsWindow.item.probeReport("file://" + startupShow.split(":")[1],name==="clubreportprobe" ? "club" : name==="confirmationreportprobe" ? "confirmation" : "activity") } else console.warn("PROBE activityreport missing window") }
     }
     Timer {
         id:typedFieldsProbe; interval:1000

@@ -8,6 +8,22 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void annualClubActivityUsesRecordedStationAndOperator()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const char* call,const char* date,const char* station,const char* op) {
+            return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE",date},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN",station},{"OPERATOR",op}},"fixture",{},true).id;
+        };
+        QVERIFY(add("K1AAA","20260101","9H1SR","9H1AA")>0); QVERIFY(add("K1BBB","20260102","9H1SR","9H1AA")>0);
+        QVERIFY(add("K1CCC","20260102","9H1SR","")>0); QVERIFY(add("K1DDD","20250102","9H1SR","9H1BB")>0);
+        QVERIFY(add("K1EEE","20260102","9H9ZZ","9H1AA")>0);
+        const auto report=activityreport::runClub(db.connection(),2026,"20m","9h1sr"); QVERIFY2(report.error.isEmpty(),qPrintable(report.error));
+        QCOMPARE(report.rows.size(),2); QCOMPARE(report.rows[0].toMap().value("operator").toString(),QString());
+        QCOMPARE(report.rows[1].toMap().value("operator").toString(),QString("9H1AA")); QCOMPARE(report.rows[1].toMap().value("count").toInt(),2);
+        QVERIFY(activityreport::clubCsv(report).contains("\"2026\",\"9H1SR\",\"9H1AA\",2"));
+        const auto all=activityreport::runClub(db.connection(),0,{},{}); QVERIFY(all.error.isEmpty()); QCOMPARE(all.rows.size(),4);
+        QCOMPARE(db.qsoCount(),qint64(5));
+    }
     void confirmationTimesKeepServicesAndMissingDatesSeparate()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
