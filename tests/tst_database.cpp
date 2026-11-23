@@ -63,6 +63,31 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestNetInventoryReturnsBoundedRoundTripPayloads()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("payload.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        auto make=[](const QString& call,const QString& comment) { return AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",comment}}; };
+        const auto a=db.insertQso(make("K1AAA",QString::fromUtf8("Città 😀 <tag>")),"fixture"), b=db.insertQso(make("K1BBB",QString(400,'x')),"fixture"); QVERIFY(a.id>0 && b.id>0);
+        QslState qsl; qsl.service="lotw"; qsl.sent="Y"; QVERIFY(db.setQslState(a.id,qsl));
+        const auto firstRecord=*db.record(a.id), secondRecord=*db.record(b.id);
+        const auto aBytes=adif::writeRecord(firstRecord).toUtf8(), bBytes=adif::writeRecord(secondRecord).toUtf8();
+        ContestNetInventory inventory; QVERIFY(inventory.begin(path)); QVERIFY(!inventory.next(20,0).ok); QVERIFY(!inventory.next(20,16*1024*1024+1).ok); QVERIFY(!inventory.next(20,1).ok);
+        qsl.sent="N"; QVERIFY(db.setQslState(a.id,qsl));
+        const auto first=inventory.next(20,aBytes.size()+bBytes.size()-1); QVERIFY2(first.ok,qPrintable(first.error)); QCOMPARE(first.rows.size(),1); QVERIFY(first.hasMore);
+        QCOMPARE(first.rows.first().id,a.id); QCOMPARE(first.rows.first().adifPayload,aBytes);
+        const auto parsed=adif::parse(first.rows.first().adifPayload); QCOMPARE(parsed.records.size(),1); QCOMPARE(parsed.records.first().value("COMMENT"),QString::fromUtf8("Città 😀 <tag>"));
+        QCOMPARE(ContestNetInventory::fingerprint(parsed.records.first()),first.rows.first().contentHash);
+        QCOMPARE(parsed.records.first().value("LOTW_QSL_SENT"),QString("Y"));
+        const auto second=inventory.next(20,1024*1024); QVERIFY(second.ok); QCOMPARE(second.rows.size(),1); QVERIFY(!second.hasMore); QCOMPARE(second.rows.first().id,b.id); QCOMPARE(second.rows.first().adifPayload,bBytes);
+    }
+    void contestNetInventoryRejectsNonRoundTrippablePayload()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("invalid-payload.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        auto valid=AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+        QVERIFY(db.insertQso(valid,"fixture").id>0); valid.set("CALL","K1BBB"); valid.set("APP_BAD:NAME","opaque"); QVERIFY(db.insertQso(valid,"fixture").id>0);
+        ContestNetInventory inventory; QVERIFY(inventory.begin(path)); const auto page=inventory.next(10); QVERIFY(!page.ok); QVERIFY(page.rows.isEmpty()); QVERIFY(page.error.contains("round-tripped"));
+        QVERIFY(!inventory.next(10).ok);
+    }
     void contestNetInventoryFingerprintBatchCost()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("fingerprint-bench.sqlite"); LogDatabase db; QVERIFY(db.open(path));
@@ -75,7 +100,7 @@ private slots:
         ContestNetInventory inventory; timer.restart(); QVERIFY(inventory.begin(path)); int count=0; bool more=true;
         while (more) { const auto page=inventory.next(500); QVERIFY2(page.ok,qPrintable(page.error)); for (const auto& row:page.rows) { QCOMPARE(row.contentHash.size(),32); ++count; } more=page.hasMore; }
         const auto hashedMs=timer.elapsed(); QCOMPARE(baselineCount,1000); QCOMPARE(count,1000);
-        qInfo("Inventory A/B 1000 synthetic QSO: metadata SQL=%lld ms snapshot with ADIF SHA-256=%lld ms",baselineMs,hashedMs);
+        qInfo("Inventory A/B 1000 synthetic QSO: metadata SQL=%lld ms snapshot with ADIF round-trip and SHA-256=%lld ms",baselineMs,hashedMs);
     }
     void contestNetInventoryFingerprintsContentNotFieldOrder()
     {

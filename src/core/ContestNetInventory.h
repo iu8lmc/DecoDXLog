@@ -11,6 +11,7 @@ struct ContestNetInventoryRow {
     int revision{0};
     bool deleted{false};
     QByteArray contentHash;
+    QByteArray adifPayload;
 };
 
 struct ContestNetInventoryPage {
@@ -26,7 +27,9 @@ class ContestNetInventory {
 public:
     ~ContestNetInventory();
     bool begin(const QString& path);
-    ContestNetInventoryPage next(int limit);
+    // Payload budget applies to returned UTF-8 ADIF bytes, not temporary
+    // SQLite/QString allocations. A too-large first record is never skipped.
+    ContestNetInventoryPage next(int limit, qint64 maxPayloadBytes = 1024 * 1024);
     void close();
     QString error() const { return m_error; }
     QString logIdentity() const { return m_identity; }
