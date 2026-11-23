@@ -139,6 +139,24 @@ class TestTesseractOcr : public QObject {
         QCOMPARE(search.matches().size(), 1);
         QCOMPARE(db.qsoCount(), 105);
     }
+    void searchRejectsReopenedLogAtSamePath()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(search.start("K1ABC")); db.close(); QVERIFY(db.open(path));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.at(0).first().toBool()); QVERIFY(search.matches().isEmpty());
+        QVERIFY(search.start("K1ABC")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QVERIFY(done.at(1).first().toBool()); QCOMPARE(search.matches().size(),1);
+    }
+    void searchRejectsReplacedLogAtSamePath()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"), other=dir.filePath("other.sqlite");
+        { LogDatabase replacement; QVERIFY(replacement.open(other)); QVERIFY(replacement.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0); }
+        LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished); QVERIFY(search.start("K1ABC"));
+        QVERIFY(QFile::rename(path,dir.filePath("original.sqlite"))); QVERIFY(QFile::rename(other,path));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.at(0).first().toBool()); QVERIFY(search.matches().isEmpty());
+    }
     void searchesDateAndTimeBeforeApplyingResultLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("dated.sqlite")));

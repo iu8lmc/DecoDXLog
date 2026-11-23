@@ -1,5 +1,6 @@
 #include "core/QslOcrSearch.h"
 #include "core/LogDatabase.h"
+#include "core/FileIdentity.h"
 #include <QPointer>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -30,12 +31,17 @@ bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc,
     if (!m_db || !m_db->isOpen() || m_db->path().isEmpty() || m_db->path() == QLatin1String(":memory:") || !valid.match(call).hasMatch()) {
         m_error = tr("Choose a callsign and an open file-backed log"); emit changed(); return false;
     }
-    const QString path = m_db->path();
+    const QString path = m_db->path(), identity = m_db->identity();
+    const QByteArray fileToken = m_db->openFileIdentity();
+    const quint64 openGeneration = m_db->openGeneration();
+    if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) {
+        m_error = tr("The open log changed"); emit changed(); return false;
+    }
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrSearch> self(this);
-    m_pool.start([self, path, call, dateUtc, timeUtc, cancelled] {
+    m_pool.start([self, path, identity, fileToken, openGeneration, call, dateUtc, timeUtc, cancelled] {
         QVariantList matches;
         QString error;
         bool truncated = false;
@@ -47,36 +53,46 @@ bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc,
             if (!sql.open()) {
                 error = tr("Cannot open the log for searching");
             } else if (!cancelled->load()) {
-                QSqlQuery q(sql);
-                QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call=? AND deleted=0");
-                if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
-                if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
-                query+=QStringLiteral(" ORDER BY id DESC LIMIT 101");
-                q.prepare(query);
-                q.addBindValue(call);
-                if (!dateUtc.isEmpty()) q.addBindValue(dateUtc);
-                if (!timeUtc.isEmpty()) q.addBindValue(timeUtc);
-                if (!q.exec()) {
-                    error = tr("Cannot search the log");
+                QSqlQuery identityQuery(sql);
+                if (!sql.transaction() || fileidentity::read(path) != fileToken ||
+                    !identityQuery.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) ||
+                    !identityQuery.next() || identityQuery.value(0).toString() != identity) {
+                    error = tr("The open log changed");
                 } else {
-                    while (!cancelled->load() && q.next()) {
-                        if (matches.size() == 100) { truncated = true; break; }
-                        matches << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("call"), q.value(1)},
-                                               {QStringLiteral("at"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
-                                               {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)},
-                                               {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)}};
+                    QSqlQuery q(sql);
+                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call=? AND deleted=0");
+                    if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
+                    if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
+                    query+=QStringLiteral(" ORDER BY id DESC LIMIT 101");
+                    q.prepare(query);
+                    q.addBindValue(call);
+                    if (!dateUtc.isEmpty()) q.addBindValue(dateUtc);
+                    if (!timeUtc.isEmpty()) q.addBindValue(timeUtc);
+                    if (!q.exec()) {
+                        error = tr("Cannot search the log");
+                    } else {
+                        while (!cancelled->load() && q.next()) {
+                            if (matches.size() == 100) { truncated = true; break; }
+                            matches << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("call"), q.value(1)},
+                                                   {QStringLiteral("at"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
+                                                   {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)},
+                                                   {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)}};
+                        }
+                        if (q.lastError().isValid()) error = tr("Cannot search the log");
                     }
-                    if (q.lastError().isValid()) error = tr("Cannot search the log");
                 }
+                sql.rollback();
             }
             sql.close();
         }
         QSqlDatabase::removeDatabase(connection);
-        QMetaObject::invokeMethod(self.data(), [self, path, matches, error, truncated, cancelled] {
+        QMetaObject::invokeMethod(self.data(), [self, path, identity, fileToken, openGeneration, matches, error, truncated, cancelled] {
             if (!self) return;
             self->m_busy = false;
             self->m_cancel.reset();
-            const bool sameLog = self->m_db && self->m_db->isOpen() && self->m_db->path() == path;
+            const bool sameLog = self->m_db && self->m_db->isOpen() && self->m_db->path() == path &&
+                                 self->m_db->openGeneration() == openGeneration && self->m_db->identity() == identity &&
+                                 self->m_db->openFileIdentity() == fileToken && self->m_db->fileIdentityMatchesOpen();
             const bool success = !cancelled->load() && error.isEmpty() && sameLog;
             self->m_matches = success ? matches : QVariantList{};
             self->m_truncated = success && truncated;
