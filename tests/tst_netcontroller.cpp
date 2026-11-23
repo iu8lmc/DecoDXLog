@@ -12,6 +12,25 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void delayedConsumedGrantDoesNotReplaceCurrentStatus()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path()); QCoreApplication::setOrganizationName("DecoNetStaleGrantTest"); QCoreApplication::setApplicationName("Stale"); QSettings().setValue("net/enabled",false);
+        LogDatabase db,authority; QVERIFY(db.open(dir.filePath("requester.sqlite"))); QVERIFY(authority.open(dir.filePath("authority.sqlite")));
+        const auto old=db.beginContestSerialRequest("event","client-a","old","authority",5); QVERIFY(old.ok);
+        const auto reply=contestserial::handleRequest(authority,"event","authority","client-a",contestserial::requestFrame(old)); QVERIFY(reply.ok);
+        QVERIFY(db.acceptContestSerialGrant("event","client-a","old","authority",5).ok); QVERIFY(db.consumeContestSerialGrant("event","client-a","old","qso-old").ok);
+        QVERIFY(db.beginContestSerialRequest("event","client-a","new","authority",6).ok); QVERIFY(db.acceptContestSerialGrant("event","client-a","new","authority",6).ok);
+        QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const int port=probe.localPort(); probe.close();
+        NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("client-a"); net.setGroup("FIELD"); net.setPort(port); net.setTarget(QHostAddress::LocalHost);
+        QVERIFY(net.configureDurableSerialAuthority("event","authority").isEmpty()); QSignalSpy accepted(&net,&NetController::durableSerialGrantAccepted);
+        net.setEnabled(true); QTRY_VERIFY_WITH_TIMEOUT(net.durableSerialStatus().contains("grant: 6"),4000);
+        QUdpSocket sender; auto body=reply.body; body.insert("seq",1); body.insert("session","delayed-authority");
+        const auto frame=ContestNet::pack("FIELD","authority","serial_grant_v3",body); QCOMPARE(sender.writeDatagram(frame,QHostAddress::LocalHost,quint16(port)),qint64(frame.size()));
+        QTest::qWait(300); QCOMPARE(accepted.size(),0); QVERIFY(net.durableSerialStatus().contains("grant: 6"));
+        QCOMPARE(net.durableSerialGrantForQso().value("requestId").toString(),QString("new")); net.setEnabled(false);
+    }
     void threeNodesRecoverLostAndReorderedGrantsAfterAuthorityRestart()
     {
         using namespace decolog::core; using decolog::app::NetController;

@@ -152,7 +152,11 @@ QString NetController::requestDurableSerialImpl(int minimum, const QString& expe
             }
             else if (request.state==QLatin1String("granted")) {
                 if (self->m_durableRetryRequestId==request.requestId) self->m_durableRetry.stop();
-                self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
+                const auto active=self->m_ctx.db->activeContestSerialRequest(request.scope,request.requester);
+                if (!active.ok || active.state!=QLatin1String("granted") || active.requestId!=request.requestId ||
+                    active.authority!=request.authority || active.serial!=request.serial)
+                    self->m_durableStatus=tr("The serial grant changed; review the current request.");
+                else self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
             }
             else if (self->m_net.running()) {
                 const QJsonObject body=contestserial::requestFrame(request);
@@ -204,7 +208,11 @@ void NetController::resumeDurableSerialRequest()
             } else if (request.state==QLatin1String("pending")) {
                 self->requestDurableSerialImpl(request.minimum,request.requestId); return;
             } else {
-                self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
+                const auto active=self->m_ctx.db->activeContestSerialRequest(request.scope,request.requester);
+                if (!active.ok || active.state!=QLatin1String("granted") || active.requestId!=request.requestId ||
+                    active.authority!=request.authority || active.serial!=request.serial)
+                    self->m_durableStatus=tr("The serial grant changed; review the current request.");
+                else self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
             }
             emit self->durableSerialStatusChanged();
         },Qt::QueuedConnection);
@@ -289,6 +297,9 @@ void NetController::acceptDurableSerialGrant(const QString& from, const QJsonObj
             if (!grant.ok || !self->m_ctx.db || self->m_ctx.db->openGeneration() != dbGeneration ||
                 self->m_ctx.db->identity() != identity || self->m_ctx.db->openFileIdentity() != fileIdentity ||
                 !self->m_ctx.db->fileIdentityMatchesOpen()) return;
+            const auto active=self->m_ctx.db->activeContestSerialRequest(grant.scope,grant.requester);
+            if (grant.state!=QLatin1String("granted") || !active.ok || active.state!=QLatin1String("granted") ||
+                active.requestId!=grant.requestId || active.authority!=grant.authority || active.serial!=grant.serial) return;
             if (self->m_durableRetryRequestId==grant.requestId) self->m_durableRetry.stop();
             self->m_durableStatus = tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(grant.serial);
             emit self->durableSerialStatusChanged();
