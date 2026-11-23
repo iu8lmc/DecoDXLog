@@ -1,10 +1,48 @@
 #include "app/NetController.h"
+#include "core/ContestSerialProtocol.h"
+#include "core/LogDatabase.h"
 
 #include <QTest>
+#include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QSettings>
+#include <QUdpSocket>
 
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void explicitAuthorityPersistsRequestsAcrossUdpRetryAndRestart()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path()); QCoreApplication::setOrganizationName("DecoNetTest"); QCoreApplication::setApplicationName("SerialAuthority");
+        QSettings().setValue("net/enabled",false);
+        const auto path=dir.filePath("authority.sqlite"); LogDatabase db,client; QVERIFY(db.open(path)); QVERIFY(client.open(dir.filePath("client.sqlite")));
+        const auto req=client.beginContestSerialRequest("event","client-a","req-a","authority",10); QVERIFY(req.ok);
+        QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const int port=probe.localPort(); probe.close(); QUdpSocket sender;
+        auto transmit=[&](int seq,const QJsonObject& payload,const QString& from=QStringLiteral("client-a")) {
+            QJsonObject body=payload; body.insert("seq",seq); body.insert("session","client-session");
+            const auto bytes=ContestNet::pack("FIELD",from,"serial_request_v3",body);
+            return sender.writeDatagram(bytes,QHostAddress::LocalHost,quint16(port))==bytes.size();
+        };
+        { NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("authority"); net.setGroup("FIELD"); net.setPort(port);
+          QVERIFY(net.configureDurableSerialAuthority("event","authority").isEmpty()); QSignalSpy grants(&net,&NetController::durableSerialGrantReady);
+          net.setEnabled(true); QVERIFY(net.running()); const auto body=contestserial::requestFrame(req);
+          QVERIFY(transmit(1,body)); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),1,10000);
+          const auto first=grants.at(0).at(0).toJsonObject(); QCOMPARE(first.value("serial").toInt(),10);
+          QVERIFY(transmit(2,body)); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),2,10000); QCOMPARE(grants.at(1).at(0).toJsonObject().value("serial").toInt(),10);
+          auto wrong=body; wrong.insert("scope","other"); QVERIFY(transmit(3,wrong)); QTest::qWait(150); QCOMPARE(grants.size(),2); net.setEnabled(false); }
+        db.close(); QVERIFY(db.open(path));
+        { NetController::Context ctx; ctx.db=&db; NetController net(ctx); net.setIdForTests("authority"); net.setGroup("FIELD"); net.setPort(port);
+          QVERIFY(net.configureDurableSerialAuthority("event","authority").isEmpty()); QSignalSpy grants(&net,&NetController::durableSerialGrantReady);
+          net.setEnabled(true); QVERIFY(transmit(4,contestserial::requestFrame(req))); QTRY_COMPARE_WITH_TIMEOUT(grants.size(),1,10000);
+          QCOMPARE(grants.at(0).at(0).toJsonObject().value("serial").toInt(),10);
+          QVERIFY(!net.configureDurableSerialAuthority("event", "").isEmpty());
+          QVERIFY(net.configureDurableSerialAuthority("event", "other-authority").isEmpty());
+          QVERIFY(transmit(5,contestserial::requestFrame(req))); QTest::qWait(150); QCOMPARE(grants.size(),1);
+          QVERIFY(net.configureDurableSerialAuthority("", "").isEmpty());
+          QVERIFY(transmit(6,contestserial::requestFrame(req))); QTest::qWait(150); QCOMPARE(grants.size(),1); net.setEnabled(false); }
+    }
     void queuedCallsKeepOrderAndRejectDuplicates()
     {
         decolog::app::NetController net({});

@@ -1,9 +1,11 @@
 #include "app/NetController.h"
 
 #include "core/Adif.h"
+#include "core/ContestSerialProtocol.h"
 #include "core/LogDatabase.h"
 
 #include <QHostInfo>
+#include <QPointer>
 #include <QSettings>
 #include <QRegularExpression>
 #include <QSqlQuery>
@@ -24,6 +26,7 @@ NetController::NetController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
 {
+    m_durablePool.setMaxThreadCount(1);
     QSettings s;
     m_enabled = s.value(QStringLiteral("net/enabled"), false).toBool();
     m_group = s.value(QStringLiteral("net/group"), QStringLiteral("DECODXLOG")).toString();
@@ -55,6 +58,60 @@ NetController::NetController(Context context, QObject* parent)
     if (m_enabled)
         QTimer::singleShot(0, this, &NetController::restart);
     m_status = tr("off");
+}
+
+NetController::~NetController()
+{
+    m_durablePool.clear();
+    m_durablePool.waitForDone();
+}
+
+QString NetController::configureDurableSerialAuthority(const QString& scope, const QString& authority)
+{
+    const QString s = scope.trimmed();
+    const QString a = authority.trimmed();
+    if (s.isEmpty() != a.isEmpty() || s.size() > 256 || a.size() > 256)
+        return tr("Enter both a contest scope and an authority ID, or leave both empty to disable.");
+    ++m_durableGeneration;
+    m_durablePool.clear();
+    m_durableBusy = false;
+    m_durableScope = s;
+    m_durableAuthority = a;
+    return {};
+}
+
+void NetController::serveDurableSerialRequest(const QString& from, const QJsonObject& body)
+{
+    if (m_durableBusy || m_durableScope.isEmpty() || m_durableAuthority != m_id ||
+        !m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen())
+        return;
+    const QString path = m_ctx.db->path();
+    const QString identity = m_ctx.db->identity();
+    const QByteArray fileIdentity = m_ctx.db->openFileIdentity();
+    const quint64 dbGeneration = m_ctx.db->openGeneration();
+    const quint64 configGeneration = m_durableGeneration;
+    const QString scope = m_durableScope;
+    const QString authority = m_id;
+    m_durableBusy = true;
+    QPointer<NetController> self(this);
+    m_durablePool.start([self, path, identity, fileIdentity, dbGeneration, configGeneration, scope, authority, from, body] {
+        contestserial::Reply reply;
+        LogDatabase db;
+        if (db.openExistingReadWrite(path) && db.openFileIdentity() == fileIdentity &&
+            db.fileIdentityMatchesOpen() && db.identity() == identity)
+            reply = contestserial::handleRequest(db, scope, authority, from, body);
+        if (!self) return;
+        QMetaObject::invokeMethod(self, [self, reply, identity, fileIdentity, dbGeneration, configGeneration] {
+            if (!self || self->m_durableGeneration != configGeneration) return;
+            self->m_durableBusy = false;
+            if (!reply.ok || !self->m_net.running() || !self->m_ctx.db ||
+                self->m_ctx.db->openGeneration() != dbGeneration || self->m_ctx.db->identity() != identity ||
+                self->m_ctx.db->openFileIdentity() != fileIdentity || !self->m_ctx.db->fileIdentityMatchesOpen())
+                return;
+            self->send(QStringLiteral("serial_grant_v3"), reply.body);
+            emit self->durableSerialGrantReady(reply.body);
+        }, Qt::QueuedConnection);
+    });
 }
 
 void NetController::setEnabled(bool on)
@@ -107,6 +164,9 @@ void NetController::setPort(int port)
 
 void NetController::restart()
 {
+    ++m_durableGeneration;
+    m_durablePool.clear();
+    m_durableBusy = false;
     m_net.stop();
     m_hello.stop();
     m_peers.clear();
@@ -393,6 +453,8 @@ void NetController::onReceived(const QString& from, const QString& type, const Q
             if (m_ctx.insertRemote && m_ctx.insertRemote(r, name))
                 ++p.qsos;
         }
+    } else if (type == QLatin1String("serial_request_v3")) {
+        serveDurableSerialRequest(from, body);
     } else if (type == QLatin1String("serialreq")) {
         if (m_serialSharing && isSerialServer())
             send(QStringLiteral("serialgrant"), QJsonObject{{QStringLiteral("to"), from},

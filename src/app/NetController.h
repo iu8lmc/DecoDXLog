@@ -10,6 +10,7 @@
 #include <QObject>
 #include <QSet>
 #include <QTimer>
+#include <QThreadPool>
 #include <QUuid>
 #include <QVariantList>
 #include <QVariantMap>
@@ -35,6 +36,7 @@ class NetController : public QObject {
     Q_PROPERTY(int received READ received NOTIFY stateChanged)
     Q_PROPERTY(int sent READ sent NOTIFY stateChanged)
     Q_PROPERTY(QStringList queuedCalls READ queuedCalls NOTIFY queuedCallsChanged)
+    Q_PROPERTY(QString nodeId READ id CONSTANT)
 
 public:
     struct Context {
@@ -51,6 +53,7 @@ public:
     };
 
     explicit NetController(Context context, QObject* parent = nullptr);
+    ~NetController() override;
 
     bool enabled() const { return m_enabled; }
     void setEnabled(bool on);
@@ -84,6 +87,7 @@ public:
     int takeSerial(int localNext);
     bool isSerialServer() const;
     QString id() const { return m_id; }
+    Q_INVOKABLE QString configureDurableSerialAuthority(const QString& scope, const QString& authority);
 
     // Chiave wire-level usata per deduplicare un datagramma. La sessione fa
     // parte della chiave: dopo un riavvio il contatore puo' ricominciare da 1.
@@ -104,11 +108,13 @@ signals:
     void messagesChanged();
     void queuedCallsChanged();
     void gabReceived(const QString& from, const QString& text);
+    void durableSerialGrantReady(const QJsonObject& grant);
 
 private:
     void restart();
     void send(const QString& type, QJsonObject body);
     void onReceived(const QString& from, const QString& type, const QJsonObject& body);
+    void serveDurableSerialRequest(const QString& from, const QJsonObject& body);
     void hello();
     void addMessage(const QString& from, const QString& text, bool mine, const QString& to = {});
     QJsonObject qsoMessage(qint64 id) const;
@@ -148,6 +154,11 @@ private:
     QTimer m_resendTimer;
     bool m_serialSharing{false};
     core::SharedSerials m_serials;
+    QThreadPool m_durablePool;
+    QString m_durableScope;
+    QString m_durableAuthority;
+    quint64 m_durableGeneration{0};
+    bool m_durableBusy{false};
     void requestSerial();
     void noteSerial(const QString& stx);
 };

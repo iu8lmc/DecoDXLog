@@ -1,6 +1,6 @@
 # Experimental contest serial message contract
 
-This is a core contract under development, not an enabled ContestNet feature. The existing `serialreq`/`serialgrant` flow remains volatile and is not made reliable by this document.
+This is an experimental contract with an opt-in authority receiver in ContestNet. The existing `serialreq`/`serialgrant` flow remains volatile and is not made reliable by this document.
 
 An operator or future session configuration must explicitly choose one scope and one authority node. The protocol does not elect a replacement authority and does not allocate locally when that authority is unavailable. Separate authority databases can allocate the same number; do not run two authorities for one scope.
 
@@ -8,4 +8,6 @@ The requester first persists a `pending` request with scope, requester ID, reque
 
 The requester checks the configured scope and authority, the envelope sender, all recorded request fields and the positive integer serial before committing the grant. Duplicate identical grants are idempotent; conflicting grants are rejected. A granted number is then bound to one explicit use ID; retrying that use ID is idempotent. This binding is not yet atomic with a QSO write or proof that a number was transmitted. Never silently renumber a transmitted number.
 
-ContestNet UDP sender IDs are unauthenticated and may be spoofed. These checks prevent accidental misrouting, not hostile impersonation. This contract has not been negotiated with older clients, does not resolve split-brain authority, and is not wired to the controller or QSO workflow. See `PROGRESS.md` for actual test evidence and outstanding LAN, restart, partition and interoperability work.
+The station network panel exposes experimental, in-memory scope and authority configuration; it is disabled again on restart. Only the named local authority serves requests. The authority opens a separate database connection on a worker and responds only after committing the reservation; one request is processed at a time, and requests arriving while busy are dropped and must be retried by the sender. The requester controller, retry and QSO workflow are not yet wired. A configuration or network restart suppresses a completed worker's response; an already committed reservation remains and must be retried with the same request ID. File identity checks reduce accidental log replacement but are not atomic with every filesystem race.
+
+ContestNet UDP sender IDs are unauthenticated and may be spoofed. These checks prevent accidental misrouting, not hostile impersonation. This contract has not been negotiated with older clients and does not resolve split-brain authority. See `PROGRESS.md` for actual test evidence and outstanding LAN, restart, partition and interoperability work.

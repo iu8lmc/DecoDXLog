@@ -55,6 +55,11 @@ GlassPanel {
             Item { Layout.fillWidth: true }
             GlassButton {
                 Layout.alignment: Qt.AlignBottom
+                text: qsTr("Serial experiment…")
+                onClicked: serialAuthorityDialog.open()
+            }
+            GlassButton {
+                Layout.alignment: Qt.AlignBottom
                 text: qsTr("Sync")
                 enabled: root.net.running
                 onClicked: root.net.requestSync()
@@ -153,6 +158,43 @@ GlassPanel {
                 tone: Theme.warningColor
                 enabled: root.net.running && (decolog.callInfo.call || "").length > 0 && parseFloat(decolog.shownFrequency || "0") > 0
                 onClicked: root.net.sendSpot(decolog.callInfo.call, parseFloat(decolog.shownFrequency) * 1000, "")
+            }
+        }
+    }
+
+    DialogFrame {
+        id: serialAuthorityDialog
+        transientParent: root.Window.window
+        title: qsTr("Experimental serial authority")
+        info: qsTr("Test only · configured for this session")
+        width: 620; height: 410
+        property string result: ""
+        body: ColumnLayout {
+            spacing: 10
+            Text {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: qsTr("Experimental UDP requests only. Sender IDs are not authenticated. This does not supply serials to QSO entry or protect against multiple authorities.")
+            }
+            Text {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("This station ID: %1. Select one authority for the contest. Configuration is cleared on restart. Leave both fields empty to disable.").arg(root.net.nodeId)
+            }
+            LabeledField {
+                label: qsTr("Contest scope")
+                StyledTextField { id: serialScope; Layout.fillWidth: true; placeholderText: qsTr("Same scope on every station") }
+            }
+            LabeledField {
+                label: qsTr("Authority station ID")
+                StyledTextField { id: serialAuthority; Layout.fillWidth: true; placeholderText: qsTr("Explicit authority ID") }
+            }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; text: serialAuthorityDialog.result }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                GlassButton { text: qsTr("Apply"); onClicked: {
+                    const error = root.net.configureDurableSerialAuthority(serialScope.text, serialAuthority.text)
+                    serialAuthorityDialog.result = error || qsTr("Applied for this session.")
+                } }
+                GlassButton { text: qsTr("Close"); onClicked: serialAuthorityDialog.close() }
             }
         }
     }
