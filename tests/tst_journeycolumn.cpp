@@ -1241,6 +1241,19 @@ private slots:
         QVERIFY2(reopened.contains("PROBE qslplan restored result") && reopened.contains("\"uniqueBenefits\":0"),reopened.constData());
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost.has_value()); QCOMPARE(cost->amount,QString("12.50")); QCOMPARE(db.qslStatus(1).first().sent,QString("Q")); }
     }
+    void recoveredActivationReviewIsExplicitAndGuarded()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}},"fixture").id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"activationreviewprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE activation review shown true") && output.contains("PROBE activation review cancel PERIOD_UNCERTAIN") && output.contains("PROBE activation review stale true") && output.contains("PROBE activation review saved true"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso);
+        QVERIFY(qso->value("APP_DECOLOG_ACTIVATION_REVIEW").isEmpty()); QCOMPARE(qso->value("MY_POTA_REF"),QString("IT-0002")); QCOMPARE(qso->value("MY_GRIDSQUARE"),QString("JM76"));
+        QCOMPARE(qso->value("COMMENT"),QString("concurrent review edit")); QVERIFY(!qso->value("APP_DECOLOG_ACTIVATION_REVIEWED_AT").isEmpty());
+        QVERIFY(qso->value("APP_DECOLOG_ACTIVATION_UUID").isEmpty());
+    }
     void recoveredRecordsUseTheirJournalPeriod()
     {
         using namespace decolog::core;

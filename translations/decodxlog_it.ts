@@ -6827,6 +6827,15 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>QsoDetailDialog</name>
+    <message><source>Review recovered activation</source><translation>Verifica attivazione recuperata</translation></message>
+    <message><source>The QSO overlaps an uncertain activation period. Check the original records and enter only known values. No session is assigned. Applying changes the draft; save the QSO separately.</source><translation>Il QSO ricade in un periodo di attivazione incerto. Consulta i registri originali e inserisci solo i valori conosciuti. Non viene assegnata alcuna sessione. Applica le modifiche alla bozza e salva separatamente il QSO.</translation></message>
+    <message><source>My POTA reference</source><translation>La mia referenza POTA</translation></message>
+    <message><source>My SOTA reference</source><translation>La mia referenza SOTA</translation></message>
+    <message><source>My WWFF reference</source><translation>La mia referenza WWFF</translation></message>
+    <message><source>My IOTA reference</source><translation>La mia referenza IOTA</translation></message>
+    <message><source>Apply reviewed values</source><translation>Applica i valori verificati</translation></message>
+    <message><source>Recovered activation period is uncertain. Review the site, references and operator against your records.</source><translation>Il periodo di attivazione recuperato è incerto. Verifica sito, referenze e operatore nei tuoi registri.</translation></message>
+    <message><source>Review activation…</source><translation>Verifica attivazione…</translation></message>
     <message>
         <source>QSO detail</source>
         <translation>Scheda del QSO</translation>

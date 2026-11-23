@@ -18,6 +18,7 @@ DialogFrame {
     property int formRev: 0
     property bool edited: false
     property bool recalculationApplied: false
+    property bool activationReviewApplied: false
     property string detailLogPath: ""
     // Cresce a ogni tasto scritto in un campo: chi guarda cosa e' cambiato lo rilegge.
     property int editRev: 0
@@ -33,6 +34,22 @@ DialogFrame {
     function probeOcrReview() { qslOcrHistory.openFor(root.qsoId, false, true) }
     function probeOcrRevisions() { qslOcrHistory.openFor(root.qsoId, false, false, true) }
     function showOcrHistory() { qslOcrHistory.openFor(root.qsoId, false) }
+    function openActivationReview() {
+        activationReview.keys = ["MY_POTA_REF", "MY_SOTA_REF", "MY_WWFF_REF", "MY_IOTA", "MY_GRIDSQUARE", "STATION_CALLSIGN", "OPERATOR"]
+        activationReview.values = activationReview.keys.map(k => String(root.field(k)))
+        activationReview.open()
+    }
+    function probeActivationReview() {
+        console.warn("PROBE activation review shown " + activationWarning.visible)
+        root.openActivationReview(); activationReview.close()
+        console.warn("PROBE activation review cancel " + root.field("APP_DECOLOG_ACTIVATION_REVIEW"))
+        root.openActivationReview(); activationReview.values = ["IT-0002", "", "", "", "JM76", "", ""]
+        activationReview.applyDraft(); decolog.editQsoField(root.qsoId,"comment","concurrent review edit"); root.save()
+        console.warn("PROBE activation review stale " + (errorText.text.length > 0 && decolog.qsoDetail(root.qsoId).fields.APP_DECOLOG_ACTIVATION_REVIEW === "PERIOD_UNCERTAIN"))
+        root.reload(); root.openActivationReview(); activationReview.values = ["IT-0002", "", "", "", "JM76", "", ""]
+        activationReview.applyDraft(); root.save()
+        console.warn("PROBE activation review saved " + (root.field("APP_DECOLOG_ACTIVATION_REVIEW") === "" && root.field("MY_POTA_REF") === "IT-0002" && !errorText.text))
+    }
 
     title: qsTr("QSO detail")
     dotColor: Theme.primaryColor
@@ -99,6 +116,7 @@ DialogFrame {
         detail = decolog.qsoDetail(qsoId)
         detailLogPath = decolog.currentLogInfo().path || ""
         recalculationApplied = false
+        activationReviewApplied = false
         decolog.recordUiLatency("qso.detail.record", Date.now() - started)
         started = Date.now()
         fields = Object.assign({}, detail.fields || {})
@@ -153,7 +171,7 @@ DialogFrame {
         // Un'ora di fine senza data di fine vale per lo stesso giorno.
         if (fields.TIME_OFF && !fields.QSO_DATE_OFF && fields.QSO_DATE)
             fields.QSO_DATE_OFF = fields.QSO_DATE
-        const error = recalculationApplied
+        const error = recalculationApplied || activationReviewApplied
             ? decolog.saveQsoGuarded(qsoId, fields, profileId, Object.keys(touchedFields), detail.uuid, detail.revision, detailLogPath)
             : decolog.saveQso(qsoId, fields, profileId, Object.keys(touchedFields))
         errorText.text = error
@@ -168,6 +186,42 @@ DialogFrame {
         defaultSuffix: "adi"
         nameFilters: [qsTr("ADIF files (*.adi)")]
         onAccepted: decolog.exportQsos([root.qsoId], selectedFile)
+    }
+    Popup {
+        id: activationReview
+        anchors.centerIn: Overlay.overlay; modal: true; padding: 16; width: 620; height: 570
+        property var keys: []
+        property var values: []
+        background: Rectangle { color: Theme.panelColor; border.color: Theme.warningColor; radius: 6 }
+        function applyDraft() {
+            for (let i=0; i<keys.length; ++i) root.setField(keys[i], String(values[i]).trim().toUpperCase())
+            root.setField("APP_DECOLOG_ACTIVATION_REVIEW", "")
+            root.setField("APP_DECOLOG_ACTIVATION_REVIEWED_AT", new Date().toISOString())
+            root.activationReviewApplied=true; root.formRev++; close()
+        }
+        contentItem: ColumnLayout {
+            spacing: 7
+            Text { Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true; text: qsTr("Review recovered activation") }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: qsTr("The QSO overlaps an uncertain activation period. Check the original records and enter only known values. No session is assigned. Applying changes the draft; save the QSO separately.") }
+            GridLayout {
+                columns: 2; Layout.fillWidth: true
+                Repeater {
+                    model: [qsTr("My POTA reference"), qsTr("My SOTA reference"), qsTr("My WWFF reference"), qsTr("My IOTA reference"), qsTr("My grid"), qsTr("Station call"), qsTr("Operator")]
+                    delegate: RowLayout {
+                        required property string modelData; required property int index
+                        Layout.fillWidth: true
+                        Text { Layout.preferredWidth: 135; text: modelData; color: Theme.textPrimary; wrapMode: Text.Wrap }
+                        TextField { Layout.fillWidth: true; text: activationReview.values[index] || ""; onTextEdited: { let a=activationReview.values.slice(); a[index]=text; activationReview.values=a } }
+                    }
+                }
+            }
+            Item { Layout.fillHeight: true }
+            RowLayout { Layout.alignment: Qt.AlignRight
+                GlassButton { text: qsTr("Cancel"); onClicked: activationReview.close() }
+                GlassButton { text: qsTr("Apply reviewed values"); onClicked: activationReview.applyDraft() }
+            }
+        }
     }
     Popup {
         id:derivedPreview; anchors.centerIn:Overlay.overlay; modal:true; padding:16; width:620; height:420
@@ -279,6 +333,13 @@ DialogFrame {
 
     body: ColumnLayout {
         spacing: 0
+        RowLayout {
+            Layout.fillWidth: true; Layout.leftMargin: 14; Layout.rightMargin: 14; Layout.topMargin: 6
+            visible: { root.formRev; root.editRev; return root.field("APP_DECOLOG_ACTIVATION_REVIEW") === "PERIOD_UNCERTAIN" }
+            Text { id: activationWarning; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: qsTr("Recovered activation period is uncertain. Review the site, references and operator against your records.") }
+            GlassButton { text: qsTr("Review activation…"); onClicked: root.openActivationReview() }
+        }
         RowLayout {
             visible:root.derivedInspection.state !== "none"
             Layout.fillWidth:true; Layout.leftMargin:14; Layout.rightMargin:14; Layout.topMargin:6
