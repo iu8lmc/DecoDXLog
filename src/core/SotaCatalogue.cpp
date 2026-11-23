@@ -1,4 +1,5 @@
 #include "core/SotaCatalogue.h"
+#include "core/ReferenceCsv.h"
 #include <QCryptographicHash>
 #include <QCoreApplication>
 
@@ -30,26 +31,6 @@ bool officialUrl(const QUrl& url)
         !url.hasFragment() && !url.hasQuery() && url.path() == QLatin1String("/summitslist.csv") &&
         (url.port() == -1 || url.port() == 443) &&
         (url.host() == QLatin1String("www.sotadata.org.uk") || url.host() == QLatin1String("storage.sota.org.uk"));
-}
-// The published snapshot is one CSV record per line. Reject ambiguous quoting
-// instead of installing a truncated or partially parsed catalogue.
-bool csvLine(const QString& line, QStringList* values)
-{
-    values->clear(); QString cell; bool quoted = false, afterQuote = false;
-    for (qsizetype i = 0; i < line.size(); ++i) {
-        const QChar c = line.at(i);
-        if (quoted) {
-            if (c == QLatin1Char('"')) {
-                if (i + 1 < line.size() && line.at(i + 1) == QLatin1Char('"')) { cell += c; ++i; }
-                else { quoted = false; afterQuote = true; }
-            } else cell += c;
-        } else if (c == QLatin1Char(',')) { values->append(cell.trimmed()); cell.clear(); afterQuote = false; }
-        else if (c == QLatin1Char('"') && cell.isEmpty() && !afterQuote) quoted = true;
-        else if (afterQuote && !c.isSpace()) return false;
-        else if (!afterQuote) cell += c;
-    }
-    if (quoted) return false;
-    values->append(cell.trimmed()); return true;
 }
 bool canReplaceCatalogue(const QString& path)
 {
@@ -96,7 +77,7 @@ QString build(const QString& inputPath, const QString& outputPath, const std::sh
     const auto match = titlePattern.match(title);
     const QDate version = QDate::fromString(match.captured(1), QStringLiteral("dd/MM/yyyy"));
     QStringList columns;
-    if (!match.hasMatch() || !version.isValid() || !csvLine(readLine(), &columns) || decoder.hasError()) return tr("The SOTA CSV header or version is invalid.");
+    if (!match.hasMatch() || !version.isValid() || !referencecsv::parseLine(readLine(), &columns) || decoder.hasError()) return tr("The SOTA CSV header or version is invalid.");
     const QStringList required{QStringLiteral("SummitCode"), QStringLiteral("SummitName"), QStringLiteral("ValidFrom"), QStringLiteral("ValidTo")};
     QList<int> indexes;
     for (const auto& field : required) {
@@ -123,7 +104,7 @@ QString build(const QString& inputPath, const QString& outputPath, const std::sh
                 const QString line = readLine();
                 if (line.isEmpty() && input.atEnd()) break;
                 QStringList cells;
-                if (line.size() > kMaxLine || decoder.hasError() || !csvLine(line, &cells) || cells.size() != columns.size()) { error = tr("The CSV contains a malformed record."); break; }
+                if (line.size() > kMaxLine || decoder.hasError() || !referencecsv::parseLine(line, &cells) || cells.size() != columns.size()) { error = tr("The CSV contains a malformed record."); break; }
                 const QString reference = cells.at(indexes.at(0)).trimmed().toUpper();
                 const QDate from = QDate::fromString(cells.at(indexes.at(2)), QStringLiteral("dd/MM/yyyy"));
                 const QDate to = QDate::fromString(cells.at(indexes.at(3)), QStringLiteral("dd/MM/yyyy"));

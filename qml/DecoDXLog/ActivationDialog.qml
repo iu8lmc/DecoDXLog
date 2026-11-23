@@ -28,6 +28,10 @@ DialogFrame {
     property var exportGroup: ({})
     property string partitionMessage: ""
     property string sotaMessage: ""
+    property string potaMessage: ""
+    property var potaLookup: ({})
+    property bool probePotaMode: false
+    property bool probePotaGroup: false
     property var sotaLookup: ({})
     property bool probeSotaMode: false
     property bool probeSotaGroup: false
@@ -58,6 +62,11 @@ DialogFrame {
         if (String(value).trim().length) programs[key] = value
         else delete programs[key]
         root.set("programs", programs)
+    }
+    function probePotaCatalogue() {
+        root.openDialog("pota")
+        root.probePotaMode = true
+        potaImportDialog.importPath("file://" + decolog.currentLogInfo().path + ".pota.csv")
     }
     function probeSotaUpdate() {
         root.openDialog("pota")
@@ -135,6 +144,14 @@ DialogFrame {
             }
         }
         function onPreviewFinished(success) {
+            if (root.probePotaGroup) {
+                root.probePotaGroup = false
+                Qt.callLater(() => {
+                    const group = groupRepeater.itemAt(0)
+                    if (group) console.warn("PROBE potaGroup status=" + group.modelData.potaSnapshotStatus + " location=" + group.modelData.potaLocationStatus + " text=" + group.probeText())
+                })
+                return
+            }
             if (root.probeSotaGroup) {
                 root.probeSotaGroup = false
                 Qt.callLater(() => {
@@ -262,6 +279,31 @@ DialogFrame {
                 sotaCheckButton.clicked()
                 console.warn("PROBE sotaImport success=" + success + " status=" + root.sotaLookup.status + " name=" + root.sotaLookup.name + " version=" + root.sotaLookup.version + " error=" + message)
                 root.probeSotaGroup = true
+                Qt.callLater(() => { const row = historyRepeater.itemAt(0); if (row) row.probeClick() })
+            }
+        }
+    }
+
+    FileDialog {
+        id: potaImportDialog
+        title: qsTr("Import POTA park list CSV")
+        nameFilters: [qsTr("CSV files (*.csv)"), qsTr("All files (*)")]
+        function importPath(path) {
+            root.potaMessage = ""
+            if (!root.act.potaCatalogue.importFile(path)) root.potaMessage = qsTr("Cannot start the catalogue import.")
+        }
+        onAccepted: importPath(selectedFile)
+    }
+    Connections {
+        target: root.act.potaCatalogue
+        function onFinished(success, message) {
+            root.potaMessage = success ? qsTr("POTA snapshot imported. File origin was not independently verified.") : message
+            root.potaLookup = ({})
+            if (root.probePotaMode) {
+                root.probePotaMode = false
+                potaSearchRef.text = "US-0015@US-MD"; potaCheckButton.clicked()
+                console.warn("PROBE potaImport success=" + success + " status=" + root.potaLookup.status + " location=" + root.potaLookup.locationStatus + " name=" + root.potaLookup.name + " error=" + message)
+                root.probePotaGroup = true
                 Qt.callLater(() => { const row = historyRepeater.itemAt(0); if (row) row.probeClick() })
             }
         }
@@ -608,6 +650,32 @@ DialogFrame {
                 .arg(({active: qsTr("in list for this date"), outsideValidity: qsTr("outside listed dates"), notFound: qsTr("not found in imported list"), unavailable: qsTr("catalogue unavailable"), invalidDate: qsTr("invalid date")})[root.sotaLookup.status] || root.sotaLookup.status || "").arg(root.sotaLookup.name || "—")
                 .arg(root.sotaLookup.validFrom || "—").arg(root.sotaLookup.validTo || "—")
         }
+        Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.borderSoft }
+        Note {
+            text: root.act.potaCatalogue.info.status === "available"
+                ? qsTr("Offline POTA snapshot · %1 parks · imported %2 · file %3 · SHA-256 %4. Local file origin is unverified.")
+                    .arg(root.act.potaCatalogue.info.count).arg(root.act.potaCatalogue.info.importedAt)
+                    .arg(root.act.potaCatalogue.info.fileName).arg(root.act.potaCatalogue.info.sha256)
+                : qsTr("No offline POTA snapshot installed. Download the park list, then import the CSV.")
+        }
+        RowLayout {
+            GlassButton { text: qsTr("Open POTA list source"); onClicked: Qt.openUrlExternally("https://pota.app/all_parks_ext.csv") }
+            GlassButton { text: root.act.potaCatalogue.busy ? qsTr("Cancel POTA import") : qsTr("Import POTA CSV…");
+                onClicked: { if (root.act.potaCatalogue.busy) root.act.potaCatalogue.cancel(); else potaImportDialog.open() } }
+        }
+        Note { visible: root.potaMessage.length > 0; text: root.potaMessage }
+        RowLayout {
+            Layout.fillWidth: true
+            StyledTextField { id: potaSearchRef; Layout.fillWidth: true; placeholderText: qsTr("Park reference, e.g. US-0015@US-MD"); uppercase: true }
+            GlassButton { id: potaCheckButton; text: qsTr("Check snapshot"); onClicked: root.potaLookup = root.act.potaCatalogue.lookup(potaSearchRef.text) }
+        }
+        Note {
+            visible: !!root.potaLookup.status
+            text: qsTr("POTA snapshot: %1 · %2 · listed locations %3 · requested location %4. This snapshot does not establish historical status or eligibility.")
+                .arg(({listedActive: qsTr("active in snapshot"), listedInactive: qsTr("inactive in snapshot"), notFound: qsTr("not found in imported list"), unavailable: qsTr("catalogue unavailable"), invalidReference: qsTr("invalid reference")})[root.potaLookup.status] || root.potaLookup.status || "")
+                .arg(root.potaLookup.name || "—").arg(root.potaLookup.locations || "—")
+                .arg(({listed: qsTr("listed in snapshot"), notListed: qsTr("not listed in snapshot"), unknown: qsTr("unknown")})[root.potaLookup.locationStatus] || "—")
+        }
         Note {
             text: qsTr("Closed tracked sessions: select one to review its reported QSO. Older untracked sessions are not inferred.")
         }
@@ -687,6 +755,14 @@ DialogFrame {
             GlassButton { id: exclusionNext; text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < (root.partitionPreview.excluded || []).length; onClicked: root.excludedPage++ }
         }
         Note {
+            visible: root.previewShown && !!root.partitionPreview.potaCatalogue
+            color: Theme.warningColor
+            text: root.partitionPreview.potaCatalogue && root.partitionPreview.potaCatalogue.status === "available"
+                ? qsTr("POTA group checks use the imported snapshot from %1 (SHA-256 %2). File origin is unverified; status is not historical and does not establish eligibility.")
+                    .arg(root.partitionPreview.potaCatalogue.importedAt).arg(root.partitionPreview.potaCatalogue.sha256)
+                : qsTr("POTA snapshot unavailable; references could not be checked against a list.")
+        }
+        Note {
             visible: root.previewShown && !!root.partitionPreview.sotaCatalogue
             color: Theme.warningColor
             text: root.partitionPreview.sotaCatalogue && root.partitionPreview.sotaCatalogue.status === "available"
@@ -715,6 +791,10 @@ DialogFrame {
                         + qsTr(" · missing station call: %1; missing operator: %2; missing both: %3")
                             .arg(modelData.missingStationCall || 0).arg(modelData.missingOperator || 0).arg(modelData.missingCallIdentity || 0)
                         + (modelData.referenceSyntaxWarning ? qsTr(" · reference does not match local syntax; verify it") : "")
+                        + (modelData.program === "POTA" ? qsTr(" · POTA snapshot: %1%2%3")
+                            .arg(({listedActive: qsTr("active in snapshot"), listedInactive: qsTr("inactive in snapshot"), notFound: qsTr("not in imported snapshot"), unavailable: qsTr("unavailable"), invalidReference: qsTr("invalid reference")})[modelData.potaSnapshotStatus] || qsTr("unavailable"))
+                            .arg(modelData.potaName ? " · " + modelData.potaName : "")
+                            .arg(modelData.potaLocationStatus ? " · " + (({listed: qsTr("location listed in snapshot"), notListed: qsTr("location not listed in snapshot"), unknown: qsTr("location unknown")})[modelData.potaLocationStatus] || "") : "") : "")
                         + (modelData.program === "SOTA" ? qsTr(" · SOTA list: %1%2")
                             .arg(({active: qsTr("listed for this day"), outsideValidity: qsTr("outside listed dates"), notFound: qsTr("not in imported list"), unavailable: qsTr("unavailable")})[modelData.catalogueStatus] || qsTr("unavailable"))
                             .arg(modelData.catalogueName ? " · " + modelData.catalogueName : "") : "")

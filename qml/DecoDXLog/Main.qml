@@ -1274,6 +1274,7 @@ RoundedWindow {
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
         else if (what[0] === "historical") historicalQsoDialog.open()
+        else if (what[0] === "potacatalogueprobe") Qt.callLater(() => activationDialog.probePotaCatalogue())
         else if (what[0] === "sotaupdateprobe") Qt.callLater(() => activationDialog.probeSotaUpdate())
         else if (what[0] === "sotacatalogueprobe") Qt.callLater(() => activationDialog.probeSotaCatalogue())
         else if (what[0] === "exclusionprobe") Qt.callLater(() => activationDialog.probeExclusions())

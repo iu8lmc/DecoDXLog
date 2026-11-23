@@ -21,7 +21,7 @@
 #include <QVariantMap>
 #include <functional>
 
-namespace decolog::core { class LogDatabase; class SotaCatalogue; }
+namespace decolog::core { class LogDatabase; class SotaCatalogue; class PotaCatalogue; }
 
 namespace decolog::app {
 
@@ -29,6 +29,7 @@ class ActivationController : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool active READ active NOTIFY changed)
     Q_PROPERTY(QObject* sotaCatalogue READ sotaCatalogue CONSTANT)
+    Q_PROPERTY(QObject* potaCatalogue READ potaCatalogue CONSTANT)
     Q_PROPERTY(bool previewBusy READ previewBusy NOTIFY previewChanged)
     Q_PROPERTY(bool partitionExportBusy READ partitionExportBusy NOTIFY partitionExportChanged)
     Q_PROPERTY(QVariantMap previewResult READ previewResult NOTIFY previewChanged)
@@ -62,11 +63,13 @@ public:
         std::function<int(int localNext)> takeSerial;
         std::function<void(bool on)> shareSerials;
         QString sotaCataloguePath; // Optional override, e.g. for isolated logs/tests.
+        QString potaCataloguePath;
     };
 
     explicit ActivationController(Context context, QObject* parent = nullptr);
     ~ActivationController() override;
     QObject* sotaCatalogue() const;
+    QObject* potaCatalogue() const;
     bool previewBusy() const { return m_previewBusy; }
     bool partitionExportBusy() const { return m_partitionExportBusy; }
     Q_INVOKABLE bool startPartitionExport(const QVariantMap& group, const QUrl& destination);
@@ -186,6 +189,7 @@ signals:
 private:
     void invalidatePreview();
     core::SotaCatalogue* m_sotaCatalogue{nullptr};
+    core::PotaCatalogue* m_potaCatalogue{nullptr};
     QThreadPool m_previewPool;
     QThreadPool m_partitionExportPool;
     std::shared_ptr<std::atomic_bool> m_partitionExportCancel;

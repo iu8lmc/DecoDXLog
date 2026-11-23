@@ -55,6 +55,25 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void potaSnapshotCanBeImportedAndReviewedInDesktop()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile fixture(dir.filePath("test.sqlite.pota.csv"));
+        QVERIFY(fixture.open(QIODevice::WriteOnly));
+        fixture.write("reference,name,active,locationDesc\nUS-0015,Park,1,\"US-DC,US-MD\"\n"); fixture.close();
+        {
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery q(db.connection());
+            QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('pota-fixture','2020-01-01T00:00:00Z','2020-01-01T23:59:00Z','{}','{\"title\":\"POTA fixture\"}')"));
+            AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20200101"}, {"TIME_ON", "120000"}, {"BAND", "20m"}, {"MODE", "CW"},
+                              {"MY_POTA_REF", "US-0015@US-MD"}, {"APP_DECOLOG_ACTIVATION_UUID", "pota-fixture"}};
+            QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
+        QByteArray output; QVERIFY2(launch(dir, QStringLiteral("potacatalogueprobe"), output), output.constData());
+        QVERIFY2(output.contains("PROBE potaImport success=true status=listedActive location=listed name=Park error="), output.constData());
+        QVERIFY2(output.contains("PROBE potaGroup status=listedActive location=listed"), output.constData());
+        QVERIFY2(output.contains("active in snapshot"), output.constData());
+        QVERIFY(QFileInfo::exists(dir.filePath("data/pota-catalogue.sqlite")));
+    }
     void sotaOfficialUpdateInDesktopWhenRequested()
     {
         if (qEnvironmentVariable("DECOLOG_SOTA_LIVE_UI") != QLatin1String("1")) QSKIP("Live desktop update not requested");

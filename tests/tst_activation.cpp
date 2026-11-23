@@ -4,6 +4,7 @@
 #include "core/Activation.h"
 #include "core/LogDatabase.h"
 #include "core/SotaCatalogue.h"
+#include "core/PotaCatalogue.h"
 
 #include <QSqlQuery>
 #include <QSignalSpy>
@@ -107,6 +108,29 @@ private slots:
         QVERIFY(db.connection().transaction());
         QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
         QVERIFY(db.connection().rollback());
+    }
+    void previewReportsPotaSnapshotWithoutHistoricalClaims()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString source = dir.filePath("parks.csv"); QFile file(source);
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write("reference,name,active,locationDesc\nUS-0015,Park,1,\"US-DC,US-MD\"\nIT-0001,Old Park,0,IT-25\n"); file.close();
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); ActivationController::Context ctx;
+        ctx.db = &db; ctx.potaCataloguePath = dir.filePath("pota.sqlite"); ActivationController act(std::move(ctx));
+        auto* catalogue = qobject_cast<PotaCatalogue*>(act.potaCatalogue()); QVERIFY(catalogue);
+        QSignalSpy imported(catalogue, &PotaCatalogue::finished); QVERIFY(catalogue->importFile(QUrl::fromLocalFile(source)));
+        QTRY_COMPARE_WITH_TIMEOUT(imported.size(), 1, 10000); QVERIFY(imported.at(0).at(0).toBool());
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "US-0015@US-MD,US-0015@US-CA,IT-0001,US-9999"}}).isEmpty());
+        AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20200101"}, {"TIME_ON", "235900"}, {"BAND", "20m"}, {"MODE", "CW"}};
+        act.session().applyTo(record, 0); QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        const auto preview = act.partitionPreview(); const auto groups = preview.value("groups").toList(); QCOMPARE(groups.size(), 4);
+        QCOMPARE(preview.value("potaCatalogue").toMap().value("source").toString(), QString("local-file-unverified"));
+        QMap<QString, QVariantMap> rows; for (const auto& item : groups) { const auto g = item.toMap(); rows[g.value("reference").toString()] = g; }
+        QCOMPARE(rows.value("US-0015@US-MD").value("potaSnapshotStatus").toString(), QString("listedActive"));
+        QCOMPARE(rows.value("US-0015@US-MD").value("potaLocationStatus").toString(), QString("listed"));
+        QCOMPARE(rows.value("US-0015@US-CA").value("potaLocationStatus").toString(), QString("notListed"));
+        QCOMPARE(rows.value("IT-0001").value("potaSnapshotStatus").toString(), QString("listedInactive"));
+        QCOMPARE(rows.value("US-9999").value("potaSnapshotStatus").toString(), QString("notFound"));
+        QVERIFY(QFile::remove(dir.filePath("pota.sqlite")));
+        const auto missing = act.partitionPreview(); QCOMPARE(missing.value("potaCatalogue").toMap().value("status").toString(), QString("unavailable"));
     }
     void previewChecksSotaCatalogueForEachUtcDay()
     {
