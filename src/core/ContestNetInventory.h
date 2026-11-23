@@ -31,6 +31,8 @@ public:
     // Payload budget applies to returned UTF-8 ADIF bytes, not temporary
     // SQLite/QString allocations. A too-large first record is never skipped.
     ContestNetInventoryPage next(int limit, qint64 maxPayloadBytes = 1024 * 1024);
+    // Read one UUID from the same pinned snapshot without advancing pagination.
+    ContestNetInventoryPage findUuid(const QString& uuid, qint64 maxPayloadBytes = 1024 * 1024);
     void close();
     QString error() const { return m_error; }
     QString logIdentity() const { return m_identity; }
@@ -42,6 +44,7 @@ public:
     static QByteArray fingerprint(const AdifRecord& record);
 
 private:
+    bool populate(ContestNetInventoryRow& row, QString& error);
     LogDatabase m_db;
     QString m_error;
     QString m_identity;

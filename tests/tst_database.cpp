@@ -166,6 +166,20 @@ private slots:
         QCOMPARE(parsed.records.first().value("LOTW_QSL_SENT"),QString("Y"));
         const auto second=inventory.next(20,1024*1024); QVERIFY(second.ok); QCOMPARE(second.rows.size(),1); QVERIFY(!second.hasMore); QCOMPARE(second.rows.first().id,b.id); QCOMPARE(second.rows.first().adifPayload,bBytes);
     }
+    void contestNetInventoryFindsOneRecordInPinnedSnapshot()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("lookup.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(900,'x')}};
+        const auto a=db.insertQso(record,"fixture"); QVERIFY(a.id>0); record.set("CALL","K1BBB"); const auto b=db.insertQso(record,"fixture"); QVERIFY(b.id>0);
+        const auto uuid=db.meta(b.id)->uuid; ContestNetInventory inventory; QVERIFY(inventory.begin(path));
+        const auto first=inventory.next(1); QVERIFY(first.ok); QCOMPARE(first.rows.first().id,a.id);
+        record.set("COMMENT","changed"); QVERIFY(db.updateQso(b.id,record).status==InsertResult::Status::Inserted);
+        QVERIFY(!inventory.findUuid(uuid,1).ok); const auto found=inventory.findUuid(uuid,2048); QVERIFY2(found.ok,qPrintable(found.error)); QCOMPARE(found.rows.size(),1); QCOMPARE(found.rows.first().id,b.id);
+        QCOMPARE(adif::parse(found.rows.first().adifPayload).records.first().value("COMMENT"),QString(900,'x'));
+        const auto absent=inventory.findUuid("absent"); QVERIFY(absent.ok); QVERIFY(absent.rows.isEmpty());
+        const auto second=inventory.next(1); QVERIFY(second.ok); QCOMPARE(second.rows.size(),1); QCOMPARE(second.rows.first().id,b.id);
+        inventory.close(); QVERIFY(!inventory.findUuid(uuid).ok);
+    }
     void contestNetInventoryRejectsNonRoundTrippablePayload()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("invalid-payload.sqlite"); LogDatabase db; QVERIFY(db.open(path));

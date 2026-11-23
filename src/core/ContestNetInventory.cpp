@@ -84,10 +84,7 @@ ContestNetInventoryPage ContestNetInventory::next(int limit, qint64 maxPayloadBy
     for (qsizetype index=0;index<page.rows.size();++index) {
         auto& row=page.rows[index];
         QString error;
-        const auto record=m_db.recordChecked(row.id,&error);
-        if (!record) { page.rows.clear(); page.error=error.isEmpty()?QStringLiteral("Cannot read QSO for inventory"):error; close(); return page; }
-        row.contentHash=fingerprint(*record);
-        row.adifPayload=adif::writeRecord(*record).toUtf8();
+        if (!populate(row,error)) { page.rows.clear(); page.error=error; close(); return page; }
         if (row.adifPayload.size()>maxPayloadBytes-payloadBytes) {
             if (index==0) { page.rows.clear(); page.error=QStringLiteral("QSO exceeds the inventory payload budget"); return page; }
             page.rows.erase(page.rows.begin()+index,page.rows.end()); page.hasMore=true; break;
@@ -101,6 +98,36 @@ ContestNetInventoryPage ContestNetInventory::next(int limit, qint64 maxPayloadBy
     if (!m_db.fileIdentityMatchesOpen()) { page.rows.clear(); page.error=QStringLiteral("Log file changed during inventory"); close(); return page; }
     if (!page.rows.isEmpty()) { m_afterId=page.rows.last().id; m_afterUuid=page.rows.last().uuid; }
     m_started=true; m_done=!page.hasMore; page.ok=true; return page;
+}
+
+bool ContestNetInventory::populate(ContestNetInventoryRow& row,QString& error)
+{
+    const auto record=m_db.recordChecked(row.id,&error);
+    if (!record) { if (error.isEmpty()) error=QStringLiteral("Cannot read QSO for inventory"); return false; }
+    row.contentHash=fingerprint(*record); row.adifPayload=adif::writeRecord(*record).toUtf8();
+    return true;
+}
+
+ContestNetInventoryPage ContestNetInventory::findUuid(const QString& uuid,qint64 maxPayloadBytes)
+{
+    ContestNetInventoryPage page;
+    if (!m_transaction) { page.error=QStringLiteral("Inventory is not open"); return page; }
+    if (uuid.isEmpty() || maxPayloadBytes<1 || maxPayloadBytes>16*1024*1024) { page.error=QStringLiteral("Invalid inventory lookup"); return page; }
+    if (!m_db.fileIdentityMatchesOpen()) { page.error=QStringLiteral("Log file changed during inventory"); close(); return page; }
+    QSqlQuery q(m_db.connection()); q.prepare(QStringLiteral("SELECT id,uuid,revision,deleted FROM qso WHERE uuid=? COLLATE BINARY")); q.addBindValue(uuid);
+    if (!q.exec()) { page.error=q.lastError().text(); close(); return page; }
+    if (q.next()) {
+        ContestNetInventoryRow row{q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toInt(),q.value(3).toBool(),{}, {}};
+        QString error; if (!populate(row,error)) { page.error=error; close(); return page; }
+        if (row.adifPayload.size()>maxPayloadBytes) { page.error=QStringLiteral("QSO exceeds the inventory payload budget"); return page; }
+        const auto parsed=adif::parse(row.adifPayload);
+        if (parsed.records.size()!=1 || fingerprint(parsed.records.first())!=row.contentHash) {
+            page.error=QStringLiteral("QSO ADIF cannot be round-tripped without changes"); close(); return page;
+        }
+        page.rows.append(row);
+    } else if (q.lastError().isValid()) { page.error=q.lastError().text(); close(); return page; }
+    if (!m_db.fileIdentityMatchesOpen()) { page.rows.clear(); page.error=QStringLiteral("Log file changed during inventory"); close(); return page; }
+    page.ok=true; return page;
 }
 
 void ContestNetInventory::close()
