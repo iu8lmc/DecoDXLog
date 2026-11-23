@@ -2416,7 +2416,7 @@ RoundedWindow {
                 Layout.fillWidth: true
                 wrapMode: Text.Wrap
                 text: window.importPreview.ok
-                      ? qsTr("%1 records read from %2. The reviewed snapshot will be imported.\nEstimated result: %3 new · %4 duplicates · %5 rejected.\nQSL status: %6 · incomplete UTC: %7.\nExtra fields are preserved: %8")
+                      ? qsTr("%1 records read from %2. The reviewed snapshot will be imported.\nEstimated result: %3 new · %4 duplicates · %5 rejected.\nQSL status: %6 · incomplete UTC: %7.\nAdditional fields found (review mapping after import): %8")
                           .arg(window.importPreview.read).arg(window.importPreview.kind || "file")
                           .arg(window.importPreview.estimatedInserted || 0)
                           .arg(window.importPreview.estimatedDuplicates || 0)

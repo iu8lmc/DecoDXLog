@@ -5227,6 +5227,16 @@ Campi extra conservati: %8</translation>
         <source>All the panels are in their own windows: ↩ in a panel brings it back here.</source>
         <translation>Tutti i pannelli sono in una finestra loro: ↩ in un pannello lo riporta qui.</translation>
     </message>
+    <message>
+        <source>%1 records read from %2. The reviewed snapshot will be imported.
+Estimated result: %3 new · %4 duplicates · %5 rejected.
+QSL status: %6 · incomplete UTC: %7.
+Additional fields found (review mapping after import): %8</source>
+        <translation>%1 record letti da %2. Sarà importata la copia esaminata.
+Risultato stimato: %3 nuovi · %4 duplicati · %5 respinti.
+Stato QSL: %6 · UTC incompleto: %7.
+Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</translation>
+    </message>
 </context>
 <context>
     <name>MapPanel</name>

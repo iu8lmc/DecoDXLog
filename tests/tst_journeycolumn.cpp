@@ -517,6 +517,16 @@ private slots:
         LogDatabase verify; QVERIFY(verify.open(dir.filePath("test.sqlite"))); QCOMPARE(verify.qsoCount(),qint64(1));
         const auto ids=verify.latestIds({},10); QCOMPARE(ids.size(),1); const auto record=verify.record(ids.first()); QVERIFY(record); QCOMPARE(record->value("CALL"),QString("K2EXT"));
     }
+    void importPreviewReportsAndPreservesProprietaryFields()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("proprietary.adi"); QFile input(path); QVERIFY(input.open(QIODevice::WriteOnly));
+        input.write("<CALL:5>K1ABC<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<APP_VENDOR_NOTE:6>secret<EOR>\n"); input.close();
+        QByteArray output; QVERIFY2(launch(dir,"importsnapshotprobe:"+path,output,7000),output.constData());
+        QVERIFY2(output.contains("\"extraFields\":[\"APP_VENDOR_NOTE\"]"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto ids=db.latestIds({},10); QCOMPARE(ids.size(),1);
+        const auto record=db.record(ids.first()); QVERIFY(record); QCOMPARE(record->value("APP_VENDOR_NOTE"),QString("secret"));
+    }
     void importPreviewUsesAllExistingDuplicateKeys()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

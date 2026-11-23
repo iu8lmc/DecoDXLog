@@ -5967,7 +5967,7 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
             || record.contains(QStringLiteral("QSL_RCVD")))
             ++qsl;
         for (const AdifField& field : record.fields())
-            if (!known.contains(field.name) && !field.name.startsWith(QStringLiteral("APP_")))
+            if (!known.contains(field.name))
                 extra.insert(field.name);
     }
     out.insert(QStringLiteral("ok"), true);
@@ -5975,7 +5975,9 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
     out.insert(QStringLiteral("read"), doc.records.size());
     out.insert(QStringLiteral("missingUtc"), missingUtc);
     out.insert(QStringLiteral("qslRecords"), qsl);
-    out.insert(QStringLiteral("extraFields"), QStringList(extra.values()));
+    QStringList extraFields = extra.values();
+    extraFields.sort();
+    out.insert(QStringLiteral("extraFields"), extraFields);
 
     // Dry-run against a private in-memory copy of the current log.  This gives
     // the operator a before/after comparison without writing the real log.
