@@ -775,6 +775,9 @@ public:
     // `fields` e' la mappa ADIF completa (come in qsoDetail().fields).
     Q_INVOKABLE QString saveQso(qint64 id, const QVariantMap& fields, qint64 stationProfileId,
                                 const QStringList& touchedFields);
+    Q_INVOKABLE QString saveQsoGuarded(qint64 id, const QVariantMap& fields, qint64 stationProfileId,
+                                       const QStringList& touchedFields, const QString& uuid, int revision,
+                                       const QString& logPath);
     Q_INVOKABLE bool deleteQso(qint64 id);
     Q_INVOKABLE int deleteQsos(const QVariantList& ids);
     Q_INVOKABLE bool deleteQsosAsync(const QVariantList& ids);
@@ -1296,7 +1299,9 @@ private:
     // `period`: dal … al … al posto degli id, scelti dal filo che scrive.
     // Salva un QSO corretto: la scheda e la tabella passano da qui. Se il nominativo cambia,
     // nazione e zone si rifanno dal nuovo, e i servizi che avevano il vecchio lo rimandano.
-    QString saveRecord(qint64 id, core::AdifRecord record, qint64 stationProfileId);
+    QString saveRecord(qint64 id, core::AdifRecord record, qint64 stationProfileId,
+                       const QString& expectedUuid = {}, int expectedRevision = 0,
+                       const QSet<QString>& touchedFields = {});
     void exportInBackground(const QList<qint64>& ids, bool all, const QString& path,
                             const std::optional<std::pair<QString, QString>>& period = std::nullopt);
     bool m_backupRunning{false};

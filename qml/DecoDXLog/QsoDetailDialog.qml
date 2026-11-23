@@ -17,6 +17,8 @@ DialogFrame {
     property var touchedFields: ({})
     property int formRev: 0
     property bool edited: false
+    property bool recalculationApplied: false
+    property string detailLogPath: ""
     // Cresce a ogni tasto scritto in un campo: chi guarda cosa e' cambiato lo rilegge.
     property int editRev: 0
     property int currentTab: 0
@@ -75,6 +77,9 @@ DialogFrame {
         console.warn("PROBE derived changed QSO " + edit + " " + errorText.text + " " + root.field("APP_B")); root.reload()
         root.previewDerived(); applyDerivedPreview.clicked()
         console.warn("PROBE derived draft " + root.field("APP_B") + " " + root.field("APP_C") + " " + root.derivedInspection.state + " db=" + decolog.qsoDetail(root.qsoId).fields.APP_B)
+        const late=decolog.editQsoField(root.qsoId,"comment","late edit"); root.save()
+        console.warn("PROBE derived guarded save " + late + " " + errorText.text + " db=" + decolog.qsoDetail(root.qsoId).fields.APP_B)
+        root.reload(); root.previewDerived(); applyDerivedPreview.clicked()
         root.save(); console.warn("PROBE derived recalculated " + root.derivedInspection.state + " " + root.field("APP_B") + " " + root.field("APP_C") + " " + errorText.text)
     }
     function probeDerivedPreview(path) {
@@ -92,6 +97,8 @@ DialogFrame {
     function reload() {
         let started = Date.now()
         detail = decolog.qsoDetail(qsoId)
+        detailLogPath = decolog.currentLogInfo().path || ""
+        recalculationApplied = false
         decolog.recordUiLatency("qso.detail.record", Date.now() - started)
         started = Date.now()
         fields = Object.assign({}, detail.fields || {})
@@ -146,7 +153,9 @@ DialogFrame {
         // Un'ora di fine senza data di fine vale per lo stesso giorno.
         if (fields.TIME_OFF && !fields.QSO_DATE_OFF && fields.QSO_DATE)
             fields.QSO_DATE_OFF = fields.QSO_DATE
-        const error = decolog.saveQso(qsoId, fields, profileId, Object.keys(touchedFields))
+        const error = recalculationApplied
+            ? decolog.saveQsoGuarded(qsoId, fields, profileId, Object.keys(touchedFields), detail.uuid, detail.revision, detailLogPath)
+            : decolog.saveQso(qsoId, fields, profileId, Object.keys(touchedFields))
         errorText.text = error
         if (error.length === 0)
             reload()
@@ -184,12 +193,12 @@ DialogFrame {
                 GlassButton { text:qsTr("Cancel"); onClicked:derivedPreview.close() }
                 GlassButton { id:applyDerivedPreview; text:qsTr("Apply to draft"); onClicked:{
                     const live=decolog.qsoDetail(root.qsoId)
-                    if (derivedPreview.qso!==root.qsoId || derivedPreview.editRevision!==root.editRev || derivedPreview.formRevision!==root.formRev || !live.uuid || live.revision!==root.detail.revision) {
+                    if (derivedPreview.qso!==root.qsoId || derivedPreview.editRevision!==root.editRev || derivedPreview.formRevision!==root.formRev || !live.uuid || live.uuid!==root.detail.uuid || live.revision!==root.detail.revision || decolog.currentLogInfo().path!==root.detailLogPath) {
                         derivedPreview.close(); errorText.text=qsTr("The QSO or draft changed; review the calculation again."); return
                     }
                     const values=derivedPreview.data.values || ({})
                     for (const key of Object.keys(values)) root.setField(key,String(values[key]))
-                    root.setField("APP_DECOLOG_DERIVED_V1",String(derivedPreview.data.trace)); root.formRev++; derivedPreview.close()
+                    root.setField("APP_DECOLOG_DERIVED_V1",String(derivedPreview.data.trace)); root.recalculationApplied=true; root.formRev++; derivedPreview.close()
                 } }
             }
         }

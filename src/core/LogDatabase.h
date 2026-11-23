@@ -277,6 +277,10 @@ public:
                            qint64 stationProfileId = -1,
                            const QString& reason = QStringLiteral("edit"));
 
+    InsertResult updateQsoGuarded(qint64 id, AdifRecord record, qint64 stationProfileId,
+                                  const QString& expectedUuid, int expectedRevision,
+                                  const QSet<QString>& touchedFields);
+
     // Cancellazione morbida: la riga resta, marcata deleted, e lo storico la
     // conserva.
     bool softDeleteQso(qint64 id);

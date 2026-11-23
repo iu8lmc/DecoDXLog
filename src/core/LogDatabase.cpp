@@ -1178,6 +1178,45 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
     return result;
 }
 
+InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 stationProfileId,
+                                          const QString& expectedUuid, int expectedRevision,
+                                          const QSet<QString>& touchedFields)
+{
+    InsertResult result;
+    result.id = id;
+    QSqlDatabase db = connection();
+    QSqlQuery transaction(db);
+    if (!transaction.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
+        result.message = transaction.lastError().text();
+        return result;
+    }
+    const auto currentMeta = meta(id);
+    if (expectedUuid.isEmpty() || !currentMeta || currentMeta->deleted ||
+        currentMeta->uuid != expectedUuid || currentMeta->revision != expectedRevision) {
+        db.rollback();
+        result.message = QStringLiteral("The QSO changed; reload and review before saving.");
+        return result;
+    }
+    const auto current = this->record(id);
+    if (!current) {
+        db.rollback();
+        result.message = QStringLiteral("The QSO changed; reload and review before saving.");
+        return result;
+    }
+    mergeUneditedQslFields(record, *current, touchedFields);
+    result = updateQso(id, record, stationProfileId);
+    if (result.status != InsertResult::Status::Inserted) {
+        db.rollback();
+        return result;
+    }
+    if (!db.commit()) {
+        result.status = InsertResult::Status::Error;
+        result.message = db.lastError().text();
+        db.rollback();
+    }
+    return result;
+}
+
 bool LogDatabase::softDeleteQso(qint64 id)
 {
     const auto m = meta(id);

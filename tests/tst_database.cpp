@@ -59,6 +59,38 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void guardedEditRejectsStaleRevisionAndMergesConcurrentQsl()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase editor, other;
+        QVERIFY(editor.open(dir.filePath("guard.sqlite")));
+        QVERIFY(other.open(dir.filePath("guard.sqlite")));
+        AdifRecord original{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},
+                            {"BAND","20m"},{"MODE","CW"},{"COMMENT","original"}};
+        const auto inserted=editor.insertQso(original,"fixture",{},true); QVERIFY(inserted.id>0);
+        const auto initial=editor.meta(inserted.id); QVERIFY(initial);
+        auto external=*other.record(inserted.id); external.set("COMMENT","external");
+        QCOMPARE(other.updateQso(inserted.id,external).status,InsertResult::Status::Inserted);
+        auto stale=original; stale.set("COMMENT","stale");
+        const auto rejected=editor.updateQsoGuarded(inserted.id,stale,-1,initial->uuid,initial->revision,{});
+        QCOMPARE(rejected.status,InsertResult::Status::Error);
+        QCOMPARE(editor.record(inserted.id)->value("COMMENT"),QString("external"));
+        QCOMPARE(editor.history(inserted.id).size(),1);
+        const auto fresh=editor.meta(inserted.id); QVERIFY(fresh);
+        auto draft=*editor.record(inserted.id); draft.set("COMMENT","reviewed");
+        QslState eqsl; eqsl.service="eqsl"; eqsl.sent="Y"; eqsl.sentDate="20260102";
+        QVERIFY(other.setQslState(inserted.id,eqsl));
+        QCOMPARE(other.meta(inserted.id)->revision,fresh->revision);
+        QCOMPARE(editor.updateQsoGuarded(inserted.id,draft,-1,fresh->uuid,fresh->revision,{}).status,InsertResult::Status::Inserted);
+        const auto saved=editor.record(inserted.id); QVERIFY(saved);
+        QCOMPARE(saved->value("COMMENT"),QString("reviewed"));
+        QCOMPARE(saved->value("EQSL_QSL_SENT"),QString("Y"));
+        QCOMPARE(saved->value("EQSL_QSLSDATE"),QString("20260102"));
+        const auto next=editor.meta(inserted.id); QVERIFY(next);
+        auto explicitEdit=*saved; explicitEdit.set("EQSL_QSL_SENT","N");
+        QCOMPARE(editor.updateQsoGuarded(inserted.id,explicitEdit,-1,next->uuid,next->revision,{"EQSL_QSL_SENT"}).status,InsertResult::Status::Inserted);
+        QCOMPARE(editor.record(inserted.id)->value("EQSL_QSL_SENT"),QString("N"));
+    }
     void ocrAcquisitionJournalExistsWithoutCreatingQsos()
     {
         LogDatabase db;

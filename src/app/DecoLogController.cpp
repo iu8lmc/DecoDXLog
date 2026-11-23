@@ -4668,7 +4668,22 @@ QString DecoLogController::saveQso(qint64 id, const QVariantMap& fields, qint64 
     return saveRecord(id, r, stationProfileId);
 }
 
-QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationProfileId)
+QString DecoLogController::saveQsoGuarded(qint64 id, const QVariantMap& fields, qint64 stationProfileId,
+                                          const QStringList& touchedFields, const QString& uuid, int revision,
+                                          const QString& logPath)
+{
+    if (uuid.isEmpty() || logPath != QDir::toNativeSeparators(m_db.path()))
+        return tr("The QSO changed; reload and review before saving.");
+    AdifRecord r;
+    for (auto it = fields.cbegin(); it != fields.cend(); ++it)
+        r.set(it.key(), it.value().toString().trimmed());
+    return saveRecord(id, r, stationProfileId, uuid, revision,
+                      QSet<QString>(touchedFields.cbegin(), touchedFields.cend()));
+}
+
+QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationProfileId,
+                                      const QString& expectedUuid, int expectedRevision,
+                                      const QSet<QString>& touchedFields)
 {
     decolog::StartupSpan trace("save QSO");
     // Un nominativo sbagliato e corretto: quello che veniva dal vecchio (nazione, DXCC, zone,
@@ -4688,7 +4703,10 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
         applyEntity(r);
     }
     InsertResult res;
-    timed(tr("Saving the QSO in the database"), [&] { res = m_db.updateQso(id, r, stationProfileId); });
+    timed(tr("Saving the QSO in the database"), [&] {
+        res = expectedUuid.isEmpty() ? m_db.updateQso(id, r, stationProfileId)
+              : m_db.updateQsoGuarded(id, r, stationProfileId, expectedUuid, expectedRevision, touchedFields);
+    });
     if (res.status != InsertResult::Status::Inserted)
         return res.message.isEmpty() ? tr("Cannot save the QSO") : res.message;
     QStringList resent;
