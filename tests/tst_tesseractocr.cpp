@@ -202,7 +202,8 @@ class TestTesseractOcr : public QObject {
         const QVariantList selection{ids.at(0), ids.at(1)};
         const QVariantList duplicate{ids.at(0), ids.at(0)};
         QVERIFY(!QslOcrAcquisition::execute(dbPath, image, hash, "card.png", "duplicate", duplicate, &cancelled).value("ok").toBool());
-        const auto saved = QslOcrAcquisition::execute(dbPath, image, hash, "card.png", "K1AAA K1BBB", selection, &cancelled);
+        QVERIFY(!QslOcrAcquisition::execute(dbPath, image, hash, "card.png", "wrong origin", selection, &cancelled, db.identity(), QByteArray("different-file")).value("ok").toBool());
+        const auto saved = QslOcrAcquisition::execute(dbPath, image, hash, "card.png", "K1AAA K1BBB", selection, &cancelled, db.identity(), db.openFileIdentity());
         QVERIFY2(saved.value("ok").toBool(), qPrintable(saved.value("error").toString()));
         QCOMPARE(saved.value("attachmentId").toLongLong(), attachment);
         QCOMPARE(saved.value("newLinks").toInt(), 1);
@@ -215,7 +216,11 @@ class TestTesseractOcr : public QObject {
         QVERIFY(!q.next());
         QVERIFY(q.exec("SELECT id,uuid FROM qsl_ocr_acquisition")); QVERIFY(q.next());
         const qint64 acquisitionId=q.value(0).toLongLong(); const QString acquisitionUuid=q.value(1).toString();
-        const auto reviewed=QslOcrAcquisition::saveReviewExecute(dbPath,acquisitionId,acquisitionUuid,0,"Corrected: K1AAA",&cancelled);
+        const auto rejectedLog=QslOcrAcquisition::saveReviewExecute(dbPath,acquisitionId,acquisitionUuid,0,"Wrong log",&cancelled,QStringLiteral("different-log"),db.openFileIdentity());
+        QVERIFY(!rejectedLog.value("ok").toBool());
+        const auto rejectedFile=QslOcrAcquisition::saveReviewExecute(dbPath,acquisitionId,acquisitionUuid,0,"Wrong file",&cancelled,db.identity(),QByteArray("different-file"));
+        QVERIFY(!rejectedFile.value("ok").toBool());
+        const auto reviewed=QslOcrAcquisition::saveReviewExecute(dbPath,acquisitionId,acquisitionUuid,0,"Corrected: K1AAA",&cancelled,db.identity(),db.openFileIdentity());
         QVERIFY2(reviewed.value("ok").toBool(),qPrintable(reviewed.value("error").toString()));
         const qint64 reviewId=reviewed.value("reviewId").toLongLong(); QVERIFY(reviewId>0);
         QVERIFY(!QslOcrAcquisition::saveReviewExecute(dbPath,acquisitionId,acquisitionUuid,0,"stale",&cancelled).value("ok").toBool());
@@ -326,7 +331,8 @@ class TestTesseractOcr : public QObject {
         QSqlQuery q(db.connection());
         q.prepare("SELECT uuid FROM qsl_ocr_acquisition WHERE id=?"); q.addBindValue(first.value("acquisitionId")); QVERIFY(q.exec()); QVERIFY(q.next());
         const QString firstUuid = q.value(0).toString(); q.finish();
-        auto undone = QslOcrAcquisition::undoExecute(db.path(), first.value("acquisitionId").toLongLong(), firstUuid, &cancel);
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), first.value("acquisitionId").toLongLong(), firstUuid, &cancel, QStringLiteral("different-log"), db.openFileIdentity()).value("ok").toBool());
+        auto undone = QslOcrAcquisition::undoExecute(db.path(), first.value("acquisitionId").toLongLong(), firstUuid, &cancel, db.identity(), db.openFileIdentity());
         QVERIFY2(undone.value("ok").toBool(), qPrintable(undone.value("error").toString()));
         QCOMPARE(undone.value("removedLinks").toInt(), 1);
         QCOMPARE(db.qslAttachments(idAt(0)).size(), 1); QVERIFY(db.qslAttachments(idAt(1)).isEmpty());

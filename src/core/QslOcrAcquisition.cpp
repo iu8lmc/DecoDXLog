@@ -1,5 +1,6 @@
 #include "core/QslOcrAcquisition.h"
 #include "core/LogDatabase.h"
+#include "core/FileIdentity.h"
 #include "core/TesseractOcr.h"
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -14,6 +15,15 @@
 #include <QUuid>
 #include <limits>
 namespace decolog::core {
+namespace {
+bool writeOriginMatches(QSqlDatabase &db, const QString &path, const QString &identity, const QByteArray &fileToken)
+{
+    if (identity.isEmpty() && fileToken.isEmpty()) return true; // Legacy core test callers.
+    if (identity.isEmpty() || fileToken.isEmpty() || fileidentity::read(path) != fileToken) return false;
+    QSqlQuery q(db);
+    return q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && q.next() && q.value(0).toString() == identity;
+}
+}
 QslOcrAcquisition::QslOcrAcquisition(LogDatabase *db, TesseractOcr *ocr, QObject *parent)
     : QObject(parent), m_db(db), m_ocr(ocr) {}
 QslOcrAcquisition::~QslOcrAcquisition() { if (m_cancel) m_cancel->store(true); m_pool.waitForDone(); }
@@ -29,12 +39,14 @@ bool QslOcrAcquisition::start(const QVariantList &selected, const QUrl &original
     }
     const QString dbPath = m_db->path(), snapshot = m_ocr->snapshotPath(), hash = m_ocr->snapshotSha256();
     const QString filename = QFileInfo(original.toLocalFile()).fileName(), ocrText = m_ocr->text();
+    const QString identity=m_db->identity(); const QByteArray fileToken=m_db->openFileIdentity();
+    if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) { m_error=tr("The open log changed"); emit changed(); return false; }
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrAcquisition> self(this);
-    m_pool.start([self, dbPath, snapshot, hash, filename, ocrText, selected, cancelled] {
-        const QVariantMap result = execute(dbPath, snapshot, hash, filename, ocrText, selected, cancelled.get());
+    m_pool.start([self, dbPath, identity, fileToken, snapshot, hash, filename, ocrText, selected, cancelled] {
+        const QVariantMap result = execute(dbPath, snapshot, hash, filename, ocrText, selected, cancelled.get(), identity, fileToken);
         QMetaObject::invokeMethod(self.data(), [self, result] {
             if (!self) return;
             self->m_busy = false; self->m_cancel.reset(); self->m_result = result;
@@ -199,10 +211,12 @@ bool QslOcrAcquisition::saveReview(qint64 acquisitionId,const QString &uuid,qint
     if (!m_db || !m_db->isOpen() || m_db->path().isEmpty() || m_db->path()==QLatin1String(":memory:")) {
         m_error=tr("Choose an open file-backed log"); emit changed(); return false;
     }
-    const QString path=m_db->path(); m_cancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_cancel;
+    const QString path=m_db->path(), identity=m_db->identity(); const QByteArray fileToken=m_db->openFileIdentity();
+    if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) { m_error=tr("The open log changed"); emit changed(); return false; }
+    m_cancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_cancel;
     m_busy=true; emit changed(); QPointer<QslOcrAcquisition> self(this);
-    m_pool.start([self,path,acquisitionId,uuid,expectedReviewId,text,cancelled] {
-        const QVariantMap result=saveReviewExecute(path,acquisitionId,uuid,expectedReviewId,text,cancelled.get());
+    m_pool.start([self,path,identity,fileToken,acquisitionId,uuid,expectedReviewId,text,cancelled] {
+        const QVariantMap result=saveReviewExecute(path,acquisitionId,uuid,expectedReviewId,text,cancelled.get(),identity,fileToken);
         if (!self) return;
         QMetaObject::invokeMethod(self.data(),[self,result] {
             if (!self) return; self->m_busy=false; self->m_cancel.reset(); self->m_result=result;
@@ -211,7 +225,7 @@ bool QslOcrAcquisition::saveReview(qint64 acquisitionId,const QString &uuid,qint
     });
     return true;
 }
-QVariantMap QslOcrAcquisition::saveReviewExecute(const QString &path,qint64 acquisitionId,const QString &uuid,qint64 expectedReviewId,const QString &text,const std::atomic_bool *cancelled)
+QVariantMap QslOcrAcquisition::saveReviewExecute(const QString &path,qint64 acquisitionId,const QString &uuid,qint64 expectedReviewId,const QString &text,const std::atomic_bool *cancelled, const QString &expectedIdentity, const QByteArray &expectedFile)
 {
     auto failed=[](const QString& error) { return QVariantMap{{QStringLiteral("ok"),false},{QStringLiteral("operation"),QStringLiteral("saveReview")},{QStringLiteral("error"),error}}; };
     if (!cancelled || acquisitionId<=0 || uuid.isEmpty() || uuid.size()>80 || expectedReviewId<0 || text.trimmed().isEmpty() || text.size()>65536 || !QFileInfo(path).isFile())
@@ -225,6 +239,7 @@ QVariantMap QslOcrAcquisition::saveReviewExecute(const QString &path,qint64 acqu
         QSqlQuery q(db); bool transaction=false; bool ok=db.open();
         if (ok) ok=q.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
         if (ok) { ok=q.exec(QStringLiteral("BEGIN IMMEDIATE")); transaction=ok; }
+        if (ok && !writeOriginMatches(db, path, expectedIdentity, expectedFile)) { ok=false; result=failed(tr("The open log changed")); }
         if (ok) {
             q.prepare(QStringLiteral("SELECT COALESCE((SELECT MAX(id) FROM qsl_ocr_review WHERE acquisition_id=a.id),0) FROM qsl_ocr_acquisition a WHERE id=? AND uuid=? AND undone_at IS NULL"));
             q.addBindValue(acquisitionId); q.addBindValue(uuid);
@@ -237,6 +252,7 @@ QVariantMap QslOcrAcquisition::saveReviewExecute(const QString &path,qint64 acqu
             q.addBindValue(acquisitionId); q.addBindValue(text); q.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
             ok=q.exec(); if (ok) reviewId=q.lastInsertId().toLongLong();
         }
+        if (ok && !writeOriginMatches(db, path, expectedIdentity, expectedFile)) { ok=false; result=failed(tr("The open log changed")); }
         if (ok && !cancelled->load()) { ok=q.exec(QStringLiteral("COMMIT")); if (ok) transaction=false; }
         else ok=false;
         if (transaction) q.exec(QStringLiteral("ROLLBACK"));
@@ -254,13 +270,14 @@ bool QslOcrAcquisition::undo(qint64 acquisitionId, const QString &uuid)
         acquisitionId <= 0 || uuid.isEmpty() || uuid.size() > 80) {
         m_error = tr("Choose a saved OCR acquisition"); emit changed(); return false;
     }
-    const QString path = m_db->path();
+    const QString path = m_db->path(), identity=m_db->identity(); const QByteArray fileToken=m_db->openFileIdentity();
+    if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) { m_error=tr("The open log changed"); emit changed(); return false; }
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrAcquisition> self(this);
-    m_pool.start([self, path, acquisitionId, uuid, cancelled] {
-        const QVariantMap result = undoExecute(path, acquisitionId, uuid, cancelled.get());
+    m_pool.start([self, path, identity, fileToken, acquisitionId, uuid, cancelled] {
+        const QVariantMap result = undoExecute(path, acquisitionId, uuid, cancelled.get(), identity, fileToken);
         QMetaObject::invokeMethod(self.data(), [self, result] {
             if (!self) return;
             self->m_busy = false; self->m_cancel.reset(); self->m_result = result;
@@ -272,7 +289,7 @@ bool QslOcrAcquisition::undo(qint64 acquisitionId, const QString &uuid)
 }
 QVariantMap QslOcrAcquisition::execute(const QString &dbPath, const QString &snapshot, const QString &sha256,
                                        const QString &sourceName, const QString &ocrText,
-                                       const QVariantList &selected, const std::atomic_bool *cancelled)
+                                       const QVariantList &selected, const std::atomic_bool *cancelled, const QString &expectedIdentity, const QByteArray &expectedFile)
 {
     auto failed = [](const QString &error) { return QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("operation"), QStringLiteral("attach")}, {QStringLiteral("error"), error}}; };
     if (!cancelled || selected.isEmpty() || selected.size() > 100 || sha256.size() != 64 || ocrText.size() > 4 * 1024 * 1024)
@@ -312,6 +329,7 @@ QVariantMap QslOcrAcquisition::execute(const QString &dbPath, const QString &sna
         QSqlQuery q(db);
         if (ok) ok = q.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
         if (ok) { ok = q.exec(QStringLiteral("BEGIN IMMEDIATE")); transaction = ok; }
+        if (ok && !writeOriginMatches(db, dbPath, expectedIdentity, expectedFile)) { ok=false; result=failed(tr("The open log changed")); }
         for (const QVariant &entry : selected) {
             if (!ok || cancelled->load()) { ok = false; break; }
             const auto qso = entry.toMap();
@@ -359,6 +377,7 @@ QVariantMap QslOcrAcquisition::execute(const QString &dbPath, const QString &sna
                 q.addBindValue(added ? QVariant(linkToken) : QVariant()); q.addBindValue(added ? QVariant(1) : QVariant()); ok = q.exec();
             }
         }
+        if (ok && !writeOriginMatches(db, dbPath, expectedIdentity, expectedFile)) { ok=false; result=failed(tr("The open log changed")); }
         if (ok && !cancelled->load()) {
             ok = q.exec(QStringLiteral("COMMIT"));
             if (ok) { transaction = false; result = {{QStringLiteral("ok"), true}, {QStringLiteral("operation"), QStringLiteral("attach")}, {QStringLiteral("acquisitionId"), acquisitionId},
@@ -373,7 +392,7 @@ QVariantMap QslOcrAcquisition::execute(const QString &dbPath, const QString &sna
     return result;
 }
 QVariantMap QslOcrAcquisition::undoExecute(const QString &dbPath, qint64 acquisitionId, const QString &uuid,
-                                           const std::atomic_bool *cancelled)
+                                           const std::atomic_bool *cancelled, const QString &expectedIdentity, const QByteArray &expectedFile)
 {
     const auto failed = [](const QString &error) {
         return QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("operation"), QStringLiteral("undo")},
@@ -393,6 +412,7 @@ QVariantMap QslOcrAcquisition::undoExecute(const QString &dbPath, qint64 acquisi
         QSqlQuery q(db);
         if (ok) ok = q.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
         if (ok) { ok = q.exec(QStringLiteral("BEGIN IMMEDIATE")); transaction = ok; }
+        if (ok && !writeOriginMatches(db, dbPath, expectedIdentity, expectedFile)) { ok=false; result=failed(tr("The open log changed")); }
         qint64 attachmentId = 0;
         if (ok) {
             q.prepare(QStringLiteral("SELECT attachment_id FROM qsl_ocr_acquisition WHERE id=? AND uuid=? AND undone_at IS NULL"));
@@ -438,6 +458,7 @@ QVariantMap QslOcrAcquisition::undoExecute(const QString &dbPath, qint64 acquisi
             q.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
             q.addBindValue(acquisitionId); q.addBindValue(uuid); ok = q.exec() && q.numRowsAffected() == 1;
         }
+        if (ok && !writeOriginMatches(db, dbPath, expectedIdentity, expectedFile)) { ok=false; result=failed(tr("The open log changed")); }
         if (ok && !cancelled->load()) {
             ok = q.exec(QStringLiteral("COMMIT"));
             if (ok) { transaction = false; result = {{QStringLiteral("ok"), true}, {QStringLiteral("operation"), QStringLiteral("undo")},

@@ -31,12 +31,14 @@ class QslOcrAcquisition : public QObject {
     Q_INVOKABLE bool loadReviews(qint64 acquisitionId, const QString &uuid, qint64 beforeId);
     Q_INVOKABLE bool saveReview(qint64 acquisitionId, const QString &uuid, qint64 expectedReviewId, const QString &text);
     static QVariantMap saveReviewExecute(const QString &dbPath, qint64 acquisitionId, const QString &uuid,
-                                         qint64 expectedReviewId, const QString &text, const std::atomic_bool *cancelled);
+                                         qint64 expectedReviewId, const QString &text, const std::atomic_bool *cancelled,
+                                         const QString &expectedIdentity = {}, const QByteArray &expectedFile = {});
     static QVariantMap execute(const QString &dbPath, const QString &snapshot, const QString &sha256,
                                const QString &sourceName, const QString &ocrText,
-                               const QVariantList &selected, const std::atomic_bool *cancelled);
+                               const QVariantList &selected, const std::atomic_bool *cancelled,
+                               const QString &expectedIdentity = {}, const QByteArray &expectedFile = {});
     static QVariantMap undoExecute(const QString &dbPath, qint64 acquisitionId, const QString &uuid,
-                                   const std::atomic_bool *cancelled);
+                                   const std::atomic_bool *cancelled, const QString &expectedIdentity = {}, const QByteArray &expectedFile = {});
   signals:
     void changed();
     void finished(bool success);
