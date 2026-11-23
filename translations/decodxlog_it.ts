@@ -446,6 +446,30 @@
 <context>
     <name>AwardsDialog</name>
     <message>
+        <source>Award account (exact)</source>
+        <translation>Account diploma (corrispondenza esatta)</translation>
+    </message>
+    <message>
+        <source>Account (exact match)</source>
+        <translation>Account (corrispondenza esatta)</translation>
+    </message>
+    <message>
+        <source>Station: %1 · award account (exact local match): %2</source>
+        <translation>Stazione: %1 · account diploma (corrispondenza locale esatta): %2</translation>
+    </message>
+    <message>
+        <source>all stations</source>
+        <translation>tutte le stazioni</translation>
+    </message>
+    <message>
+        <source>all accounts</source>
+        <translation>tutti gli account</translation>
+    </message>
+    <message>
+        <source>unknown</source>
+        <translation>sconosciuto</translation>
+    </message>
+    <message>
         <source>Awards</source>
         <translation>Diplomi</translation>
     </message>

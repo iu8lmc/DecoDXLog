@@ -6,6 +6,33 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void selectionsAlsoRespectTheExactAwardAccount()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("accounts.sqlite"))); QString error;
+        QVERIFY(qslplanner::saveGoalSelection(db,1,{"dxcc"},&error));
+        QCOMPARE(*qslplanner::loadGoalSelectionForAccount(db,1,"account-A",&error),QStringList({"dxcc"}));
+        QVERIFY(qslplanner::saveGoalSelectionForAccount(db,1,"account-A",{"waz"},&error));
+        QVERIFY(qslplanner::saveGoalSelectionForAccount(db,1,"account-B",{"vucc"},&error));
+        QCOMPARE(*qslplanner::loadGoalSelectionForAccount(db,1,"account-A",&error),QStringList({"waz"}));
+        QCOMPARE(*qslplanner::loadGoalSelectionForAccount(db,1,"account-B",&error),QStringList({"vucc"}));
+        QCOMPARE(*qslplanner::loadGoalSelectionForAccount(db,1,"account-a",&error),QStringList({"dxcc"}));
+        QCOMPARE(*qslplanner::loadGoalSelection(db,1,&error),QStringList({"dxcc"}));
+    }
+    void accountFilterLimitsPlannerCandidates()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        StationProfile a; a.name="A"; a.stationCallsign="K1AAA"; a.awardAccount="account-A";
+        StationProfile b; b.name="B"; b.stationCallsign="K1BBB"; b.awardAccount="account-B";
+        const auto aId=db.saveStationProfile(a), bId=db.saveStationProfile(b); QVERIFY(aId>0 && bId>0);
+        const auto first=db.insertQso({{"CALL","K1ONE"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"}},"test",{},false,aId);
+        const auto second=db.insertQso({{"CALL","K1TWO"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","110"}},"test",{},false,bId);
+        QVERIFY(first.id>0 && second.id>0);
+        AwardFilter filter; filter.awardAccountUuid="account-A";
+        const auto plan=qslplanner::build(db,filter,{"dxcc"}); QVERIFY2(plan.error.isEmpty(),qPrintable(plan.error));
+        QCOMPARE(plan.candidates.size(),1); QCOMPARE(plan.candidates.first().qsoId,first.id);
+        filter.awardAccountUuid="account-B";
+        const auto other=qslplanner::build(db,filter,{"dxcc"}); QCOMPARE(other.candidates.size(),1); QCOMPARE(other.candidates.first().qsoId,second.id);
+    }
     void selectionsAreScopedPerLogAndProfile()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); QString error;

@@ -2599,8 +2599,10 @@ QVariantMap DecoLogController::qslGoalSelection() const
 {
     const int profile=m_awardFilter.stationProfileId;
     QString error;
-    const auto goals=qslplanner::loadGoalSelection(m_db,profile,&error);
-    const QString scope=QStringLiteral("%1:%2").arg(m_db.openGeneration()).arg(profile);
+    const QString account=m_awardFilter.awardAccountUuid;
+    const auto goals=qslplanner::loadGoalSelectionForAccount(m_db,profile,account,&error);
+    const auto accountHash=QCryptographicHash::hash(account.toUtf8(),QCryptographicHash::Sha256).toHex();
+    const QString scope=QStringLiteral("%1:%2:%3").arg(m_db.openGeneration()).arg(profile).arg(QString::fromLatin1(accountHash));
     return {{QStringLiteral("scope"),scope},{QStringLiteral("found"),bool(goals)},
             {QStringLiteral("goals"),goals ? QVariant(*goals) : QVariant(QStringList{})},
             {QStringLiteral("error"),error}};
@@ -2609,7 +2611,7 @@ QVariantMap DecoLogController::qslGoalSelection() const
 QString DecoLogController::saveQslGoalSelection(const QStringList& goals)
 {
     QString error;
-    if (!qslplanner::saveGoalSelection(m_db,m_awardFilter.stationProfileId,goals,&error))
+    if (!qslplanner::saveGoalSelectionForAccount(m_db,m_awardFilter.stationProfileId,m_awardFilter.awardAccountUuid,goals,&error))
         return error.isEmpty() ? tr("Cannot save QSL goals") : error;
     return {};
 }
@@ -3708,6 +3710,14 @@ void DecoLogController::setAwardProfile(int profileId)
 {
     if (profileId == m_awardFilter.stationProfileId) return;
     m_awardFilter.stationProfileId = qMax(0, profileId);
+    awardFilterChanged();
+}
+
+void DecoLogController::setAwardAccount(const QString& account)
+{
+    const QString normalized=account.trimmed();
+    if (normalized.size()>256 || normalized==m_awardFilter.awardAccountUuid) return;
+    m_awardFilter.awardAccountUuid=normalized;
     awardFilterChanged();
 }
 

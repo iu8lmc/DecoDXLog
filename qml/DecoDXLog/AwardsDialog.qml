@@ -162,6 +162,18 @@ DialogFrame {
         loadPlannerScope(false)
         console.warn("PROBE qslscopes " + JSON.stringify({first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError}))
     }
+    function probeQslAccounts(restore) {
+        openAt("dxcc"); decolog.awardProfile=1; decolog.awardAccount="account-A"; qslPlanner.open(); loadPlannerScope(true)
+        const firstInitial=plannerGoals.slice()
+        if (!restore) { plannerGoals=["waz"]; persistPlannerGoals() }
+        const first=plannerGoals.slice()
+        decolog.awardAccount="account-B"; loadPlannerScope(false)
+        const secondInitial=plannerGoals.slice()
+        if (!restore) { plannerGoals=["vucc"]; persistPlannerGoals() }
+        const second=plannerGoals.slice()
+        decolog.awardAccount="account-A"; loadPlannerScope(false)
+        console.warn("PROBE qslaccounts " + JSON.stringify({firstInitial:firstInitial,first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError,label:plannerAccountLabel.text}))
+    }
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
     function probeQslExternal() { openAt("dxcc"); plannerExternalStart.start() }
     Timer { id:plannerExternalStart; interval:1000
@@ -280,6 +292,13 @@ DialogFrame {
             Text {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
                 text: qsTr("Potential benefits use current award filters and rules. Candidates are shown by QSO ID; priority greedily covers new benefits, with ties favouring sent/unconfirmed accepted services, then QSO ID. Costs and success probabilities are not ranked. Review before action.")
+            }
+            Text {
+                id: plannerAccountLabel
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("Station: %1 · award account (exact local match): %2")
+                    .arg(decolog.awardProfile > 0 ? (decolog.stationProfiles.byId(decolog.awardProfile).name || qsTr("unknown")) : qsTr("all stations"))
+                    .arg(decolog.awardAccount || qsTr("all accounts"))
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -964,6 +983,14 @@ DialogFrame {
                     model: ids.map(id => id === 0 ? qsTr("All stations") : decolog.stationProfiles.byId(id).name)
                     currentIndex: Math.max(0, ids.indexOf(decolog.awardProfile))
                     onActivated: decolog.awardProfile = ids[currentIndex]
+                }
+                StyledTextField {
+                    Layout.preferredWidth: 160
+                    Accessible.name: qsTr("Award account (exact)")
+                    placeholderText: qsTr("Account (exact match)")
+                    text: decolog.awardAccount
+                    maximumLength: 256
+                    onEditingFinished: decolog.awardAccount = text.trim()
                 }
                 StyledComboBox {
                     Layout.preferredWidth: 130

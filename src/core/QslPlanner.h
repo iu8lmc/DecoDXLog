@@ -7,6 +7,8 @@ namespace decolog::core::qslplanner {
 // No value means there is no saved selection for this log/profile.
 std::optional<QStringList> loadGoalSelection(const LogDatabase& db, int profileId, QString* error = nullptr);
 bool saveGoalSelection(LogDatabase& db, int profileId, const QStringList& goals, QString* error = nullptr);
+std::optional<QStringList> loadGoalSelectionForAccount(const LogDatabase& db, int profileId, const QString& account, QString* error = nullptr);
+bool saveGoalSelectionForAccount(LogDatabase& db, int profileId, const QString& account, const QStringList& goals, QString* error = nullptr);
 
 struct PendingDetail { QString service, date, rawDate, dateStatus; int days{-1}; };
 PendingDetail pendingSince(const QslState& state, QDate today);

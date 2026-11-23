@@ -235,6 +235,7 @@ class DecoLogController : public QObject {
     // I 60 metri nel DXCC, nel Challenge e nel WAS (l'ARRL non li accetta).
     Q_PROPERTY(bool awardCount60m READ awardCount60m WRITE setAwardCount60m NOTIFY awardsChanged)
     Q_PROPERTY(int awardProfile READ awardProfile WRITE setAwardProfile NOTIFY awardsChanged)
+    Q_PROPERTY(QString awardAccount READ awardAccount WRITE setAwardAccount NOTIFY awardsChanged)
     Q_PROPERTY(QString awardTag READ awardTag WRITE setAwardTag NOTIFY awardsChanged)
     Q_PROPERTY(QVariantList dxCampaigns READ dxCampaigns NOTIFY dxCampaignChanged)
     Q_PROPERTY(QVariantMap dxCampaign READ dxCampaign NOTIFY dxCampaignChanged)
@@ -536,6 +537,8 @@ public:
     void setAwardCount60m(bool on);
     int awardProfile() const { return static_cast<int>(m_awardFilter.stationProfileId); }
     void setAwardProfile(int profileId);
+    QString awardAccount() const { return m_awardFilter.awardAccountUuid; }
+    void setAwardAccount(const QString& account);
     QString awardTag() const { return m_awardFilter.tag; }
     void setAwardTag(const QString& tag);
     QVariantList dxCampaigns() const;

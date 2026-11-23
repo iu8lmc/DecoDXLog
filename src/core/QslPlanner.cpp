@@ -26,14 +26,14 @@ QString goalSelectionKey(int profileId)
     return QStringLiteral("qslplanner.goals.v1.profile.%1").arg(profileId);
 }
 }
-std::optional<QStringList> loadGoalSelection(const LogDatabase& db, int profileId, QString* error)
+static std::optional<QStringList> loadGoalSelectionAtKey(const LogDatabase& db, int profileId, const QString& key, QString* error)
 {
     if (error) error->clear();
     if (!db.isOpen() || !db.fileIdentityMatchesOpen() || profileId < 0) {
         if (error) *error = QStringLiteral("Log unavailable or profile invalid"); return {};
     }
     QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?"));
-    q.addBindValue(goalSelectionKey(profileId));
+    q.addBindValue(key);
     if (!q.exec()) { if (error) *error=q.lastError().text(); return {}; }
     if (!q.next()) { if (error && q.lastError().isValid()) *error=q.lastError().text(); return {}; }
     QJsonParseError parse; const auto doc=QJsonDocument::fromJson(q.value(0).toString().toUtf8(),&parse);
@@ -45,7 +45,7 @@ std::optional<QStringList> loadGoalSelection(const LogDatabase& db, int profileI
     if (!validGoalSelection(profileId,goals)) { if (error) *error=QStringLiteral("Invalid saved QSL goals"); return {}; }
     return goals;
 }
-bool saveGoalSelection(LogDatabase& db, int profileId, const QStringList& goals, QString* error)
+static bool saveGoalSelectionAtKey(LogDatabase& db, int profileId, const QString& key, const QStringList& goals, QString* error)
 {
     if (error) error->clear();
     if (!db.isOpen() || !db.fileIdentityMatchesOpen() || !validGoalSelection(profileId,goals)) {
@@ -53,7 +53,7 @@ bool saveGoalSelection(LogDatabase& db, int profileId, const QStringList& goals,
     }
     const auto json=QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(goals)).toJson(QJsonDocument::Compact));
     QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
-    q.addBindValue(goalSelectionKey(profileId)); q.addBindValue(json);
+    q.addBindValue(key); q.addBindValue(json);
     if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
     return true;
 }
@@ -66,6 +66,34 @@ PendingDetail pendingSince(const QslState& state,QDate today)
     out.date=date.toString(Qt::ISODate);
     if (date>today) { out.dateStatus=QStringLiteral("future"); return out; }
     out.dateStatus=QStringLiteral("valid"); out.days=int(date.daysTo(today)); return out;
+}
+std::optional<QStringList> loadGoalSelection(const LogDatabase& db, int profileId, QString* error)
+{
+    return loadGoalSelectionAtKey(db,profileId,goalSelectionKey(profileId),error);
+}
+bool saveGoalSelection(LogDatabase& db, int profileId, const QStringList& goals, QString* error)
+{
+    return saveGoalSelectionAtKey(db,profileId,goalSelectionKey(profileId),goals,error);
+}
+static QString accountGoalKey(int profileId, const QString& account)
+{
+    const auto digest=QCryptographicHash::hash(account.toUtf8(),QCryptographicHash::Sha256).toHex();
+    return QStringLiteral("qslplanner.goals.v2.profile.%1.account.%2").arg(profileId).arg(QString::fromLatin1(digest));
+}
+std::optional<QStringList> loadGoalSelectionForAccount(const LogDatabase& db, int profileId, const QString& account, QString* error)
+{
+    if (account.isEmpty()) return loadGoalSelection(db,profileId,error);
+    if (account.size()>256 || account!=account.trimmed()) { if (error) *error=QStringLiteral("Invalid award account"); return {}; }
+    QString localError; auto result=loadGoalSelectionAtKey(db,profileId,accountGoalKey(profileId,account),&localError);
+    if (!localError.isEmpty()) { if (error) *error=localError; return {}; }
+    if (result) { if (error) error->clear(); return result; }
+    return loadGoalSelection(db,profileId,error);
+}
+bool saveGoalSelectionForAccount(LogDatabase& db, int profileId, const QString& account, const QStringList& goals, QString* error)
+{
+    if (account.isEmpty()) return saveGoalSelection(db,profileId,goals,error);
+    if (account.size()>256 || account!=account.trimmed()) { if (error) *error=QStringLiteral("Invalid award account"); return false; }
+    return saveGoalSelectionAtKey(db,profileId,accountGoalKey(profileId,account),goals,error);
 }
 int Benefit::alternativeCount(qint64 self, bool pendingOnly) const
 {

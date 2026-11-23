@@ -1120,6 +1120,23 @@ private slots:
         QCOMPARE(settings.value("qslPlanner/goalsJson").toString(),QStringLiteral("[\"wac\"]"));
     }
 
+    void qslPlannerGoalsFollowAwardAccountAcrossRestart()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          StationProfile p; p.name="Station"; p.stationCallsign="K1AAA"; QCOMPARE(db.saveStationProfile(p),qint64(1));
+          QString error; QVERIFY(qslplanner::saveGoalSelection(db,1,{"dxcc"},&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"qslaccountsprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("\"firstInitial\":[\"dxcc\"]") && output.contains("\"first\":[\"waz\"]") &&
+                 output.contains("\"secondInitial\":[\"dxcc\"]") && output.contains("\"second\":[\"vucc\"]") &&
+                 output.contains("\"back\":[\"waz\"]") && output.contains("\"error\":\"\"") &&
+                 output.contains("account-A"),output.constData());
+        QByteArray restored; QVERIFY2(launch(dir,"qslaccountsprobe:restore",restored,4500),restored.constData());
+        QVERIFY2(restored.contains("\"firstInitial\":[\"waz\"]") && restored.contains("\"secondInitial\":[\"vucc\"]") &&
+                 restored.contains("\"back\":[\"waz\"]"),restored.constData());
+    }
+
     void qslPlannerDesktopShowsBenefitsAndInvalidation()
     {
         using namespace decolog::core;
