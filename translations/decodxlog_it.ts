@@ -137,6 +137,8 @@
 </context>
 <context>
     <name>ActivationDialog</name>
+    <message><source>Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references; %3 awaiting activation-period review. %4 groups.</source><translation>Esclusi dal raggruppamento: %1 con data UTC mancante o non valida; %2 senza referenze dell'operatore; %3 in attesa di verifica del periodo di attivazione. %4 gruppi.</translation></message>
+    <message><source>activation period needs review</source><translation>periodo di attivazione da verificare</translation></message>
     <message>
         <source>Contest</source>
         <translation>Contest</translation>
@@ -6828,7 +6830,9 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 <context>
     <name>QsoDetailDialog</name>
     <message><source>Review recovered activation</source><translation>Verifica attivazione recuperata</translation></message>
-    <message><source>The QSO overlaps an uncertain activation period. Check the original records and enter only known values. No session is assigned. Applying changes the draft; save the QSO separately.</source><translation>Il QSO ricade in un periodo di attivazione incerto. Consulta i registri originali e inserisci solo i valori conosciuti. Non viene assegnata alcuna sessione. Applica le modifiche alla bozza e salva separatamente il QSO.</translation></message>
+    <message><source>The QSO overlaps an uncertain activation period. Check the original records and enter only known values. Review any existing session association below. Applying changes the draft; save the QSO separately.</source><translation>Il QSO ricade in un periodo di attivazione incerto. Consulta i registri originali e inserisci solo i valori conosciuti. Verifica l'eventuale associazione a una sessione indicata sotto. Applica le modifiche alla bozza e salva separatamente il QSO.</translation></message>
+    <message><source>Existing session identifier: %1</source><translation>Identificativo della sessione esistente: %1</translation></message>
+    <message><source>Remove this session association</source><translation>Rimuovi questa associazione alla sessione</translation></message>
     <message><source>My POTA reference</source><translation>La mia referenza POTA</translation></message>
     <message><source>My SOTA reference</source><translation>La mia referenza SOTA</translation></message>
     <message><source>My WWFF reference</source><translation>La mia referenza WWFF</translation></message>

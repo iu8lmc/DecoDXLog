@@ -1246,7 +1246,7 @@ private slots:
         using namespace decolog::core;
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
-          QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}},"fixture").id>0); }
+          QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"},{"APP_DECOLOG_ACTIVATION_UUID","source-session"}},"fixture").id>0); }
         QByteArray output; QVERIFY2(launch(dir,"activationreviewprobe",output,4000),output.constData());
         QVERIFY2(output.contains("PROBE activation review shown true") && output.contains("PROBE activation review cancel PERIOD_UNCERTAIN") && output.contains("PROBE activation review stale true") && output.contains("PROBE activation review saved true"),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso);

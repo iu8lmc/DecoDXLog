@@ -763,7 +763,7 @@ DialogFrame {
         }
         Note {
             visible: root.previewShown && !root.partitionPreview.error
-            text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
+            text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references; %3 awaiting activation-period review. %4 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg(root.partitionPreview.uncertainPeriod || 0).arg((root.partitionPreview.groups || []).length)
         }
         Repeater {
             id: exclusionRepeater
@@ -772,7 +772,7 @@ DialogFrame {
                 required property var modelData
                 text: qsTr("Excluded QSO #%1 · %2 · %3: %4")
                     .arg(modelData.id).arg(modelData.call || "—").arg(modelData.at || "—")
-                    .arg(modelData.reason === "missingDate" ? qsTr("missing or invalid UTC date") : qsTr("no operator programme reference"))
+                    .arg(modelData.reason === "missingDate" ? qsTr("missing or invalid UTC date") : modelData.reason === "uncertainPeriod" ? qsTr("activation period needs review") : qsTr("no operator programme reference"))
             }
         }
         RowLayout {

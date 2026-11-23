@@ -789,7 +789,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
             {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
     };
-    int count = 0, missingDate = 0, missingReference = 0;
+    int count = 0, missingDate = 0, missingReference = 0, uncertainPeriod = 0;
     const QList<QPair<QString, QString>> fields{{QStringLiteral("POTA"), QStringLiteral("MY_POTA_REF")},
         {QStringLiteral("SOTA"), QStringLiteral("MY_SOTA_REF")}, {QStringLiteral("WWFF"), QStringLiteral("MY_WWFF_REF")},
         {QStringLiteral("IOTA"), QStringLiteral("MY_IOTA")}};
@@ -797,6 +797,9 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
         ++count;
         const auto extra = QJsonDocument::fromJson(q.value(1).toString().toUtf8()).object();
+        if (extra.value(QStringLiteral("APP_DECOLOG_ACTIVATION_REVIEW")).toString() == QLatin1String("PERIOD_UNCERTAIN")) {
+            ++uncertainPeriod; exclude(QStringLiteral("uncertainPeriod")); continue;
+        }
         QDateTime timestamp = QDateTime::fromString(q.value(0).toString(), Qt::ISODate);
         if (timestamp.isValid()) timestamp.setTimeZone(QTimeZone::UTC);
         QDate date = timestamp.date();
@@ -885,6 +888,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     }
     result[QStringLiteral("groups")] = rows; result[QStringLiteral("reportedCount")] = count;
     result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
+    result[QStringLiteral("uncertainPeriod")] = uncertainPeriod;
     result[QStringLiteral("excluded")] = excluded;
     if (ownsTransaction && !db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;

@@ -37,6 +37,7 @@ DialogFrame {
     function openActivationReview() {
         activationReview.keys = ["MY_POTA_REF", "MY_SOTA_REF", "MY_WWFF_REF", "MY_IOTA", "MY_GRIDSQUARE", "STATION_CALLSIGN", "OPERATOR"]
         activationReview.values = activationReview.keys.map(k => String(root.field(k)))
+        removeActivationLink.checked = false
         activationReview.open()
     }
     function probeActivationReview() {
@@ -47,6 +48,7 @@ DialogFrame {
         activationReview.applyDraft(); decolog.editQsoField(root.qsoId,"comment","concurrent review edit"); root.save()
         console.warn("PROBE activation review stale " + (errorText.text.length > 0 && decolog.qsoDetail(root.qsoId).fields.APP_DECOLOG_ACTIVATION_REVIEW === "PERIOD_UNCERTAIN"))
         root.reload(); root.openActivationReview(); activationReview.values = ["IT-0002", "", "", "", "JM76", "", ""]
+        removeActivationLink.checked = true
         activationReview.applyDraft(); root.save()
         console.warn("PROBE activation review saved " + (root.field("APP_DECOLOG_ACTIVATION_REVIEW") === "" && root.field("MY_POTA_REF") === "IT-0002" && !errorText.text))
     }
@@ -195,6 +197,7 @@ DialogFrame {
         background: Rectangle { color: Theme.panelColor; border.color: Theme.warningColor; radius: 6 }
         function applyDraft() {
             for (let i=0; i<keys.length; ++i) root.setField(keys[i], String(values[i]).trim().toUpperCase())
+            if (removeActivationLink.checked) root.setField("APP_DECOLOG_ACTIVATION_UUID", "")
             root.setField("APP_DECOLOG_ACTIVATION_REVIEW", "")
             root.setField("APP_DECOLOG_ACTIVATION_REVIEWED_AT", new Date().toISOString())
             root.activationReviewApplied=true; root.formRev++; close()
@@ -203,7 +206,10 @@ DialogFrame {
             spacing: 7
             Text { Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true; text: qsTr("Review recovered activation") }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
-                text: qsTr("The QSO overlaps an uncertain activation period. Check the original records and enter only known values. No session is assigned. Applying changes the draft; save the QSO separately.") }
+                text: qsTr("The QSO overlaps an uncertain activation period. Check the original records and enter only known values. Review any existing session association below. Applying changes the draft; save the QSO separately.") }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
+                text: qsTr("Existing session identifier: %1").arg(root.field("APP_DECOLOG_ACTIVATION_UUID") || "—") }
+            CheckBox { id: removeActivationLink; visible: !!root.field("APP_DECOLOG_ACTIVATION_UUID"); text: qsTr("Remove this session association") }
             GridLayout {
                 columns: 2; Layout.fillWidth: true
                 Repeater {

@@ -342,6 +342,18 @@ private slots:
         legacy.stop(); QVERIFY(!legacy.active());
         QVERIFY(q.exec("SELECT COUNT(*) FROM activation_run")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
     }
+    void uncertainRecoveredContactIsExcludedUntilReviewed()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord qso{{"CALL","K1AAA"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+        act.session().applyTo(qso,0); qso.set("APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN");
+        const auto inserted=db.insertQso(qso,"fixture",{},true,0,false); QVERIFY(inserted.id>0);
+        const auto pending=act.partitionPreview(); QCOMPARE(pending.value("reportedCount").toInt(),1); QVERIFY(pending.value("groups").toList().isEmpty());
+        QCOMPARE(pending.value("uncertainPeriod").toInt(),1); const auto excluded=pending.value("excluded").toList(); QCOMPARE(excluded.size(),1); QCOMPARE(excluded.first().toMap().value("reason").toString(),QString("uncertainPeriod"));
+        qso.remove("APP_DECOLOG_ACTIVATION_REVIEW"); QVERIFY(db.updateQso(inserted.id,qso).status==InsertResult::Status::Inserted);
+        const auto reviewed=act.partitionPreview(); QCOMPARE(reviewed.value("groups").toList().size(),1); QCOMPARE(reviewed.value("uncertainPeriod").toInt(),0);
+    }
     void previewGroupsReportedQsosWithoutAttributingUnrelatedContacts()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
@@ -588,7 +600,11 @@ private slots:
             QCOMPARE(selected.at(0).value("MY_IOTA"), QString("EU-025")); QCOMPARE(selected.at(0).value("IOTA"), QString("NA-001"));
             QCOMPARE(selected.at(0).value("MY_SIG"), QString("POTA"));
         }
-        r.set("COMMENT", "changed after preview"); QCOMPARE(db.updateQso(inserted.id, r).status, InsertResult::Status::Inserted);
+        r.set("APP_DECOLOG_ACTIVATION_REVIEW", "PERIOD_UNCERTAIN"); QCOMPARE(db.updateQso(inserted.id, r).status, InsertResult::Status::Inserted);
+        exported.clear(); QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY(!exported.at(0).at(0).toBool());
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), data); file.close();
+        r.remove("APP_DECOLOG_ACTIVATION_REVIEW"); r.set("COMMENT", "changed after preview"); QCOMPARE(db.updateQso(inserted.id, r).status, InsertResult::Status::Inserted);
         exported.clear(); QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
         QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY(!exported.at(0).at(0).toBool());
         QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), data); file.close();
