@@ -924,6 +924,35 @@ QVariantMap ActivationController::sessionReviewTokens(const QString& uuid) const
     return {{QStringLiteral("summary"),summary},{QStringLiteral("token"),token}};
 }
 
+QVariantMap ActivationController::sessionReviewHistory(const QString& uuid, const QString& token, qint64 afterId) const
+{
+    const auto fail = [this](const QString& text) { return QVariantMap{{QStringLiteral("error"),text},{QStringLiteral("rows"),QVariantList{}}}; };
+    if (!m_ctx.db || !m_ctx.db->isOpen() || uuid.isEmpty() || token.isEmpty() || afterId<0)
+        return fail(tr("The activation history cannot be checked."));
+    QSqlDatabase db=m_ctx.db->connection(); QSqlQuery scope(db);
+    if (!scope.exec(QStringLiteral("SAVEPOINT activation_review_history"))) return fail(tr("The activation history cannot be checked."));
+    struct Release { QSqlDatabase db; ~Release() { QSqlQuery q(db); q.exec(QStringLiteral("RELEASE SAVEPOINT activation_review_history")); } } release{db};
+    if (m_ctx.db->activationRunToken(uuid)!=token) return fail(tr("The activation session changed; select it again."));
+    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT id,changed_at,event,substr(state_json,1,65537) FROM activation_run_change WHERE session_uuid=? AND id>? ORDER BY id LIMIT 51"));
+    q.addBindValue(uuid); q.addBindValue(afterId);
+    if (!q.exec()) return fail(tr("The activation history cannot be checked."));
+    QVariantList rows;
+    while (q.next()) {
+        if (rows.size() == 50) return {{QStringLiteral("rows"),rows},{QStringLiteral("hasMore"),true}};
+        const QString json=q.value(3).toString(); QJsonParseError parse; const auto doc=QJsonDocument::fromJson(json.toUtf8(),&parse);
+        const bool valid=json.size()<=65536 && parse.error==QJsonParseError::NoError && doc.isObject();
+        const auto state=valid ? doc.object() : QJsonObject{};
+        rows << QVariantMap{{QStringLiteral("id"),q.value(0)}, {QStringLiteral("at"),q.value(1).toString().left(64)}, {QStringLiteral("event"),q.value(2).toString().left(32)},
+            {QStringLiteral("valid"),valid}, {QStringLiteral("kind"),state.value(QStringLiteral("kind")).toString().left(64)},
+            {QStringLiteral("reference"),state.value(QStringLiteral("reference")).toString().left(512)},
+            {QStringLiteral("grid"),state.value(QStringLiteral("myGrid")).toString().left(64)},
+            {QStringLiteral("profileId"),state.value(QStringLiteral("stationProfileId")).toVariant()},
+            {QStringLiteral("programs"),QString::fromUtf8(QJsonDocument(state.value(QStringLiteral("programs")).toObject()).toJson(QJsonDocument::Compact)).left(1024)}};
+    }
+    if (q.lastError().isValid()) return fail(tr("The activation history cannot be checked."));
+    return {{QStringLiteral("rows"),rows},{QStringLiteral("hasMore"),false}};
+}
+
 QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
 {
     QVariantList rows;

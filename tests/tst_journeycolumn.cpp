@@ -1260,9 +1260,10 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}},"fixture").id>0);
-          QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('tracked-session','2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')")); }
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('tracked-session','2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')"));
+          QVERIFY(q.exec("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES('tracked-session','2026-11-01T11:00:00Z','start','{\"reference\":\"IT-0002\",\"myGrid\":\"JM76\"}')")); }
         QByteArray output; QVERIFY2(launch(dir,"activationassignprobe",output,4000),output.constData());
-        QVERIFY2(output.contains("PROBE activation assignment sessions 2") && output.contains("PROBE activation assignment saved true"),output.constData());
+        QVERIFY2(output.contains("PROBE activation assignment sessions 2") && output.contains("PROBE activation history rows 1 reference=IT-0002") && output.contains("PROBE activation assignment saved true"),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso);
         QCOMPARE(qso->value("APP_DECOLOG_ACTIVATION_UUID"),QString("tracked-session")); QCOMPARE(qso->value("MY_POTA_REF"),QString("IT-0002")); QVERIFY(qso->value("APP_DECOLOG_ACTIVATION_REVIEW").isEmpty());
     }

@@ -48,6 +48,18 @@ private slots:
         QVERIFY(q.exec("UPDATE activation_run SET ended_at='2026-11-01T14:00:00Z' WHERE uuid='reviewed'")); const auto changed=act.sessionReviewTokens("reviewed"); QVERIFY(changed.value("summary")!=listed);
         QVERIFY(q.exec("DELETE FROM activation_run_change WHERE session_uuid='reviewed'")); QVERIFY(q.exec("DELETE FROM activation_run WHERE uuid='reviewed'")); QVERIFY(act.sessionReviewTokens("reviewed").isEmpty());
     }
+    void sessionReviewHistoryPagesAndRejectsChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db,other; const auto path=dir.filePath("log.sqlite"); QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        QSqlQuery q(other.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('reviewed','2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')"));
+        QVERIFY(q.prepare("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES('reviewed','2026-11-01T12:00:00Z','update',?)"));
+        for (int i=0;i<55;++i) { q.bindValue(0,QString("{\"reference\":\"IT-%1\",\"myGrid\":\"JM75\",\"stationProfileId\":2}").arg(i,4,10,QLatin1Char('0'))); QVERIFY(q.exec()); }
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx)); const auto token=act.sessionReviewToken("reviewed"); QVERIFY(!token.isEmpty());
+        const auto first=act.sessionReviewHistory("reviewed",token,0); QVERIFY(first.value("error").toString().isEmpty()); const auto rows=first.value("rows").toList(); QCOMPARE(rows.size(),50); QVERIFY(first.value("hasMore").toBool());
+        QCOMPARE(rows.first().toMap().value("reference").toString(),QString("IT-0000")); QCOMPARE(rows.first().toMap().value("grid").toString(),QString("JM75")); QCOMPARE(rows.first().toMap().value("profileId").toLongLong(),qint64(2));
+        const auto second=act.sessionReviewHistory("reviewed",token,rows.last().toMap().value("id").toLongLong()); QCOMPARE(second.value("rows").toList().size(),5); QVERIFY(!second.value("hasMore").toBool());
+        QVERIFY(q.exec("UPDATE activation_run SET ended_at='2026-11-01T14:00:00Z' WHERE uuid='reviewed'")); const auto stale=act.sessionReviewHistory("reviewed",token,0); QVERIFY(!stale.value("error").toString().isEmpty()); QVERIFY(stale.value("rows").toList().isEmpty());
+    }
     void selectedContestFindingsAreReadOnlyAndBoundToLog()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

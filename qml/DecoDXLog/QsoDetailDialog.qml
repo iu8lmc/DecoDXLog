@@ -60,6 +60,7 @@ DialogFrame {
         root.openActivationReview()
         console.warn("PROBE activation assignment sessions " + activationReview.sessionRows.length)
         if (activationReview.sessionRows.length > 1) sessionChoice.activated(1)
+        activationHistory.start(); console.warn("PROBE activation history rows " + activationHistory.rows.length + " reference=" + (activationHistory.rows.length ? activationHistory.rows[0].reference : "")); activationHistory.close()
         activationReview.values = ["IT-0002", "", "", "", "JM76", "", ""]
         activationReview.applyDraft(); root.save()
         console.warn("PROBE activation assignment saved " + (root.field("APP_DECOLOG_ACTIVATION_UUID") === "tracked-session" && !errorText.text))
@@ -216,6 +217,46 @@ DialogFrame {
         onAccepted: decolog.exportQsos([root.qsoId], selectedFile)
     }
     Popup {
+        id: activationHistory
+        anchors.centerIn: Overlay.overlay; modal: true; padding: 16; width: 700; height: 440
+        property var rows: []
+        property var cursors: [0]
+        property int page: 0
+        property bool hasMore: false
+        property string failure: ""
+        function start() { cursors=[0]; page=0; load(); open() }
+        function load() {
+            const result=decolog.activation.sessionReviewHistory(activationReview.selectedUuid,activationReview.selectedToken,cursors[page])
+            rows=result.rows || []; hasMore=!!result.hasMore; failure=result.error || ""
+        }
+        background: Rectangle { color: Theme.panelColor; border.color: Theme.warningColor; radius: 6 }
+        contentItem: ColumnLayout {
+            Text { Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true; text: qsTr("Recorded activation changes") }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: activationHistory.failure || qsTr("These are application-recorded changes, not proof of the physical site or operator. Profile IDs refer to the recorded selection, not historical profile contents. Long values may be shortened.") }
+            ScrollView { Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                ColumnLayout { width: parent.width
+                    Repeater { model: activationHistory.rows
+                        Text { required property var modelData; Layout.fillWidth: true; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Theme.textPrimary
+                            text: modelData.valid ? qsTr("%1 · %2 · programme %3 · reference %4 · grid %5 · profile ID %6\nAdditional references: %7")
+                                .arg(modelData.at || "—").arg(modelData.event || "—").arg(modelData.kind || "—").arg(modelData.reference || "—").arg(modelData.grid || "—").arg(modelData.profileId || "—").arg(modelData.programs || "—")
+                                : qsTr("%1 · %2 · recorded state is invalid or too large to display").arg(modelData.at || "—").arg(modelData.event || "—") }
+                    }
+                }
+            }
+            RowLayout {
+                GlassButton { text: qsTr("Previous"); enabled: activationHistory.page > 0; onClicked: { activationHistory.page--; activationHistory.load() } }
+                Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(activationHistory.page+1) }
+                GlassButton { text: qsTr("Next"); enabled: activationHistory.hasMore && activationHistory.rows.length > 0; onClicked: {
+                    const cursors=activationHistory.cursors.slice(); cursors[activationHistory.page+1]=activationHistory.rows[activationHistory.rows.length-1].id
+                    activationHistory.cursors=cursors; activationHistory.page++; activationHistory.load()
+                } }
+                Item { Layout.fillWidth: true }
+                GlassButton { text: qsTr("Close"); onClicked: activationHistory.close() }
+            }
+        }
+    }
+    Popup {
         id: activationReview
         anchors.centerIn: Overlay.overlay; modal: true; padding: 16; width: 700; height: 650
         property var keys: []
@@ -267,6 +308,7 @@ DialogFrame {
                 } }
             Text { Layout.fillWidth: true; visible: !!activationReview.selectedUuid && !activationReview.selectedToken; wrapMode: Text.Wrap; color: Theme.warningColor
                 text: qsTr("The session could not be checked; reload and review it before saving.") }
+            GlassButton { text: qsTr("Review recorded changes…"); enabled: !!activationReview.selectedToken; onClicked: activationHistory.start() }
             RowLayout {
                 GlassButton { id: activationPreviousPage; text: qsTr("Previous sessions"); enabled: activationReview.page > 0; onClicked: { activationReview.page--; activationReview.loadSessions() } }
                 Text { text: qsTr("Page %1").arg(activationReview.page + 1); color: Theme.textSecondary }

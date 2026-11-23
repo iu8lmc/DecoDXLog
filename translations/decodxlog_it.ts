@@ -6829,6 +6829,13 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>QsoDetailDialog</name>
+    <message><source>Recorded activation changes</source><translation>Modifiche di attivazione registrate</translation></message>
+    <message><source>These are application-recorded changes, not proof of the physical site or operator. Profile IDs refer to the recorded selection, not historical profile contents. Long values may be shortened.</source><translation>Queste modifiche sono registrate dall'applicazione e non provano il sito fisico o l'operatore. Gli ID dei profili indicano la selezione registrata, non il contenuto storico dei profili. I valori lunghi possono essere abbreviati.</translation></message>
+    <message><source>%1 · %2 · programme %3 · reference %4 · grid %5 · profile ID %6
+Additional references: %7</source><translation>%1 · %2 · programma %3 · referenza %4 · locator %5 · ID profilo %6
+Referenze aggiuntive: %7</translation></message>
+    <message><source>%1 · %2 · recorded state is invalid or too large to display</source><translation>%1 · %2 · lo stato registrato non è valido o è troppo grande da mostrare</translation></message>
+    <message><source>Review recorded changes…</source><translation>Verifica le modifiche registrate…</translation></message>
     <message><source>The session could not be checked; reload and review it before saving.</source><translation>Impossibile verificare la sessione; ricaricala e controllala prima di salvare.</translation></message>
     <message><source>Keep the existing association</source><translation>Mantieni l'associazione esistente</translation></message>
     <message><source>Active session: %1</source><translation>Sessione attiva: %1</translation></message>
@@ -11107,6 +11114,8 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>decolog::app::ActivationController</name>
+    <message><source>The activation history cannot be checked.</source><translation>Impossibile verificare la cronologia dell'attivazione.</translation></message>
+    <message><source>The activation session changed; select it again.</source><translation>La sessione di attivazione è cambiata; selezionala di nuovo.</translation></message>
     <message>
         <source>Choose what kind of session it is</source>
         <translation>Scegli che tipo di sessione è</translation>
