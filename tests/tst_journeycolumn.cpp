@@ -1279,6 +1279,20 @@ private slots:
         QVERIFY2(output.contains("PROBE activation page first 101 next=true") && output.contains("PROBE activation page second 6 next=false") && output.contains("PROBE activation page retained session-000 page=0") && output.contains("PROBE activation page saved session-000 error="),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso); QCOMPARE(qso->value("APP_DECOLOG_ACTIVATION_UUID"),QString("session-000"));
     }
+    void recoveredActivationHistoryNavigatesPages()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('tracked-session','2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')"));
+          QVERIFY(q.prepare("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES('tracked-session','2026-11-01T12:00:00Z','update',?)"));
+          for (int i=0;i<55;++i) { q.bindValue(0,QString("{\"kind\":\"pota\",\"reference\":\"IT-%1\",\"myGrid\":\"JM75\",\"stationProfileId\":2}").arg(i,4,10,QLatin1Char('0'))); QVERIFY(q.exec()); } }
+        const auto capture=qEnvironmentVariable("DECOLOG_ACTIVATION_HISTORY_CAPTURE");
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("activationhistorypageprobe")+(capture.isEmpty()?QString():QStringLiteral(":")+capture),output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE activation events first 50 next=true") && output.contains("PROBE activation events second 5 next=false") && output.contains("PROBE activation events back 50 first=IT-0000"),output.constData());
+        if (!capture.isEmpty()) { QVERIFY2(output.contains("PROBE activation history image true"),output.constData()); QVERIFY(QFileInfo(capture).size()>0); }
+    }
     void recoveredRecordsUseTheirJournalPeriod()
     {
         using namespace decolog::core;

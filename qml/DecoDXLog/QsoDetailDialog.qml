@@ -76,6 +76,15 @@ DialogFrame {
         activationReview.applyDraft(); root.save()
         console.warn("PROBE activation page saved " + root.field("APP_DECOLOG_ACTIVATION_UUID") + " error=" + errorText.text)
     }
+    function probeActivationHistoryPages(capture) {
+        root.openActivationReview(); sessionChoice.activated(1); activationHistory.start()
+        console.warn("PROBE activation events first " + activationHistory.rows.length + " next=" + activationHistoryNext.enabled)
+        activationHistoryNext.clicked()
+        console.warn("PROBE activation events second " + activationHistory.rows.length + " next=" + activationHistoryNext.enabled)
+        activationHistoryPrevious.clicked()
+        console.warn("PROBE activation events back " + activationHistory.rows.length + " first=" + (activationHistory.rows[0] || {}).reference)
+        if (capture) Qt.callLater(function() { activationHistory.contentItem.grabToImage(function(image) { console.warn("PROBE activation history image " + image.saveToFile(capture)) }) })
+    }
 
     title: qsTr("QSO detail")
     dotColor: Theme.primaryColor
@@ -234,10 +243,10 @@ DialogFrame {
             Text { Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true; text: qsTr("Recorded activation changes") }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
                 text: activationHistory.failure || qsTr("These are application-recorded changes, not proof of the physical site or operator. Profile IDs refer to the recorded selection, not historical profile contents. Long values may be shortened.") }
-            ScrollView { Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-                ColumnLayout { width: parent.width
+            ScrollView { id: activationHistoryScroll; Layout.fillWidth: true; Layout.fillHeight: true; clip: true; contentWidth: availableWidth
+                ColumnLayout { width: activationHistoryScroll.availableWidth
                     Repeater { model: activationHistory.rows
-                        Text { required property var modelData; Layout.fillWidth: true; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Theme.textPrimary
+                        Text { required property var modelData; Layout.fillWidth: true; Layout.preferredWidth: 1; Layout.maximumWidth: activationHistoryScroll.availableWidth; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Theme.textPrimary
                             text: modelData.valid ? qsTr("%1 · %2 · programme %3 · reference %4 · grid %5 · profile ID %6\nAdditional references: %7")
                                 .arg(modelData.at || "—").arg(modelData.event || "—").arg(modelData.kind || "—").arg(modelData.reference || "—").arg(modelData.grid || "—").arg(modelData.profileId || "—").arg(modelData.programs || "—")
                                 : qsTr("%1 · %2 · recorded state is invalid or too large to display").arg(modelData.at || "—").arg(modelData.event || "—") }
@@ -245,9 +254,9 @@ DialogFrame {
                 }
             }
             RowLayout {
-                GlassButton { text: qsTr("Previous"); enabled: activationHistory.page > 0; onClicked: { activationHistory.page--; activationHistory.load() } }
+                GlassButton { id: activationHistoryPrevious; text: qsTr("Previous"); enabled: activationHistory.page > 0; onClicked: { activationHistory.page--; activationHistory.load() } }
                 Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(activationHistory.page+1) }
-                GlassButton { text: qsTr("Next"); enabled: activationHistory.hasMore && activationHistory.rows.length > 0; onClicked: {
+                GlassButton { id: activationHistoryNext; text: qsTr("Next"); enabled: activationHistory.hasMore && activationHistory.rows.length > 0; onClicked: {
                     const cursors=activationHistory.cursors.slice(); cursors[activationHistory.page+1]=activationHistory.rows[activationHistory.rows.length-1].id
                     activationHistory.cursors=cursors; activationHistory.page++; activationHistory.load()
                 } }

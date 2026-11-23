@@ -1380,6 +1380,7 @@ RoundedWindow {
         else if (what[0] === "activationreviewprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeActivationReview()) }
         else if (what[0] === "activationassignprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeActivationAssignment()) }
         else if (what[0] === "activationpageprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeActivationPagination()) }
+        else if (what[0] === "activationhistorypageprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeActivationHistoryPages(what.length > 1 ? startupShow.substring(startupShow.indexOf(":")+1) : "")) }
         else if (what[0] === "derivedrestoreprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeDerivedRestore()) }
         else if (what[0] === "derivedrecalcprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeDerivedRecalculate()) }
         else if (what[0] === "derivedpreviewprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeDerivedPreview(startupShow.substring(startupShow.indexOf(":")+1))) }
