@@ -1,6 +1,9 @@
 #include "core/ContestNetQsoTransfer.h"
 #include <QCryptographicHash>
 #include <QJsonArray>
+#include <QDataStream>
+#include <QIODevice>
+#include <QSqlRecord>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -19,6 +22,31 @@ bool number(const QJsonValue& v, int min, int max, int* out) {
 bool validPayload(const QByteArray& data,const QByteArray& digest) {
     const auto doc=adif::parse(data);
     return doc.records.size()==1 && ContestNetInventory::fingerprint(doc.records.first())==digest;
+}
+// Local-only guard. Each result row is serialized and hashed separately so
+// attachment contents are not loaded into memory. Run within a transaction.
+QByteArray localStateFingerprint(const QSqlDatabase& db,qint64 id) {
+    const QStringList statements{
+        QStringLiteral("SELECT * FROM qso WHERE id=?"),
+        QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,last_error,via FROM qsl_status WHERE qso_id=? ORDER BY service"),
+        QStringLiteral("SELECT x.attachment_id,x.link_token,x.link_revision,a.sha256,a.filename,a.mime,a.size,a.created_at,length(a.data) FROM qsl_attachment_qso x LEFT JOIN qsl_attachment a ON a.id=x.attachment_id WHERE x.qso_id=? ORDER BY x.attachment_id"),
+        QStringLiteral("SELECT id,field,previous_value,value,source,kind,acquired_at,valid_from,valid_to FROM qso_enrichment WHERE qso_id=? ORDER BY id")
+    };
+    QCryptographicHash hash(QCryptographicHash::Sha256); hash.addData(QByteArrayLiteral("contestnet-local-review-v1"));
+    for (int index=0;index<statements.size();++index) {
+        QSqlQuery query(db); if (!query.prepare(statements[index])) return {};
+        query.addBindValue(id); if (!query.exec()) return {};
+        int count=0; QByteArray marker; QDataStream head(&marker,QIODevice::WriteOnly); head.setVersion(QDataStream::Qt_6_0); head << index; hash.addData(marker);
+        const int columns=query.record().count();
+        while (query.next()) {
+            QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_0); stream << columns;
+            for (int column=0;column<columns;++column) stream << query.value(column);
+            if (stream.status()!=QDataStream::Ok) return {}; hash.addData(bytes); ++count;
+        }
+        if (query.lastError().isValid() || (index==0 && count!=1)) return {};
+        marker.clear(); QDataStream tail(&marker,QIODevice::WriteOnly); tail.setVersion(QDataStream::Qt_6_0); tail << count; hash.addData(marker);
+    }
+    return hash.result();
 }
 }
 Encoder::Encoder(const QString& transfer,const QString& log,const ContestNetInventoryRow& row)
@@ -157,6 +185,8 @@ Review reviewExisting(LogDatabase& db,const QString& expected,const Receiver& re
     if (!db.fileIdentityMatchesOpen() || db.identity()!=expected) return fail(QStringLiteral("Destination log changed"));
     review.logIdentity=expected; review.fileIdentity=db.openFileIdentity(); review.sourceLog=receiver.sourceLog(); review.uuid=incoming.uuid;
     review.id=id; review.localRevision=meta->revision; review.localDeleted=meta->deleted; review.localHash=ContestNetInventory::fingerprint(*record);
+    review.localStateHash=localStateFingerprint(connection,id);
+    if (review.localStateHash.isEmpty()) return fail(QStringLiteral("Cannot inspect complete local QSO state"));
     review.remoteRevision=incoming.revision; review.remoteDeleted=incoming.deleted; review.remoteHash=incoming.contentHash;
     review.remotePayloadHash=QCryptographicHash::hash(incoming.adifPayload,QCryptographicHash::Sha256);
     if (!connection.commit()) return fail(connection.lastError().text());
@@ -181,7 +211,8 @@ ApplyResult applyReviewed(LogDatabase& db,const QString& expected,const Receiver
     if (db.identity()!=expected || !db.fileIdentityMatchesOpen()) return fail(QStringLiteral("Destination log changed"));
     QString error; const auto meta=db.meta(review.id); const auto local=db.recordChecked(review.id,&error);
     if (!meta || !local || meta->uuid!=review.uuid || meta->revision!=review.localRevision || meta->deleted!=review.localDeleted
-        || ContestNetInventory::fingerprint(*local)!=review.localHash)
+        || ContestNetInventory::fingerprint(*local)!=review.localHash || review.localStateHash.isEmpty()
+        || localStateFingerprint(connection,review.id)!=review.localStateHash)
         return fail(error.isEmpty()?QStringLiteral("Local QSO changed since review"):error);
     if (incoming.deleted) {
         if (!db.softDeleteQso(review.id)) return fail(QStringLiteral("Cannot delete QSO"));

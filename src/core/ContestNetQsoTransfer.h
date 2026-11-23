@@ -36,7 +36,7 @@ private:
 };
 struct ApplyResult { bool ok{false}; bool inserted{false}; qint64 id{0}; QString error; };
 struct Review {
-    bool ok{false}; QString error, logIdentity, sourceLog, uuid; QByteArray fileIdentity, localHash, remoteHash, remotePayloadHash;
+    bool ok{false}; QString error, logIdentity, sourceLog, uuid; QByteArray fileIdentity, localHash, localStateHash, remoteHash, remotePayloadHash;
     qint64 id{0}; int localRevision{0}, remoteRevision{0}; bool localDeleted{false}, remoteDeleted{false};
 };
 Review reviewExisting(LogDatabase& db, const QString& expectedLogIdentity, const Receiver& receiver);
