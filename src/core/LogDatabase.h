@@ -149,6 +149,8 @@ struct ApiIdempotencyRecord {
     QByteArray contentType;
     QByteArray responseBody;
     QString createdAt;
+    std::optional<QByteArray> requestFormat;
+    std::optional<QByteArray> requestApp;
 };
 
 struct ConfirmationResult {

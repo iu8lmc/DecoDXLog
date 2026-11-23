@@ -425,13 +425,14 @@ private slots:
     {
         QNetworkAccessManager net;
         auto request = [&](const QByteArray& method, const QString& path, const QByteArray& body = {},
-                           const QByteArray& idempotencyKey = QByteArray()) {
+                           const QByteArray& idempotencyKey = QByteArray(),
+                           const QByteArray& contentType = "text/plain", const QByteArray& app = "tester") {
             QNetworkRequest r(QUrl(QStringLiteral("http://127.0.0.1:%1%2").arg(m_apiPort).arg(path)));
             r.setRawHeader("X-DecoDXLog-Token", "0123456789abcdef0123456789abcdef");
-            r.setRawHeader("X-App", "tester");
+            r.setRawHeader("X-App", app);
             if (!idempotencyKey.isEmpty())
                 r.setRawHeader("Idempotency-Key", idempotencyKey);
-            r.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("text/plain"));
+            r.setRawHeader("Content-Type", contentType);
             QNetworkReply* reply = net.sendCustomRequest(r, method, body);
             QSignalSpy done(reply, &QNetworkReply::finished);
             done.wait(5000);
@@ -473,6 +474,8 @@ private slots:
         QVERIFY2(waitFor([&] { return restartedListening.match(QString::fromUtf8(m_output)).hasMatch(); }, 90000),
                  m_output.right(2000).constData());
         const auto secondRetry = request("POST", QStringLiteral("/api/v1/qso"), retryBody, "retry-1");
+        QCOMPARE(request("POST", QStringLiteral("/api/v1/qso"), retryBody, "retry-1", "application/json").first, 409);
+        QCOMPARE(request("POST", QStringLiteral("/api/v1/qso"), retryBody, "retry-1", "text/plain", "other-app").first, 409);
         QCOMPARE(firstRetry.first, 201);
         QCOMPARE(secondRetry.first, 201);
         QCOMPARE(secondRetry.second, firstRetry.second);

@@ -104,7 +104,7 @@ profilo di stazione, attivazione aperta, doppioni, callbook e invio QSL automati
 Per i retry del client si può aggiungere `Idempotency-Key` (massimo 128 caratteri)
 alla POST. Quando la risposta di idempotenza è stata salvata, la stessa chiave e lo stesso
 corpo restituiscono la stessa risposta senza creare un secondo QSO. Riutilizzare la chiave con un corpo diverso restituisce
-`409`. Anche senza la chiave, la deduplicazione normale del log impedisce che lo
+`409`. Per le nuove chiavi vengono confrontati anche il formato effettivo (JSON o ADIF) e il nome `X-App` normalizzato usato per la provenienza: una differenza restituisce `409`. Le chiavi salvate prima della migrazione conservano il confronto storico del solo corpo, perché il contesto originario non è disponibile. Anche senza la chiave, la deduplicazione normale del log impedisce che lo
 stesso contatto venga registrato due volte; contatti distinti restano distinti.
 
 Le chiavi sono persistite nel database del log, con una retention di 30 giorni;

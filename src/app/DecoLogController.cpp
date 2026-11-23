@@ -4075,11 +4075,16 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const QString idempotencyKey = QString::fromUtf8(request.headers.value("idempotency-key")).trimmed();
         if (idempotencyKey.size() > 128)
             return HttpResponse::error(400, QStringLiteral("idempotency key is too long"));
+        const QByteArray requestFormat = request.headers.value("content-type").contains("json") ? QByteArray("json") : QByteArray("adif");
+        const QString app = QString::fromUtf8(request.headers.value("x-app")).trimmed();
+        const QByteArray requestApp = (app.isEmpty() ? QStringLiteral("API") : app.left(60)).toUtf8();
         if (!idempotencyKey.isEmpty()) {
             const auto previous = m_db.apiIdempotency(idempotencyKey);
             if (previous) {
-                if (previous->requestBody != request.body)
-                    return HttpResponse::error(409, QStringLiteral("idempotency key was used with a different body"));
+                if (previous->requestBody != request.body ||
+                    (previous->requestFormat && *previous->requestFormat != requestFormat) ||
+                    (previous->requestApp && *previous->requestApp != requestApp))
+                    return HttpResponse::error(409, QStringLiteral("idempotency key was used with a different request"));
                 return HttpResponse{previous->status, previous->contentType, previous->responseBody};
             }
         }
@@ -4092,7 +4097,6 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const AdifDocument doc = adif::parse(adifText);
         if (doc.records.isEmpty())
             return HttpResponse::error(400, QStringLiteral("no ADIF record in the body"));
-        const QString app = QString::fromUtf8(request.headers.value("x-app")).trimmed();
         QJsonArray results;
         int saved = 0;
         for (AdifRecord record : doc.records) {
@@ -4112,7 +4116,8 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         if (!idempotencyKey.isEmpty())
             m_db.saveApiIdempotency(idempotencyKey,
                                     ApiIdempotencyRecord{request.body, response.status, response.contentType,
-                                                         response.body, QDateTime::currentDateTimeUtc().toString(Qt::ISODate)});
+                                                         response.body, QDateTime::currentDateTimeUtc().toString(Qt::ISODate),
+                                                         requestFormat, requestApp});
         return response;
     }
 

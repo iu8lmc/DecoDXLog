@@ -28,7 +28,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 29;
+constexpr int kSchemaVersion = 30;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -250,7 +250,7 @@ private slots:
         { LogDatabase db; QVERIFY(db.open(path)); const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0); qsoId=qso.id;
           QslState state; state.service="lotw"; state.sent="Y"; QVERIFY(db.setQslState(qsoId,state)); const auto before=db.contestNetChangesAfter(0,10); QVERIFY(before.ok); watermark=before.changes.last().sequence;
           QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_update")); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_delete")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=29")); }
-        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),29); QCOMPARE(db.qsoCount(),1); QVERIFY(db.contestNetChangesAfter(watermark,10).changes.isEmpty());
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),1); QVERIFY(db.contestNetChangesAfter(watermark,10).changes.isEmpty());
           QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qsl_status SET sent='N' WHERE qso_id="+QString::number(qsoId))); const auto after=db.contestNetChangesAfter(watermark,10); QVERIFY(after.ok); QCOMPARE(after.changes.size(),1); QCOMPARE(after.changes.first().qsoUuid,db.meta(qsoId)->uuid); }
     }
     void contestNetInventoryRejectsIncompleteQslJournalSchema()
@@ -1751,6 +1751,38 @@ private slots:
             QCOMPARE(found->contentType, QByteArray("application/json"));
             QVERIFY(!reopened.apiIdempotency(QStringLiteral("missing")));
             QVERIFY(found->requestBody != QByteArray("body-b"));
+        }
+    }
+
+    void apiIdempotencyMigrationPreservesLegacyAndRequestContext()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("api-context.sqlite"));
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            QVERIFY(db.saveApiIdempotency(QStringLiteral("legacy"), {"body", 201, "application/json", "{}", {}}));
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec(QStringLiteral("ALTER TABLE api_idempotency DROP COLUMN request_format")));
+            QVERIFY(q.exec(QStringLiteral("ALTER TABLE api_idempotency DROP COLUMN request_app")));
+            QVERIFY(q.exec(QStringLiteral("DELETE FROM schema_version WHERE version=30")));
+        }
+        {
+            LogDatabase db; QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), kSchemaVersion);
+            const auto legacy = db.apiIdempotency(QStringLiteral("legacy"));
+            QVERIFY(legacy); QVERIFY(!legacy->requestFormat); QVERIFY(!legacy->requestApp);
+            const ApiIdempotencyRecord modern{"body", 201, "application/json", "{}", {}, QByteArray("adif"), QByteArray("tester")};
+            QVERIFY(db.saveApiIdempotency(QStringLiteral("modern"), modern));
+            auto changed = modern; changed.requestApp = QByteArray("other");
+            QVERIFY(!db.saveApiIdempotency(QStringLiteral("modern"), changed));
+        }
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            const auto modern = db.apiIdempotency(QStringLiteral("modern"));
+            QVERIFY(modern); QVERIFY(modern->requestFormat); QVERIFY(modern->requestApp);
+            QCOMPARE(*modern->requestFormat, QByteArray("adif"));
+            QCOMPARE(*modern->requestApp, QByteArray("tester"));
         }
     }
 

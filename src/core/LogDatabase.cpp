@@ -540,6 +540,8 @@ bool LogDatabase::migrate()
               "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=OLD.qso_id AND OLD.qso_id IS NOT NEW.qso_id; END"),
               QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qsl_delete AFTER DELETE ON qsl_status BEGIN "
               "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=OLD.qso_id; END")}, nullptr},
+        {30, {QStringLiteral("ALTER TABLE api_idempotency ADD COLUMN request_format BLOB"),
+              QStringLiteral("ALTER TABLE api_idempotency ADD COLUMN request_app BLOB")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -550,6 +552,18 @@ bool LogDatabase::migrate()
         }
         QSqlQuery q(db);
         QStringList statements = step.statements;
+        if (step.to == 30) {
+            QSqlQuery columns(db);
+            if (!columns.exec(QStringLiteral("PRAGMA table_info(api_idempotency)"))) {
+                m_lastError = columns.lastError().text();
+                db.rollback();
+                return false;
+            }
+            QSet<QString> names;
+            while (columns.next()) names.insert(columns.value(1).toString());
+            if (names.contains(QStringLiteral("request_format"))) statements.removeAt(0);
+            if (names.contains(QStringLiteral("request_app"))) statements.removeAll(QStringLiteral("ALTER TABLE api_idempotency ADD COLUMN request_app BLOB"));
+        }
         if (step.to == 10) {
             QSqlQuery exists(db);
             if (!exists.exec(QStringLiteral("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='station_profile'"))
@@ -683,12 +697,14 @@ std::optional<ApiIdempotencyRecord> LogDatabase::apiIdempotency(const QString& k
 
     QSqlQuery q(connection());
     q.prepare(QStringLiteral("SELECT request_body, status, content_type, response_body, created_at "
-                             "FROM api_idempotency WHERE key = ?"));
+                             " , request_format, request_app FROM api_idempotency WHERE key = ?"));
     q.addBindValue(key);
     if (!q.exec() || !q.next())
         return std::nullopt;
     return ApiIdempotencyRecord{q.value(0).toByteArray(), q.value(1).toInt(), q.value(2).toByteArray(),
-                                q.value(3).toByteArray(), q.value(4).toString()};
+                                q.value(3).toByteArray(), q.value(4).toString(),
+                                q.value(5).isNull() ? std::nullopt : std::optional<QByteArray>(q.value(5).toByteArray()),
+                                q.value(6).isNull() ? std::nullopt : std::optional<QByteArray>(q.value(6).toByteArray())};
 }
 
 bool LogDatabase::saveApiIdempotency(const QString& key, const ApiIdempotencyRecord& record)
@@ -700,8 +716,8 @@ bool LogDatabase::saveApiIdempotency(const QString& key, const ApiIdempotencyRec
                                   : record.createdAt;
     QSqlQuery q(connection());
     q.prepare(QStringLiteral("INSERT INTO api_idempotency "
-                             "(key, request_body, status, content_type, response_body, created_at) "
-                             "VALUES (?, ?, ?, ?, ?, ?) "
+                             "(key, request_body, status, content_type, response_body, created_at, request_format, request_app) "
+                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
                              "ON CONFLICT(key) DO NOTHING"));
     q.addBindValue(key);
     q.addBindValue(record.requestBody);
@@ -709,6 +725,8 @@ bool LogDatabase::saveApiIdempotency(const QString& key, const ApiIdempotencyRec
     q.addBindValue(record.contentType);
     q.addBindValue(record.responseBody);
     q.addBindValue(createdAt);
+    q.addBindValue(record.requestFormat ? QVariant(*record.requestFormat) : QVariant(QMetaType::fromType<QByteArray>()));
+    q.addBindValue(record.requestApp ? QVariant(*record.requestApp) : QVariant(QMetaType::fromType<QByteArray>()));
     if (!q.exec())
         return false;
     if (q.numRowsAffected() > 0)
@@ -721,7 +739,8 @@ bool LogDatabase::saveApiIdempotency(const QString& key, const ApiIdempotencyRec
     return existing && existing->requestBody == record.requestBody
         && existing->status == record.status
         && existing->contentType == record.contentType
-        && existing->responseBody == record.responseBody;
+        && existing->responseBody == record.responseBody
+        && existing->requestFormat == record.requestFormat && existing->requestApp == record.requestApp;
 }
 
 QString LogDatabase::isoFromAdif(const QString& date, const QString& time)
