@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
+from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -53,6 +54,23 @@ class ManagerTests(unittest.TestCase):
             manager.remove(extensions,manifest['id']); self.assertEqual(manager.list_installed(extensions),[])
             db=sqlite3.connect(log); self.assertEqual(db.execute('select call from qso').fetchall(),[('K1ABC',)]); db.close()
             self.assertRaises(ValueError,manager.run,extensions,manifest['id'],'read-token',12345,1)
+
+    def test_incompatible_or_invalid_update_keeps_active_version(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); src=base/'src'; src.mkdir(); root=base/'installed'; entry=src/'demo.py'; entry.write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.demo','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=src/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            manifest.update(version='2.0.0',permissions=['status.read']); path.write_text(json.dumps(manifest))
+            with self.assertRaises(ValueError): manager.install(root,path)
+            self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
+            manifest['permissions']=['qso.read']; path.write_text(json.dumps(manifest)); entry.write_text('def broken(:\n')
+            with self.assertRaises(ValueError): manager.install(root,path)
+            self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
+            entry.write_text("print('valid')\n")
+            with patch.object(manager, '_atomic_file', side_effect=OSError('injected pointer failure')):
+                with self.assertRaises(OSError): manager.install(root,path)
+            self.assertEqual(manager.list_installed(root)[0]['version'],'1.0.0')
+            manager.install(root,path); self.assertEqual(manager.list_installed(root)[0]['version'],'2.0.0')
 
     def test_dependencies_are_copied_and_changes_detected(self):
         with tempfile.TemporaryDirectory() as temp:

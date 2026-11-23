@@ -75,10 +75,16 @@ def install(root, manifest_path):
     manifest_path = pathlib.Path(manifest_path)
     _regular(manifest_path, harness.MAX_MANIFEST)
     manifest = harness.load_manifest(manifest_path)
+    harness.supported_scope(manifest)
     files = {name: _regular(manifest_path.parent / name, MAX_ENTRY)
              for name in [manifest['entrypoint']] + manifest.get('dependencies', [])}
     if sum(map(len, files.values())) > 4 * MAX_ENTRY:
         raise ValueError('extension files are too large')
+    for name, data in files.items():
+        try:
+            compile(data, name, 'exec', dont_inherit=True)
+        except (SyntaxError, ValueError) as exc:
+            raise ValueError('invalid extension Python source') from exc
     manifest_bytes = (json.dumps(manifest, sort_keys=True, ensure_ascii=False, indent=2)+'\n').encode()
     folder = _directory(_root(root, create=True), manifest['id'], create=True)
     version = folder / manifest['version']

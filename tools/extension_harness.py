@@ -85,16 +85,19 @@ def contains_secret(value, secret):
     return False
 
 
+def supported_scope(manifest):
+    permissions = set(manifest["permissions"])
+    if "qso.read" in permissions and "tracker.read" not in permissions:
+        return "recent_sample"
+    if "tracker.read" in permissions and "qso.read" not in permissions:
+        return "tracker_snapshot"
+    raise ValueError("the harness requires one supported example capability")
+
+
 def run_extension(manifest_path, token, port, timeout):
     manifest_path = pathlib.Path(manifest_path).resolve(strict=True)
     manifest = load_manifest(manifest_path)
-    permissions = set(manifest["permissions"])
-    if "qso.read" in permissions and "tracker.read" not in permissions:
-        expected_scope = "recent_sample"
-    elif "tracker.read" in permissions and "qso.read" not in permissions:
-        expected_scope = "tracker_snapshot"
-    else:
-        raise ValueError("the harness requires one supported example capability")
+    expected_scope = supported_scope(manifest)
     if not token or not 1 <= port <= 65535 or not 0.1 <= timeout <= 60:
         raise ValueError("invalid token, port or timeout")
     env = {k: os.environ[k] for k in ("PATH", "SYSTEMROOT", "WINDIR") if k in os.environ}
