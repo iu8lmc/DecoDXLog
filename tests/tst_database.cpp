@@ -1834,6 +1834,31 @@ private slots:
         QCOMPARE(db.record(good.id)->value("LOTW_QSL_SENT"), QStringLiteral("Y"));
     }
 
+    void nestedQsoUpdateFailureRestoresRecordQslAndHistory()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const AdifRecord original{{"CALL", "K1OLD"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                                  {"BAND", "20m"}, {"MODE", "CW"}, {"NAME", "Before"}, {"LOTW_QSL_SENT", "Y"}};
+        const auto inserted = db.insertQso(original, "test");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        const auto revision = db.meta(inserted.id)->revision;
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER fail_qsl_edit BEFORE INSERT ON qsl_status BEGIN SELECT RAISE(FAIL, 'injected qsl failure'); END")));
+        QVERIFY(q.exec(QStringLiteral("BEGIN IMMEDIATE")));
+        auto changed = original; changed.set("NAME", "After");
+        const auto failure = db.updateQso(inserted.id, changed);
+        QCOMPARE(failure.status, InsertResult::Status::Error);
+        QCOMPARE(db.record(inserted.id)->value("NAME"), QStringLiteral("Before"));
+        QCOMPARE(db.record(inserted.id)->value("LOTW_QSL_SENT"), QStringLiteral("Y"));
+        QCOMPARE(db.meta(inserted.id)->revision, revision);
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM qso_history"))); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0); q.finish();
+        QVERIFY(q.exec(QStringLiteral("DROP TRIGGER fail_qsl_edit")));
+        QCOMPARE(db.updateQso(inserted.id, changed).status, InsertResult::Status::Inserted);
+        QVERIFY(q.exec(QStringLiteral("COMMIT")));
+        QCOMPARE(db.record(inserted.id)->value("NAME"), QStringLiteral("After"));
+        QCOMPARE(db.record(inserted.id)->value("LOTW_QSL_SENT"), QStringLiteral("Y"));
+    }
+
     void insertAndReadBack()
     {
         LogDatabase db;

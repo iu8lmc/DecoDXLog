@@ -1295,10 +1295,19 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
     if (!p)
         return result;
 
-    // Dentro una transazione gia' aperta (un import, una correzione in blocco)
-    // si lavora in quella; altrimenti se ne apre una propria.
+    // A savepoint protects the entire edit even within a caller's transaction.
     QSqlDatabase db = connection();
-    const bool ownTransaction = db.transaction();
+    QSqlQuery savepoint(db);
+    if (!savepoint.exec(QStringLiteral("SAVEPOINT decolog_update_qso"))) {
+        result.message = savepoint.lastError().text();
+        m_lastError = result.message;
+        return result;
+    }
+    const auto rollbackUpdate = [&] {
+        QSqlQuery rollback(db);
+        rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_update_qso"));
+        rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_update_qso"));
+    };
 
     QSqlQuery h(db);
     h.prepare(QStringLiteral(
@@ -1309,9 +1318,9 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
     h.addBindValue(reason);
     h.addBindValue(nowIso());
     if (!h.exec()) {
-        if (ownTransaction)
-            db.rollback();
         result.message = h.lastError().text();
+        rollbackUpdate();
+        m_lastError = result.message;
         return result;
     }
 
@@ -1343,14 +1352,22 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
     for (const auto& v : values)
         u.addBindValue(v);
     u.addBindValue(id);
-    if (!u.exec() || !writeQsl(id, p->qsl, true)) {
+    if (!u.exec()) {
         result.message = u.lastError().text();
-        if (ownTransaction)
-            db.rollback();
+        rollbackUpdate();
+        m_lastError = result.message;
         return result;
     }
-    if (ownTransaction && !db.commit()) {
-        result.message = db.lastError().text();
+    if (!writeQsl(id, p->qsl, true)) {
+        result.message = QStringLiteral("cannot write QSL status");
+        rollbackUpdate();
+        m_lastError = result.message;
+        return result;
+    }
+    if (!savepoint.exec(QStringLiteral("RELEASE SAVEPOINT decolog_update_qso"))) {
+        result.message = savepoint.lastError().text();
+        rollbackUpdate();
+        m_lastError = result.message;
         return result;
     }
     result.status = InsertResult::Status::Inserted;
