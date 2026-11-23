@@ -73,6 +73,7 @@ private slots:
         QVERIFY2(output.contains("PROBE qslplan status 3 potential benefits · 3 candidate QSO"),output.constData());
         QVERIFY2(output.contains("K1PAA") && output.contains("M0ABC"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan row K1PAA") && output.contains("DXCC 291"),output.constData());
+        QVERIFY2(output.contains("Alternative: its benefits are covered by higher-priority candidates") && output.contains("\"priorityRank\":1") && output.contains("\"pendingMarginalCount\":2"),output.constData());
         QVERIFY2(output.contains("sent/unconfirmed alternatives: 2"),output.constData());
         QVERIFY2(output.contains("route evidence older than 180 days; verify") && output.contains("route source: fixture"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan group M0ABC · bureau · QSO: 1, 2 · potential benefits: 2 · cost unknown"),output.constData());

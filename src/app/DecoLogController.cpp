@@ -2291,6 +2291,8 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         QVariantList ungrouped; for (qint64 id : plan.ungroupedPaperQsoIds) ungrouped << id;
         for (const auto& candidate : plan.candidates) {
             QVariantList benefits;
+            QStringList marginal;
+            for (const auto& key : candidate.marginalBenefits) marginal << key.first.toUpper()+QLatin1Char(' ')+key.second;
             for (const auto& benefit : candidate.benefits) {
                 auto sortedIds=[](const QSet<qint64>& values) {
                     QList<qint64> ids=values.values(); std::sort(ids.begin(),ids.end());
@@ -2308,6 +2310,8 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
                 {QStringLiteral("manager"),candidate.manager},{QStringLiteral("managerSource"),candidate.managerSource},
                 {QStringLiteral("managerObservedAt"),candidate.managerObservedAt.toString(Qt::ISODate)},
                 {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("benefits"),benefits},
+                {QStringLiteral("priorityRank"),candidate.priorityRank},{QStringLiteral("marginalBenefits"),marginal},
+                {QStringLiteral("pendingMarginalCount"),candidate.pendingMarginalCount},
                 {QStringLiteral("alternatives"),alternatives}};
         }
         if (!self) return;

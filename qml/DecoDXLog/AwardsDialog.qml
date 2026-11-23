@@ -161,7 +161,7 @@ DialogFrame {
             spacing: 8
             Text {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                text: qsTr("Uses the current award filters and locally configured rules. Benefits are estimates, not official credits. Updates after in-app changes.")
+                text: qsTr("Potential benefits use current award filters and rules. Candidates are shown by QSO ID; priority greedily covers new benefits, with ties favouring sent/unconfirmed accepted services, then QSO ID. Costs and success probabilities are not ranked. Review before action.")
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -236,7 +236,7 @@ DialogFrame {
                 model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.candidates || [])
                 delegate: Rectangle {
                     required property var modelData
-                    readonly property string probeText: candidateHeading.text + " " + candidateBenefits.text
+                    readonly property string probeText: candidateHeading.text + " " + candidatePriority.text + " " + candidateBenefits.text
                     readonly property string probeRoute: candidateRoute.text
                     width: ListView.view.width; height: row.implicitHeight + 14; radius: 4
                     color: Theme.glassOverlay; border.color: Theme.borderSoft
@@ -244,12 +244,17 @@ DialogFrame {
                         id: row; anchors.fill: parent; anchors.margins: 7
                         Text { id: candidateHeading; Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true
                             text: modelData.call + "  #" + modelData.id + "  ·  " + (modelData.manager || qsTr("manager unknown")) }
+                        Text { id: candidatePriority; Layout.fillWidth: true; color: Theme.textSecondary; wrapMode: Text.Wrap
+                            text: modelData.priorityRank > 0
+                                  ? qsTr("Priority %1 · adds %2 · %3 already sent/unconfirmed").arg(modelData.priorityRank)
+                                      .arg(modelData.marginalBenefits.join(", ")).arg(modelData.pendingMarginalCount)
+                                  : qsTr("Alternative: its benefits are covered by higher-priority candidates") }
                         Text { id: candidateBenefits; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
                             text: modelData.benefits.map(b => b.award.toUpperCase() + " " + b.key + " [" + b.services.join(", ") + "] · "
                                 + qsTr("alternatives: %1").arg(b.alternatives.join(", ") || qsTr("none"))
                                 + (b.pendingAlternatives.length ? " · " + qsTr("sent/unconfirmed alternatives: %1").arg(b.pendingAlternatives.join(", ")) : "")).join("\n") }
                         Text { id: candidateRoute; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                            text: qsTr("Sent/unconfirmed services: %1 · route source: %2 · observed: %3 · %4 · cost unknown")
+                            text: qsTr("Sent/unconfirmed services: %1 · route source: %2 · observed: %3 · %4")
                                 .arg(modelData.pending.join(", ") || qsTr("none recorded"))
                                 .arg(modelData.managerSource || qsTr("unknown"))
                                 .arg(modelData.managerObservedAt || qsTr("unknown"))

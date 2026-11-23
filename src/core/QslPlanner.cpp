@@ -7,6 +7,7 @@
 #include <QJsonObject>
 #include <QRegularExpression>
 #include <algorithm>
+#include <queue>
 
 namespace decolog::core::qslplanner {
 namespace {
@@ -135,6 +136,52 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         result.candidates.append(candidate);
     }
     std::sort(result.candidates.begin(),result.candidates.end(),[](const Candidate& a,const Candidate& b) { return a.qsoId<b.qsoId; });
+    // Greedy coverage: maximize still-uncovered award/items; on ties, prefer
+    // already sent/unconfirmed accepted services, then the lower QSO ID.
+    // This is explanatory prioritization, not a minimum-cost or success model.
+    using Key=QPair<QString,QString>;
+    struct Score { int remaining; int pending; qint64 id; int index; int generation; };
+    struct Less { bool operator()(const Score& a,const Score& b) const {
+        if (a.remaining!=b.remaining) return a.remaining<b.remaining;
+        if (a.pending!=b.pending) return a.pending<b.pending;
+        return a.id>b.id;
+    }};
+    struct Work { int remaining{0}; int pending{0}; int generation{0}; bool chosen{false}; };
+    QList<Work> work(result.candidates.size());
+    QHash<Key,QList<int>> owners;
+    auto alreadySent=[](const Candidate& candidate,const Benefit& benefit) {
+        for (const QString& service : candidate.pendingServices)
+            if (benefit.acceptedServices.contains(service)) return true;
+        return false;
+    };
+    std::priority_queue<Score,std::vector<Score>,Less> queue;
+    for (int i=0; i<result.candidates.size(); ++i) {
+        const Candidate& candidate=result.candidates.at(i);
+        for (const Benefit& benefit : candidate.benefits) {
+            owners[{benefit.award,benefit.key}].append(i); ++work[i].remaining;
+            if (alreadySent(candidate,benefit)) ++work[i].pending;
+        }
+        queue.push({work[i].remaining,work[i].pending,candidate.qsoId,i,0});
+    }
+    QSet<Key> covered; int rank=0;
+    while (!queue.empty()) {
+        const Score score=queue.top(); queue.pop(); Work& current=work[score.index];
+        if (current.chosen || score.generation!=current.generation || score.remaining<=0) continue;
+        current.chosen=true; Candidate& chosen=result.candidates[score.index]; chosen.priorityRank=++rank;
+        for (const Benefit& benefit : chosen.benefits) {
+            const Key key{benefit.award,benefit.key}; if (covered.contains(key)) continue;
+            covered.insert(key); chosen.marginalBenefits.append(key);
+            if (alreadySent(chosen,benefit)) ++chosen.pendingMarginalCount;
+            for (int index : owners.value(key)) {
+                Work& other=work[index]; if (other.chosen) continue;
+                const Candidate& candidate=result.candidates.at(index);
+                const auto found=std::find_if(candidate.benefits.cbegin(),candidate.benefits.cend(),[&](const Benefit& b) { return b.award==key.first && b.key==key.second; });
+                --other.remaining;
+                if (found!=candidate.benefits.cend() && alreadySent(candidate,*found)) --other.pending;
+                ++other.generation; queue.push({other.remaining,other.pending,candidate.qsoId,index,other.generation});
+            }
+        }
+    }
     struct Group { QList<qint64> ids; QSet<QPair<QString,QString>> benefits; };
     QMap<QPair<QString,QString>,Group> routes;
     for (const Candidate& candidate : result.candidates) {

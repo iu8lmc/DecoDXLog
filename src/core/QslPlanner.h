@@ -31,6 +31,9 @@ struct Candidate {
     QStringList pendingServices;
     QList<Benefit> benefits;
     QSet<qint64> alternativeQsoIds;
+    int priorityRank{0}; // zero means an alternative after the greedy coverage pass
+    QList<QPair<QString,QString>> marginalBenefits;
+    int pendingMarginalCount{0};
 };
 struct PaperRoute {
     QString manager;
