@@ -222,17 +222,21 @@ GlassPanel {
         if (!campaigns.length) { console.warn("PROBE dxspots missing campaign"); return }
         root.campaignBackend.selectDxCampaign(campaigns[0].id); campaignDialog.edit(root.campaignBackend.dxCampaign)
         root.campaignBackend.cluster.filter={maxAgeMinutes:30}
+        root.campaignBackend.cluster.injectLine("DX de IK1AAA: 7025.0 3Y0K CW 1200Z")
         root.campaignBackend.cluster.injectLine("DX de IK1AAA: 14025.0 3Y0J CW 1200Z")
         root.campaignBackend.cluster.injectLine("DX de IK1AAA: 14025.0 K1XYZ CW 1200Z")
         campaignSpotProbe.start()
     }
     Timer {
-        id:campaignSpotProbe; interval:800
+        id:campaignSpotProbe; interval:800; repeat:true; property int tries:0
         onTriggered: {
+            if (root.campaignBackend.dxCampaignBusy && ++tries<10) return
+            stop()
             const spots=root.campaignBackend.dxCampaignSpots(30)
             console.warn("PROBE dxspots matching " + JSON.stringify(spots))
+            console.warn("PROBE dxspots goalorder " + spots.map(s => s.call+":"+s.goalNeeded).join(","))
             const row=campaignSpots.itemAtIndex(0); console.warn("PROBE dxspots rendered " + (row ? row.text : "missing"))
-            root.campaignBackend.cluster.filter={bands:["40m"],maxAgeMinutes:30}
+            root.campaignBackend.cluster.filter={bands:["15m"],maxAgeMinutes:30}
             console.warn("PROBE dxspots filtered " + JSON.stringify(root.campaignBackend.dxCampaignSpots(30)))
         }
     }
@@ -455,7 +459,7 @@ GlassPanel {
                     }
                 }
                 Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor
-                    text:qsTr("Fresh spots for the saved campaign (30 min, current cluster filters). DX Assistant ranks the cluster's global log context, not the selected profile or verified award credit.") }
+                    text:qsTr("Fresh spots for the saved campaign (30 min, current cluster filters). Open campaign goals rank first when the matrix is ready; DX Assistant ranks within each group using the cluster's global log context. This is not verified award credit.") }
                 ListView {
                     id:campaignSpots; objectName:"dxCampaignSpots"; Layout.fillWidth:true; Layout.preferredHeight:110; clip:true
                     model: {
@@ -467,6 +471,7 @@ GlassPanel {
                         required property var modelData; width:ListView.view.width; wrapMode:Text.Wrap; color:root.textColor
                         text:modelData.call + " · " + modelData.band + " · " + modelData.mode + " · " + modelData.frequencyKhz + " kHz · "
                             + qsTr("score %1").arg(modelData.score) + " · " + modelData.spottedAt + " · " + (modelData.source || qsTr("source unknown"))
+                            + (modelData.goalTarget ? " · " + (modelData.goalNeeded ? qsTr("goal open") : qsTr("goal met")) : "")
                             + " · " + (modelData.reasons || []).join(", ") + ((modelData.limitations || []).length ? " · " + (modelData.limitations || []).join(", ") : "")
                     }
                 }

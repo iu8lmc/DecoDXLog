@@ -156,6 +156,15 @@ QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)
         (cell.target==QLatin1String("confirmed") && cell.confirmed==0);
     if(error) error->clear(); return out;
 }
+QString matrixMode(const Campaign& c,const QString& reportedMode)
+{
+    const QString raw=reportedMode.trimmed().toUpper();
+    if (c.modes.contains(raw)) return raw;
+    const QString normal=campaignMode(raw);
+    if (normal.isEmpty()) return {};
+    for (const QString& mode : c.modes) if (campaignMode(mode)==normal) return mode;
+    return {};
+}
 QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visible,
                                const QDateTime& now,int maxAgeMinutes)
 {

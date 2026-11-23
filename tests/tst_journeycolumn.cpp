@@ -86,11 +86,14 @@ private slots:
         using namespace decolog::core;
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); dxcampaign::Campaign c;
-          const auto now=QDateTime::currentDateTimeUtc(); c.title="Live fixture"; c.calls={"3Y0J"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
-          c.source="synthetic"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
+          const auto now=QDateTime::currentDateTimeUtc(); c.title="Live fixture"; c.calls={"3Y0J","3Y0K"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="synthetic"; c.verifiedAt=now; c.bands={"20m","40m"}; c.modes={"CW"}; c.goals={{"20m","CW","worked"},{"40m","CW","worked"}};
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import").id>0);
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
         QByteArray output; QVERIFY2(launch(dir,"dxcampaignspotprobe",output,6000),output.constData());
         QVERIFY2(output.contains("PROBE dxspots matching") && output.contains("\"call\":\"3Y0J\"") && output.contains("\"spotKey\":\"3Y0J|20m|CW\""),output.constData());
-        QVERIFY2(output.contains("PROBE dxspots rendered 3Y0J") && output.contains("PROBE dxspots filtered []"),output.constData());
+        QVERIFY2(output.contains("PROBE dxspots goalorder 3Y0K:true,3Y0J:false"),output.constData());
+        QVERIFY2(output.contains("PROBE dxspots rendered 3Y0K") && output.contains("PROBE dxspots filtered []"),output.constData());
         QVERIFY2(!output.contains("\"call\":\"K1XYZ\"") && !output.contains("TypeError"),output.constData());
     }
     void dxCampaignDateReviewChangesOnlyChosenExpedition()

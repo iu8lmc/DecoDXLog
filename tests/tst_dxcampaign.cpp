@@ -70,6 +70,14 @@ private slots:
         QCOMPARE(dxcampaign::freshSpots(c,{atLimit,pastLimit},now,30).size(),1);
         c.archived=true; QVERIFY(dxcampaign::freshSpots(c,{fresh},now,30).isEmpty());
     }
+    void spotModesResolveToTheSameMatrixCell()
+    {
+        dxcampaign::Campaign c; c.modes={"SSB","USB","CW"};
+        QCOMPARE(dxcampaign::matrixMode(c,"usb"),QString("USB"));
+        QCOMPARE(dxcampaign::matrixMode(c,"lsb"),QString("SSB"));
+        QCOMPARE(dxcampaign::matrixMode(c,"FM"),QString());
+        c.modes={"USB","LSB"}; QCOMPARE(dxcampaign::matrixMode(c,"LSB"),QString("LSB"));
+    }
     void matrixRespectsProfileAndRejectsInvalidChanges()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile a; a.name="A"; a.stationCallsign="9H1AA"; const qint64 first=db.saveStationProfile(a);

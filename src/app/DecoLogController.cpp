@@ -2404,7 +2404,26 @@ QVariantList DecoLogController::dxCampaignSpots(int maxAgeMinutes) const
     if (!m_cluster || m_dxCampaign.isEmpty() || m_dxCampaignPath!=m_db.path()) return {};
     const auto campaign=dxcampaign::load(m_db,m_dxCampaign.value(QStringLiteral("id")).toString());
     if (!campaign || campaign->revision!=m_dxCampaign.value(QStringLiteral("revision")).toInt()) return {};
-    return m_cluster->campaignRecommendations(*campaign,maxAgeMinutes);
+    QVariantList spots=m_cluster->campaignRecommendations(*campaign,maxAgeMinutes);
+    if (m_dxCampaignBusy || m_dxCampaignMatrix.isEmpty() || !m_dxCampaignError.isEmpty()) return spots;
+    for (QVariant& item : spots) {
+        QVariantMap spot=item.toMap();
+        const QString band=spot.value(QStringLiteral("band")).toString().trimmed().toLower();
+        const QString mode=dxcampaign::matrixMode(*campaign,spot.value(QStringLiteral("mode")).toString());
+        for (const QVariant& value : m_dxCampaignMatrix) {
+            const QVariantMap cell=value.toMap();
+            if (cell.value(QStringLiteral("band")).toString()!=band || cell.value(QStringLiteral("mode")).toString()!=mode) continue;
+            spot.insert(QStringLiteral("goalTarget"),cell.value(QStringLiteral("target")));
+            spot.insert(QStringLiteral("goalNeeded"),cell.value(QStringLiteral("needed")));
+            break;
+        }
+        item=spot;
+    }
+    std::stable_sort(spots.begin(),spots.end(),[](const QVariant& a,const QVariant& b) {
+        const auto priority=[](const QVariant& v) { const auto row=v.toMap(); return row.value(QStringLiteral("goalNeeded")).toBool() ? 2 : row.value(QStringLiteral("goalTarget")).toString().isEmpty() ? 1 : 0; };
+        return priority(a)>priority(b);
+    });
+    return spots;
 }
 
 void DecoLogController::buildQslPlan(const QStringList& requested)
