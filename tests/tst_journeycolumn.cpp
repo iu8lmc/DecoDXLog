@@ -1209,6 +1209,16 @@ private slots:
                  restored.contains("\"back\":[\"waz\"]"),restored.constData());
     }
 
+    void qslCostEditorRejectsRebuiltPlan()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const auto qso=db.insertQso({{"CALL","K1PAA"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"},{"QSL_VIA","M0ABC"}},"fixture"); QVERIFY(qso.id>0);
+          QslState card; card.service="card"; card.via="B"; QVERIFY(db.setCardState(qso.id,card)); QString error; QVERIFY(qslplanner::saveRouteCost(db,"M0ABC","B",{"9.99","EUR","estimate","",""},&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"qslstalecostprobe",output,5500),output.constData());
+        QVERIFY2(output.contains("PROBE stale cost opened true") && output.contains("PROBE stale cost save true") && output.contains("PROBE stale cost clear true") && (output.contains("The reviewed log or plan changed") || output.contains("Il log o il piano verificato")),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost); QCOMPARE(cost->amount,QString("9.99"));
+    }
     void qslPlannerDesktopShowsBenefitsAndInvalidation()
     {
         using namespace decolog::core;

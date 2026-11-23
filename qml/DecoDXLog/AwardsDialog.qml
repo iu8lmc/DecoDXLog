@@ -178,6 +178,18 @@ DialogFrame {
         console.warn("PROBE qslaccounts " + JSON.stringify({firstInitial:firstInitial,first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError,label:plannerAccountLabel.text,options:accountPicker.accountOptions,field:accountInput.text,manual:manual}))
     }
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
+    function probeQslStaleCost() { openAt("dxcc"); staleCostStart.start() }
+    Timer { id: staleCostStart; interval: 1000; onTriggered: { openPlannerButton.clicked(); plannerRefresh.stop(); root.plannerGoals=["dxcc"]; root.plannerSelectionDirty=false; decolog.buildQslPlan(root.plannerGoals); staleCostReady.start() } }
+    Timer { id: staleCostReady; interval: 100; repeat: true; property int tries: 0
+        onTriggered: { if ((!decolog.qslPlanCurrent() || !(decolog.qslPlan.paperRoutes || []).length) && ++tries<60) return
+            stop(); if (!decolog.qslPlanCurrent() || !(decolog.qslPlan.paperRoutes || []).length) { console.warn("PROBE stale cost no plan"); return }
+            costEditor.edit(decolog.qslPlan.paperRoutes[0]); amountField.text="12.50"; currencyField.text="EUR"
+            console.warn("PROBE stale cost opened " + !!costEditor.reviewToken)
+            decolog.buildQslPlan(root.plannerGoals); staleCostRebuilt.start() } }
+    Timer { id: staleCostRebuilt; interval: 100; repeat: true; property int tries: 0
+        onTriggered: { if (!decolog.qslPlanCurrent() && ++tries<60) return; stop()
+            saveCostButton.clicked(); console.warn("PROBE stale cost save " + costEditor.visible + " " + costError.text)
+            clearCostButton.clicked(); console.warn("PROBE stale cost clear " + costEditor.visible + " " + costError.text) } }
     function probeQslExternal() { openAt("dxcc"); plannerExternalStart.start() }
     Timer { id:plannerExternalStart; interval:1000
         onTriggered: { openPlannerButton.clicked(); plannerRefresh.stop(); root.plannerGoals=["dxcc"]; root.plannerSelectionDirty=false; buildPlannerButton.clicked(); plannerExternalReady.start() } }
@@ -552,6 +564,7 @@ DialogFrame {
                     }
                 }
                 GlassButton {
+                    id: clearCostButton
                     text: qsTr("Clear cost")
                     onClicked: { if (!costEditor.logPath || costEditor.logPath !== decolog.currentLogInfo().path) { costError.text=qsTr("The open log changed. Reopen this editor."); return }; const error=decolog.changeReviewedQslRouteCost(costEditor.reviewToken,costEditor.route.manager,costEditor.route.channel,{},true); if (error.length) costError.text=error; else costEditor.close() }
                 }
