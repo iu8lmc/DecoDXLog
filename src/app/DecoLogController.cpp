@@ -2274,8 +2274,16 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         QVariantList rows;
         for (const auto& candidate : plan.candidates) {
             QVariantList benefits;
-            for (const auto& benefit : candidate.benefits)
-                benefits << QVariantMap{{QStringLiteral("award"),benefit.award},{QStringLiteral("key"),benefit.key},{QStringLiteral("services"),benefit.acceptedServices}};
+            for (const auto& benefit : candidate.benefits) {
+                auto sortedIds=[](const QSet<qint64>& values) {
+                    QList<qint64> ids=values.values(); std::sort(ids.begin(),ids.end());
+                    QVariantList result; for (qint64 id : ids) result << id; return result;
+                };
+                benefits << QVariantMap{{QStringLiteral("award"),benefit.award},{QStringLiteral("key"),benefit.key},
+                    {QStringLiteral("services"),benefit.acceptedServices},
+                    {QStringLiteral("alternatives"),sortedIds(benefit.alternativeQsoIds)},
+                    {QStringLiteral("pendingAlternatives"),sortedIds(benefit.pendingAlternativeQsoIds)}};
+            }
             QVariantList alternatives;
             QList<qint64> ids=candidate.alternativeQsoIds.values(); std::sort(ids.begin(),ids.end());
             for (qint64 id : ids) alternatives << id;

@@ -11,6 +11,7 @@ DialogFrame {
     id: root
 
     signal openQso(var id)
+    signal openPaperQueue()
 
     property string awardId: "dxcc"
     property string search: ""
@@ -71,6 +72,8 @@ DialogFrame {
             console.warn("PROBE qslplan status " + qslPlanStatus.text)
             const first = qslPlanCandidates.itemAtIndex(0)
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
+            console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
+            paperQueueButton.clicked()
             decolog.awardBand = "40m"
             console.warn("PROBE qslplan stale " + decolog.qslPlan.stale)
         }
@@ -133,6 +136,7 @@ DialogFrame {
                 delegate: Rectangle {
                     required property var modelData
                     readonly property string probeText: candidateHeading.text + " " + candidateBenefits.text
+                    readonly property string probeRoute: candidateRoute.text
                     width: ListView.view.width; height: row.implicitHeight + 14; radius: 4
                     color: Theme.glassOverlay; border.color: Theme.borderSoft
                     ColumnLayout {
@@ -140,17 +144,22 @@ DialogFrame {
                         Text { id: candidateHeading; Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true
                             text: modelData.call + "  #" + modelData.id + "  ·  " + (modelData.manager || qsTr("manager unknown")) }
                         Text { id: candidateBenefits; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                            text: modelData.benefits.map(b => b.award.toUpperCase() + " " + b.key + " [" + b.services.join(", ") + "]").join(" · ") }
-                        Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                            text: qsTr("Alternatives: %1 · pending: %2 · route source: %3 · observed: %4 · cost unknown")
-                                .arg(modelData.alternatives.join(", ") || qsTr("none"))
+                            text: modelData.benefits.map(b => b.award.toUpperCase() + " " + b.key + " [" + b.services.join(", ") + "] · "
+                                + qsTr("alternatives: %1").arg(b.alternatives.join(", ") || qsTr("none"))
+                                + (b.pendingAlternatives.length ? " · " + qsTr("sent/unconfirmed alternatives: %1").arg(b.pendingAlternatives.join(", ")) : "")).join("\n") }
+                        Text { id: candidateRoute; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                            text: qsTr("Sent/unconfirmed services: %1 · route source: %2 · observed: %3 · %4 · cost unknown")
                                 .arg(modelData.pending.join(", ") || qsTr("none recorded"))
                                 .arg(modelData.managerSource || qsTr("unknown"))
-                                .arg(modelData.managerObservedAt || qsTr("unknown")) }
+                                .arg(modelData.managerObservedAt || qsTr("unknown"))
+                                .arg(!modelData.managerObservedAt ? qsTr("route age unknown")
+                                    : Date.now() - Date.parse(modelData.managerObservedAt) > 180 * 86400000
+                                      ? qsTr("route evidence older than 180 days; verify") : qsTr("verify route")) }
                         GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
                     }
                 }
             }
+            GlassButton { id: paperQueueButton; text: qsTr("Open paper QSL queue"); onClicked: root.openPaperQueue() }
         }
     }
 

@@ -7,6 +7,8 @@ struct Benefit {
     QString award;
     QString key;
     QStringList acceptedServices;
+    QSet<qint64> alternativeQsoIds;
+    QSet<qint64> pendingAlternativeQsoIds;
 };
 struct Candidate {
     qint64 qsoId{0};

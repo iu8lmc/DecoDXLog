@@ -25,8 +25,9 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             const auto alternatives=contributions.qsoIds.value(award.id).value(item.key);
             if (alternatives.isEmpty()) continue;
             ++result.uniqueBenefits;
-            const Benefit benefit{award.id,item.key,awards::creditsFor(award.id,filter)};
             for (qint64 id : alternatives) {
+                Benefit benefit{award.id,item.key,awards::creditsFor(award.id,filter),alternatives,{}};
+                benefit.alternativeQsoIds.remove(id);
                 Candidate& candidate=candidates[id]; candidate.qsoId=id; candidate.benefits.append(benefit);
                 candidate.alternativeQsoIds.unite(alternatives);
             }
@@ -49,6 +50,21 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             if (state.sent.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0 && state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)!=0)
                 candidate.pendingServices.append(state.service);
         std::sort(candidate.benefits.begin(),candidate.benefits.end(),[](const Benefit& a,const Benefit& b) { return a.award==b.award ? a.key<b.key : a.award<b.award; });
+    }
+    for (auto it=candidates.begin(); it!=candidates.end(); ++it) {
+        Candidate& candidate=it.value();
+        for (Benefit& benefit : candidate.benefits) {
+            for (qint64 alternate : benefit.alternativeQsoIds) {
+                const auto other=candidates.constFind(alternate);
+                if (other==candidates.cend()) continue;
+                for (const QString& service : other->pendingServices) {
+                    if (benefit.acceptedServices.contains(service)) {
+                        benefit.pendingAlternativeQsoIds.insert(alternate);
+                        break;
+                    }
+                }
+            }
+        }
         result.candidates.append(candidate);
     }
     std::sort(result.candidates.begin(),result.candidates.end(),[](const Candidate& a,const Candidate& b) { return a.qsoId<b.qsoId; });

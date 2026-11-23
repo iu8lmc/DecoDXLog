@@ -32,10 +32,18 @@ private slots:
         QCOMPARE(plan.candidates.size(),3); QCOMPARE(plan.uniqueBenefits,3);
         QCOMPARE(plan.candidates[0].benefits.size(),2);
         QVERIFY(plan.candidates[0].alternativeQsoIds.contains(b));
+        QCOMPARE(plan.candidates[0].benefits[0].award,QString("dxcc"));
+        QCOMPARE(plan.candidates[0].benefits[0].alternativeQsoIds,QSet<qint64>({b}));
+        QCOMPARE(plan.candidates[0].benefits[1].award,QString("waz"));
+        QCOMPARE(plan.candidates[0].benefits[1].alternativeQsoIds,QSet<qint64>({b,c}));
         QCOMPARE(plan.candidates[0].manager,QString("M0ABC"));
+        QslState unaccepted; unaccepted.service="eqsl"; unaccepted.sent="Y"; QVERIFY(db.setQslState(c,unaccepted));
+        plan=qslplanner::build(db,filter,{"dxcc","waz"});
+        QVERIFY(plan.candidates[0].benefits[1].pendingAlternativeQsoIds.isEmpty());
         QslState state; state.service="card"; state.sent="Y"; QVERIFY(db.setQslState(b,state));
         plan=qslplanner::build(db,filter,{"dxcc","waz"});
         QVERIFY(plan.candidates[1].pendingServices.contains("card"));
+        QCOMPARE(plan.candidates[0].benefits[0].pendingAlternativeQsoIds,QSet<qint64>({b}));
         state.rcvd="Y"; QVERIFY(db.setCardState(b,state));
         plan=qslplanner::build(db,filter,{"dxcc","waz"});
         QCOMPARE(plan.uniqueBenefits,1); QCOMPARE(plan.candidates.size(),1); QCOMPARE(plan.candidates[0].qsoId,c);

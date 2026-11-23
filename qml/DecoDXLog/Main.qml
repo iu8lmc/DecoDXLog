@@ -1909,6 +1909,11 @@ RoundedWindow {
     AwardsDialog {
         id: awardsDialog
         onOpenQso: (id) => window.openQso(id)
+        onOpenPaperQueue: {
+            window.openCards("queue")
+            if (typeof startupShow !== "undefined" && startupShow === "qslplanprobe")
+                Qt.callLater(() => console.warn("PROBE qslplan paperqueue " + (cardsWindow.item ? cardsWindow.item.view : "missing")))
+        }
     }
 
     FileDialog {
