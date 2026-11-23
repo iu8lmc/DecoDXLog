@@ -7,10 +7,70 @@
 #include <QTemporaryDir>
 #include <QSettings>
 #include <QUdpSocket>
+#include <memory>
 
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void threeNodesRecoverLostAndReorderedGrantsAfterAuthorityRestart()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path()); QCoreApplication::setOrganizationName("DecoNetThreeNodeTest"); QCoreApplication::setApplicationName("ThreeNode"); QSettings().setValue("net/enabled",false);
+        const QString authorityPath=dir.filePath("authority.sqlite"), aPath=dir.filePath("a.sqlite"), bPath=dir.filePath("b.sqlite");
+        LogDatabase authorityDb,aDb,bDb; QVERIFY(authorityDb.open(authorityPath)); QVERIFY(aDb.open(aPath)); QVERIFY(bDb.open(bPath));
+        QUdpSocket p0,p1,p2; QVERIFY(p0.bind(QHostAddress::LocalHost,0)); QVERIFY(p1.bind(QHostAddress::LocalHost,0)); QVERIFY(p2.bind(QHostAddress::LocalHost,0));
+        const int authorityPort=p0.localPort(), aPort=p1.localPort(), bPort=p2.localPort(); p0.close(); p1.close(); p2.close();
+        NetController::Context aCtx; aCtx.db=&aDb; NetController a(aCtx); NetController::Context bCtx; bCtx.db=&bDb; NetController b(bCtx);
+        a.setIdForTests("client-a"); b.setIdForTests("client-b"); a.setPort(aPort); b.setPort(bPort);
+        for (auto* node : {&a,&b}) { node->setGroup("FIELD"); node->setTarget(QHostAddress::LocalHost); QVERIFY(node->configureDurableSerialAuthority("event","authority").isEmpty()); }
+        QUdpSocket relay; int seq=0; int lostRequests=0, duplicateRequests=0; bool deliverGrants=false;
+        QJsonObject heldA,heldB;
+        auto forward=[&](const QString& from,const QString& type,QJsonObject body,int port) {
+            body.insert("seq",++seq); body.insert("session","three-node-relay");
+            const auto bytes=ContestNet::pack("FIELD",from,type,body); relay.writeDatagram(bytes,QHostAddress::LocalHost,quint16(port));
+        };
+        NetController::Context authorityCtx; authorityCtx.db=&authorityDb;
+        std::unique_ptr<NetController> authority;
+        auto createAuthority=[&] {
+            QSettings().setValue("net/enabled",false); authority=std::make_unique<NetController>(authorityCtx);
+            authority->setIdForTests("authority"); authority->setGroup("FIELD"); authority->setPort(authorityPort); authority->setTarget(QHostAddress::LocalHost);
+            authority->configureDurableSerialAuthority("event","authority");
+            connect(authority.get(),&NetController::durableSerialGrantReady,&relay,[&](const QJsonObject& body) {
+                const QString node=body.value("requester").toString();
+                if (!deliverGrants) { if (node=="client-a" && heldA.isEmpty()) heldA=body; if (node=="client-b" && heldB.isEmpty()) heldB=body; return; }
+                forward("authority","serial_grant_v3",body,node=="client-a"?aPort:bPort);
+            });
+        };
+        createAuthority();
+        auto relayRequest=[&](const QString& id,const QJsonObject& body) {
+            if (!authority || !authority->running()) { ++lostRequests; return; }
+            forward(id,"serial_request_v3",body,authorityPort);
+            if (duplicateRequests++==0) forward(id,"serial_request_v3",body,authorityPort);
+        };
+        connect(&a,&NetController::durableSerialRequestSent,&relay,[&](const QJsonObject& body) { relayRequest("client-a",body); });
+        connect(&b,&NetController::durableSerialRequestSent,&relay,[&](const QJsonObject& body) { relayRequest("client-b",body); });
+        QSignalSpy aSent(&a,&NetController::durableSerialRequestSent),bSent(&b,&NetController::durableSerialRequestSent);
+        a.setEnabled(true); b.setEnabled(true); QVERIFY(a.requestDurableSerial(1).isEmpty()); QVERIFY(b.requestDurableSerial(1).isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(aSent.size()>0 && bSent.size()>0,4000); QVERIFY(lostRequests>=2);
+        QCOMPARE(aDb.activeContestSerialRequest("event","client-a").state,QString("pending")); QCOMPARE(bDb.activeContestSerialRequest("event","client-b").state,QString("pending"));
+        authority->setEnabled(true); QTRY_VERIFY_WITH_TIMEOUT(!heldA.isEmpty() && !heldB.isEmpty(),12000);
+        QVERIFY(heldA.value("serial").toInt()!=heldB.value("serial").toInt()); QVERIFY(duplicateRequests>0);
+        authority->setEnabled(false); authority.reset(); authorityDb.close(); QVERIFY(authorityDb.open(authorityPath)); createAuthority(); authority->setEnabled(true);
+        deliverGrants=true;
+        forward("authority","serial_grant_v3",heldB,bPort); forward("authority","serial_grant_v3",heldB,bPort);
+        QTRY_VERIFY_WITH_TIMEOUT(!a.durableSerialGrantForQso().isEmpty() && !b.durableSerialGrantForQso().isEmpty(),12000);
+        QCOMPARE(a.durableSerialGrantForQso().value("serial").toInt(),heldA.value("serial").toInt());
+        QCOMPARE(b.durableSerialGrantForQso().value("serial").toInt(),heldB.value("serial").toInt());
+        QCOMPARE(a.durableSerialGrantForQso().value("requestId").toString(),heldA.value("requestId").toString());
+        QCOMPARE(b.durableSerialGrantForQso().value("requestId").toString(),heldB.value("requestId").toString());
+        a.setEnabled(false); b.setEnabled(false); authority->setEnabled(false);
+        aDb.close(); bDb.close(); QVERIFY(aDb.open(aPath)); QVERIFY(bDb.open(bPath));
+        const auto aSaved=aDb.activeContestSerialRequest("event","client-a"), bSaved=bDb.activeContestSerialRequest("event","client-b");
+        QVERIFY(aSaved.ok); QVERIFY(bSaved.ok); QCOMPARE(aSaved.state,QString("granted")); QCOMPARE(bSaved.state,QString("granted"));
+        QCOMPARE(aSaved.serial,heldA.value("serial").toInt()); QCOMPARE(bSaved.serial,heldB.value("serial").toInt());
+        QCOMPARE(aSaved.requestId,heldA.value("requestId").toString()); QCOMPARE(bSaved.requestId,heldB.value("requestId").toString());
+    }
     void selfAuthoritySharesDurableSequenceAndRecovers()
     {
         using namespace decolog::core; using decolog::app::NetController;
