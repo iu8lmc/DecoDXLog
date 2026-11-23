@@ -69,6 +69,22 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void experimentalSerialGrantIsBoundByManualQso()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings s(iniPath(dir),QSettings::IniFormat); s.setValue("net/id","client-a"); s.setValue("net/enabled",false); s.sync(); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QVERIFY(db.beginContestSerialRequest("event","client-a","req","authority",10).ok); QVERIFY(db.acceptContestSerialGrant("event","client-a","req","authority",10).ok); }
+        QByteArray output; QVERIFY2(launch(dir,"serialqsoprobe",output,3500),output.constData());
+        QVERIFY2(output.contains("PROBE serialQso setup= config= result="),output.constData());
+        QVERIFY2(output.contains("shown=10 available=true checkedAfter=false"),output.constData());
+        QVERIFY2(output.contains("missing=No matching experimental serial grant is available") && output.contains("legacy="),output.constData());
+        QVERIFY2(output.contains("stale=The selected serial grant changed"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto grant=db.contestSerialRequest("event","client-a","req");
+        QCOMPARE(grant.state,QString("consumed")); QVERIFY(!grant.useId.isEmpty()); QSqlQuery q(db.connection());
+        q.prepare("SELECT id,uuid FROM qso WHERE call='K1PROBE'"); QVERIFY(q.exec()); QVERIFY(q.next()); const auto stored=db.record(q.value(0).toLongLong()); QVERIFY(stored); QCOMPARE(stored->value("STX"),QString("10")); QCOMPARE(q.value(1).toString(),grant.useId);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM qso WHERE call='K1NOGRANT'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        QVERIFY(q.exec("SELECT id FROM qso WHERE call='K1LEGACY'")); QVERIFY(q.next()); const auto legacy=db.record(q.value(0).toLongLong()); QVERIFY(legacy); QCOMPARE(legacy->value("STX"),QString("11"));
+    }
     void qslPlannerRejectsReplacedCloneAtSamePath()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

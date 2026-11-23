@@ -1286,6 +1286,18 @@ RoundedWindow {
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
+        else if (what[0] === "serialqsoprobe") Qt.callLater(() => {
+            const setup = decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
+            const config = decolog.net.configureDurableSerialAuthority("event","authority")
+            const stale = decolog.logManualQso({call:"K1STALE",date:"2026-01-01",time:"11:59",freq:"14.070",mode:"CW",experimental_serial:true,
+                experimental_serial_grant:{scope:"event",requester:"client-a",requestId:"req",authority:"authority",serial:11}})
+            const panel = window.panelItem("newqso")
+            const ui = panel && panel.item ? panel.item.probeExperimentalSerialSubmit() : { shown:0, available:false, error:"panel missing" }
+            const result = ui.error
+            const missing = decolog.logManualQso({call:"K1NOGRANT",date:"2026-01-01",time:"12:01",freq:"14.070",mode:"CW",experimental_serial:true})
+            const legacy = decolog.logManualQso({call:"K1LEGACY",date:"2026-01-01",time:"12:02",freq:"14.070",mode:"CW"})
+            console.warn("PROBE serialQso setup=" + setup + " config=" + config + " result=" + result + " shown=" + ui.shown + " available=" + ui.available + " checkedAfter=" + ui.checkedAfter + " missing=" + missing + " legacy=" + legacy + " stale=" + stale)
+        })
         else if (what[0] === "potacatalogueprobe") Qt.callLater(() => activationDialog.probePotaCatalogue())
         else if (what[0] === "sotaupdateprobe") Qt.callLater(() => activationDialog.probeSotaUpdate())
         else if (what[0] === "sotacatalogueprobe") Qt.callLater(() => activationDialog.probeSotaCatalogue())

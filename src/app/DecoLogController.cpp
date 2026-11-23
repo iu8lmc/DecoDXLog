@@ -4310,6 +4310,21 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
 {
     auto text = [&fields](const char* key) { return fields.value(QLatin1String(key)).toString().trimmed(); };
     const bool historical = fields.value(QStringLiteral("historical_entry")).toBool();
+    const bool experimentalSerial = fields.value(QStringLiteral("experimental_serial")).toBool();
+    QVariantMap serialGrant;
+    if (experimentalSerial) {
+        if (historical || !m_activation->active() || m_activation->session().kind != core::Activation::Kind::Contest ||
+            !m_activation->session().serialEnabled)
+            return tr("Open a serial-enabled contest session to use an experimental grant.");
+        if (!m_net || (serialGrant=m_net->durableSerialGrantForQso()).isEmpty())
+            return tr("No matching experimental serial grant is available; request one first.");
+        const QVariantMap selected=fields.value(QStringLiteral("experimental_serial_grant")).toMap();
+        for (const QString& key : {QStringLiteral("scope"),QStringLiteral("requester"),QStringLiteral("requestId"),QStringLiteral("authority")})
+            if (selected.value(key).toString()!=serialGrant.value(key).toString())
+                return tr("The selected serial grant changed; review it before logging.");
+        if (selected.value(QStringLiteral("serial")).toInt()!=serialGrant.value(QStringLiteral("serial")).toInt())
+            return tr("The selected serial grant changed; review it before logging.");
+    }
 
     AdifRecord r;
     r.set(QStringLiteral("CALL"), text("call").toUpper());
@@ -4492,16 +4507,20 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         applyEntity(r);
         // Explicit QSO/rover fields remain first; the activation supplies its
         // site before the station profile fills any remaining blanks.
-        m_activation->applyTo(r);
+        m_activation->applyTo(r, experimentalSerial ? serialGrant.value(QStringLiteral("serial")).toInt() : 0);
     }
     applyProfile(r, profileId);
     // A mano non si rifiuta nessun QSO per doppione: chi scrive sa cosa ha gia' nel log, e
     // ripassare la stessa stazione (in un'attivazione, o un'altra volta) e' normale.
     // Il controllo dei doppioni resta per Decodium e per i QSO che arrivano via UDP.
-    const InsertResult res = m_db.insertQso(r, QStringLiteral("manual"), QStringLiteral("DecoDXLog ") + version(),
-                                            true, profileId, false);
+    const InsertResult res = experimentalSerial
+        ? m_db.insertQsoWithContestSerial(r, QStringLiteral("manual"), serialGrant.value(QStringLiteral("scope")).toString(),
+            serialGrant.value(QStringLiteral("requester")).toString(), serialGrant.value(QStringLiteral("requestId")).toString(),
+            serialGrant.value(QStringLiteral("authority")).toString(), QStringLiteral("DecoDXLog ") + version(), true, profileId, false)
+        : m_db.insertQso(r, QStringLiteral("manual"), QStringLiteral("DecoDXLog ") + version(), true, profileId, false);
     switch (res.status) {
     case InsertResult::Status::Inserted: {
+        if (experimentalSerial) m_net->durableSerialQsoSaved();
         decolog::StartupSpan t1("logManual: model insert");
         m_model->insertQso(res.id);
         if (!historical) {

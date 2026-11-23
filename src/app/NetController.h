@@ -90,6 +90,8 @@ public:
     QString id() const { return m_id; }
     Q_INVOKABLE QString configureDurableSerialAuthority(const QString& scope, const QString& authority);
     Q_INVOKABLE QString requestDurableSerial(int minimum);
+    Q_INVOKABLE QVariantMap durableSerialGrantForQso() const;
+    void durableSerialQsoSaved();
     QString durableSerialStatus() const { return m_durableStatus; }
 
     // Chiave wire-level usata per deduplicare un datagramma. La sessione fa

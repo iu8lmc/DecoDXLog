@@ -727,11 +727,11 @@ QVariantMap ActivationController::suggestFromLog(const QString& rawCall) const
     return out;
 }
 
-void ActivationController::applyTo(AdifRecord& record) const
+void ActivationController::applyTo(AdifRecord& record, int serialOverride) const
 {
-    int serial = m_session.nextSerial;
+    int serial = serialOverride > 0 ? serialOverride : m_session.nextSerial;
     // In rete il numero lo da' chi distribuisce: una sequenza sola per tutti.
-    if (m_session.serialEnabled && m_session.sharedSerial && m_ctx.takeSerial)
+    if (serialOverride <= 0 && m_session.serialEnabled && m_session.sharedSerial && m_ctx.takeSerial)
         serial = m_ctx.takeSerial(m_session.nextSerial);
     m_lastSerial = serial;
     m_session.applyTo(record, serial);

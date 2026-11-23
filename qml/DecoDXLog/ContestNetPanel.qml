@@ -173,7 +173,7 @@ GlassPanel {
             spacing: 10
             Text {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
-                text: qsTr("Experimental UDP requests only. Sender IDs are not authenticated. This does not supply serials to QSO entry or protect against multiple authorities.")
+                text: qsTr("Experimental UDP serials. Sender IDs are not authenticated; multiple authorities can issue the same number. A grant must be selected explicitly for each manual QSO.")
             }
             Text {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary

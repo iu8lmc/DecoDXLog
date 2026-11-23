@@ -132,7 +132,7 @@ QString NetController::requestDurableSerial(int minimum)
             if (!request.ok) self->m_durableStatus=tr("Request failed: %1").arg(request.error);
             else if (request.state==QLatin1String("granted")) {
                 if (self->m_durableRetryRequestId==request.requestId) self->m_durableRetry.stop();
-                self->m_durableStatus=tr("Experimental grant: %1; not connected to QSO entry.").arg(request.serial);
+                self->m_durableStatus=tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(request.serial);
             }
             else if (self->m_net.running()) {
                 const QJsonObject body=contestserial::requestFrame(request);
@@ -152,6 +152,24 @@ QString NetController::requestDurableSerial(int minimum)
         },Qt::QueuedConnection);
     });
     return {};
+}
+
+QVariantMap NetController::durableSerialGrantForQso() const
+{
+    if (m_durableScope.isEmpty() || m_durableAuthority.isEmpty() || !m_ctx.db ||
+        !m_ctx.db->isOpen() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) return {};
+    const auto request=m_ctx.db->activeContestSerialRequest(m_durableScope,m_id);
+    if (!request.ok || request.state!=QLatin1String("granted") || request.authority!=m_durableAuthority || request.serial<1) return {};
+    return {{QStringLiteral("scope"),request.scope},{QStringLiteral("requester"),request.requester},
+            {QStringLiteral("requestId"),request.requestId},{QStringLiteral("authority"),request.authority},
+            {QStringLiteral("serial"),request.serial}};
+}
+
+void NetController::durableSerialQsoSaved()
+{
+    m_durableRetry.stop();
+    m_durableStatus=tr("Experimental grant used; request the next serial.");
+    emit durableSerialStatusChanged();
 }
 
 void NetController::serveDurableSerialRequest(const QString& from, const QJsonObject& body)
@@ -215,7 +233,7 @@ void NetController::acceptDurableSerialGrant(const QString& from, const QJsonObj
                 self->m_ctx.db->identity() != identity || self->m_ctx.db->openFileIdentity() != fileIdentity ||
                 !self->m_ctx.db->fileIdentityMatchesOpen()) return;
             if (self->m_durableRetryRequestId==grant.requestId) self->m_durableRetry.stop();
-            self->m_durableStatus = tr("Experimental grant: %1; not connected to QSO entry.").arg(grant.serial);
+            self->m_durableStatus = tr("Experimental grant: %1; select it explicitly for a manual QSO.").arg(grant.serial);
             emit self->durableSerialStatusChanged();
             emit self->durableSerialGrantAccepted(body);
         }, Qt::QueuedConnection);

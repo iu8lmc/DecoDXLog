@@ -196,7 +196,7 @@ public:
     // Il QSO sarebbe un duplicato di questa attivazione?
     bool isDuplicate(const QString& call, const QString& band, const QString& mode) const;
     // Aggiunge al record quello che la sessione impone.
-    void applyTo(core::AdifRecord& record) const;
+    void applyTo(core::AdifRecord& record, int serialOverride = 0) const;
     // Un QSO e' stato scritto: numero progressivo avanti e conteggi aggiornati.
     void qsoLogged();
 

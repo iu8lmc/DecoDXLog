@@ -93,6 +93,9 @@ private slots:
         QSqlQuery count(db.connection()); QVERIFY(count.exec("SELECT COUNT(*) FROM qso")); QVERIFY(count.next()); QCOMPARE(count.value(0).toInt(),0); count.finish();
         QCOMPARE(db.contestSerialRequest("event","node","req-1").state,QString("granted")); QVERIFY(trigger.exec("DROP TRIGGER fail_serial_use"));
         auto conflict=qso; conflict.set("STX","12"); QVERIFY(db.insertQsoWithContestSerial(conflict,"manual","event","node","req-1","authority").status != InsertResult::Status::Inserted);
+        auto exchangeConflict=qso; exchangeConflict.set("STX_STRING","12");
+        QVERIFY(db.insertQsoWithContestSerial(exchangeConflict,"manual","event","node","req-1","authority").status != InsertResult::Status::Inserted);
+        QCOMPARE(db.contestSerialRequest("event","node","req-1").state,QString("granted"));
         const auto inserted=db.insertQsoWithContestSerial(qso,"manual","event","node","req-1","authority"); QCOMPARE(inserted.status,InsertResult::Status::Inserted);
         const auto record=db.record(inserted.id); QVERIFY(record); QCOMPARE(record->value("STX"),QString("10"));
         const auto meta=db.meta(inserted.id); QVERIFY(meta); auto used=db.contestSerialRequest("event","node","req-1"); QCOMPARE(used.state,QString("consumed")); QCOMPARE(used.useId,meta->uuid);

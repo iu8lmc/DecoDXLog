@@ -13,6 +13,12 @@ GlassPanel {
     readonly property var last: decolog.incoming.length > 0 ? decolog.incoming[0] : null
     readonly property var visibleFields: decolog.newQsoVisibleFields
     readonly property var customFields: decolog.newQsoCustomFields
+    property var experimentalSelection: ({})
+    readonly property var experimentalGrant: {
+        if (!decolog.net || !decolog.net.durableSerialGrantForQso) return ({})
+        const status = decolog.net.durableSerialStatus
+        return decolog.net.durableSerialGrantForQso()
+    }
 
     function fieldVisible(name) { return root.visibleFields.indexOf(name) >= 0 }
     function defaultTxPower() {
@@ -259,11 +265,14 @@ GlassPanel {
             iota: root.fieldVisible("IOTA") ? iotaField.text : "",
             state: stateField.text, tx_pwr: txPwrField.text,
             prop_mode: propModeBox.editText, sat_name: satNameField.text, sat_mode: satModeField.text,
-            srx: srxField.text, custom_fields: root.customAdifValues()
+            srx: srxField.text, custom_fields: root.customAdifValues(), experimental_serial: useExperimentalSerial.checked,
+            experimental_serial_grant: root.experimentalSelection
         })
         formError.text = error
-        if (error.length === 0)
+        if (error.length === 0) {
+            useExperimentalSerial.checked = false
             clearForm()
+        }
     }
 
     // Used only by the isolated, explicitly enabled 20k-log UI probe.
@@ -275,6 +284,19 @@ GlassPanel {
         modeBox.editText = "FT8"
         submit()
         return formError.text
+    }
+
+    function probeExperimentalSerialSubmit() {
+        callField.text = "K1PROBE"
+        dateField.text = decolog.showDate("20260101")
+        timeField.text = "12:00:00"
+        freqField.text = "14.070"
+        modeBox.editText = "CW"
+        const shown = root.experimentalGrant.serial || 0
+        const available = useExperimentalSerial.visible
+        useExperimentalSerial.checked = true
+        submit()
+        return { shown: shown, available: available, checkedAfter: useExperimentalSerial.checked, error: formError.text }
     }
 
     Component.onCompleted: {
@@ -658,6 +680,23 @@ GlassPanel {
                     wrapMode: Text.WordWrap
                     font.pixelSize: 11
                 }
+                CheckBox {
+                    id: useExperimentalSerial
+                    objectName: "useExperimentalSerial"
+                    Layout.fillWidth: true
+                    visible: decolog.activation.state.serialEnabled === true && !!decolog.net && (decolog.net.durableSerialStatus || "").length > 0
+                    property var shownGrant: checked ? root.experimentalSelection : root.experimentalGrant
+                    onCheckedChanged: root.experimentalSelection = checked ? Object.assign({}, root.experimentalGrant) : ({})
+                    text: shownGrant.serial
+                          ? qsTr("Use experimental serial %1 (scope %2, authority %3) for this QSO").arg(shownGrant.serial).arg(shownGrant.scope).arg(shownGrant.authority)
+                          : qsTr("Use experimental serial: no grant available")
+                    contentItem: Text { text: useExperimentalSerial.text; color: Theme.warningColor; wrapMode: Text.WordWrap; leftPadding: useExperimentalSerial.indicator.width + 6 }
+                }
+                Text {
+                    Layout.fillWidth: true; visible: useExperimentalSerial.visible && useExperimentalSerial.checked
+                    text: qsTr("UDP IDs are unauthenticated; multiple authorities can issue the same number. Verify before transmitting.")
+                    color: Theme.warningColor; wrapMode: Text.WordWrap; font.pixelSize: 11
+                }
                 RowLayout {
                     Layout.fillWidth: true
                     visible: decolog.activation.state.serialEnabled === true || root.fieldVisible("COMMENT")
@@ -681,7 +720,8 @@ GlassPanel {
                         StyledTextField {
                             Layout.preferredWidth: 70
                             readOnly: true
-                            text: decolog.activation.state.sharedSerial ? qsTr("On save") : decolog.activation.nextSerial
+                            text: useExperimentalSerial.checked ? (root.experimentalSelection.serial || qsTr("Unavailable"))
+                                  : decolog.activation.state.sharedSerial ? qsTr("On save") : decolog.activation.nextSerial
                         }
                     }
                     LabeledField {

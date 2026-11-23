@@ -1126,6 +1126,12 @@ InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, co
         bool ok=false; const int number=existing.toInt(&ok);
         if (!ok || number!=serial) return fail(QStringLiteral("The QSO serial differs from the granted serial"));
     }
+    const QString exchange=input.value(QStringLiteral("STX_STRING")).trimmed();
+    static const QRegularExpression numericExchange(QStringLiteral("^[0-9]+$"));
+    if (numericExchange.match(exchange).hasMatch()) {
+        bool ok=false; const int number=exchange.toInt(&ok);
+        if (!ok || number!=serial) return fail(QStringLiteral("The numeric sent exchange differs from the granted serial"));
+    }
     AdifRecord record=input; if (existing.isEmpty()) record.set(QStringLiteral("STX"),QString::number(serial));
     result=insertQso(record,source,sourceApp,manual,stationProfileId,checkDuplicate);
     if (result.status!=InsertResult::Status::Inserted) { db.rollback(); return result; }
