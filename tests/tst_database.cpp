@@ -62,6 +62,13 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void dataVersionDetectsOtherConnectionCommits()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase one,two; QVERIFY(one.open(dir.filePath("log.sqlite"))); QVERIFY(two.open(dir.filePath("log.sqlite")));
+        const auto before=one.dataVersion(); QVERIFY(before>=0); one.setSetting("fixture.own","one"); QCOMPARE(one.dataVersion(),before);
+        two.setSetting("fixture.other","two"); QVERIFY(one.dataVersion()!=before); QCOMPARE(one.setting("fixture.other"),QString("two"));
+        two.close(); QCOMPARE(two.dataVersion(),qint64(-1));
+    }
     void guardedContestArchiveRejectsOtherLogAndDoesNotCreateMissingFile()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString a=dir.filePath("a # ?.sqlite"), b=dir.filePath("b.sqlite"), missing=dir.filePath("missing.sqlite");

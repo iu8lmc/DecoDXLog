@@ -265,6 +265,8 @@ public:
     bool openReadOnly(const QString& path);
     bool openExistingReadWrite(const QString& path);
     QString identity() const;
+    // Connection-local SQLite change token; compare only on this same open connection.
+    qint64 dataVersion() const;
     void close();
     bool isOpen() const;
     QString path() const { return m_path; }

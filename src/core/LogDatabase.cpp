@@ -308,6 +308,15 @@ QString LogDatabase::identity() const
     return {};
 }
 
+qint64 LogDatabase::dataVersion() const
+{
+    if (!isOpen()) return -1;
+    QSqlQuery q(connection());
+    if (!q.exec(QStringLiteral("PRAGMA data_version")) || !q.next()) return -1;
+    bool ok=false; const qint64 version=q.value(0).toLongLong(&ok);
+    return ok ? version : -1;
+}
+
 void LogDatabase::close()
 {
     if (!QSqlDatabase::contains(m_connectionName))

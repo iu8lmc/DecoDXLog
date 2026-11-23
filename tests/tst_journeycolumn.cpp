@@ -68,6 +68,24 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void importPreviewRejectsExternalLogChange()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const auto path=dir.filePath("source.adi"); QFile input(path); QVERIFY(input.open(QIODevice::WriteOnly));
+        input.write("<CALL:5>K1OLD<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>\n"); input.close();
+        auto env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000"); QProcess app;
+        app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",dir.filePath("test.sqlite"),"--port","0","--show","importsnapshotprobe:"+path,"--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE importsnapshot ready") && timer.elapsed()<10000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(200); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE importsnapshot ready"),output.constData());
+        { LogDatabase external; QVERIFY(external.open(dir.filePath("test.sqlite")));
+          QVERIFY(external.insertQso(AdifRecord{{"CALL","K2EXT"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"external",{},true,0,false).id>0); }
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QVERIFY2(app.exitStatus()==QProcess::NormalExit && app.exitCode()==0,output.constData());
+        LogDatabase verify; QVERIFY(verify.open(dir.filePath("test.sqlite"))); QCOMPARE(verify.qsoCount(),qint64(1));
+        const auto ids=verify.latestIds({},10); QCOMPARE(ids.size(),1); const auto record=verify.record(ids.first()); QVERIFY(record); QCOMPARE(record->value("CALL"),QString("K2EXT"));
+    }
     void importPreviewUsesAllExistingDuplicateKeys()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

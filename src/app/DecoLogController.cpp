@@ -5524,6 +5524,7 @@ void DecoLogController::importAdif(const QUrl& url)
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
     const bool reviewed = m_importPreviewFile == url && !m_importPreviewAdif.isEmpty();
     if (reviewed && (m_importPreviewLogPath != m_db.path() || m_importPreviewIdentity != m_db.identity() || m_importPreviewLogGeneration != m_db.openGeneration()
+        || m_importPreviewDataVersion < 0 || m_db.dataVersion() != m_importPreviewDataVersion
         || m_importPreviewLogVersion != m_logVersion
         || m_importPreviewProfile != (m_profiles ? m_profiles->activeProfileId() : 0))) {
         addActivity(QStringLiteral("IMPORT"), tr("Logbook or station changed; preview the import again"), QStringLiteral("warning"));
@@ -5683,24 +5684,24 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
 
 void DecoLogController::cancelImportPreview()
 {
-    ++m_importPreviewGeneration; m_importPreviewFile=QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear();
+    ++m_importPreviewGeneration; m_importPreviewFile=QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear(); m_importPreviewDataVersion=-1;
 }
 
 void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const QString& stationCall)
 {
-    const QString dbPath = m_db.path(), dbIdentity=m_db.identity(); const quint64 dbGeneration=m_db.openGeneration();
+    const QString dbPath = m_db.path(), dbIdentity=m_db.identity(); const quint64 dbGeneration=m_db.openGeneration(); const qint64 dataVersion=m_db.dataVersion();
     const int digital = m_db.dedupWindowSeconds(false);
     const int manual = m_db.dedupWindowSeconds(true);
     const quint64 generation = ++m_importPreviewGeneration;
     const quint64 logVersion = m_logVersion;
     const qint64 profile = m_profiles ? m_profiles->activeProfileId() : 0;
-    m_importPreviewFile = QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear();
+    m_importPreviewFile = QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear(); m_importPreviewDataVersion=-1;
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, url, dbPath, dbIdentity, dbGeneration, digital, manual, generation, logVersion, profile, fromClubLog, stationCall] {
+    m_importPool.start([self, url, dbPath, dbIdentity, dbGeneration, dataVersion, digital, manual, generation, logVersion, profile, fromClubLog, stationCall] {
         QVariantMap result;
         QByteArray snapshot;
         LogDatabase db;
-        if (dbPath.isEmpty() || dbIdentity.isEmpty() || dbPath == QLatin1String(":memory:") || !db.open(dbPath) || db.identity()!=dbIdentity) {
+        if (dbPath.isEmpty() || dbIdentity.isEmpty() || dataVersion<0 || dbPath == QLatin1String(":memory:") || !db.open(dbPath) || db.identity()!=dbIdentity) {
             result = {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Cannot open logbook for preview")}};
         } else {
             db.setDedupWindows(digital, manual);
@@ -5732,9 +5733,9 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
                            : QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), error}};
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, url, dbPath, dbIdentity, dbGeneration, generation, logVersion, profile, result, snapshot] {
+        QMetaObject::invokeMethod(self.data(), [self, url, dbPath, dbIdentity, dbGeneration, dataVersion, generation, logVersion, profile, result, snapshot] {
             if (!self || generation != self->m_importPreviewGeneration) return;
-            if (self->m_db.path() != dbPath || self->m_db.identity()!=dbIdentity || self->m_db.openGeneration()!=dbGeneration || self->m_logVersion != logVersion
+            if (self->m_db.path() != dbPath || self->m_db.identity()!=dbIdentity || self->m_db.openGeneration()!=dbGeneration || self->m_db.dataVersion()!=dataVersion || self->m_logVersion != logVersion
                 || (self->m_profiles ? self->m_profiles->activeProfileId() : 0) != profile) {
                 emit self->importPreviewReady(url, {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Logbook changed; preview again")}});
                 return;
@@ -5742,6 +5743,7 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
             if (result.value(QStringLiteral("ok")).toBool()) {
                 self->m_importPreviewFile = url; self->m_importPreviewLogPath = dbPath;
                 self->m_importPreviewAdif=snapshot; self->m_importPreviewIdentity=dbIdentity; self->m_importPreviewLogGeneration=dbGeneration;
+                self->m_importPreviewDataVersion=dataVersion;
                 self->m_importPreviewLogVersion = logVersion; self->m_importPreviewProfile = profile;
             }
             emit self->importPreviewReady(url, result);

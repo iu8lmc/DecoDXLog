@@ -1265,6 +1265,7 @@ private:
     quint64 m_importPreviewLogGeneration{0};
     qint64 m_importPreviewProfile{0};
     quint64 m_importPreviewLogVersion{0};
+    qint64 m_importPreviewDataVersion{-1};
     QThreadPool m_statsViewPool;
     QThreadPool m_activityReportPool;
     quint64 m_activityReportGeneration{0};
