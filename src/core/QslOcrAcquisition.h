@@ -14,17 +14,23 @@ class QslOcrAcquisition : public QObject {
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(QVariantMap result READ result NOTIFY changed)
+    Q_PROPERTY(QVariantList history READ history NOTIFY changed)
   public:
     QslOcrAcquisition(LogDatabase *db, TesseractOcr *ocr, QObject *parent = nullptr);
     ~QslOcrAcquisition() override;
     bool busy() const { return m_busy; }
     QString error() const { return m_error; }
     QVariantMap result() const { return m_result; }
+    QVariantList history() const { return m_history; }
     Q_INVOKABLE bool start(const QVariantList &selected, const QUrl &original);
     Q_INVOKABLE void cancel();
+    Q_INVOKABLE bool undo(qint64 acquisitionId, const QString &uuid);
+    Q_INVOKABLE bool review(qint64 qsoId, qint64 beforeId);
     static QVariantMap execute(const QString &dbPath, const QString &snapshot, const QString &sha256,
                                const QString &sourceName, const QString &ocrText,
                                const QVariantList &selected, const std::atomic_bool *cancelled);
+    static QVariantMap undoExecute(const QString &dbPath, qint64 acquisitionId, const QString &uuid,
+                                   const std::atomic_bool *cancelled);
   signals:
     void changed();
     void finished(bool success);
@@ -36,5 +42,6 @@ class QslOcrAcquisition : public QObject {
     bool m_busy{false};
     QString m_error;
     QVariantMap m_result;
+    QVariantList m_history;
 };
 } // namespace decolog::core

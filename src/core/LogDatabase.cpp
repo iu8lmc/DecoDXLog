@@ -434,6 +434,11 @@ bool LogDatabase::migrate()
         {19, {QStringLiteral("CREATE TABLE IF NOT EXISTS qsl_ocr_acquisition (id INTEGER PRIMARY KEY, uuid TEXT NOT NULL UNIQUE, attachment_id INTEGER NOT NULL REFERENCES qsl_attachment(id), sha256 TEXT NOT NULL, source_name TEXT NOT NULL, ocr_text TEXT NOT NULL, created_at TEXT NOT NULL)"),
               QStringLiteral("CREATE TABLE IF NOT EXISTS qsl_ocr_acquisition_qso (acquisition_id INTEGER NOT NULL REFERENCES qsl_ocr_acquisition(id), qso_id INTEGER NOT NULL, qso_uuid TEXT NOT NULL, qso_revision INTEGER NOT NULL, newly_linked INTEGER NOT NULL CHECK(newly_linked IN (0,1)), PRIMARY KEY(acquisition_id,qso_uuid))"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qsl_ocr_acquisition_qso ON qsl_ocr_acquisition_qso(qso_uuid,acquisition_id)")}, nullptr},
+        {20, {QStringLiteral("ALTER TABLE qsl_attachment_qso ADD COLUMN link_token TEXT"),
+              QStringLiteral("ALTER TABLE qsl_attachment_qso ADD COLUMN link_revision INTEGER NOT NULL DEFAULT 1"),
+              QStringLiteral("ALTER TABLE qsl_ocr_acquisition_qso ADD COLUMN link_token TEXT"),
+              QStringLiteral("ALTER TABLE qsl_ocr_acquisition_qso ADD COLUMN link_revision INTEGER"),
+              QStringLiteral("ALTER TABLE qsl_ocr_acquisition ADD COLUMN undone_at TEXT")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -518,6 +523,20 @@ bool LogDatabase::migrate()
                 return false;
             }
             if (columnQuery.value(0).toInt() != 0) statements.removeFirst();
+        }
+        if (step.to == 20) {
+            QStringList filtered;
+            for (const QString &statement : statements) {
+                const auto tokens = statement.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+                QSqlQuery columns(db);
+                columns.prepare(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name=?"));
+                columns.addBindValue(tokens.value(2)); columns.addBindValue(tokens.value(5));
+                if (!columns.exec() || !columns.next()) {
+                    db.rollback(); m_lastError = QStringLiteral("cannot inspect QSL acquisition columns during migration"); return false;
+                }
+                if (columns.value(0).toInt() == 0) filtered << statement;
+            }
+            statements = filtered;
         }
         if (step.needsQsoColumn) {
             q.prepare(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('qso') WHERE name = ?"));
@@ -3348,7 +3367,8 @@ qint64 LogDatabase::addQslAttachment(const QByteArray& data, const QString& file
         id = insert.lastInsertId().toLongLong();
     }
     QSqlQuery link(db);
-    link.prepare(QStringLiteral("INSERT OR IGNORE INTO qsl_attachment_qso (attachment_id, qso_id) VALUES (?, ?)"));
+    link.prepare(QStringLiteral("INSERT INTO qsl_attachment_qso (attachment_id, qso_id) VALUES (?, ?) "
+                                "ON CONFLICT(attachment_id,qso_id) DO UPDATE SET link_revision=link_revision+1"));
     for (const qint64 qsoId : qsoIds) {
         link.bindValue(0, id);
         link.bindValue(1, qsoId);

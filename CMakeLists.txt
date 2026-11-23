@@ -469,6 +469,7 @@ set(DECODXLOG_QML_FILES
     qml/DecoDXLog/QslCardsWindow.qml
     qml/DecoDXLog/QsoDetailDialog.qml
     qml/DecoDXLog/QslOcrDialog.qml
+    qml/DecoDXLog/QslOcrHistoryDialog.qml
     qml/DecoDXLog/StationProfilesDialog.qml
     qml/DecoDXLog/SetupDialog.qml
     qml/DecoDXLog/LogbookWindow.qml

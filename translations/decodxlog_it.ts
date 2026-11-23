@@ -6828,6 +6828,10 @@ Campi extra conservati: %8</translation>
         <source>Read image with local OCR…</source>
         <translation>Leggi immagine con OCR locale…</translation>
     </message>
+    <message>
+        <source>OCR acquisition history…</source>
+        <translation>Cronologia acquisizioni OCR…</translation>
+    </message>
 </context>
 <context>
     <name>QsoJourney</name>
@@ -15504,6 +15508,129 @@ Campi extra conservati: %8</translation>
     <message>
         <source>Cannot save the OCR acquisition</source>
         <translation>Impossibile salvare l’acquisizione OCR</translation>
+    </message>
+    <message>
+        <source>Choose a QSO in an open file-backed log</source>
+        <translation>Scegli un QSO in un log aperto su file</translation>
+    </message>
+    <message>
+        <source>Cannot open the log for reviewing acquisitions</source>
+        <translation>Impossibile aprire il log per consultare le acquisizioni</translation>
+    </message>
+    <message>
+        <source>Cannot review OCR acquisitions</source>
+        <translation>Impossibile consultare le acquisizioni OCR</translation>
+    </message>
+    <message>
+        <source>Review cancelled</source>
+        <translation>Consultazione annullata</translation>
+    </message>
+    <message>
+        <source>The open log changed</source>
+        <translation>Il log aperto è cambiato</translation>
+    </message>
+    <message>
+        <source>Choose a saved OCR acquisition</source>
+        <translation>Scegli un’acquisizione OCR salvata</translation>
+    </message>
+    <message>
+        <source>Undo cancelled</source>
+        <translation>Annullamento interrotto</translation>
+    </message>
+    <message>
+        <source>Acquisition is unavailable or already undone</source>
+        <translation>Acquisizione non disponibile o già annullata</translation>
+    </message>
+    <message>
+        <source>A QSO or attachment link changed; undo requires manual review</source>
+        <translation>Un QSO o un collegamento è cambiato; controlla manualmente prima di annullare</translation>
+    </message>
+    <message>
+        <source>Acquisition has no recorded QSO</source>
+        <translation>L’acquisizione non contiene QSO registrati</translation>
+    </message>
+    <message>
+        <source>Cannot undo the OCR acquisition</source>
+        <translation>Impossibile annullare l’acquisizione OCR</translation>
+    </message>
+</context>
+<context>
+    <name>QslOcrHistoryDialog</name>
+    <message>
+        <source>OCR acquisition history</source>
+        <translation>Cronologia acquisizioni OCR</translation>
+    </message>
+    <message>
+        <source>Review every affected QSO</source>
+        <translation>Controlla tutti i QSO coinvolti</translation>
+    </message>
+    <message>
+        <source>Undo links created by this acquisition for up to %1 QSO? Existing or later-used links are protected. The image and audit record remain.</source>
+        <translation>Annullare i collegamenti creati da questa acquisizione per un massimo di %1 QSO? I collegamenti precedenti o riutilizzati sono protetti. L’immagine e il registro restano.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Annulla</translation>
+    </message>
+    <message>
+        <source>Undo acquisition links</source>
+        <translation>Annulla collegamenti acquisizione</translation>
+    </message>
+    <message>
+        <source>An acquisition can involve several QSO. Review every target before undoing it.</source>
+        <translation>Un’acquisizione può coinvolgere più QSO. Controlla tutti i destinatari prima di annullarla.</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Aggiorna</translation>
+    </message>
+    <message>
+        <source>Newer</source>
+        <translation>Più recenti</translation>
+    </message>
+    <message>
+        <source>Older</source>
+        <translation>Meno recenti</translation>
+    </message>
+    <message>
+        <source>Working…</source>
+        <translation>Operazione in corso…</translation>
+    </message>
+    <message>
+        <source>Undone</source>
+        <translation>Annullata</translation>
+    </message>
+    <message>
+        <source>No OCR acquisitions for this QSO.</source>
+        <translation>Nessuna acquisizione OCR per questo QSO.</translation>
+    </message>
+    <message>
+        <source>Image SHA-256: %1</source>
+        <translation>SHA-256 immagine: %1</translation>
+    </message>
+    <message>
+        <source>Affected QSO (new links are marked +):</source>
+        <translation>QSO coinvolti (i nuovi collegamenti sono indicati con +):</translation>
+    </message>
+    <message>
+        <source>changed or unavailable</source>
+        <translation>modificato o non disponibile</translation>
+    </message>
+    <message>
+        <source>Recognized text (first 4096 characters)</source>
+        <translation>Testo riconosciuto (primi 4096 caratteri)</translation>
+    </message>
+    <message>
+        <source>Undo is unavailable because a link is legacy, changed or missing. Review manually.</source>
+        <translation>Annullamento non disponibile perché un collegamento è precedente, modificato o mancante. Controlla manualmente.</translation>
+    </message>
+    <message>
+        <source>Undo acquisition…</source>
+        <translation>Annulla acquisizione…</translation>
+    </message>
+    <message>
+        <source>Undone at %1</source>
+        <translation>Annullata il %1</translation>
     </message>
 </context>
 </TS>

@@ -6812,6 +6812,10 @@ Champs supplémentaires conservés : %8</translation>
         <source>Read image with local OCR…</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>OCR acquisition history…</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>QsoJourney</name>
@@ -15467,6 +15471,129 @@ Champs supplémentaires conservés : %8</translation>
     </message>
     <message>
         <source>Cannot save the OCR acquisition</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose a QSO in an open file-backed log</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot open the log for reviewing acquisitions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot review OCR acquisitions</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Review cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The open log changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Choose a saved OCR acquisition</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undo cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Acquisition is unavailable or already undone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>A QSO or attachment link changed; undo requires manual review</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Acquisition has no recorded QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot undo the OCR acquisition</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>QslOcrHistoryDialog</name>
+    <message>
+        <source>OCR acquisition history</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Review every affected QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undo links created by this acquisition for up to %1 QSO? Existing or later-used links are protected. The image and audit record remain.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undo acquisition links</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>An acquisition can involve several QSO. Review every target before undoing it.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Newer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Older</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Working…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undone</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>No OCR acquisitions for this QSO.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Image SHA-256: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Affected QSO (new links are marked +):</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>changed or unavailable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Recognized text (first 4096 characters)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undo is unavailable because a link is legacy, changed or missing. Review manually.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undo acquisition…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Undone at %1</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

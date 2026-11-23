@@ -25,7 +25,10 @@ DialogFrame {
     property var attachments: []
     property var managerSuggestion: ({})
     QslOcrDialog { id: qslOcrDialog; onAcquired: root.attachments = decolog.qsoDetail(root.qsoId).attachments || [] }
+    QslOcrHistoryDialog { id: qslOcrHistory; onHistoryChanged: root.attachments = decolog.qsoDetail(root.qsoId).attachments || [] }
     function probeOcr(url, match, acquire) { qslOcrDialog.open(); qslOcrDialog.probe(url, match, acquire) }
+    function probeOcrHistory() { qslOcrHistory.openFor(root.qsoId, true) }
+    function showOcrHistory() { qslOcrHistory.openFor(root.qsoId, false) }
 
     title: qsTr("QSO detail")
     dotColor: Theme.primaryColor
@@ -774,6 +777,13 @@ DialogFrame {
                         buttonHeight: 24
                         fontPixelSize: 11
                         onClicked: qslOcrDialog.open()
+                    }
+                    GlassButton {
+                        text: qsTr("OCR acquisition history…")
+                        buttonHeight: 24
+                        fontPixelSize: 11
+                        enabled: !decolog.qslOcrAcquisition.busy
+                        onClicked: qslOcrHistory.openFor(root.qsoId, false)
                     }
                     Text { Layout.fillWidth: true; text: qsTr("Not a confirmation by itself"); color: Theme.textSecondary; font.pixelSize: 10 }
                 }

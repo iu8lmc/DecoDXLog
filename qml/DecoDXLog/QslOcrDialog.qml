@@ -69,6 +69,7 @@ DialogFrame {
     Connections {
         target: root.acquisition
         function onFinished(success) {
+            if (root.acquisition.result.operation !== "attach") return
             root.saved = success
             if (success) root.acquired()
             if (root.probing && root.probeAcquire)

@@ -37,6 +37,13 @@ class TestTesseractOcr : public QObject {
         return path;
     }
   private slots:
+    void acquisitionOffersGuardedUndo()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        TesseractOcr ocr;
+        QslOcrAcquisition acquisition(&db, &ocr);
+        QVERIFY(acquisition.metaObject()->indexOfMethod("undo(qlonglong,QString)") >= 0);
+    }
     void ocrUsesImmutableImageSnapshot()
     {
         TesseractOcr ocr;
@@ -221,6 +228,149 @@ class TestTesseractOcr : public QObject {
         const auto result = acquisition.result();
         QVERIFY2(result.value("ok").toBool(), qPrintable(result.value("error").toString()));
         QCOMPARE(db.qslAttachmentData(result.value("attachmentId").toLongLong()), original);
+    }
+    void guardedUndoPreservesExistingAndLaterLinks()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
+        QFile file(image); QVERIFY(file.open(QIODevice::ReadOnly)); const auto bytes = file.readAll(); file.close();
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        QVariantList selected;
+        for (const QString &call : {"K1AAA", "K1BBB", "K1CCC"}) {
+            AdifRecord r{{"CALL", call}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            const auto inserted = db.insertQso(r, "manual", {}, true, 0, false); QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+            QSqlQuery q(db.connection()); q.prepare("SELECT uuid,revision FROM qso WHERE id=?"); q.addBindValue(inserted.id);
+            QVERIFY(q.exec()); QVERIFY(q.next()); selected << QVariantMap{{"id", inserted.id}, {"uuid", q.value(0)}, {"revision", q.value(1)}};
+        }
+        const auto idAt = [&](int i) { return selected.at(i).toMap().value("id").toLongLong(); };
+        const qint64 attachment = db.addQslAttachment(bytes, "card.png", "image/png", {idAt(0)}); QVERIFY(attachment > 0);
+        std::atomic_bool cancel{false};
+        const auto first = QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "ocr", {selected.at(0), selected.at(1)}, &cancel);
+        QVERIFY(first.value("ok").toBool()); QCOMPARE(first.value("newLinks").toInt(), 1);
+        TesseractOcr ocr; QslOcrAcquisition review(&db, &ocr); QSignalSpy reviewed(&review, &QslOcrAcquisition::finished);
+        QVERIFY(review.review(idAt(0), 0)); QTRY_COMPARE_WITH_TIMEOUT(reviewed.size(), 1, 5000);
+        QVERIFY(reviewed.first().first().toBool()); QCOMPARE(review.history().size(), 1);
+        const auto firstHistory = review.history().first().toMap();
+        QCOMPARE(firstHistory.value("targets").toList().size(), 2);
+        QCOMPARE(firstHistory.value("text").toString(), QString("ocr"));
+        QVERIFY(firstHistory.value("guarded").toBool());
+        QSqlQuery q(db.connection());
+        q.prepare("SELECT uuid FROM qsl_ocr_acquisition WHERE id=?"); q.addBindValue(first.value("acquisitionId")); QVERIFY(q.exec()); QVERIFY(q.next());
+        const QString firstUuid = q.value(0).toString(); q.finish();
+        auto undone = QslOcrAcquisition::undoExecute(db.path(), first.value("acquisitionId").toLongLong(), firstUuid, &cancel);
+        QVERIFY2(undone.value("ok").toBool(), qPrintable(undone.value("error").toString()));
+        QCOMPARE(undone.value("removedLinks").toInt(), 1);
+        QCOMPARE(db.qslAttachments(idAt(0)).size(), 1); QVERIFY(db.qslAttachments(idAt(1)).isEmpty());
+        QCOMPARE(db.qslAttachmentData(attachment), bytes);
+        QVERIFY(review.review(idAt(0), 0)); QTRY_COMPARE_WITH_TIMEOUT(reviewed.size(), 2, 5000);
+        QVERIFY(!review.history().first().toMap().value("undoneAt").isNull());
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), first.value("acquisitionId").toLongLong(), firstUuid, &cancel).value("ok").toBool());
+        const auto second = QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "ocr", {selected.at(1), selected.at(2)}, &cancel);
+        QVERIFY(second.value("ok").toBool());
+        q.prepare("SELECT uuid FROM qsl_ocr_acquisition WHERE id=?"); q.addBindValue(second.value("acquisitionId")); QVERIFY(q.exec()); QVERIFY(q.next());
+        const QString secondUuid = q.value(0).toString(); q.finish();
+        // A later ordinary attachment action reasserts the same link.
+        {
+            LogDatabase other; QVERIFY(other.open(db.path()));
+            QCOMPARE(other.addQslAttachment(bytes, "card.png", "image/png", {idAt(1)}), attachment);
+        }
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), second.value("acquisitionId").toLongLong(), secondUuid, &cancel).value("ok").toBool());
+        QVERIFY(review.review(idAt(1), 0)); QTRY_COMPARE_WITH_TIMEOUT(reviewed.size(), 3, 5000);
+        QVERIFY(!review.history().first().toMap().value("guarded").toBool());
+        QCOMPARE(db.qslAttachments(idAt(1)).size(), 1); QCOMPARE(db.qslAttachments(idAt(2)).size(), 1);
+        QVERIFY(q.exec("UPDATE qso SET revision=revision+1 WHERE id=" + QString::number(idAt(2))));
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), second.value("acquisitionId").toLongLong(), secondUuid, &cancel).value("ok").toBool());
+        QCOMPARE(db.qslAttachments(idAt(2)).size(), 1);
+        cancel.store(true);
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), second.value("acquisitionId").toLongLong(), secondUuid, &cancel).value("ok").toBool());
+        QCOMPARE(db.qsoCount(), 3);
+    }
+    void guardedUndoRollsBackAndRefusesLegacyLinks()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
+        QFile file(image); QVERIFY(file.open(QIODevice::ReadOnly)); const auto bytes = file.readAll();
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        QVariantList selected;
+        for (const QString &call : {"K1AAA", "K1BBB"}) {
+            AdifRecord r{{"CALL", call}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            const auto ins = db.insertQso(r, "manual", {}, true, 0, false); QCOMPARE(ins.status, InsertResult::Status::Inserted);
+            QSqlQuery q(db.connection()); q.prepare("SELECT uuid,revision FROM qso WHERE id=?"); q.addBindValue(ins.id); QVERIFY(q.exec()); QVERIFY(q.next());
+            selected << QVariantMap{{"id", ins.id}, {"uuid", q.value(0)}, {"revision", q.value(1)}};
+        }
+        std::atomic_bool cancelled{false};
+        const auto acquisition = QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "ocr", selected, &cancelled);
+        QVERIFY(acquisition.value("ok").toBool());
+        const qint64 acquisitionId = acquisition.value("acquisitionId").toLongLong();
+        QSqlQuery q(db.connection()); q.prepare("SELECT uuid FROM qsl_ocr_acquisition WHERE id=?"); q.addBindValue(acquisitionId); QVERIFY(q.exec()); QVERIFY(q.next());
+        const QString uuid = q.value(0).toString(); q.finish();
+        const qint64 first = selected.at(0).toMap().value("id").toLongLong(), second = selected.at(1).toMap().value("id").toLongLong();
+        QVERIFY(q.exec("CREATE TRIGGER reject_undo BEFORE DELETE ON qsl_attachment_qso WHEN OLD.qso_id=" + QString::number(second) + " BEGIN SELECT RAISE(ABORT,'reject'); END"));
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), acquisitionId, uuid, &cancelled).value("ok").toBool());
+        QCOMPARE(db.qslAttachments(first).size(), 1); QCOMPARE(db.qslAttachments(second).size(), 1);
+        QVERIFY(q.exec("DROP TRIGGER reject_undo"));
+        QVERIFY(q.exec("UPDATE qsl_ocr_acquisition_qso SET link_token=NULL WHERE qso_id=" + QString::number(first)));
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), acquisitionId, uuid, &cancelled).value("ok").toBool());
+        QCOMPARE(db.qslAttachments(first).size(), 1); QCOMPARE(db.qslAttachments(second).size(), 1);
+    }
+    void acquisitionHistoryIsIndexedAndPaged()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
+        QFile file(image); QVERIFY(file.open(QIODevice::ReadOnly)); const auto bytes = file.readAll();
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        AdifRecord r{{"CALL", "K1AAA"}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+        const auto ins = db.insertQso(r, "manual", {}, true, 0, false); QCOMPARE(ins.status, InsertResult::Status::Inserted);
+        QSqlQuery q(db.connection()); q.prepare("SELECT uuid,revision FROM qso WHERE id=?"); q.addBindValue(ins.id); QVERIFY(q.exec()); QVERIFY(q.next());
+        const QVariantList selected{QVariantMap{{"id", ins.id}, {"uuid", q.value(0)}, {"revision", q.value(1)}}}; q.finish();
+        QVERIFY(q.exec("EXPLAIN QUERY PLAN SELECT acquisition_id FROM qsl_ocr_acquisition_qso INDEXED BY idx_qsl_ocr_acquisition_qso "
+                       "WHERE qso_uuid=(SELECT uuid FROM qso WHERE id=1) AND qso_id=1 AND acquisition_id<9999 ORDER BY acquisition_id DESC LIMIT 51"));
+        bool indexed = false; while (q.next()) indexed |= q.value(3).toString().contains("idx_qsl_ocr_acquisition_qso"); QVERIFY(indexed);
+        std::atomic_bool cancelled{false};
+        for (int i = 0; i < 52; ++i)
+            QVERIFY(QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "ocr", selected, &cancelled).value("ok").toBool());
+        TesseractOcr ocr; QslOcrAcquisition history(&db, &ocr); QSignalSpy done(&history, &QslOcrAcquisition::finished);
+        QVERIFY(history.review(ins.id, 0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 5000);
+        QCOMPARE(history.history().size(), 51);
+        const qint64 anchor = history.history().at(49).toMap().value("id").toLongLong();
+        QVERIFY(history.review(ins.id, anchor)); QTRY_COMPARE_WITH_TIMEOUT(done.size(), 2, 5000);
+        QCOMPARE(history.history().size(), 2);
+        QVERIFY(history.history().first().toMap().value("id").toLongLong() < anchor);
+        QCOMPARE(db.qsoCount(), 1);
+    }
+    void guardedUndoDetectsEditedQsoAndLaterOcrReuse()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
+        QFile f(image); QVERIFY(f.open(QIODevice::ReadOnly)); const auto bytes = f.readAll();
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        QVariantList rows;
+        for (const QString &call : {"K1AAA", "K1BBB"}) {
+            AdifRecord r{{"CALL", call}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            const auto ins = db.insertQso(r, "manual", {}, true, 0, false); QCOMPARE(ins.status, InsertResult::Status::Inserted);
+            QSqlQuery q(db.connection()); q.prepare("SELECT uuid,revision FROM qso WHERE id=?"); q.addBindValue(ins.id); QVERIFY(q.exec()); QVERIFY(q.next());
+            rows << QVariantMap{{"id", ins.id}, {"uuid", q.value(0)}, {"revision", q.value(1)}};
+        }
+        std::atomic_bool cancel{false};
+        const auto first = QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "first", {rows.at(0)}, &cancel);
+        QVERIFY(first.value("ok").toBool());
+        const auto second = QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "second", {rows.at(0)}, &cancel);
+        QVERIFY(second.value("ok").toBool()); QCOMPARE(second.value("newLinks").toInt(), 0);
+        const auto third = QslOcrAcquisition::execute(db.path(), image, hash, "card.png", "third", {rows.at(1)}, &cancel);
+        QVERIFY(third.value("ok").toBool()); QCOMPARE(third.value("newLinks").toInt(), 1);
+        QSqlQuery q(db.connection());
+        auto findUuid = [&](qint64 id) { QSqlQuery get(db.connection()); get.prepare("SELECT uuid FROM qsl_ocr_acquisition WHERE id=?"); get.addBindValue(id); return get.exec() && get.next() ? get.value(0).toString() : QString(); };
+        const qint64 firstId = first.value("acquisitionId").toLongLong(), thirdId = third.value("acquisitionId").toLongLong();
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), firstId, findUuid(firstId), &cancel).value("ok").toBool());
+        const qint64 editedId = rows.at(1).toMap().value("id").toLongLong();
+        QVERIFY(q.exec("UPDATE qso SET revision=revision+1 WHERE id=" + QString::number(editedId)));
+        QVERIFY(!QslOcrAcquisition::undoExecute(db.path(), thirdId, findUuid(thirdId), &cancel).value("ok").toBool());
+        QCOMPARE(db.qslAttachments(rows.at(0).toMap().value("id").toLongLong()).size(), 1);
+        QCOMPARE(db.qslAttachments(editedId).size(), 1);
     }
     void readsTwoLocalLayoutsWithoutModifyingImages()
     {

@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 19;
+constexpr int kSchemaVersion = 20;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -91,6 +91,35 @@ private slots:
             QCOMPARE(db.qsoCount(), 1);
             QCOMPARE(db.qslAttachments(id).size(), 1);
             QCOMPARE(db.qslAttachmentData(attachment), QByteArray("image bytes"));
+        }
+    }
+    void schema19UpgradeKeepsLegacyOcrAcquisition()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path = dir.filePath("legacy19.sqlite");
+        qint64 qsoId = 0, attachment = 0;
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            AdifRecord r{{"CALL", "K1ABC"}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            const auto ins = db.insertQso(r, "manual", {}, true, 0, false); QCOMPARE(ins.status, InsertResult::Status::Inserted); qsoId = ins.id;
+            attachment = db.addQslAttachment("image bytes", "card.png", "image/png", {qsoId}); QVERIFY(attachment > 0);
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("INSERT INTO qsl_ocr_acquisition(uuid,attachment_id,sha256,source_name,ocr_text,created_at) "
+                           "SELECT 'legacy',id,sha256,'card.png','ocr','2026-09-23T14:30:00Z' FROM qsl_attachment"));
+            QVERIFY(q.exec("INSERT INTO qsl_ocr_acquisition_qso(acquisition_id,qso_id,qso_uuid,qso_revision,newly_linked) "
+                           "SELECT 1,id,uuid,revision,1 FROM qso"));
+            QVERIFY(q.exec("ALTER TABLE qsl_attachment_qso DROP COLUMN link_token"));
+            QVERIFY(q.exec("ALTER TABLE qsl_attachment_qso DROP COLUMN link_revision"));
+            QVERIFY(q.exec("ALTER TABLE qsl_ocr_acquisition_qso DROP COLUMN link_token"));
+            QVERIFY(q.exec("ALTER TABLE qsl_ocr_acquisition_qso DROP COLUMN link_revision"));
+            QVERIFY(q.exec("ALTER TABLE qsl_ocr_acquisition DROP COLUMN undone_at"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=20"));
+        }
+        {
+            LogDatabase db; QVERIFY2(db.open(path), qPrintable(db.lastError()));
+            QCOMPARE(db.schemaVersion(), kSchemaVersion); QCOMPARE(db.qslAttachments(qsoId).size(), 1);
+            QCOMPARE(db.qslAttachmentData(attachment), QByteArray("image bytes"));
+            QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT link_token,link_revision FROM qsl_ocr_acquisition_qso"));
+            QVERIFY(q.next()); QVERIFY(q.value(0).isNull()); QVERIFY(q.value(1).isNull());
         }
     }
     void radioNetIndexMigratesMalformedExtras()

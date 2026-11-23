@@ -13,6 +13,8 @@
 #include "core/LogDatabase.h"
 #include "core/RadioNet.h"
 #include "core/TesseractOcr.h"
+#include "core/QslOcrAcquisition.h"
+#include <QCryptographicHash>
 
 class TestJourneyColumn : public QObject {
     Q_OBJECT
@@ -128,6 +130,37 @@ private slots:
         QSqlQuery journal(db.connection()); QVERIFY(journal.exec("SELECT ocr_text FROM qsl_ocr_acquisition"));
         QVERIFY(journal.next()); QVERIFY(journal.value(0).toString().contains("K1ABC")); QVERIFY(!journal.next());
         QVERIFY(db.record(1)->value("QSL_RCVD").isEmpty());
+    }
+    void qslOcrHistoryUndoPreservesPreviouslyExistingLink()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const QString path = QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"); QVERIFY(!path.isEmpty());
+        QFile image(path); QVERIFY(image.open(QIODevice::ReadOnly)); const QByteArray bytes = image.readAll();
+        const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());
+        qint64 attachment = 0;
+        {
+            decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            QVariantList selected;
+            for (const QString &call : {"K1ABC", "K1DEF"}) {
+                decolog::core::AdifRecord record{{"CALL", call}, {"QSO_DATE", "20260923"}, {"TIME_ON", "143000"}, {"BAND", "20m"}, {"MODE", "SSB"}};
+                const auto inserted = db.insertQso(record, "manual", {}, true, 0, false);
+                QCOMPARE(inserted.status, decolog::core::InsertResult::Status::Inserted);
+                QSqlQuery q(db.connection()); q.prepare("SELECT uuid,revision FROM qso WHERE id=?"); q.addBindValue(inserted.id); QVERIFY(q.exec()); QVERIFY(q.next());
+                selected << QVariantMap{{"id", inserted.id}, {"uuid", q.value(0)}, {"revision", q.value(1)}};
+            }
+            attachment = db.addQslAttachment(bytes, "card.png", "image/png", {1}); QVERIFY(attachment > 0);
+            std::atomic_bool cancelled{false};
+            const auto result = decolog::core::QslOcrAcquisition::execute(db.path(), path, hash, "card.png", "K1ABC K1DEF", selected, &cancelled);
+            QVERIFY2(result.value("ok").toBool(), qPrintable(result.value("error").toString()));
+            QCOMPARE(result.value("newLinks").toInt(), 1);
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("qslocrundo"), output), output.constData());
+        QVERIFY2(output.contains("PROBE qslUndo success=true removed=1"), output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+        QCOMPARE(db.qsoCount(), 2); QCOMPARE(db.qslAttachments(1).size(), 1); QVERIFY(db.qslAttachments(2).isEmpty());
+        QCOMPARE(db.qslAttachmentData(attachment), bytes);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT undone_at FROM qsl_ocr_acquisition")); QVERIFY(q.next()); QVERIFY(!q.value(0).isNull());
     }
     void roverManualQsoRespectsHistoryAndExplicitOverride()
     {
