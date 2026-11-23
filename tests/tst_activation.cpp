@@ -54,10 +54,59 @@ private slots:
         ActivationController::Context legacyContext; legacyContext.db = &db;
         ActivationController legacy(std::move(legacyContext)); legacy.load(); QVERIFY(legacy.active());
         QVERIFY(legacy.state().value("sessionUuid").toString().isEmpty());
+        QVERIFY(!legacy.partitionPreview().value("error").toString().isEmpty());
         AdifRecord old{{"CALL", "K1OLD"}}; legacy.session().applyTo(old, 0);
         QVERIFY(old.value("APP_DECOLOG_ACTIVATION_UUID").isEmpty());
         legacy.stop(); QVERIFY(!legacy.active());
         QVERIFY(q.exec("SELECT COUNT(*) FROM activation_run")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
+    }
+    void previewGroupsReportedQsosWithoutAttributingUnrelatedContacts()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        ActivationController::Context ctx; ctx.db = &db;
+        ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001,IT-0002"},
+                           {"programs", QVariantMap{{"sota", "I/LM-001"}}}}).isEmpty());
+        AdifRecord one{{"CALL","K1AAA"},{"QSO_DATE","20261231"},{"TIME_ON","235900"}, {"BAND","20m"},{"MODE","CW"},{"OPERATOR","9H1AA"},{"MY_GRIDSQUARE","JN35"},{"POTA_REF","US-1234"}};
+        act.session().applyTo(one, 0); QCOMPARE(db.insertQso(one, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        AdifRecord two{{"CALL","K1BBB"},{"QSO_DATE","20270101"},{"TIME_ON","000100"}, {"BAND","20m"},{"MODE","CW"},{"OPERATOR","9H1BB"},{"MY_GRIDSQUARE","JN36"}};
+        act.session().applyTo(two, 0); QCOMPARE(db.insertQso(two, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        AdifRecord unrelated{{"CALL","K1CCC"},{"QSO_DATE","20270101"},{"TIME_ON","000200"},{"BAND","20m"},{"MODE","CW"},{"MY_POTA_REF","IT-0001"}};
+        QCOMPARE(db.insertQso(unrelated, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        const QVariantMap preview = act.partitionPreview();
+        QCOMPARE(preview.value("error").toString(), QString());
+        QCOMPARE(preview.value("reportedCount").toInt(), 2);
+        const auto groups = preview.value("groups").toList(); QCOMPARE(groups.size(), 6);
+        QSet<QString> observed;
+        for (const auto& v : groups) { const auto g = v.toMap(); QCOMPARE(g.value("count").toInt(), 1);
+            observed.insert(g.value("program").toString()+"/"+g.value("reference").toString()+"/"+g.value("day").toString()+"/"+g.value("operator").toString()+"/"+g.value("grid").toString()); }
+        QVERIFY(observed.contains("POTA/IT-0001/2026-12-31/9H1AA/JN35"));
+        QVERIFY(observed.contains("POTA/IT-0002/2026-12-31/9H1AA/JN35"));
+        QVERIFY(observed.contains("SOTA/I/LM-001/2027-01-01/9H1BB/JN36"));
+        QVERIFY(!observed.contains("POTA/US-1234/2026-12-31/9H1AA/JN35"));
+        AdifRecord noRef{{"CALL","K1DDD"},{"QSO_DATE","20270101"},{"TIME_ON","000300"},{"BAND","20m"},{"MODE","CW"},
+                          {"APP_DECOLOG_ACTIVATION_UUID",act.state().value("sessionUuid").toString()}};
+        QCOMPARE(db.insertQso(noRef, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        const auto again = act.partitionPreview(); QCOMPARE(again.value("missingReference").toInt(), 1);
+        QCOMPARE(again.value("reportedCount").toInt(), 3);
+        QVERIFY(db.connection().transaction());
+        QVERIFY(!act.partitionPreview().value("error").toString().isEmpty());
+        QVERIFY(db.connection().rollback());
+    }
+    void previewRefusesPartialResultsAboveLimit()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        for (int n = 0; n < 1001; ++n) {
+            AdifRecord r{{"CALL", QString("K%1AAA").arg(n)}, {"QSO_DATE", "20261231"},
+                         {"TIME_ON", "235900"}, {"BAND", "20m"}, {"MODE", "CW"}};
+            act.session().applyTo(r, 0);
+            QCOMPARE(db.insertQso(r, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        }
+        const auto result = act.partitionPreview();
+        QVERIFY(!result.value("error").toString().isEmpty());
+        QVERIFY(result.value("groups").toList().isEmpty());
     }
     void simultaneousProgramReferencesStayIndependent()
     {

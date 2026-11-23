@@ -12,6 +12,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSqlQuery>
 #include <QTimeZone>
@@ -622,6 +623,65 @@ QVariantList ActivationController::qsoIds() const
             ids << q.value(0).toLongLong();
     }
     return ids;
+}
+
+QVariantMap ActivationController::partitionPreview() const
+{
+    QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
+    const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
+    if (!m_session.active || m_session.sessionUuid.isEmpty())
+        return fail(tr("This session has no tracked identity; its QSO cannot be attributed automatically."));
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return fail(tr("The log is not open."));
+    auto db = m_ctx.db->connection();
+    if (!db.transaction()) return fail(tr("Cannot open a consistent preview of the log."));
+    struct ReadTransaction { QSqlDatabase db; bool committed{false}; ~ReadTransaction() { if (!committed) db.rollback(); } } transaction{db};
+    QSqlQuery exists(db);
+    exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=? AND ended_at IS NULL"));
+    exists.addBindValue(m_session.sessionUuid);
+    if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
+    QSqlQuery q(m_ctx.db->connection());
+    q.prepare(QStringLiteral("SELECT id FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id LIMIT 1001"));
+    q.addBindValue(m_session.sessionUuid);
+    if (!q.exec()) return fail(tr("Cannot read the session QSO."));
+    QList<qint64> ids;
+    while (q.next()) ids << q.value(0).toLongLong();
+    if (ids.size() > 1000) return fail(tr("Preview is limited to 1000 reported QSO; no partial result is shown."));
+    result[QStringLiteral("reportedCount")] = ids.size();
+    QMap<QString, QVariantMap> groups;
+    int missingDate = 0, missingReference = 0;
+    const QList<QPair<QString, QString>> fields{{QStringLiteral("POTA"), QStringLiteral("MY_POTA_REF")},
+        {QStringLiteral("SOTA"), QStringLiteral("MY_SOTA_REF")}, {QStringLiteral("WWFF"), QStringLiteral("MY_WWFF_REF")},
+        {QStringLiteral("IOTA"), QStringLiteral("MY_IOTA")}};
+    for (qint64 id : ids) {
+        const auto record = m_ctx.db->record(id);
+        if (!record) return fail(tr("A session QSO could not be read; retry the preview."));
+        const QDate date = QDate::fromString(record->value(QStringLiteral("QSO_DATE")), QStringLiteral("yyyyMMdd"));
+        if (!date.isValid()) { ++missingDate; continue; }
+        const QString day = date.toString(Qt::ISODate);
+        const QString op = record->value(QStringLiteral("OPERATOR")).trimmed().toUpper();
+        const QString grid = record->value(QStringLiteral("MY_GRIDSQUARE")).trimmed().toUpper();
+        bool found = false;
+        for (const auto& pair : fields) {
+            QSet<QString> seen;
+            for (const QString& item : record->value(pair.second).split(QLatin1Char(','), Qt::SkipEmptyParts)) {
+                const QString reference = item.trimmed().toUpper();
+                if (reference.isEmpty() || seen.contains(reference)) continue;
+                seen.insert(reference); found = true;
+                const QString key = QString::fromUtf8(QJsonDocument(QJsonArray{pair.first, reference, day, op, grid}).toJson(QJsonDocument::Compact));
+                if (!groups.contains(key)) groups.insert(key, {{QStringLiteral("program"), pair.first}, {QStringLiteral("reference"), reference},
+                    {QStringLiteral("day"), day}, {QStringLiteral("operator"), op}, {QStringLiteral("grid"), grid}, {QStringLiteral("count"), 0}});
+                groups[key][QStringLiteral("count")] = groups[key].value(QStringLiteral("count")).toInt() + 1;
+            }
+        }
+        if (!found) ++missingReference;
+    }
+    QVariantList rows; for (const auto& row : groups) rows << row;
+    result[QStringLiteral("groups")] = rows;
+    result[QStringLiteral("missingDate")] = missingDate;
+    result[QStringLiteral("missingReference")] = missingReference;
+    if (!db.commit()) return fail(tr("Cannot complete the log preview."));
+    transaction.committed = true;
+    return result;
 }
 
 QString ActivationController::suggestedFileName() const

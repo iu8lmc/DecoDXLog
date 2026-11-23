@@ -64,6 +64,7 @@ private slots:
         QVERIFY2(output.contains("PROBE multiStarted active=true sota=I/LM-001"), output.constData());
         QVERIFY2(output.contains("PROBE multiInvalidUpdate blocked=true sota=I/LM-001"), output.constData());
         QVERIFY2(output.contains("PROBE multiSaved count=2 firstError= secondError="), output.constData());
+        QVERIFY2(output.contains("PROBE multiPreview reported=2 groups=5 error="), output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(), 2);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,call FROM qso WHERE deleted=0 ORDER BY id"));
         QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1AAA"));

@@ -442,6 +442,7 @@ bool LogDatabase::migrate()
         {21, {QStringLiteral("CREATE TABLE IF NOT EXISTS activation_run (uuid TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT, initial_json TEXT NOT NULL, last_json TEXT NOT NULL)"),
               QStringLiteral("CREATE TABLE IF NOT EXISTS activation_run_change (id INTEGER PRIMARY KEY, session_uuid TEXT NOT NULL REFERENCES activation_run(uuid), changed_at TEXT NOT NULL, event TEXT NOT NULL, state_json TEXT NOT NULL)"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_activation_run_change ON activation_run_change(session_uuid,id)")}, nullptr},
+        {22, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qso_reported_activation ON qso((CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)) WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END) IS NOT NULL")}, "adif_extra"},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -547,7 +548,7 @@ bool LogDatabase::migrate()
             if (!q.exec() || !q.next() || q.value(0).toInt() == 0)
                 statements.clear();
         }
-        if (step.to == 18 && !statements.isEmpty()) {
+        if ((step.to == 18 || step.to == 22) && !statements.isEmpty()) {
             QSqlQuery columnQuery(db);
             if (!columnQuery.exec(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('qso') WHERE name='deleted'")) ||
                 !columnQuery.next()) {

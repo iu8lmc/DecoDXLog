@@ -13,6 +13,8 @@ DialogFrame {
     readonly property var act: decolog.activation
     readonly property var state: act.state
     property var draft: ({})
+    property var partitionPreview: ({})
+    property bool previewShown: false
 
     // `kind` apre gia' sul tipo giusto: "contest" quando si arriva dal contest.
     function openDialog(kind) {
@@ -21,6 +23,7 @@ DialogFrame {
                                myGrid: decolog.myGrid, tag: "", band: "", mode: "",
                                serialEnabled: kind === "contest", nextSerial: 1 }
         errorText.text = ""
+        previewShown = false
         open()
     }
     function chooseContest() { contestPicker.openPicker() }
@@ -56,7 +59,13 @@ DialogFrame {
         applySessionButton.clicked()
         const two = decolog.logManualQso({call: "K1BBB", date: decolog.showDate(now.date), time: now.time, band: "20m", mode: "CW"})
         console.warn("PROBE multiSaved count=" + decolog.currentLogInfo().qsos + " firstError=" + one + " secondError=" + two)
+        previewButton.clicked()
+        console.warn("PROBE multiPreview reported=" + root.partitionPreview.reportedCount + " groups=" + root.partitionPreview.groups.length + " error=" + (root.partitionPreview.error || ""))
         root.act.stop()
+    }
+    Connections {
+        target: root.act
+        function onChanged() { root.previewShown = false }
     }
     readonly property var kindLabels: ({ pota: "POTA", sota: "SOTA", wwff: "WWFF", iota: "IOTA",
                                          contest: qsTr("Contest"), free: qsTr("Free session") })
@@ -410,6 +419,33 @@ DialogFrame {
             visible: root.act.active && (Object.keys(root.state.programs || {}).length > 0 || String(root.state.reference || "").indexOf(",") >= 0)
             text: qsTr("The existing ADIF export is not split by programme, reference or UTC day. Review and prepare separate submission files as required.")
             color: Theme.warningColor
+        }
+        GlassButton {
+            id: previewButton
+            visible: root.act.active
+            text: qsTr("Preview reported programme groups")
+            onClicked: {
+                root.partitionPreview = root.act.partitionPreview()
+                root.previewShown = true
+            }
+        }
+        Note {
+            visible: root.previewShown
+            color: Theme.warningColor
+            text: root.partitionPreview.error || qsTr("%1 QSO report this session. Groups are not eligibility checks or submission files; imported or edited identifiers can be inaccurate. Network QSO may be missing. Missing operator or grid is shown as —. Recalculate after changes.").arg(root.partitionPreview.reportedCount || 0)
+        }
+        Note {
+            visible: root.previewShown && !root.partitionPreview.error
+            text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. Showing at most the first 100 of %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
+        }
+        Repeater {
+            model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.groups || []).slice(0, 100) : []
+            Note {
+                required property var modelData
+                text: qsTr("%1 · %2 · %3 UTC · operator %4 · grid %5: %6 QSO")
+                    .arg(modelData.program).arg(modelData.reference).arg(modelData.day)
+                    .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
+            }
         }
         Text {
             id: errorText
