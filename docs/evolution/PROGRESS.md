@@ -1781,3 +1781,11 @@ Added an opt-in application probe and integration fixture for the pending goal-a
 A/B on macOS arm64/Qt 6.11.2: with the final `watchSnapshotCurrent` recheck temporarily removed, the fixture observed one obsolete DXCAMPAIGN highlight and failed its zero-alert assertion. With the recheck restored, the same fixture passed with zero highlights; the normal actual-app goal-watch fixture also passed. CTest database, dxcampaign and dxassistant passed 3/3. The fixture uses a timed 500 ms gap rather than a worker-completion barrier: the A run demonstrates the stale alert in that run, but timing varies under load and the B run alone does not prove the precise worker schedule.
 
 This uses two local processes and synthetic input, not two stations, a real cluster, physical interaction or RF. It does not remove the interval after the final check, test power loss, Windows/Linux, or complete the other desktop roadmap requirements.
+
+## 2026-11-23 — G04 worker-confirmed two-process alert race
+
+The actual-app race fixture now waits for an explicitly enabled test trace from the worker confirming `needed=1`, then writes the matching QSO from the separate test process while the app UI event loop is still held. It checks that the UI has not resumed both before and after the write. The trace is emitted only when `DECOLOG_TEST_DX_WATCH_TRACE` is set; the synthetic busy-wait remains limited to the explicit test probe. This replaces the earlier unverified 500 ms assumption about worker scheduling.
+
+A/B on macOS arm64/Qt 6.11.2: with the callback's version recheck temporarily removed, the worker confirmed an open goal, the external write committed before UI resumption, and one obsolete alert appeared. With the recheck restored, the same ordered sequence produced no alert; the normal actual-app goal-watch fixture also passed. CTest database, dxcampaign and dxassistant passed 3/3.
+
+This controls the tested order but uses a bounded five-second UI hold, not an unbounded interprocess barrier; the test fails if the worker or external write cannot complete in that interval. It exercises an offscreen app and a separate local test process with synthetic cluster input, not two radio stations, real cluster/RF, Windows/Linux or every possible concurrent schedule. A commit after the final version check remains possible. The desktop roadmap remains open.

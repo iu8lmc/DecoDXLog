@@ -2446,6 +2446,8 @@ void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
         m_dxWatchPool.start([self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey] {
             LogDatabase db; QString error; bool needed=false;
             if (db.open(path)) { const auto result=dxcampaign::goalNeeded(db,campaign,spot,&error); needed=result && *result; }
+            if (qEnvironmentVariableIsSet("DECOLOG_TEST_DX_WATCH_TRACE"))
+                qWarning("PROBE dxgoalrace worker needed=%d", needed ? 1 : 0);
             if (!self) return;
             QMetaObject::invokeMethod(self.data(),[self,path,campaign,spot,profile,logVersion,generation,dataVersion,pendingKey,needed] {
                 if (!self) return; self->m_dxWatchPending.remove(pendingKey);

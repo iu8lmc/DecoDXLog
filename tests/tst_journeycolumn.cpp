@@ -958,7 +958,8 @@ private slots:
           c.goals={{"20m","CW","worked"}}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
         QProcessEnvironment env=QProcessEnvironment::systemEnvironment();
         env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
-        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","6000"); env.insert("DECODXLOG_TRACE_ACTIVITY","1");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","9000"); env.insert("DECODXLOG_TRACE_ACTIVITY","1");
+        env.insert("DECOLOG_TEST_DX_WATCH_TRACE","1");
         QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
         app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","dxgoalraceprobe","--grab",dir.filePath("screen.png")});
         QVERIFY(app.waitForStarted(10000));
@@ -967,10 +968,16 @@ private slots:
             app.waitForReadyRead(100); output += app.readAll();
         }
         QVERIFY2(output.contains("PROBE dxgoalrace queued"), output.constData());
-        QTest::qWait(500); // The UI remains held while the worker reads the empty goal.
+        while (!output.contains("PROBE dxgoalrace worker needed=1") && timer.elapsed()<15000) {
+            app.waitForReadyRead(100); output += app.readAll();
+        }
+        QVERIFY2(output.contains("PROBE dxgoalrace worker needed=1"), output.constData());
+        QVERIFY2(!output.contains("PROBE dxgoalrace resumed"), output.constData());
         { LogDatabase writer; QVERIFY(writer.open(path)); const auto now=QDateTime::currentDateTimeUtc();
           const auto qso=writer.insertQso({{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
           QCOMPARE(qso.status,InsertResult::Status::Inserted); }
+        output += app.readAll();
+        QVERIFY2(!output.contains("PROBE dxgoalrace resumed"), output.constData());
         QVERIFY(app.waitForFinished(20000)); output+=app.readAll();
         QVERIFY2(output.contains("PROBE dxgoalrace resumed"),output.constData());
         QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);

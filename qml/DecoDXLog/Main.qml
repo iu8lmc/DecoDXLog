@@ -1708,7 +1708,7 @@ RoundedWindow {
             decolog.cluster.filter={maxAgeMinutes:30}
             decolog.cluster.injectLine("DX de IK1AAA: 14025.0 3Y0J CW 1200Z")
             console.warn("PROBE dxgoalrace queued")
-            const until = Date.now() + 2200
+            const until = Date.now() + 5000
             while (Date.now() < until) {}
             console.warn("PROBE dxgoalrace resumed")
         }
