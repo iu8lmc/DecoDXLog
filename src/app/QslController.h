@@ -211,6 +211,7 @@ private:
     QByteArray m_lotwFileIdentity;
     quint64 m_lotwOpenGeneration{0};
     QHash<qint64, QPair<QString, int>> m_lotwQsoVersions;
+    QHash<qint64, QVariantList> m_lotwQslSnapshots;
     int m_accepted{0};
     int m_duplicates{0};
     int m_rejected{0};

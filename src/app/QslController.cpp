@@ -26,10 +26,13 @@
 #include <utility>
 #include <QSet>
 #include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlError>
 #include <QStandardPaths>
 #include <algorithm>
 #include <memory>
 #include <array>
+#include <optional>
 
 namespace decolog::app {
 
@@ -57,6 +60,25 @@ constexpr std::array<ServiceInfo, 7> kServices{{
 constexpr int kLotwBatch = 500;
 // Club Log preferisce blocchi ragionevoli a un log intero per volta.
 constexpr int kClubLogBatch = 1000;
+
+// QSL state changes do not increment the QSO revision. Include row presence so
+// that a newly inserted, otherwise empty state also invalidates the snapshot.
+std::optional<QVariantList> lotwQslSnapshot(QSqlDatabase db, qint64 id)
+{
+    QSqlQuery q(db);
+    q.prepare(QStringLiteral("SELECT sent, sent_date, rcvd, rcvd_date, remote_id, last_error, via FROM qsl_status WHERE qso_id = ? AND service = 'lotw'"));
+    q.addBindValue(id);
+    if (!q.exec()) return std::nullopt;
+    QVariantList values;
+    if (q.next()) {
+        values.append(true);
+        for (int i=0; i<7; ++i) values.append(q.value(i));
+    } else {
+        if (q.lastError().isValid()) return std::nullopt;
+        values.append(false);
+    }
+    return values;
+}
 
 bool isBatchService(const QString& service)
 {
@@ -1028,11 +1050,14 @@ void QslController::startNext()
         }
         const QByteArray adif=m_ctx.db->exportAdif(m_batch,QCoreApplication::applicationVersion());
         const AdifDocument document=adif::parse(adif);
-        QJsonArray contacts; QHash<qint64,QPair<QString,int>> versions;
+        QJsonArray contacts; QHash<qint64,QPair<QString,int>> versions; QHash<qint64,QVariantList> qslSnapshots;
         bool snapshotOk=!adif.isEmpty() && !m_batch.isEmpty() && document.records.size()==m_batch.size();
         for (qsizetype i=0; snapshotOk && i<m_batch.size(); ++i) {
             const qint64 id=m_batch.at(i); const auto meta=m_ctx.db->meta(id);
             if (!meta || meta->deleted || meta->uuid.isEmpty()) { snapshotOk=false; break; }
+            const auto qsl=lotwQslSnapshot(snapshotDb,id);
+            if (!qsl) { snapshotOk=false; break; }
+            qslSnapshots.insert(id,*qsl);
             const auto& record=document.records.at(i);
             versions.insert(id,qMakePair(meta->uuid,meta->revision));
             contacts.append(QJsonObject{{QStringLiteral("id"),QString::number(id)},{QStringLiteral("uuid"),meta->uuid},{QStringLiteral("revision"),meta->revision},
@@ -1057,7 +1082,7 @@ void QslController::startNext()
             QslUploadResult failed; failed.requiresReconciliation=true; failed.message=tr("LoTW: cannot save the batch checkpoint; no upload started"); finishBatch(failed); return;
         }
         m_lotwCheckpointNonce=nonce; m_lotwLogIdentity=m_ctx.db->identity(); m_lotwLogPath=m_ctx.db->path();
-        m_lotwFileIdentity=m_ctx.db->openFileIdentity(); m_lotwOpenGeneration=m_ctx.db->openGeneration(); m_lotwQsoVersions=versions;
+        m_lotwFileIdentity=m_ctx.db->openFileIdentity(); m_lotwOpenGeneration=m_ctx.db->openGeneration(); m_lotwQsoVersions=versions; m_lotwQslSnapshots=qslSnapshots;
         emit changed();
         QTemporaryFile file(QDir::tempPath()+QStringLiteral("/decolog-lotw-XXXXXX.adi")); file.setAutoRemove(false);
         if (!file.open() || file.write(adif)!=adif.size() || !file.flush()) {
@@ -1465,10 +1490,11 @@ bool QslController::saveBatchStates(const QString& service, const QslUploadResul
     const auto previousChanges = m_uploadChanges;
     bool saved = true;
     if (guardedLotw) {
-        if (m_lotwQsoVersions.size()!=m_batch.size()) saved=false;
+        if (m_lotwQsoVersions.size()!=m_batch.size() || m_lotwQslSnapshots.size()!=m_batch.size()) saved=false;
         for (qint64 id : std::as_const(m_batch)) {
             const auto meta=m_ctx.db->meta(id); const auto expected=m_lotwQsoVersions.value(id);
-            if (!meta || meta->deleted || meta->uuid!=expected.first || meta->revision!=expected.second) { saved=false; break; }
+            const auto qsl=lotwQslSnapshot(db,id);
+            if (!meta || meta->deleted || meta->uuid!=expected.first || meta->revision!=expected.second || !qsl || *qsl!=m_lotwQslSnapshots.value(id)) { saved=false; break; }
         }
     }
     for (qint64 id : std::as_const(m_batch)) {
@@ -1553,7 +1579,7 @@ void QslController::finishBatch(const QslUploadResult& result)
                 note(tr("LoTW: checkpoint could not be cleared; review the batch before retrying"), QStringLiteral("warning"));
             }
         }
-        m_lotwCheckpointNonce.clear(); m_lotwLogIdentity.clear(); m_lotwLogPath.clear(); m_lotwFileIdentity.clear(); m_lotwQsoVersions.clear();
+        m_lotwCheckpointNonce.clear(); m_lotwLogIdentity.clear(); m_lotwLogPath.clear(); m_lotwFileIdentity.clear(); m_lotwQsoVersions.clear(); m_lotwQslSnapshots.clear();
     }
 
     if (m_clubLogRestJournalThisRun) {

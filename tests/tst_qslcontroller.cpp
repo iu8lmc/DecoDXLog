@@ -618,6 +618,22 @@ private slots:
         QVERIFY(controller.lotwPendingInfo().value("pending").toBool()); QVERIFY(!controller.autoUpload("lotw")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1); QCOMPARE(db.record(qso.id)->value("COMMENT"),QString("edited after export"));
     }
 
+    void lotwSuccessDoesNotOverwriteConcurrentQslChange()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), ready=dir.filePath("ready"), release=dir.filePath("release");
+        QFile file(script); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\nwhile [ ! -e "+QFile::encodeName(release)+" ]; do sleep 0.05; done\nexit 0\n"); file.close(); QVERIFY(file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        const QString path=dir.filePath("log.sqlite"); LogDatabase db,other; QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.setAutoUpload("lotw",true); controller.uploadPending("lotw",0);
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ready),5000); QslState edited; edited.service="lotw"; edited.sent="N"; edited.lastError="operator review"; QVERIFY(other.setQslState(qso.id,edited));
+        QFile gate(release); QVERIFY(gate.open(QIODevice::WriteOnly)); gate.close(); QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(),5000);
+        QVERIFY(controller.lotwPendingInfo().value("pending").toBool()); QVERIFY(!controller.autoUpload("lotw")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+        QSqlQuery check(db.connection()); QVERIFY(check.exec("SELECT last_error FROM qsl_status WHERE service='lotw'")); QVERIFY(check.next()); QCOMPARE(check.value(0).toString(),QString("operator review"));
+    }
+
     void lotwSuccessAfterLogSwitchDoesNotTouchNewLog()
     {
 #ifdef Q_OS_WIN
