@@ -93,6 +93,7 @@ DialogFrame {
     Connections {
         target: decolog
         function onQslPlanChanged() {
+            if (root.plannerExternalProbe && decolog.qslPlan.error) console.warn("PROBE qslExternal error "+decolog.qslPlan.error)
             if (root.plannerExternalProbe && decolog.qslPlan.stale) { root.plannerExternalSawStale=true; console.warn("PROBE qslExternal stale"); console.warn("PROBE qslExternal guard "+JSON.stringify(decolog.qslPlanAlternativePage(1,"dxcc","291",0))) }
             if (root.plannerExternalProbe && root.plannerExternalSawStale && !decolog.qslPlanBusy && !decolog.qslPlan.stale && decolog.qslPlan.candidates) {
                 console.warn("PROBE qslExternal refreshed "+JSON.stringify(decolog.qslPlan)); root.plannerExternalProbe=false

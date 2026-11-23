@@ -318,7 +318,7 @@ DecoLogController::DecoLogController(QObject* parent)
     connect(this, &DecoLogController::logChanged, this, invalidateQslPlan);
     m_qslPlanVersionTimer.setInterval(1000);
     connect(&m_qslPlanVersionTimer,&QTimer::timeout,this,[this,invalidateQslPlan] {
-        if (m_qslPlanDataVersion<0 || !m_db.isOpen() || m_db.openGeneration()!=m_qslPlanOpenGeneration ||
+        if (m_qslPlanDataVersion<0 || !m_db.isOpen() || !m_db.fileIdentityMatchesOpen() || m_db.openGeneration()!=m_qslPlanOpenGeneration ||
             m_db.dataVersion()!=m_qslPlanDataVersion) invalidateQslPlan();
     });
     m_traffic = new TrafficMonitor(&m_udp, &m_decoLink, this);
@@ -2561,7 +2561,12 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         m_qslPlan = {{QStringLiteral("error"), tr("Choose at least one award and open a log")}};
         m_qslPlanBusy = false; ++m_qslPlanGeneration; emit qslPlanChanged(); return;
     }
+    if (!m_db.fileIdentityMatchesOpen()) {
+        m_qslPlanSnapshot.reset(); m_qslPlanPool.clear(); m_qslPlanVersionTimer.stop(); m_qslPlanDataVersion=-1;
+        m_qslPlan={{QStringLiteral("error"),tr("Log file changed; reopen it before planning")}}; m_qslPlanBusy=false; ++m_qslPlanGeneration; emit qslPlanChanged(); return;
+    }
     const QString path=m_db.path(), identity=m_db.identity(); const AwardFilter filter=m_awardFilter;
+    const QByteArray fileToken=m_db.openFileIdentity();
     const qint64 dataVersion=m_db.dataVersion(); const quint64 openGeneration=m_db.openGeneration(), logVersion=m_logVersion;
     if (identity.isEmpty() || dataVersion<0) {
         m_qslPlanSnapshot.reset(); m_qslPlanPool.clear(); m_qslPlanVersionTimer.stop(); m_qslPlanDataVersion=-1;
@@ -2576,10 +2581,10 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
     m_qslPlanSnapshot.reset(); m_qslPlan.clear(); m_qslPlanBusy=true; emit qslPlanChanged();
     QPointer<DecoLogController> self(this);
     m_qslPlanPool.clear();
-    m_qslPlanPool.start([self,path,identity,dataVersion,openGeneration,logVersion,filter,goals,calc,generation] {
+    m_qslPlanPool.start([self,path,identity,fileToken,dataVersion,openGeneration,logVersion,filter,goals,calc,generation] {
         LogDatabase db; qslplanner::Plan plan;
         if (!db.openReadOnly(path)) plan.error=db.lastError();
-        else if (db.identity()!=identity) plan.error=QStringLiteral("Log identity changed");
+        else if (!db.fileIdentityMatchesOpen() || db.openFileIdentity()!=fileToken || db.identity()!=identity) plan.error=QStringLiteral("Log identity or file changed");
         else plan=qslplanner::build(db,filter,goals,calc);
         QVariantList rows;
         QVariantList routes;
@@ -2628,7 +2633,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         QMetaObject::invokeMethod(self.data(),[self,path,identity,dataVersion,openGeneration,logVersion,generation,snapshot,rows,routes,ungrouped] {
             if (!self || generation!=self->m_qslPlanGeneration) return;
             self->m_qslPlanBusy=false;
-            if (self->m_db.path()!=path || self->m_db.identity()!=identity || self->m_db.openGeneration()!=openGeneration ||
+            if (self->m_db.path()!=path || !self->m_db.fileIdentityMatchesOpen() || self->m_db.identity()!=identity || self->m_db.openGeneration()!=openGeneration ||
                 self->m_db.dataVersion()!=dataVersion || self->m_logVersion!=logVersion) {
                 self->m_qslPlanVersionTimer.stop(); self->m_qslPlanDataVersion=-1; self->m_qslPlan={{QStringLiteral("stale"),true}};
             }
@@ -2644,7 +2649,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
 bool DecoLogController::qslPlanCurrent() const
 {
     return !m_qslPlanBusy && m_qslPlanSnapshot && !m_qslPlan.value(QStringLiteral("stale")).toBool() &&
-           m_qslPlanDataVersion>=0 && m_db.isOpen() && m_db.openGeneration()==m_qslPlanOpenGeneration &&
+           m_qslPlanDataVersion>=0 && m_db.isOpen() && m_db.fileIdentityMatchesOpen() && m_db.openGeneration()==m_qslPlanOpenGeneration &&
            m_db.identity()==m_qslPlanIdentity && m_db.dataVersion()==m_qslPlanDataVersion;
 }
 
