@@ -1275,6 +1275,7 @@ RoundedWindow {
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
         else if (what[0] === "historical") historicalQsoDialog.open()
+        else if (what[0] === "importguideprobe") Qt.callLater(() => importSourceGuide.probe())
         else if (what[0] === "qslplanprobe") Qt.callLater(() => awardsDialog.probeQslPlan())
         else if (what[0] === "qslscopesprobe") Qt.callLater(() => awardsDialog.probeQslScopes(what[1] === "restore"))
         else if (what[0] === "qslaccountsprobe") Qt.callLater(() => awardsDialog.probeQslAccounts(what[1] === "restore"))
@@ -2120,13 +2121,64 @@ RoundedWindow {
         }
     }
 
+    DialogFrame {
+        id: importSourceGuide
+        title: qsTr("Import a log")
+        info: qsTr("Choose the source, then review the file before importing")
+        dialogKey: "import-source-guide"
+        width: 660; height: 390
+        property int sourceIndex: 0
+        readonly property var sourceNames: [qsTr("Other or generic"), "Log4OM", "DXKeeper / DXLab", "Logger32", "Ham Radio Deluxe", "MacLoggerDX", "N1MM Logger+"]
+        readonly property var guidance: [
+            qsTr("Choose an ADIF, CSV/TSV or supported N1MM database file."),
+            qsTr("In Log4OM 2, use File → Export ADIF and select the fields you want to keep."),
+            qsTr("In DXKeeper, export the desired Log Page Display as ADIF; check its filters and selected records."),
+            qsTr("Export the desired Logger32 log to ADIF and check the exported record range."),
+            qsTr("In Ham Radio Deluxe Logbook, use File → Export and select ADIF and the fields to include."),
+            qsTr("In MacLoggerDX, use File → Export ADIF; a selection can limit the records exported."),
+            qsTr("Choose an N1MM Logger+ .s3db database or an ADIF export of the desired contest log.")
+        ]
+        readonly property string backupNote: qsTr("An ADIF export is not a complete backup. Keep the original log and review profiles, confirmations, attachments and extra fields.")
+        function filtersFor(index) {
+            if (index === 0) return [qsTr("Logs (*.adi *.adif *.csv *.tsv *.s3db)"), qsTr("ADIF files (*.adi *.adif)"), qsTr("Spreadsheets (*.csv *.tsv)"), qsTr("N1MM Logger+ databases (*.s3db)"), qsTr("All files (*)")]
+            if (index === 6) return [qsTr("N1MM Logger+ databases (*.s3db)"), qsTr("ADIF files (*.adi *.adif)"), qsTr("All files (*)")]
+            return [qsTr("ADIF files (*.adi *.adif)"), qsTr("All files (*)")]
+        }
+        function prepareFileChooser() { importDialog.nameFilters=filtersFor(sourceIndex) }
+        function probe() {
+            open()
+            sourceIndex=1; prepareFileChooser(); const selectedAdif=importDialog.nameFilters.slice()
+            sourceIndex=6; prepareFileChooser(); const selectedN1mm=importDialog.nameFilters.slice()
+            sourceIndex=0; prepareFileChooser()
+            console.warn("PROBE importguide " + JSON.stringify({sources:sourceNames, sourceCount:sourceNames.length, backupNotePresent:backupNote.length>0,
+                generic:importDialog.nameFilters, adif:selectedAdif, n1mm:selectedN1mm}))
+        }
+        body: ColumnLayout {
+            anchors.margins: 16; spacing: 10
+            StyledComboBox {
+                Layout.fillWidth: true
+                Accessible.name: qsTr("Source program")
+                model: importSourceGuide.sourceNames
+                currentIndex: importSourceGuide.sourceIndex
+                onActivated: index => importSourceGuide.sourceIndex=index
+            }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary; text:importSourceGuide.guidance[importSourceGuide.sourceIndex] }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:importSourceGuide.backupNote }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("The source choice suggests file types; it does not verify the exporter or change the import parser.") }
+            Item { Layout.fillHeight:true }
+            RowLayout {
+                Item { Layout.fillWidth:true }
+                GlassButton { text:qsTr("Cancel"); onClicked:importSourceGuide.close() }
+                GlassButton { text:qsTr("Choose file…"); onClicked: { importSourceGuide.prepareFileChooser(); importSourceGuide.close(); importDialog.open() } }
+            }
+        }
+    }
+
     FileDialog {
         id: importDialog
         title: qsTr("Import a log")
         // L'ADIF di qualunque programma, un foglio di calcolo, il database di N1MM.
-        nameFilters: [qsTr("Logs (*.adi *.adif *.csv *.tsv *.s3db)"), qsTr("ADIF files (*.adi *.adif)"),
-                      qsTr("Spreadsheets (*.csv *.tsv)"), qsTr("N1MM Logger+ databases (*.s3db)"),
-                      qsTr("All files (*)")]
+        nameFilters: importSourceGuide.filtersFor(0)
         onAccepted: {
             decolog.previewImport(selectedFile, false)
         }
@@ -2914,7 +2966,7 @@ RoundedWindow {
             console.warn("sblocco: chiusi", closed, "popup")
         }
     }
-    Shortcut { sequence: "Ctrl+I"; onActivated: importDialog.open() }
+    Shortcut { sequence: "Ctrl+I"; onActivated: importSourceGuide.open() }
     Shortcut { sequence: "Ctrl+E"; onActivated: exportDialog.open() }
     Shortcut { sequence: "Ctrl+K"; onActivated: window.openCluster(0) }
     Shortcut { sequence: "Ctrl+T"; onActivated: activationDialog.openDialog() }
@@ -2930,7 +2982,7 @@ RoundedWindow {
             Layout.fillWidth: true
             onSetupRequested: setupDialog.open()
             onLogsRequested: logsDialog.openDialog()
-            onImportRequested: importDialog.open()
+            onImportRequested: importSourceGuide.open()
             onUndoImportRequested: decolog.previewImportUndo()
             onExportRequested: exportDialog.open()
             onExportPeriodRequested: exportPeriodDialog.openDialog()

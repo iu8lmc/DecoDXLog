@@ -1120,6 +1120,26 @@ private slots:
         QCOMPARE(settings.value("qslPlanner/goalsJson").toString(),QStringLiteral("[\"wac\"]"));
     }
 
+    void importGuideOffersSourcesWithoutChangingLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,"importguideprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE importguide") && output.contains("Log4OM") && output.contains("DXKeeper") &&
+                 output.contains("Logger32") && output.contains("Ham Radio Deluxe") && output.contains("MacLoggerDX") &&
+                 output.contains("N1MM Logger+") && output.contains("ADIF") && output.contains("s3db") &&
+                 output.contains("\"backupNotePresent\":true") && output.contains("\"sourceCount\":7"),output.constData());
+        const QByteArray marker("PROBE importguide "); const int start=output.indexOf(marker); QVERIFY(start>=0);
+        const int end=output.indexOf('\n',start); QVERIFY(end>start);
+        const auto info=QJsonDocument::fromJson(output.mid(start+marker.size(),end-start-marker.size())).object();
+        QCOMPARE(info.value("generic").toArray().size(),5);
+        QCOMPARE(info.value("adif").toArray().size(),2);
+        QCOMPARE(info.value("n1mm").toArray().size(),3);
+        QVERIFY(info.value("adif").toArray().first().toString().contains("*.adi"));
+        QVERIFY(!info.value("adif").toArray().first().toString().contains("*.s3db"));
+        QVERIFY(info.value("n1mm").toArray().first().toString().contains("*.s3db"));
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+
     void qslPlannerGoalsFollowAwardAccountAcrossRestart()
     {
         using namespace decolog::core;

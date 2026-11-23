@@ -4894,6 +4894,58 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 <context>
     <name>Main</name>
     <message>
+        <source>Choose the source, then review the file before importing</source>
+        <translation>Scegli la sorgente, poi controlla il file prima di importare</translation>
+    </message>
+    <message>
+        <source>Other or generic</source>
+        <translation>Altro o generico</translation>
+    </message>
+    <message>
+        <source>Choose an ADIF, CSV/TSV or supported N1MM database file.</source>
+        <translation>Scegli un file ADIF, CSV/TSV o un database N1MM supportato.</translation>
+    </message>
+    <message>
+        <source>In Log4OM 2, use File → Export ADIF and select the fields you want to keep.</source>
+        <translation>In Log4OM 2 usa File → Export ADIF e seleziona i campi da conservare.</translation>
+    </message>
+    <message>
+        <source>In DXKeeper, export the desired Log Page Display as ADIF; check its filters and selected records.</source>
+        <translation>In DXKeeper esporta in ADIF la vista del log desiderata; controlla filtri e record selezionati.</translation>
+    </message>
+    <message>
+        <source>Export the desired Logger32 log to ADIF and check the exported record range.</source>
+        <translation>Esporta il log Logger32 desiderato in ADIF e controlla l’intervallo dei record esportati.</translation>
+    </message>
+    <message>
+        <source>In Ham Radio Deluxe Logbook, use File → Export and select ADIF and the fields to include.</source>
+        <translation>In Ham Radio Deluxe Logbook usa File → Export e seleziona ADIF e i campi da includere.</translation>
+    </message>
+    <message>
+        <source>In MacLoggerDX, use File → Export ADIF; a selection can limit the records exported.</source>
+        <translation>In MacLoggerDX usa File → Export ADIF; una selezione può limitare i record esportati.</translation>
+    </message>
+    <message>
+        <source>Choose an N1MM Logger+ .s3db database or an ADIF export of the desired contest log.</source>
+        <translation>Scegli un database N1MM Logger+ .s3db o un’esportazione ADIF del log contest desiderato.</translation>
+    </message>
+    <message>
+        <source>An ADIF export is not a complete backup. Keep the original log and review profiles, confirmations, attachments and extra fields.</source>
+        <translation>Un’esportazione ADIF non è un backup completo. Conserva il log originale e controlla profili, conferme, allegati e campi aggiuntivi.</translation>
+    </message>
+    <message>
+        <source>The source choice suggests file types; it does not verify the exporter or change the import parser.</source>
+        <translation>La sorgente suggerisce i tipi di file; non verifica il programma esportatore e non cambia il parser di importazione.</translation>
+    </message>
+    <message>
+        <source>Source program</source>
+        <translation>Programma sorgente</translation>
+    </message>
+    <message>
+        <source>Choose file…</source>
+        <translation>Scegli file…</translation>
+    </message>
+    <message>
         <source>DXpedition calendar</source>
         <translation>Calendario DX-Pedition</translation>
     </message>
