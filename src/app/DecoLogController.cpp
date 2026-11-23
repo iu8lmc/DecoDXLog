@@ -1329,7 +1329,12 @@ bool DecoLogController::openDatabase(const QString& path)
     m_qslOcr = new core::TesseractOcr(QString(), this);
     m_qslOcrSearch = new core::QslOcrSearch(&m_db, this);
     m_qslOcrAcquisition = new core::QslOcrAcquisition(&m_db, m_qslOcr, this);
-    connect(m_qslOcrAcquisition, &core::QslOcrAcquisition::finished, this, [this](bool success) { if (success) emit logChanged(); });
+    connect(m_qslOcrAcquisition, &core::QslOcrAcquisition::finished, this, [this](bool success) {
+        if (success) emit logChanged();
+        const auto result=m_qslOcrAcquisition->result();
+        if (result.value(QStringLiteral("originChanged")).toBool())
+            addActivity(QStringLiteral("OCR"), QStringLiteral("%1 (%2)").arg(m_qslOcrAcquisition->error(), result.value(QStringLiteral("originPath")).toString()), QStringLiteral("warning"));
+    });
     m_predictTracker = new core::PredictTracker(this);
     m_predictPassPlanner = new core::PredictPassPlanner(this);
     m_predictPassSchedule = new core::PredictPassSchedule(this);

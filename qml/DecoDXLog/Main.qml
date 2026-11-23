@@ -1649,6 +1649,7 @@ RoundedWindow {
         }
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
         else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "ocralertprobe") ocrAlertProbe.start()
         else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe" || what[0] === "importcancelbusyprobe" || what[0] === "importlongprobe") importSnapshotProbe.start()
         else if (what[0] === "confirmationreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "clubreportprobe") { openStats(); activityReportProbe.start() }
@@ -2194,6 +2195,18 @@ RoundedWindow {
             if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0 || startupShow.indexOf("importcancelbusyprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready " + JSON.stringify(result)); importSnapshotAccept.start() }
         }
     }
+    Timer { id:ocrAlertProbe; interval:1000; onTriggered: {
+        const uuid=startupShow.split(":")[1]; const started=decolog.qslOcrAcquisition.saveReview(1,uuid,0,"OCR origin test")
+        console.warn("PROBE ocrAlert started="+started)
+        const until=Date.now()+3500; while (Date.now()<until) {}
+    } }
+    Connections { target:decolog.qslOcrAcquisition; function onFinished(success) {
+        if (startupShow.indexOf("ocralertprobe:") !== 0) return
+        Qt.callLater(function() {
+            const model=decolog.activity; const idx=model.index(0,0)
+            console.warn("PROBE ocrAlert done="+success+" category="+model.data(idx,258)+" message="+model.data(idx,259))
+        })
+    } }
     Timer { id:importLongProbe; interval:500; onTriggered: {
         importPreviewScroll.contentY = Math.max(0, importPreviewScroll.contentHeight - importPreviewScroll.height)
         console.warn("PROBE importlong scroll=" + (importPreviewScroll.contentY > 0) + " bottom=" + (importPreviewScroll.contentY + importPreviewScroll.height >= importPreviewScroll.contentHeight - 1) + " buttons=" + (importPreviewActions.y + importPreviewActions.height <= importPreviewDialog.height) + " last=" + (window.importPreview.extraFields.indexOf("APP_VENDOR_FIELD_149") >= 0))

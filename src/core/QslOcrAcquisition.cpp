@@ -35,6 +35,7 @@ void QslOcrAcquisition::finishWrite(const QString &path, const QString &identity
     const bool committed=result.value(QStringLiteral("ok")).toBool();
     if (!same) {
         m_result.insert(QStringLiteral("originChanged"),true);
+        m_result.insert(QStringLiteral("originPath"),path);
         m_result.insert(QStringLiteral("committed"),committed);
         m_result.insert(QStringLiteral("ok"),false);
         m_error=committed ? tr("The operation was saved in the original log; the open log has changed. Review the original log before repeating it.")

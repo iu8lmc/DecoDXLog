@@ -1649,6 +1649,24 @@ private slots:
         QCOMPARE(db.qslAttachmentData(attachment), bytes);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT undone_at FROM qsl_ocr_acquisition")); QVERIFY(q.next()); QVERIFY(!q.value(0).isNull());
     }
+    void qslOcrChangedOriginAppearsInActivity()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("test.sqlite");
+        const QString image=QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"); QFile f(image); QVERIFY(f.open(QIODevice::ReadOnly)); const auto bytes=f.readAll();
+        const QString hash=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex()); QString uuid;
+        { LogDatabase db; QVERIFY(db.open(path)); const auto qso=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260923"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false); QVERIFY(qso.id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT uuid,revision FROM qso")); QVERIFY(q.next()); const QVariantList selected{QVariantMap{{"id",qso.id},{"uuid",q.value(0)},{"revision",q.value(1)}}}; q.finish(); std::atomic_bool cancelled{false};
+          QVERIFY(QslOcrAcquisition::execute(path,image,hash,"card.png","ocr",selected,&cancelled).value("ok").toBool()); QVERIFY(q.exec("SELECT uuid FROM qsl_ocr_acquisition WHERE id=1")); QVERIFY(q.next()); uuid=q.value(0).toString(); }
+        auto env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software"); env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","6500");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels); app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","ocralertprobe:"+uuid,"--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start(); while (!output.contains("PROBE ocrAlert started=true") && timer.elapsed()<10000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE ocrAlert started=true"),output.constData());
+        const QString connection="ocr-alert-observer"; { QSqlDatabase observer=QSqlDatabase::addDatabase("QSQLITE",connection); observer.setConnectOptions("QSQLITE_OPEN_READONLY"); observer.setDatabaseName(path); QVERIFY(observer.open()); bool committed=false; timer.restart();
+          while (!committed && timer.elapsed()<2500) { QSqlQuery q(observer); QVERIFY(q.exec("SELECT count(*) FROM qsl_ocr_review")); QVERIFY(q.next()); committed=q.value(0).toInt()==1; if (!committed) QTest::qSleep(10); } QVERIFY(committed); observer.close(); }
+        QSqlDatabase::removeDatabase(connection); QVERIFY(QFile::rename(path,dir.filePath("moved.sqlite")));
+        QVERIFY(app.waitForFinished(15000)); output+=app.readAll(); QVERIFY2(app.exitCode()==0,output.constData());
+        QVERIFY2(output.contains("PROBE ocrAlert done=false category=OCR message=") && output.contains("test.sqlite"),output.constData());
+    }
     void qslOcrHistorySavesReviewedTextSeparately()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString image=QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"); QVERIFY(!image.isEmpty());
