@@ -180,6 +180,12 @@ class TestTesseractOcr : public QObject {
         verify.finish(); QVERIFY(acquisition.saveReview(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0,"stale")); db.close(); QVERIFY(db.open(path));
         QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QVERIFY(!done.last().first().toBool()); QVERIFY(acquisition.result().value("originChanged").toBool());
         QVERIFY(!acquisition.result().value("committed").toBool()); QVERIFY(acquisition.error().contains("failed",Qt::CaseInsensitive));
+        QVERIFY(acquisition.review(inserted.id,0)); db.close(); QVERIFY(db.open(path)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),3,5000);
+        QVERIFY(!done.last().first().toBool()); QVERIFY(acquisition.history().isEmpty());
+        QVERIFY(acquisition.loadReviews(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0)); db.close(); QVERIFY(db.open(path));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),4,5000); QVERIFY(!done.last().first().toBool()); QVERIFY(acquisition.reviews().isEmpty());
+        QVERIFY(acquisition.loadReviews(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),5,5000);
+        QVERIFY(done.last().first().toBool()); QCOMPARE(acquisition.reviews().size(),1);
     }
     void searchesDateAndTimeBeforeApplyingResultLimit()
     {
