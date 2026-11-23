@@ -34,4 +34,7 @@ private:
     int m_total{0}, m_received{0};
     bool m_complete{false}, m_failed{false};
 };
+struct ApplyResult { bool ok{false}; bool inserted{false}; qint64 id{0}; QString error; };
+// Call only after explicit review and peer authorization. Never overwrites.
+ApplyResult applyMissing(LogDatabase& db, const QString& expectedLogIdentity, const Receiver& receiver);
 }

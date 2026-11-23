@@ -5,6 +5,7 @@
 #include "core/LogDatabase.h"
 
 #include <QSignalSpy>
+#include <QSqlQuery>
 #include <QJsonArray>
 #include <QTest>
 #include <QUdpSocket>
@@ -191,6 +192,29 @@ private slots:
         contestqso::Receiver receiver("node","transfer"); for (int i=0;i<encoder.count();++i) QVERIFY(receiver.accept("node",encoder.frame(i)));
         QVERIFY(receiver.complete()); QCOMPARE(receiver.row().uuid,original.uuid); QCOMPARE(receiver.row().adifPayload,original.adifPayload);
         QCOMPARE(receiver.sourceLog(),inventory.logIdentity()); QCOMPARE(db.record(inserted.id)->value("COMMENT"),record.value("COMMENT"));
+    }
+    void qsoTransferApplyMissingIsAtomicAndGuarded()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase source,target; QVERIFY(source.open(dir.filePath("source.sqlite"))); QVERIFY(target.open(dir.filePath("target.sqlite")));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT","test"}};
+        auto inserted=source.insertQso(record,"fixture"); QVERIFY(inserted.id>0); ContestNetInventory inventory; QVERIFY(inventory.begin(dir.filePath("source.sqlite")));
+        const auto page=inventory.next(10); QVERIFY(page.ok); const auto original=page.rows.first(); contestqso::Encoder encoder("transfer",inventory.logIdentity(),original);
+        contestqso::Receiver receiver("node","transfer"); for (int i=0;i<encoder.count();++i) QVERIFY(receiver.accept("node",encoder.frame(i)));
+        auto result=contestqso::applyMissing(target,"wrong-log",receiver); QVERIFY(!result.ok); QCOMPARE(target.idForUuid(original.uuid),qint64(0));
+        result=contestqso::applyMissing(target,target.identity(),receiver); QVERIFY2(result.ok,qPrintable(result.error)); QVERIFY(result.inserted);
+        const auto id=target.idForUuid(original.uuid); QVERIFY(id>0); QCOMPARE(ContestNetInventory::fingerprint(*target.record(id)),original.contentHash);
+        const auto changes=target.contestNetChangesAfter(0,100); QVERIFY(changes.ok); QCOMPARE(changes.changes.size(),1); QCOMPARE(changes.changes.first().qsoUuid,original.uuid); QVERIFY(changes.changes.first().previousQsoUuid.isEmpty());
+        result=contestqso::applyMissing(target,target.identity(),receiver); QVERIFY(result.ok); QVERIFY(!result.inserted); QCOMPARE(target.idForUuid(original.uuid),id);
+        contestqso::Receiver partial("node","another"); result=contestqso::applyMissing(target,target.identity(),partial); QVERIFY(!result.ok);
+        auto edited=*target.record(id); edited.set("COMMENT","local edit"); QVERIFY(target.updateQso(id,edited).status==InsertResult::Status::Inserted);
+        result=contestqso::applyMissing(target,target.identity(),receiver); QVERIFY(!result.ok); QCOMPARE(target.record(id)->value("COMMENT"),QString("local edit"));
+        LogDatabase failed; QVERIFY(failed.open(dir.filePath("failed.sqlite"))); QSqlQuery q(failed.connection());
+        QVERIFY(q.exec("CREATE TRIGGER reject_identity BEFORE UPDATE OF uuid ON qso BEGIN SELECT RAISE(ABORT, 'injected'); END"));
+        result=contestqso::applyMissing(failed,failed.identity(),receiver); QVERIFY(!result.ok); QCOMPARE(failed.latestIds(QString(),100).size(),0);
+        QVERIFY(q.exec("SELECT count(*) FROM contest_net_change")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        QVERIFY(q.exec("DROP TRIGGER reject_identity")); result=contestqso::applyMissing(failed,failed.identity(),receiver); QVERIFY2(result.ok,qPrintable(result.error));
+        LogDatabase duplicate; QVERIFY(duplicate.open(dir.filePath("duplicate.sqlite"))); QVERIFY(duplicate.insertQso(record,"fixture").id>0);
+        result=contestqso::applyMissing(duplicate,duplicate.identity(),receiver); QVERIFY(!result.ok); QCOMPARE(duplicate.latestIds(QString(),100).size(),1);
     }
     void qsoTransferRejectsMalformedFragments()
     {

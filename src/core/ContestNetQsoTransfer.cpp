@@ -2,6 +2,8 @@
 #include <QCryptographicHash>
 #include <QJsonArray>
 #include <QRegularExpression>
+#include <QSqlError>
+#include <QSqlQuery>
 #include <cmath>
 
 namespace decolog::core::contestqso {
@@ -88,4 +90,53 @@ bool Receiver::accept(const QString& sender,const QJsonObject& f) {
     }
     m_error.clear(); return true;
 }
+ApplyResult applyMissing(LogDatabase& db,const QString& expectedLogIdentity,const Receiver& receiver) {
+    ApplyResult result;
+    if (!receiver.complete() || !db.isOpen() || expectedLogIdentity.isEmpty() || db.identity()!=expectedLogIdentity || !db.fileIdentityMatchesOpen()) {
+        result.error=QStringLiteral("Unverified transfer or changed destination log"); return result;
+    }
+    const auto incoming=receiver.row();
+    if (incoming.deleted) { result.error=QStringLiteral("Deleted QSO require conflict review"); return result; }
+    const auto doc=adif::parse(incoming.adifPayload);
+    if (doc.records.size()!=1 || ContestNetInventory::fingerprint(doc.records.first())!=incoming.contentHash) {
+        result.error=QStringLiteral("Invalid transferred ADIF"); return result;
+    }
+    auto connection=db.connection(); QSqlQuery q(connection);
+    if (!q.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.error=q.lastError().text(); return result; }
+    auto fail=[&](const QString& message) { connection.rollback(); ApplyResult failed; failed.error=message; return failed; };
+    if (db.identity()!=expectedLogIdentity || !db.fileIdentityMatchesOpen()) return fail(QStringLiteral("Destination log changed"));
+    q.prepare(QStringLiteral("SELECT id FROM qso WHERE uuid=?")); q.addBindValue(incoming.uuid);
+    if (!q.exec()) return fail(q.lastError().text());
+    if (q.next()) {
+        const auto existing=q.value(0).toLongLong(); QString error;
+        const auto metadata=db.meta(existing); const auto record=db.recordChecked(existing,&error);
+        if (!metadata || !record || metadata->deleted || metadata->revision!=incoming.revision || ContestNetInventory::fingerprint(*record)!=incoming.contentHash)
+            return fail(error.isEmpty()?QStringLiteral("Existing QSO differs; review required"):error);
+        if (!connection.commit()) return fail(connection.lastError().text());
+        result.ok=true; result.id=existing; return result;
+    }
+    if (q.lastError().isValid()) return fail(q.lastError().text());
+    if (!q.exec(QStringLiteral("SELECT COALESCE(MAX(sequence),0) FROM contest_net_change")) || !q.next()) return fail(QStringLiteral("Cannot read change journal"));
+    const qint64 watermark=q.value(0).toLongLong();
+    const auto inserted=db.insertQso(doc.records.first(),QStringLiteral("contestnet"),receiver.sourceLog(),false,0,true);
+    if (inserted.status!=InsertResult::Status::Inserted) return fail(inserted.message.isEmpty()?QStringLiteral("QSO cannot be inserted"):inserted.message);
+    const auto temporary=db.meta(inserted.id);
+    if (!temporary || temporary->uuid.isEmpty()) return fail(QStringLiteral("Cannot identify inserted QSO"));
+    q.prepare(QStringLiteral("UPDATE qso SET uuid=?, revision=? WHERE id=?")); q.addBindValue(incoming.uuid); q.addBindValue(incoming.revision); q.addBindValue(inserted.id);
+    if (!q.exec() || q.numRowsAffected()!=1) return fail(q.lastError().text().isEmpty()?QStringLiteral("Cannot preserve QSO identity"):q.lastError().text());
+    // Hide the generated, never externally visible UUID from this transaction's
+    // local change journal; the final identity still has an insertion event.
+    q.prepare(QStringLiteral("DELETE FROM contest_net_change WHERE sequence>? AND qso_uuid=?"));
+    q.addBindValue(watermark); q.addBindValue(temporary->uuid);
+    if (!q.exec()) return fail(q.lastError().text());
+    q.prepare(QStringLiteral("UPDATE contest_net_change SET previous_qso_uuid=NULL WHERE sequence>? AND qso_uuid=? AND previous_qso_uuid=?"));
+    q.addBindValue(watermark); q.addBindValue(incoming.uuid); q.addBindValue(temporary->uuid);
+    if (!q.exec() || q.numRowsAffected()!=1) return fail(QStringLiteral("Cannot finalize change journal"));
+    QString error; const auto saved=db.recordChecked(inserted.id,&error);
+    if (!saved || ContestNetInventory::fingerprint(*saved)!=incoming.contentHash) return fail(error.isEmpty()?QStringLiteral("Stored QSO differs from received ADIF"):error);
+    if (!db.fileIdentityMatchesOpen() || db.identity()!=expectedLogIdentity) return fail(QStringLiteral("Destination log changed"));
+    if (!connection.commit()) return fail(connection.lastError().text());
+    result.ok=true; result.inserted=true; result.id=inserted.id; return result;
+}
+
 }
