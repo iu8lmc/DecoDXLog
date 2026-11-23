@@ -456,6 +456,10 @@ bool LogDatabase::migrate()
         {22, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qso_reported_activation ON qso((CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)) WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END) IS NOT NULL")}, "adif_extra"},
         {23, {QStringLiteral("CREATE TABLE IF NOT EXISTS qsl_ocr_review (id INTEGER PRIMARY KEY, acquisition_id INTEGER NOT NULL REFERENCES qsl_ocr_acquisition(id), reviewed_text TEXT NOT NULL, created_at TEXT NOT NULL)"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qsl_ocr_review_acquisition ON qsl_ocr_review(acquisition_id,id)")}, nullptr},
+        {24, {QStringLiteral("CREATE TABLE IF NOT EXISTS contest_serial_reservation ("
+              "scope TEXT NOT NULL, requester TEXT NOT NULL, request_id TEXT NOT NULL, "
+              "minimum INTEGER NOT NULL CHECK(minimum > 0), serial INTEGER NOT NULL CHECK(serial > 0), "
+              "created_at TEXT NOT NULL, PRIMARY KEY(scope,requester,request_id), UNIQUE(scope,serial))")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1214,6 +1218,60 @@ InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 
         result.message = db.lastError().text();
         db.rollback();
     }
+    return result;
+}
+
+ContestSerialReservation LogDatabase::reserveContestSerial(const QString& scope, const QString& requester,
+                                                              const QString& requestId, int minimum)
+{
+    ContestSerialReservation result;
+    if (scope.trimmed().isEmpty() || requester.trimmed().isEmpty() || requestId.trimmed().isEmpty() ||
+        scope.size() > 256 || requester.size() > 256 || requestId.size() > 256 || minimum < 1) {
+        result.error = QStringLiteral("Invalid serial reservation request");
+        return result;
+    }
+    QSqlDatabase db = connection();
+    QSqlQuery begin(db);
+    if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
+        result.error = begin.lastError().text();
+        return result;
+    }
+    auto fail = [&](const QString& error) {
+        db.rollback();
+        result.error = error;
+        return result;
+    };
+    QSqlQuery existing(db);
+    existing.prepare(QStringLiteral("SELECT minimum,serial FROM contest_serial_reservation "
+                                    "WHERE scope=? AND requester=? AND request_id=?"));
+    existing.addBindValue(scope); existing.addBindValue(requester); existing.addBindValue(requestId);
+    if (!existing.exec()) return fail(existing.lastError().text());
+    if (existing.next()) {
+        if (existing.value(0).toInt() != minimum)
+            return fail(QStringLiteral("Serial request identity reused with different parameters"));
+        result.serial = existing.value(1).toInt();
+        result.replayed = true;
+    } else {
+        QSqlQuery highest(db);
+        highest.prepare(QStringLiteral("SELECT COALESCE(MAX(serial),0) FROM contest_serial_reservation WHERE scope=?"));
+        highest.addBindValue(scope);
+        if (!highest.exec() || !highest.next()) return fail(highest.lastError().text());
+        const qint64 previous = highest.value(0).toLongLong();
+        if (previous >= std::numeric_limits<int>::max())
+            return fail(QStringLiteral("Serial number range exhausted"));
+        const qint64 next = qMax(qint64(minimum), previous + 1);
+        if (next > std::numeric_limits<int>::max())
+            return fail(QStringLiteral("Serial number range exhausted"));
+        QSqlQuery insert(db);
+        insert.prepare(QStringLiteral("INSERT INTO contest_serial_reservation "
+                                      "(scope,requester,request_id,minimum,serial,created_at) VALUES (?,?,?,?,?,?)"));
+        insert.addBindValue(scope); insert.addBindValue(requester); insert.addBindValue(requestId);
+        insert.addBindValue(minimum); insert.addBindValue(next); insert.addBindValue(nowIso());
+        if (!insert.exec()) return fail(insert.lastError().text());
+        result.serial = int(next);
+    }
+    if (!db.commit()) return fail(db.lastError().text());
+    result.ok = true;
     return result;
 }
 

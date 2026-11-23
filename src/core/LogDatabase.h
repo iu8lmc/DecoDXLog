@@ -30,6 +30,13 @@ struct InsertResult {
     QString message;
 };
 
+struct ContestSerialReservation {
+    bool ok{false};
+    bool replayed{false};
+    int serial{0};
+    QString error;
+};
+
 struct ImportResult {
     int read{0};
     int inserted{0};
@@ -280,6 +287,11 @@ public:
     InsertResult updateQsoGuarded(qint64 id, AdifRecord record, qint64 stationProfileId,
                                   const QString& expectedUuid, int expectedRevision,
                                   const QSet<QString>& touchedFields);
+
+    // A persistent allocator on this log only. Scope and requester identities
+    // must be agreed by the network protocol; this does not elect a server.
+    ContestSerialReservation reserveContestSerial(const QString& scope, const QString& requester,
+                                                   const QString& requestId, int minimum);
 
     // Cancellazione morbida: la riga resta, marcata deleted, e lo storico la
     // conserva.

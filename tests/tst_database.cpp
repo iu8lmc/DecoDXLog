@@ -15,6 +15,9 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
+#include <atomic>
+#include <thread>
+#include <limits>
 
 using namespace decolog::core;
 
@@ -23,7 +26,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 23;
+constexpr int kSchemaVersion = 24;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -59,6 +62,74 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestSerialReservationsSurviveRestartAndRetry()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("serials.sqlite");
+        {
+            LogDatabase db, second; QVERIFY(db.open(path)); QVERIFY(second.open(path));
+            const auto first=db.reserveContestSerial("contest-2026", "node-a", "request-1", 100);
+            QVERIFY2(first.ok,qPrintable(first.error)); QCOMPARE(first.serial,100); QVERIFY(!first.replayed);
+            const auto replay=second.reserveContestSerial("contest-2026", "node-a", "request-1", 100);
+            QVERIFY2(replay.ok,qPrintable(replay.error)); QCOMPARE(replay.serial,100); QVERIFY(replay.replayed);
+            const auto changed=second.reserveContestSerial("contest-2026", "node-a", "request-1", 101);
+            QVERIFY(!changed.ok);
+            const auto next=second.reserveContestSerial("contest-2026", "node-b", "request-2", 1);
+            QVERIFY2(next.ok,qPrintable(next.error)); QCOMPARE(next.serial,101);
+            QVERIFY(!db.reserveContestSerial("", "node-a", "request-3", 1).ok);
+        }
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            const auto replay=db.reserveContestSerial("contest-2026", "node-a", "request-1", 100);
+            QVERIFY2(replay.ok,qPrintable(replay.error)); QCOMPARE(replay.serial,100); QVERIFY(replay.replayed);
+            const auto next=db.reserveContestSerial("contest-2026", "node-a", "request-3", 1);
+            QVERIFY2(next.ok,qPrintable(next.error)); QCOMPARE(next.serial,102);
+            const auto separate=db.reserveContestSerial("other-contest", "node-a", "request-1", 1);
+            QVERIFY2(separate.ok,qPrintable(separate.error)); QCOMPARE(separate.serial,1);
+            const auto last=db.reserveContestSerial("exhausted", "node", "last", std::numeric_limits<int>::max());
+            QVERIFY(last.ok); QCOMPARE(last.serial,std::numeric_limits<int>::max());
+            QVERIFY(!db.reserveContestSerial("exhausted", "node", "next", 1).ok);
+            QCOMPARE(db.qsoCount(),qint64(0));
+        }
+    }
+    void contestSerialReservationsSerializeConcurrentConnections()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("concurrent.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); }
+        std::atomic<int> ready{0}; std::atomic<bool> go{false};
+        ContestSerialReservation a, b;
+        auto reserve=[&](const QString& node, ContestSerialReservation& result) {
+            LogDatabase db;
+            if (!db.open(path)) { result.error=db.lastError(); ++ready; return; }
+            ++ready; while (!go.load()) std::this_thread::yield();
+            result=db.reserveContestSerial("contest",node,"request",1);
+        };
+        std::thread one(reserve,QStringLiteral("one"),std::ref(a));
+        std::thread two(reserve,QStringLiteral("two"),std::ref(b));
+        while (ready.load()<2) std::this_thread::yield(); go=true;
+        one.join(); two.join();
+        QVERIFY2(a.ok,qPrintable(a.error)); QVERIFY2(b.ok,qPrintable(b.error));
+        QCOMPARE(qMin(a.serial,b.serial),1); QCOMPARE(qMax(a.serial,b.serial),2);
+    }
+    void contestSerialReservationFailureRollsBackAndSchema23Migrates()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("older.sqlite");
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            const auto qso=db.insertQso(AdifRecord{{"CALL","K1OLD"},{"QSO_DATE","20260101"},
+                {"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true); QVERIFY(qso.id>0);
+            QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE contest_serial_reservation"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version=24"));
+        }
+        {
+            LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),24); QCOMPARE(db.qsoCount(),qint64(1));
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("CREATE TRIGGER reject_serial BEFORE INSERT ON contest_serial_reservation BEGIN SELECT RAISE(ABORT,'injected'); END"));
+            const auto failed=db.reserveContestSerial("contest", "node", "request", 1); QVERIFY(!failed.ok); QVERIFY(failed.error.contains("injected"));
+            QVERIFY(q.exec("SELECT COUNT(*) FROM contest_serial_reservation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+            QVERIFY(q.exec("DROP TRIGGER reject_serial"));
+            const auto retry=db.reserveContestSerial("contest", "node", "request", 1); QVERIFY2(retry.ok,qPrintable(retry.error)); QCOMPARE(retry.serial,1);
+        }
+    }
     void guardedEditRejectsStaleRevisionAndMergesConcurrentQsl()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
