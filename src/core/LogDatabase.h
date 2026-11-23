@@ -662,7 +662,7 @@ private:
     struct Prepared;
     std::optional<Prepared> prepare(const AdifRecord& input, InsertResult& error) const;
     bool writeQsl(qint64 qsoId, const QList<QslState>& states, bool keepRemote);
-    QString snapshotJson(qint64 id) const;
+    QString snapshotJson(qint64 id, QString* error = nullptr) const;
     bool applySchema();
     bool migrate();
     std::optional<qint64> findDuplicate(const QString& call, const QString& band,

@@ -1218,12 +1218,16 @@ ContestNetChangePage LogDatabase::contestNetChangesAfter(qint64 sequence, int li
     return page;
 }
 
-QString LogDatabase::snapshotJson(qint64 id) const
+QString LogDatabase::snapshotJson(qint64 id, QString* error) const
 {
-    const auto r = record(id);
-    const auto m = meta(id);
-    if (!r || !m)
+    const auto r = recordChecked(id, error);
+    if (!r)
         return {};
+    const auto m = meta(id);
+    if (!m) {
+        if (error) *error = QStringLiteral("cannot read QSO metadata for history");
+        return {};
+    }
     QJsonArray fields;
     for (const auto& f : r->fields())
         fields.append(QJsonArray{f.name, f.value});
@@ -1315,12 +1319,20 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
         rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_update_qso"));
     };
 
+    QString snapshotError;
+    const QString snapshot = snapshotJson(id, &snapshotError);
+    if (snapshot.isEmpty()) {
+        result.message = snapshotError.isEmpty() ? QStringLiteral("cannot read QSO history snapshot") : snapshotError;
+        rollbackUpdate();
+        m_lastError = result.message;
+        return result;
+    }
     QSqlQuery h(db);
     h.prepare(QStringLiteral(
         "INSERT INTO qso_history (qso_uuid, revision, snapshot, reason, recorded_at) VALUES (?, ?, ?, ?, ?)"));
     h.addBindValue(m->uuid);
     h.addBindValue(m->revision);
-    h.addBindValue(snapshotJson(id));
+    h.addBindValue(snapshot);
     h.addBindValue(reason);
     h.addBindValue(nowIso());
     if (!h.exec()) {
@@ -1654,12 +1666,19 @@ bool LogDatabase::softDeleteQso(qint64 id)
         rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_delete_qso"));
         rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_delete_qso"));
     };
+    QString snapshotError;
+    const QString snapshot = snapshotJson(id, &snapshotError);
+    if (snapshot.isEmpty()) {
+        m_lastError = snapshotError.isEmpty() ? QStringLiteral("cannot read QSO history snapshot") : snapshotError;
+        rollbackDelete();
+        return false;
+    }
     QSqlQuery h(db);
     h.prepare(QStringLiteral(
         "INSERT INTO qso_history (qso_uuid, revision, snapshot, reason, recorded_at) VALUES (?, ?, ?, 'delete', ?)"));
     h.addBindValue(m->uuid);
     h.addBindValue(m->revision);
-    h.addBindValue(snapshotJson(id));
+    h.addBindValue(snapshot);
     h.addBindValue(nowIso());
     QSqlQuery u(db);
     u.prepare(QStringLiteral(

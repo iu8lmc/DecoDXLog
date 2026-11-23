@@ -1927,6 +1927,41 @@ private slots:
         QCOMPARE(q.value(0).toString(), QStringLiteral("Y")); QCOMPARE(q.value(1).toString(), QStringLiteral("remote-1"));
     }
 
+    void deleteRefusesIncompleteHistorySnapshotOnQslReadFailure()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER"))
+            QSKIP("Opt in only when the Qt SQLite driver uses the same system SQLite library");
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto inserted = db.insertQso({{"CALL", "K1HIS"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                                            {"BAND", "20m"}, {"MODE", "CW"}, {"LOTW_QSL_SENT", "Y"}}, "test");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        QLibrary sqlite(QStringLiteral("sqlite3"));
+        using Authorizer = int (*)(void *, int, const char *, const char *, const char *, const char *);
+        using SetAuthorizer = int (*)(void *, Authorizer, void *);
+        const auto setAuthorizer = reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer"));
+        QVariant handle = db.connection().driver()->handle();
+        if (!setAuthorizer || QByteArray(handle.typeName()) != "sqlite3*" || !handle.data())
+            QSKIP("SQLite native authorizer is unavailable");
+        void *nativeDb = *static_cast<void **>(handle.data()); QVERIFY(nativeDb);
+        const auto denyQsl = +[](void *, int action, const char *table, const char *column, const char *, const char *) {
+            return action == 20 && table && column && std::strcmp(table, "qsl_status") == 0 &&
+                   std::strcmp(column, "last_error") == 0 ? 1 : 0;
+        };
+        QCOMPARE(setAuthorizer(nativeDb, denyQsl, nullptr), 0);
+        const bool deleted = db.softDeleteQso(inserted.id);
+        QCOMPARE(setAuthorizer(nativeDb, nullptr, nullptr), 0);
+        QVERIFY(!deleted);
+        QVERIFY(!db.meta(inserted.id)->deleted);
+        QVERIFY(db.history(inserted.id).isEmpty());
+        QCOMPARE(db.record(inserted.id)->value("LOTW_QSL_SENT"), QStringLiteral("Y"));
+        QVERIFY(db.softDeleteQso(inserted.id));
+        QCOMPARE(db.history(inserted.id).size(), 1);
+        QCOMPARE(db.history(inserted.id).first().record.value("LOTW_QSL_SENT"), QStringLiteral("Y"));
+    }
+
     void insertAndReadBack()
     {
         LogDatabase db;
