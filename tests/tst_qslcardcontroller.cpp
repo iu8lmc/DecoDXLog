@@ -686,6 +686,24 @@ private slots:
         QVERIFY(cloud.request.isEmpty()); QVERIFY(cards.mailStatus().contains("log changed",Qt::CaseInsensitive));
     }
 
+    void emailLookupStopsWhenSameIdentityFileReplaced()
+    {
+        core::LogDatabase db; const QString path=m_dir.filePath("mail-file-origin.sqlite"), clone=m_dir.filePath("mail-file-clone.sqlite");
+        QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+        const auto qso=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        core::QslState state; state.service="card"; state.sent="Q"; state.via="E"; QVERIFY(db.setCardState(qso.id,state));
+        q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text()));
+        FakeCloud cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost)); std::function<void(const QString&,const QString&)> callback;
+        QslCardController::Context ctx; ctx.db=&db; ctx.cloudAccess=[&] { return QPair<QString,QString>{cloud.url(),"fake"}; };
+        ctx.emailFor=[&](const QString&,auto done) { callback=std::move(done); };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.sendCardsByEmail({QVariant(qso.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(bool(callback),15000);
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path));
+        callback(QStringLiteral("test@example.invalid"),{}); QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),5000);
+        QVERIFY(cloud.request.isEmpty()); QVERIFY(cards.mailStatus().contains("log changed",Qt::CaseInsensitive));
+    }
+
     void confirmedEmailIsRecordedOnlyInOriginalLog()
     {
         core::LogDatabase db;
@@ -768,6 +786,29 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),15000);
         QCOMPARE(db.qslStatus(qso.id).first().sent,QString("Q"));
         QVERIFY(notes.join(' ').contains("could not be recorded")); QVERIFY(notes.join(' ').contains("identity",Qt::CaseInsensitive));
+    }
+
+    void confirmedEmailDoesNotMarkReplacedClone()
+    {
+        core::LogDatabase db; const QString path=m_dir.filePath("mail-confirm-file.sqlite"), clone=m_dir.filePath("mail-confirm-clone.sqlite");
+        QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+        const auto qso=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        core::QslState state; state.service="card"; state.sent="Q"; state.via="E"; QVERIFY(db.setCardState(qso.id,state));
+        q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text()));
+        QTcpServer cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost)); QStringList notes;
+        QslCardController::Context ctx; ctx.db=&db;
+        ctx.cloudAccess=[&] { return QPair<QString,QString>{QStringLiteral("http://127.0.0.1:%1").arg(cloud.serverPort()),"fake"}; };
+        ctx.emailFor=[](const QString&,auto done) { done(QStringLiteral("test@example.invalid"),{}); };
+        ctx.activity=[&](const QString&,const QString& message,const QString&) { notes << message; };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.sendCardsByEmail({QVariant(qso.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(cloud.hasPendingConnections(),15000); QTcpSocket* socket=cloud.nextPendingConnection(); QVERIFY(socket);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable()>0,5000);
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path));
+        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}"); socket->flush();
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.mailBusy(),15000);
+        core::LogDatabase replacement; QVERIFY(replacement.open(path)); QCOMPARE(replacement.qslStatus(qso.id).first().sent,QString("Q"));
+        QVERIFY(notes.join(' ').contains("could not be recorded"));
     }
 
     void whatWasPutByHandAndIsNotUsualStays()

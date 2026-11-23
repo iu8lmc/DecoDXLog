@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QFileInfo>
+#include <QFile>
 #include <QTimer>
 #include <QPointer>
 #include <QSqlDatabase>
@@ -28,12 +29,39 @@
 #include <QSettings>
 #include <QSet>
 #include <QUrl>
+#ifdef Q_OS_UNIX
+#include <sys/stat.h>
+#endif
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace decolog::app {
 
 using namespace decolog::core;
 
 namespace {
+
+QByteArray fileIdentity(const QString& path)
+{
+#ifdef Q_OS_UNIX
+    struct stat info {};
+    if (::stat(QFile::encodeName(path).constData(),&info)!=0 || !S_ISREG(info.st_mode)) return {};
+    return QByteArray::number(qulonglong(info.st_dev))+':'+QByteArray::number(qulonglong(info.st_ino));
+#elif defined(Q_OS_WIN)
+    const HANDLE handle=CreateFileW(reinterpret_cast<LPCWSTR>(QDir::toNativeSeparators(path).utf16()),FILE_READ_ATTRIBUTES,
+        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+    if (handle==INVALID_HANDLE_VALUE) return {};
+    BY_HANDLE_FILE_INFORMATION info {}; const bool ok=GetFileInformationByHandle(handle,&info); CloseHandle(handle);
+    if (!ok || (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) return {};
+    return QByteArray::number(qulonglong(info.dwVolumeSerialNumber))+':'+QByteArray::number(qulonglong(info.nFileIndexHigh))+':'+QByteArray::number(qulonglong(info.nFileIndexLow));
+#else
+    Q_UNUSED(path); return {};
+#endif
+}
 
 QString today()
 {
@@ -204,7 +232,7 @@ QslCardController::QslCardController(Context context, QObject* parent)
         if (!m_mailTargets.contains(tag)) return;
         const MailTarget target = m_mailTargets.take(tag);
         if (target.generation == m_mailGeneration) ++m_mailSent;
-        recordConfirmedMail(target.path, target.identity, target.openGeneration, target.id, target.uuid, to);
+        recordConfirmedMail(target.path, target.identity, target.fileToken, target.openGeneration, target.id, target.uuid, to);
         emit mailChanged();
     });
     connect(&m_mail, &core::MailSender::failed, this,
@@ -1024,10 +1052,12 @@ bool QslCardController::mailOriginIsCurrent() const
 {
     return m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path() == m_mailOriginPath &&
            m_ctx.db->openGeneration()==m_mailOriginOpenGeneration && !m_mailOriginIdentity.isEmpty() &&
-           m_ctx.db->identity()==m_mailOriginIdentity;
+           m_ctx.db->identity()==m_mailOriginIdentity &&
+           (m_mailOriginPath.isEmpty() || m_mailOriginPath==QLatin1String(":memory:") ||
+            (!m_mailOriginFileToken.isEmpty() && fileIdentity(m_mailOriginPath)==m_mailOriginFileToken));
 }
 
-void QslCardController::recordConfirmedMail(const QString& path, const QString& identity, quint64 openGeneration, qint64 id,
+void QslCardController::recordConfirmedMail(const QString& path, const QString& identity, const QByteArray& fileToken, quint64 openGeneration, qint64 id,
                                             const QString& uuid, const QString& email)
 {
     ++m_mailPendingRecords;
@@ -1059,13 +1089,15 @@ void QslCardController::recordConfirmedMail(const QString& path, const QString& 
         return;
     }
     QPointer<QslCardController> self(this);
-    m_cardPool.start([self, path, identity, id, uuid, complete] {
+    m_cardPool.start([self, path, identity, fileToken, id, uuid, complete] {
         CardBatchResult result;
         LogDatabase db;
-        if (!QFileInfo::exists(path)) {
+        if (fileToken.isEmpty() || fileIdentity(path)!=fileToken) {
             result.failed = 1; result.error = QObject::tr("The original log is unavailable.");
         } else if (!db.openExistingReadWrite(path)) {
             result.failed = 1; result.error = db.lastError();
+        } else if (fileIdentity(path)!=fileToken) {
+            result.failed=1; result.error=QObject::tr("The original log file changed.");
         } else {
             result = changeCardBatch(db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid, false, -1, identity);
         }
@@ -1117,10 +1149,11 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
     const quint64 generation = m_mailGeneration;
     const QString originPath = m_mailOriginPath;
     const QString originIdentity = m_mailOriginIdentity;
+    const QByteArray originFileToken = m_mailOriginFileToken;
     const quint64 originOpenGeneration = m_mailOriginOpenGeneration;
     const QString uuid = qso.value(QStringLiteral("uuid")).toString();
     QNetworkReply* reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, id, email, generation, originPath, originIdentity, originOpenGeneration, uuid] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, id, email, generation, originPath, originIdentity, originFileToken, originOpenGeneration, uuid] {
         reply->deleteLater();
         // Fermato a meta': i conti sono gia' azzerati, non si tocca piu' niente.
         if (reply->error() == QNetworkReply::OperationCanceledError)
@@ -1131,7 +1164,7 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
             // user pressed Stop. Preserve the real sent state without touching
             // counters of any newer batch.
             if (code == 200) {
-                recordConfirmedMail(originPath, originIdentity, originOpenGeneration, id, uuid, email);
+                recordConfirmedMail(originPath, originIdentity, originFileToken, originOpenGeneration, id, uuid, email);
             }
             return;
         }
@@ -1139,7 +1172,7 @@ void QslCardController::sendThroughCloud(const QVariantMap& qso, const QString& 
         const QJsonObject answer = QJsonDocument::fromJson(reply->readAll()).object();
         if (code == 200) {
             ++m_mailSent;
-            recordConfirmedMail(originPath, originIdentity, originOpenGeneration, id, uuid, email);
+            recordConfirmedMail(originPath, originIdentity, originFileToken, originOpenGeneration, id, uuid, email);
         } else {
             ++m_mailFailed;
             const QString detail = answer.value(QStringLiteral("detail")).toString();
@@ -1167,7 +1200,7 @@ void QslCardController::queueCard(const QVariantMap& qso, const QString& email)
     const QString call = qso.value(QStringLiteral("call")).toString().toUpper();
     core::MailMessage message;
     message.tag = ++m_mailNextTag;
-    m_mailTargets.insert(message.tag, MailTarget{m_mailOriginPath,m_mailOriginIdentity,m_mailOriginOpenGeneration,
+    m_mailTargets.insert(message.tag, MailTarget{m_mailOriginPath,m_mailOriginIdentity,m_mailOriginFileToken,m_mailOriginOpenGeneration,
         qso.value(QStringLiteral("id")).toLongLong(),
         qso.value(QStringLiteral("uuid")).toString(), m_mailGeneration});
     message.to = email;
@@ -1220,7 +1253,8 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
     m_mailOriginPath = path;
     m_mailOriginIdentity = m_ctx.db->identity();
     m_mailOriginOpenGeneration = m_ctx.db->openGeneration();
-    if (m_mailOriginIdentity.isEmpty()) {
+    m_mailOriginFileToken = (path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileIdentity(path);
+    if (m_mailOriginIdentity.isEmpty() || (!path.isEmpty() && path!=QLatin1String(":memory:") && m_mailOriginFileToken.isEmpty())) {
         m_mailStatus=tr("Cannot verify log identity"); note(m_mailStatus,QStringLiteral("warning")); emit mailChanged(); return;
     }
     if (path.isEmpty() || path == QLatin1String(":memory:")) {
@@ -1233,10 +1267,11 @@ void QslCardController::sendCardsByEmail(const QVariantList& ids)
     QPointer<QslCardController> self(this);
     const QList<qint64> selected = toIds(ids);
     const QString identity=m_mailOriginIdentity;
-    m_readPool.start([self, path, identity, selected, generation] {
+    const QByteArray fileToken=m_mailOriginFileToken;
+    m_readPool.start([self, path, identity, fileToken, selected, generation] {
         LogDatabase db;
         const bool opened = db.openReadOnly(path);
-        const bool ok = opened && db.identity()==identity;
+        const bool ok = opened && fileIdentity(path)==fileToken && db.identity()==identity;
         const QList<QVariantMap> rows = ok ? chosenCardRows(db, selected) : QList<QVariantMap>();
         const QString error = ok ? QString() : (opened ? QObject::tr("Log identity changed during email preparation") : db.lastError());
         if (!self) return;

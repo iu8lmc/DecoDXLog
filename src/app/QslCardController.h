@@ -190,7 +190,7 @@ private:
     QString mailRoute() const;
     void lookupAndSend(const QList<QVariantMap>& qsos, quint64 generation);
     void beginMail(const QList<QVariantMap>& qsos, quint64 generation);
-    void recordConfirmedMail(const QString& path, const QString& identity, quint64 openGeneration,
+    void recordConfirmedMail(const QString& path, const QString& identity, const QByteArray& fileToken, quint64 openGeneration,
                              qint64 id, const QString& uuid, const QString& email);
     bool mailOriginIsCurrent() const;
     QString mailBodyFor(const QVariantMap& qso) const;
@@ -205,12 +205,13 @@ private:
     int m_mailFailed{0};
     quint64 m_mailGeneration{0};
     bool m_mailPreparing{false};
-    struct MailTarget { QString path; QString identity; quint64 openGeneration{0}; qint64 id{0}; QString uuid; quint64 generation{0}; };
+    struct MailTarget { QString path; QString identity; QByteArray fileToken; quint64 openGeneration{0}; qint64 id{0}; QString uuid; quint64 generation{0}; };
     QHash<qint64, MailTarget> m_mailTargets;
     qint64 m_mailNextTag{0};
     int m_mailPendingRecords{0};
     QString m_mailOriginPath;
     QString m_mailOriginIdentity;
+    QByteArray m_mailOriginFileToken;
     quint64 m_mailOriginOpenGeneration{0};
 };
 
