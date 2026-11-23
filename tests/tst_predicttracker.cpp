@@ -3,6 +3,7 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <QUdpSocket>
+#include <limits>
 using namespace decolog::core;
 static QByteArray checksummed(QByteArray line)
 {
@@ -13,6 +14,22 @@ static QByteArray checksummed(QByteArray line)
 class TestPredictTracker : public QObject {
     Q_OBJECT
   private slots:
+    void pairsManualLinearAndIndependentTransponders()
+    {
+        PredictTracker tracker;
+        const auto independent=tracker.nominalTransponderPair(145.95,435.85,0,0,"independent");
+        QVERIFY(independent.value("ok").toBool()); QCOMPARE(independent.value("txMHz").toDouble(),145.95); QCOMPARE(independent.value("rxMHz").toDouble(),435.85);
+        const auto inverted=tracker.nominalTransponderPair(145.95,435.85,10,50,"inverting");
+        QVERIFY(inverted.value("ok").toBool()); QVERIFY(qAbs(inverted.value("txMHz").toDouble()-145.96)<1e-9); QVERIFY(qAbs(inverted.value("rxMHz").toDouble()-435.84)<1e-9);
+        const auto straight=tracker.nominalTransponderPair(145.95,435.85,-10,50,"noninverting");
+        QVERIFY(straight.value("ok").toBool()); QVERIFY(qAbs(straight.value("txMHz").toDouble()-145.94)<1e-9); QVERIFY(qAbs(straight.value("rxMHz").toDouble()-435.84)<1e-9);
+        QVERIFY(!tracker.nominalTransponderPair(145.95,435.85,51,50,"inverting").value("ok").toBool());
+        QVERIFY(!tracker.nominalTransponderPair(145.95,435.85,1,0,"independent").value("ok").toBool());
+        QVERIFY(!tracker.nominalTransponderPair(145.95,435.85,0,50,"unknown").value("ok").toBool());
+        QVERIFY(!tracker.nominalTransponderPair(std::numeric_limits<double>::quiet_NaN(),435.85,0,0,"independent").value("ok").toBool());
+        QVERIFY(!tracker.nominalTransponderPair(145.95,435.85,-51,50,"noninverting").value("ok").toBool());
+        QVERIFY(!tracker.nominalTransponderPair(0.001,435.85,-10,50,"inverting").value("ok").toBool());
+    }
     void tleIntegrityChecksRejectCorruptionAndMismatchedSatellites()
     {
         const QByteArray one="1 23455U 94089A   97320.90946019  .00000140  00000-0  10191-3 0  2621";

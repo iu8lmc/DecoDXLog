@@ -156,7 +156,8 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
         server.shutdown()
         print(f'PASS pass: {server.commands}')
 
-for fresh, save_mode in ((False, ''), (True, ''), (True, 'CW'), (True, 'FM')):
+for fresh, save_mode, mapping in ((False, '', ''), (True, '', ''), (True, 'CW', ''), (True, 'FM', ''),
+                                  (True, 'CW', 'inverting'), (True, 'CW', 'noninverting')):
     save = bool(save_mode)
     with tempfile.TemporaryDirectory(prefix='decolog-predict-draft-') as tmp:
         root = pathlib.Path(tmp)
@@ -168,29 +169,36 @@ for fresh, save_mode in ((False, ''), (True, ''), (True, 'CW'), (True, 'FM')):
             env = os.environ.copy()
             env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
                        DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='2800')
+            probe = ('predictdraftlinear' if mapping == 'inverting' else 'predictdraftnoninvert' if mapping == 'noninverting'
+                     else 'predictdraftfm' if save_mode == 'FM' else 'predictdraftsave' if save else 'predictdraft')
             command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
                        '--db', str(root/'test.sqlite'), '--port', '0', '--show',
-                       f'{"predictdraftfm" if save_mode == "FM" else "predictdraftsave" if save else "predictdraft"}:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
+                       f'{probe}:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
             result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
             output = result.stdout + result.stderr
-            expected = ('PROBE predictDraft visible=true tx=145.998596 rx=435.004184 sat=OSCAR-7' if fresh
+            expected_tx = '146.008596' if mapping else '145.998596'
+            expected_rx = '434.994183' if mapping == 'inverting' else '435.014184' if mapping == 'noninverting' else '435.004184'
+            expected = (f'PROBE predictDraft visible=true tx={expected_tx} rx={expected_rx} sat=OSCAR-7' if fresh
                         else 'PROBE predictDraft visible=false')
             if result.returncode or expected not in output:
                 raise SystemExit(f'FAIL draft fresh={fresh}: {output}; requests={server.commands}')
             if fresh and 'PROBE predictDraftPreserved=true notice=true' not in output:
                 raise SystemExit(f'FAIL draft overwrite: {output}')
+            if mapping and 'PROBE predictLinear outside=true draft=false' not in output:
+                raise SystemExit(f'FAIL out-of-range offset: {output}')
             if save and any(marker not in output for marker in ('PROBE predictDraftBeforeSave count=0', 'PROBE predictDraftInvalid kept=true', 'PROBE predictDraftSaved=true')):
                 raise SystemExit(f'FAIL explicit save: {output}')
             with sqlite3.connect(root/'test.sqlite') as db:
                 rows = db.execute('SELECT call,freq,band,freq_rx,band_rx,prop_mode,sat_name,mode,sat_mode FROM qso WHERE deleted=0').fetchall()
                 if save:
-                    assert rows == [('K1AAA', 145.998596, '2m', 435.004184, '70cm', 'SAT', 'OSCAR-7', save_mode, 'V/U')], rows
+                    assert rows == [('K1AAA', float(expected_tx), '2m', float(expected_rx), '70cm', 'SAT', 'OSCAR-7', save_mode, 'V/U')], rows
                 else:
                     assert not rows, rows
             if save:
                 verify_env = env.copy()
                 verify_env.update(DECODXLOG_TEST_FIXTURE='1', DECOLOG_TEST_SATELLITE_DB=str(root/'test.sqlite'),
-                                  DECOLOG_TEST_SATELLITE_MODE=save_mode)
+                                  DECOLOG_TEST_SATELLITE_MODE=save_mode, DECOLOG_TEST_SATELLITE_TX=expected_tx,
+                                  DECOLOG_TEST_SATELLITE_RX=expected_rx)
                 verify = subprocess.run([sys.argv[2], 'exportTrackerQsoFixture'], env=verify_env,
                                         capture_output=True, text=True, timeout=15)
                 if verify.returncode:

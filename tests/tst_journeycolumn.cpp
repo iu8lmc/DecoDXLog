@@ -955,8 +955,10 @@ private slots:
         QCOMPARE(document.records.size(), 1);
         const auto &qso = document.records.first();
         QCOMPARE(qso.value("CALL"), QStringLiteral("K1AAA"));
-        QCOMPARE(qso.value("FREQ"), QStringLiteral("145.998596"));
-        QCOMPARE(qso.value("FREQ_RX"), QStringLiteral("435.004184"));
+        const QString expectedTx=qEnvironmentVariable("DECOLOG_TEST_SATELLITE_TX",QStringLiteral("145.998596"));
+        const QString expectedRx=qEnvironmentVariable("DECOLOG_TEST_SATELLITE_RX",QStringLiteral("435.004184"));
+        QCOMPARE(qso.value("FREQ"), expectedTx);
+        QCOMPARE(qso.value("FREQ_RX"), expectedRx);
         QCOMPARE(qso.value("BAND"), QStringLiteral("2m"));
         QCOMPARE(qso.value("BAND_RX"), QStringLiteral("70cm"));
         QCOMPARE(qso.value("PROP_MODE"), QStringLiteral("SAT"));
@@ -968,7 +970,7 @@ private slots:
         QCOMPARE(imported.importAdif(exported).inserted, 1);
         const auto roundtrip = decolog::core::adif::parse(imported.exportAdif());
         QCOMPARE(roundtrip.records.size(), 1);
-        QCOMPARE(roundtrip.records.first().value("FREQ_RX"), QStringLiteral("435.004184"));
+        QCOMPARE(roundtrip.records.first().value("FREQ_RX"), expectedRx);
         QCOMPARE(roundtrip.records.first().value("SAT_NAME"), QStringLiteral("OSCAR-7"));
         QCOMPARE(roundtrip.records.first().value("SAT_MODE"), QStringLiteral("V/U"));
     }

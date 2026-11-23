@@ -35,6 +35,28 @@ QVariantMap PredictTracker::publicStatus() const
     return result;
 }
 
+QVariantMap PredictTracker::nominalTransponderPair(double txCenterMHz, double rxCenterMHz,
+                                                    double offsetKhz, double halfWidthKhz,
+                                                    const QString& mapping) const
+{
+    const auto failResult=[](const QString& error) { return QVariantMap{{QStringLiteral("ok"),false},{QStringLiteral("error"),error}}; };
+    if (!std::isfinite(txCenterMHz) || !std::isfinite(rxCenterMHz) || !std::isfinite(offsetKhz) ||
+        !std::isfinite(halfWidthKhz) || txCenterMHz<=0 || rxCenterMHz<=0 || txCenterMHz>1000000 || rxCenterMHz>1000000)
+        return failResult(tr("Enter finite positive nominal frequencies."));
+    double tx=txCenterMHz, rx=rxCenterMHz;
+    if (mapping == QLatin1String("independent")) {
+        if (offsetKhz != 0) return failResult(tr("Independent frequencies do not use a transponder offset."));
+    } else if (mapping == QLatin1String("inverting") || mapping == QLatin1String("noninverting")) {
+        if (halfWidthKhz<=0 || halfWidthKhz>1000000 || std::abs(offsetKhz)>halfWidthKhz)
+            return failResult(tr("Enter a positive half bandwidth and an offset inside it."));
+        tx += offsetKhz/1000.0;
+        rx += (mapping == QLatin1String("inverting") ? -offsetKhz : offsetKhz)/1000.0;
+    } else return failResult(tr("Unsupported transponder mapping."));
+    if (!std::isfinite(tx) || !std::isfinite(rx) || tx<=0 || rx<=0 || tx>1000000 || rx>1000000)
+        return failResult(tr("The resulting nominal frequencies are invalid."));
+    return {{QStringLiteral("ok"),true},{QStringLiteral("txMHz"),tx},{QStringLiteral("rxMHz"),rx}};
+}
+
 QVariantMap PredictTracker::correctedFrequencies(double txMHz, double rxMHz) const
 {
     const auto failResult = [](const QString &error) {

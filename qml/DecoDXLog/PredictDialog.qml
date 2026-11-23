@@ -22,6 +22,7 @@ DialogFrame {
     property bool probingDraft: false
     property bool probingDraftSave: false
     property string probingDraftMode: "CW"
+    property string probingDraftMapping: "independent"
     property int probePassCount: 0
     property int probeLiveSuccesses: 0
     property bool listValid: false
@@ -70,10 +71,14 @@ DialogFrame {
         satelliteField.text = name
         firstPassButton.clicked()
     }
-    function probeDraft(host, port, name, save, mode) {
+    function probeDraft(host, port, name, save, mode, mapping) {
         probingDraft = true
         probingDraftSave = !!save
         probingDraftMode = mode || "CW"
+        probingDraftMapping = mapping || "independent"
+        mappingBox.currentIndex = probingDraftMapping === "inverting" ? 1 : probingDraftMapping === "noninverting" ? 2 : 0
+        offsetField.text = probingDraftMapping === "independent" ? "" : "10"
+        halfWidthField.text = probingDraftMapping === "independent" ? "" : "50"
         hostField.text = host
         portField.text = String(port)
         satelliteField.text = name
@@ -86,7 +91,13 @@ DialogFrame {
             correction = ({ok: false, error: qsTr("Read the selected satellite first.")})
             return false
         }
-        correction = root.tracker.correctedFrequencies(Number(uplinkField.text.replace(",", ".")), Number(downlinkField.text.replace(",", ".")))
+        const mapping=["independent", "inverting", "noninverting"][mappingBox.currentIndex]
+        if (!mapping) { correction=({ok:false, error:qsTr("Select a transponder model.")}); return false }
+        const nominal=root.tracker.nominalTransponderPair(Number(uplinkField.text.replace(",", ".")),
+            Number(downlinkField.text.replace(",", ".")), mapping === "independent" ? 0 : Number(offsetField.text.replace(",", ".")),
+            mapping === "independent" ? 0 : Number(halfWidthField.text.replace(",", ".")), mapping)
+        if (!nominal.ok) { correction=nominal; return false }
+        correction = root.tracker.correctedFrequencies(nominal.txMHz,nominal.rxMHz)
         return !!correction.ok
     }
     function prepareDraft() {
@@ -204,6 +215,11 @@ DialogFrame {
             }
             if (root.probingDraft) {
                 if (success) {
+                    if (root.probingDraftMapping !== "independent") {
+                        offsetField.text="51"; const rejected=!root.calculateCorrection()
+                        console.warn("PROBE predictLinear outside=" + rejected + " draft=" + satelliteQso.visible)
+                        offsetField.text="10"
+                    }
                     prepareDraftButton.clicked()
                     console.warn("PROBE predictDraft visible=" + satelliteQso.visible + " tx=" + satelliteQso.initialTxForProbe
                                  + " rx=" + satelliteQso.initialRxForProbe + " sat=" + satelliteQso.initialSatelliteForProbe)
@@ -276,9 +292,23 @@ DialogFrame {
             }
         }
         RowLayout {
+            Layout.fillWidth:true; spacing:8
+            Text { text:qsTr("Transponder model"); color:Theme.textSecondary }
+            StyledComboBox { id:mappingBox; Layout.fillWidth:true
+                model:[qsTr("Independent frequencies / FM"),qsTr("Linear: inverting"),qsTr("Linear: non-inverting")]
+                onActivated:{ root.correction=({}); correctionStatus.text="" } }
+        }
+        RowLayout {
+            Layout.fillWidth:true; spacing:8; visible:mappingBox.currentIndex>0
+            StyledTextField { id:offsetField; Layout.fillWidth:true; placeholderText:qsTr("Uplink centre offset (kHz)"); Accessible.name:qsTr("Uplink centre offset in kHz"); onTextChanged:{ root.correction=({}); if (correctionStatus) correctionStatus.text="" } }
+            StyledTextField { id:halfWidthField; Layout.fillWidth:true; placeholderText:qsTr("Half bandwidth (kHz)"); Accessible.name:qsTr("Linear half bandwidth in kHz"); onTextChanged:{ root.correction=({}); if (correctionStatus) correctionStatus.text="" } }
+        }
+        Text { Layout.fillWidth:true; visible:mappingBox.currentIndex>0; wrapMode:Text.WordWrap; color:Theme.warningColor
+            text:qsTr("Enter nominal uplink/downlink centre frequencies and half bandwidth for this transponder. This ideal 1:1 mapping is not a satellite catalogue; verify current limits and operating mode.") }
+        RowLayout {
             Layout.fillWidth: true
-            StyledTextField { id: uplinkField; Layout.fillWidth: true; placeholderText: qsTr("Nominal uplink TX MHz"); Accessible.name: qsTr("Nominal uplink TX MHz"); onTextChanged: { root.correction = ({}); if (correctionStatus) correctionStatus.text = "" } }
-            StyledTextField { id: downlinkField; Layout.fillWidth: true; placeholderText: qsTr("Nominal downlink RX MHz"); Accessible.name: qsTr("Nominal downlink RX MHz"); onTextChanged: { root.correction = ({}); if (correctionStatus) correctionStatus.text = "" } }
+            StyledTextField { id: uplinkField; Layout.fillWidth: true; placeholderText: mappingBox.currentIndex>0 ? qsTr("Uplink centre TX MHz") : qsTr("Nominal uplink TX MHz"); Accessible.name: qsTr("Nominal uplink TX MHz"); onTextChanged: { root.correction = ({}); if (correctionStatus) correctionStatus.text = "" } }
+            StyledTextField { id: downlinkField; Layout.fillWidth: true; placeholderText: mappingBox.currentIndex>0 ? qsTr("Downlink centre RX MHz") : qsTr("Nominal downlink RX MHz"); Accessible.name: qsTr("Nominal downlink RX MHz"); onTextChanged: { root.correction = ({}); if (correctionStatus) correctionStatus.text = "" } }
             GlassButton { text: qsTr("Preview Doppler"); enabled: root.resultValid && !root.tracker.busy; onClicked: { root.calculateCorrection(); correctionStatus.text = root.correction.ok ? qsTr("Corrected TX %1 MHz · RX %2 MHz").arg(Number(root.correction.txMHz).toFixed(6)).arg(Number(root.correction.rxMHz).toFixed(6)) : root.correction.error } }
             GlassButton { id: prepareDraftButton; text: qsTr("Prepare QSO…"); enabled: root.resultValid && !root.tracker.busy; onClicked: root.prepareDraft() }
         }
