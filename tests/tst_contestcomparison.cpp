@@ -1,4 +1,5 @@
 #include "core/ContestComparison.h"
+#include "core/ContestReport.h"
 #include "core/LogDatabase.h"
 #include <QTest>
 #include <QSqlQuery>
@@ -79,6 +80,21 @@ class TestContestComparison : public QObject {
         auto recreated=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",first,first,second,second,11,12,0,0,fresh.generation); QVERIFY(recreated.error.isEmpty());
         auto staleDelete=contestcomparison::removeGoals(b.connection(),b.identity(),"CQ-WW-CW",first,first,second,second,made.a.revision,made.b.revision,made.generation); QVERIFY(!staleDelete.error.isEmpty());
         auto current=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",first,first,second,second); QCOMPARE(current.a.target,11); QCOMPARE(current.b.target,12); QCOMPARE(a.qsoCount(),qint64(0));
+    }
+    void comparesSelectedCqWwFindingsWithoutAssociatingQsos()
+    {
+        const QByteArray textA="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n"
+            "****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1AAA 14\nunknown line\n"
+            "****** Incorrect Exchange Information ******\n21020 CW 2024-11-23 1203 K1ABC 05 JA1ABC 25 correct 24\n";
+        const QByteArray textB="Contest: 2025 CQ WORLD WIDE CW DX CONTEST\nCall: K2ABC\n"
+            "****** Incorrect Call ******\n7020 CW 2025-11-22 1202 K2ABC 05 DL2BAD 14 correct DL2GOOD\n";
+        const auto a=contestreport::parseCqWw(textA), b=contestreport::parseCqWw(textB); QVERIFY(a.error.isEmpty() && b.error.isEmpty());
+        const auto r=contestcomparison::compareFindings(a,b,"CQ-WW-CW",QDate(2024,11,23),QDate(2024,11,23),QDate(2025,11,22),QDate(2025,11,22));
+        QVERIFY2(r.error.isEmpty(),qPrintable(r.error)); QCOMPARE(r.unknownA,1); QCOMPARE(r.unknownB,0); QCOMPARE(r.ownCallA,QString("K1ABC")); QCOMPARE(r.ownCallB,QString("K2ABC"));
+        QCOMPARE(r.nilA,1); QCOMPARE(r.nilB,0); QCOMPARE(r.callA,0); QCOMPARE(r.callB,1); QCOMPARE(r.exchangeA,1); QCOMPARE(r.exchangeB,0);
+        QVERIFY(!contestcomparison::compareFindings(a,b,"CQ-WW-SSB",QDate(2024,11,23),QDate(2024,11,23),QDate(2025,11,22),QDate(2025,11,22)).error.isEmpty());
+        const auto overlap=contestcomparison::compareFindings(a,a,"CQ-WW-CW",QDate(2024,11,23),QDate(2024,11,23),QDate(2024,11,23),QDate(2024,11,23));
+        QCOMPARE(overlap.nilA,1); QCOMPARE(overlap.nilB,1);
     }
     void comparesRecordedContestQsosAcrossPeriods()
     {

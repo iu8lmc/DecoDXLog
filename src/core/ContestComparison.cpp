@@ -1,4 +1,6 @@
 #include "core/ContestComparison.h"
+#include "core/ContestReport.h"
+#include <QRegularExpression>
 #include <QDateTime>
 #include <QCryptographicHash>
 #include <QJsonArray>
@@ -11,6 +13,36 @@
 #include <QTimeZone>
 
 namespace decolog::core::contestcomparison {
+Findings compareFindings(const contestreport::Report &a, const contestreport::Report &b, const QString &contestId,
+                         QDate fromA, QDate toA, QDate fromB, QDate toB)
+{
+    Findings out;
+    const QString contest=contestId.trimmed().toUpper();
+    const QRegularExpression header(QStringLiteral("^\\d{4}\\s+CQ\\s+WORLD\\s+WIDE\\s+(CW|SSB|RTTY)\\s+DX\\s+CONTEST$"), QRegularExpression::CaseInsensitiveOption);
+    auto valid=[&](const contestreport::Report &report) {
+        const auto match=header.match(report.contest.trimmed());
+        return report.error.isEmpty() && !report.ownCall.trimmed().isEmpty() && match.hasMatch()
+            && QStringLiteral("CQ-WW-")+match.captured(1).toUpper()==contest;
+    };
+    if (!fromA.isValid() || !toA.isValid() || !fromB.isValid() || !toB.isValid() || fromA>toA || fromB>toB ||
+        fromA.daysTo(toA)>366 || fromB.daysTo(toB)>366 || !valid(a) || !valid(b)) {
+        out.error=QStringLiteral("Select valid periods and two CQ WW reports matching the contest ID."); return out;
+    }
+    out.ownCallA=a.ownCall; out.ownCallB=b.ownCall; out.contestA=a.contest; out.contestB=b.contest;
+    out.unknownA=a.unrecognizedLines.size(); out.unknownB=b.unrecognizedLines.size();
+    auto count=[](const contestreport::Report &report,QDate from,QDate to,int &nil,int &call,int &exchange,int &outside) {
+        for (const auto &entry:report.entries) {
+            const QDate day=QDate::fromString(entry.date,Qt::ISODate);
+            if (!day.isValid() || day<from || day>to) { ++outside; continue; }
+            if (entry.kind==QStringLiteral("not_in_log")) ++nil;
+            else if (entry.kind==QStringLiteral("incorrect_call")) ++call;
+            else if (entry.kind==QStringLiteral("incorrect_exchange")) ++exchange;
+        }
+    };
+    count(a,fromA,toA,out.nilA,out.callA,out.exchangeA,out.outsideA);
+    count(b,fromB,toB,out.nilB,out.callB,out.exchangeB,out.outsideB);
+    return out;
+}
 namespace {
 const QString goalPrefix=QStringLiteral("contest_goal.v1.");
 bool validGoalKey(const QString &contest, QDate from, QDate to)

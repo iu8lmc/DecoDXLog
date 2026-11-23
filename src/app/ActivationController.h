@@ -82,6 +82,7 @@ public:
     bool previewBusy() const { return m_previewBusy; }
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
+    Q_INVOKABLE bool startContestFindings(const QUrl &a, const QUrl &b, const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB);
     Q_INVOKABLE bool startContestComparison(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB);
     Q_INVOKABLE bool requestContestGoals(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB,
                                          bool save, int targetA, int targetB, int revisionA, int revisionB, bool remove=false);
@@ -205,6 +206,7 @@ signals:
     void contestReportBusyChanged();
     void contestReportFinished(const QVariantMap& result);
     void contestComparisonFinished(const QVariantMap& result);
+    void contestFindingsFinished(const QVariantMap& result);
     void contestGoalsFinished(const QVariantMap& result);
     void contestReportCandidatesFinished(const QVariantMap& result);
     void contestReportArchiveFinished(bool success, const QString& message);

@@ -43,6 +43,14 @@ RoundedWindow {
         contestComparison.probingStale=!!stale
         if (stale) comparisonContest.text="OTHER"
     }
+    function probeContestFindings(folder,stale) {
+        contestComparison.open(); comparisonContest.text="CQ-WW-CW"
+        comparisonA.setTexts(decolog.showDate("2024-11-23"),decolog.showDate("2024-11-23"))
+        comparisonB.setTexts(decolog.showDate("2025-11-22"),decolog.showDate("2025-11-22"))
+        comparisonFindings.fileA="file://"+folder+"/a.rpt"; comparisonFindings.fileB="file://"+folder+"/b.rpt"
+        comparisonFindings.probing=true; comparisonFindings.probingStale=stale; comparisonFindings.open(); findingsCompare.clicked()
+        if (stale) comparisonContest.text="OTHER"
+    }
     function probeContestAudio(folder) {
         contestAudioDialog.open()
         contestAudioDialog.folder=folder
@@ -1173,6 +1181,7 @@ RoundedWindow {
                         if (!decolog.activation.startContestComparison(comparisonContest.text.trim(),comparisonA.fromIso,comparisonA.toIso,comparisonB.fromIso,comparisonB.toIso)) contestComparison.errorText=qsTr("Cannot compare this log now.")
                     }
                 }
+                GlassButton { text:qsTr("Compare CQ WW reports"); enabled:!decolog.activation.contestReportBusy; onClicked: { comparisonFindings.result=({}); comparisonFindings.errorText=""; comparisonFindings.open() } }
                 Text { color:Theme.textPrimary; text:decolog.activation.contestReportBusy ? qsTr("Comparing…") : qsTr("A: %1 QSO · B: %2 QSO").arg(contestComparison.result.totalA || 0).arg(contestComparison.result.totalB || 0) }
             }
             Text { id:goalAStatus; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
@@ -1192,6 +1201,47 @@ RoundedWindow {
                     Text { color:Theme.textSecondary; text:qsTr("A %1 · B %2 · Δ %3").arg(modelData.a).arg(modelData.b).arg(modelData.delta) }
                 }
             }
+        }
+    }
+
+    FileDialog { id:findingsFileA; title:qsTr("Choose CQ WW report for period A"); fileMode:FileDialog.OpenFile; onAccepted: { comparisonFindings.fileA=selectedFile; comparisonFindings.result=({}) } }
+    FileDialog { id:findingsFileB; title:qsTr("Choose CQ WW report for period B"); fileMode:FileDialog.OpenFile; onAccepted: { comparisonFindings.fileB=selectedFile; comparisonFindings.result=({}) } }
+    DialogFrame {
+        id:comparisonFindings; dialogKey:"comparisonFindings"; width:700; height:480; title:qsTr("Compare CQ WW report findings"); dotColor:Theme.primaryColor
+        property url fileA:""; property url fileB:""; property var result:({}); property string errorText:""; property int startRevision:0; property bool probing:false; property bool probingStale:false
+        Connections { target:root; function onComparisonLogRevisionChanged() { comparisonFindings.result=({}) } }
+        Connections { target:comparisonContest; function onTextChanged() { comparisonFindings.result=({}) } }
+        Connections { target:comparisonA; function onFromIsoChanged() { comparisonFindings.result=({}) } function onToIsoChanged() { comparisonFindings.result=({}) } }
+        Connections { target:comparisonB; function onFromIsoChanged() { comparisonFindings.result=({}) } function onToIsoChanged() { comparisonFindings.result=({}) } }
+        Connections { target:decolog.activation
+            function onContestFindingsFinished(r) {
+                if (!r.error && (comparisonFindings.startRevision!==root.comparisonLogRevision || r.fileA!==comparisonFindings.fileA.toString() || r.fileB!==comparisonFindings.fileB.toString() || r.contest!==comparisonContest.text.trim() || r.fromA!==comparisonA.fromIso || r.toA!==comparisonA.toIso || r.fromB!==comparisonB.fromIso || r.toB!==comparisonB.toIso)) {
+                    comparisonFindings.result=({}); comparisonFindings.errorText=qsTr("The selection changed; compare again."); if (comparisonFindings.probingStale) console.warn("PROBE contestFindings stale=true"); return
+                }
+                comparisonFindings.result=r.error ? ({}) : r; comparisonFindings.errorText=r.error || ""
+                if (comparisonFindings.probing) console.warn("PROBE contestFindings nilA="+r.nilA+" callB="+r.callB+" unknownA="+r.unknownA+" error="+comparisonFindings.errorText)
+            }
+        }
+        ColumnLayout { anchors.fill:parent; spacing:10
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Uses the contest ID and UTC periods in the comparison window. Only NIL, incorrect call and incorrect exchange sections are counted. Unrecognised lines and unsupported sections are not evidence of no errors. Findings are not matched to QSO, scores or eligibility; verify station and edition.") }
+            RowLayout { GlassButton { text:qsTr("Select report A"); onClicked:findingsFileA.open() } Text { Layout.fillWidth:true; elide:Text.ElideMiddle; color:Theme.textSecondary; text:comparisonFindings.fileA.toString() } }
+            RowLayout { GlassButton { text:qsTr("Select report B"); onClicked:findingsFileB.open() } Text { Layout.fillWidth:true; elide:Text.ElideMiddle; color:Theme.textSecondary; text:comparisonFindings.fileB.toString() } }
+            GlassButton { id:findingsCompare; text:qsTr("Compare findings"); enabled:!decolog.activation.contestReportBusy
+                onClicked: {
+                    comparisonFindings.result=({}); comparisonFindings.errorText=""
+                    if (!contestComparison.validGoalPeriods()) { comparisonFindings.errorText=qsTr("Enter the contest ID and both dates for each period."); return }
+                    comparisonFindings.startRevision=root.comparisonLogRevision
+                    if (!decolog.activation.startContestFindings(comparisonFindings.fileA,comparisonFindings.fileB,comparisonContest.text.trim(),comparisonA.fromIso,comparisonA.toIso,comparisonB.fromIso,comparisonB.toIso)) comparisonFindings.errorText=qsTr("Select two local report files.")
+                }
+            }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.errorColor; text:comparisonFindings.errorText }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary; visible:comparisonFindings.result.contestA !== undefined
+                text:qsTr("A: %1 · %2 · %3\nNIL %4 · incorrect call %5 · incorrect exchange %6\nUnrecognised lines %7 · findings outside period %8").arg(comparisonFindings.result.nameA).arg(comparisonFindings.result.contestA).arg(comparisonFindings.result.ownCallA).arg(comparisonFindings.result.nilA).arg(comparisonFindings.result.callA).arg(comparisonFindings.result.exchangeA).arg(comparisonFindings.result.unknownA).arg(comparisonFindings.result.outsideA) }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary; visible:comparisonFindings.result.contestB !== undefined
+                text:qsTr("B: %1 · %2 · %3\nNIL %4 · incorrect call %5 · incorrect exchange %6\nUnrecognised lines %7 · findings outside period %8").arg(comparisonFindings.result.nameB).arg(comparisonFindings.result.contestB).arg(comparisonFindings.result.ownCallB).arg(comparisonFindings.result.nilB).arg(comparisonFindings.result.callB).arg(comparisonFindings.result.exchangeB).arg(comparisonFindings.result.unknownB).arg(comparisonFindings.result.outsideB) }
+            Item { Layout.fillHeight:true }
+            GlassButton { text:qsTr("Close"); onClicked:comparisonFindings.close() }
         }
     }
 

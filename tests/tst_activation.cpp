@@ -23,6 +23,19 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void selectedContestFindingsAreReadOnlyAndBoundToLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        const QByteArray a="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1AAA 14\nunknown line\n";
+        const QByteArray b="Contest: 2025 CQ WORLD WIDE CW DX CONTEST\nCall: K2ABC\n****** Incorrect Call ******\n7020 CW 2025-11-22 1202 K2ABC 05 DL2BAD 14 correct DL2GOOD\n";
+        QFile fa(dir.filePath("a.rpt")), fb(dir.filePath("b.rpt")); QVERIFY(fa.open(QIODevice::WriteOnly)); QCOMPARE(fa.write(a),a.size()); fa.close(); QVERIFY(fb.open(QIODevice::WriteOnly)); QCOMPARE(fb.write(b),b.size()); fb.close();
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx)); QSignalSpy done(&act,&ActivationController::contestFindingsFinished);
+        auto start=[&] { return act.startContestFindings(QUrl::fromLocalFile(fa.fileName()),QUrl::fromLocalFile(fb.fileName()),"CQ-WW-CW","2024-11-23","2024-11-23","2025-11-22","2025-11-22"); };
+        QVERIFY(start()); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); const auto r=done.last().at(0).toMap();
+        QVERIFY2(r.value("error").toString().isEmpty(),qPrintable(r.value("error").toString())); QCOMPARE(r.value("nilA").toInt(),1); QCOMPARE(r.value("callB").toInt(),1); QCOMPARE(r.value("unknownA").toInt(),1); QCOMPARE(db.qsoCount(),qint64(0));
+        QVERIFY(fa.open(QIODevice::ReadOnly)); QCOMPARE(fa.readAll(),a); fa.close(); QVERIFY(fb.open(QIODevice::ReadOnly)); QCOMPARE(fb.readAll(),b); fb.close();
+        QVERIFY(start()); QVERIFY(db.open(dir.filePath("other.sqlite"))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QVERIFY(!done.last().at(0).toMap().value("error").toString().isEmpty());
+    }
     void recentContestQsoIncludesFullUtcForAudioReview()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;

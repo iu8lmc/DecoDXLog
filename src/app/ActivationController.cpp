@@ -997,6 +997,41 @@ bool ActivationController::requestContestGoals(const QString &contest, const QSt
     return true;
 }
 
+bool ActivationController::startContestFindings(const QUrl &a, const QUrl &b, const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB)
+{
+    if (m_contestReportBusy || !a.isLocalFile() || !b.isLocalFile() || a.toLocalFile().isEmpty() || b.toLocalFile().isEmpty() ||
+        !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() || m_ctx.db->path()==QLatin1String(":memory:") ||
+        contest.size()>64 || fromA.size()>10 || toA.size()>10 || fromB.size()>10 || toB.size()>10 || m_ctx.db->identity().isEmpty()) return false;
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity(); const quint64 generation=m_ctx.db->openGeneration();
+    m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self,path,identity,generation,a,b,contest,fromA,toA,fromB,toB] {
+        QVariantMap result{{"contest",contest},{"fromA",fromA},{"toA",toA},{"fromB",fromB},{"toB",toB},
+                           {"fileA",a.toString()},{"fileB",b.toString()},{"nameA",QFileInfo(a.toLocalFile()).fileName()},{"nameB",QFileInfo(b.toLocalFile()).fileName()}};
+        auto read=[](const QUrl &url) {
+            core::contestreport::Report report; QFile f(url.toLocalFile());
+            if (!QFileInfo(f).isFile() || !f.open(QIODevice::ReadOnly)) { report.error=tr("Cannot open the selected report file."); return report; }
+            const auto bytes=f.read(2*1024*1024+1);
+            if (f.error()!=QFileDevice::NoError) { report.error=tr("Could not read the complete report file."); return report; }
+            return core::contestreport::parseCqWw(bytes);
+        };
+        const auto ra=read(a), rb=read(b);
+        const auto c=core::contestcomparison::compareFindings(ra,rb,contest,QDate::fromString(fromA,Qt::ISODate),QDate::fromString(toA,Qt::ISODate),QDate::fromString(fromB,Qt::ISODate),QDate::fromString(toB,Qt::ISODate));
+        result.insert("error",!ra.error.isEmpty()?ra.error:!rb.error.isEmpty()?rb.error:c.error);
+        result.insert("nilA",c.nilA); result.insert("nilB",c.nilB); result.insert("callA",c.callA); result.insert("callB",c.callB);
+        result.insert("exchangeA",c.exchangeA); result.insert("exchangeB",c.exchangeB); result.insert("unknownA",c.unknownA); result.insert("unknownB",c.unknownB);
+        result.insert("outsideA",c.outsideA); result.insert("outsideB",c.outsideB); result.insert("ownCallA",c.ownCallA); result.insert("ownCallB",c.ownCallB);
+        result.insert("contestA",c.contestA); result.insert("contestB",c.contestB);
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,generation,result] {
+            if (!self) return; QVariantMap delivered=result;
+            if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=path || self->m_ctx.db->openGeneration()!=generation || self->m_ctx.db->identity()!=identity)
+                delivered={{"error",tr("The log changed; compare again.")}};
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged(); emit self->contestFindingsFinished(delivered);
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
+
 bool ActivationController::startContestComparison(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB)
 {
     if (m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
