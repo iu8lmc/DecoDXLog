@@ -47,7 +47,11 @@ private slots:
         QCOMPARE(saved.value("revisionA").toInt(),1); QVERIFY(!request(true,8,2,0,0));
         QVERIFY(db.open(dir.filePath("other.sqlite"))); QVERIFY(!request(true,8,2,1,1));
         QVERIFY(db.open(dir.filePath("log.sqlite"))); QVERIFY(request(false,0,0,0,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),3,5000);
-        const auto loaded=done.last().at(0).toMap(); QCOMPARE(loaded.value("targetA").toInt(),5); QCOMPARE(loaded.value("targetB").toInt(),1); QCOMPARE(db.qsoCount(),qint64(0));
+        const auto loaded=done.last().at(0).toMap(); QCOMPARE(loaded.value("targetA").toInt(),5); QCOMPARE(loaded.value("targetB").toInt(),1);
+        QVERIFY(act.requestContestGoals("CQ-WW-CW","2024-11-23","2024-11-23","2025-11-22","2025-11-22",false,0,0,1,1,true));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),4,5000); const auto removed=done.last().at(0).toMap();
+        QVERIFY2(removed.value("error").toString().isEmpty(),qPrintable(removed.value("error").toString()));
+        QVERIFY(removed.value("removed").toBool()); QCOMPARE(removed.value("revisionA").toInt(),0); QCOMPARE(db.qsoCount(),qint64(0));
     }
     void contestComparisonUsesCurrentLogAndRejectsLogSwitch()
     {

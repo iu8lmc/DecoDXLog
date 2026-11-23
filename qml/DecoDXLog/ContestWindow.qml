@@ -24,12 +24,12 @@ RoundedWindow {
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
-    function probeContestGoals(save) {
+    function probeContestGoals(mode) {
         contestComparison.open()
         comparisonContest.text="CQ-WW-CW"
         comparisonA.setTexts(decolog.showDate("2024-11-23"),decolog.showDate("2024-11-23"))
         comparisonB.setTexts(decolog.showDate("2025-11-22"),decolog.showDate("2025-11-22"))
-        contestComparison.probingGoals=save ? "save" : "load"
+        contestComparison.probingGoals=mode
         comparisonLoadGoals.clicked()
     }
     function probeContestComparison(stale) {
@@ -133,12 +133,14 @@ RoundedWindow {
             }
             contestComparison.goalRevisionA=result.revisionA; contestComparison.goalRevisionB=result.revisionB; contestComparison.goalsLoaded=true
             comparisonGoalA.value=result.targetA; comparisonGoalB.value=result.targetB
-            contestComparison.goalMessage=result.saved ? qsTr("Goals saved in this log.") : qsTr("Goals loaded; edit and save explicitly.")
+            contestComparison.goalMessage=result.removed ? qsTr("Saved goals removed from this log.") : result.saved ? qsTr("Goals saved in this log.") : qsTr("Goals loaded; edit and save explicitly.")
             if (contestComparison.probingGoals === "save" && !result.saved) {
                 comparisonGoalA.value=5; comparisonGoalB.value=1
                 Qt.callLater(() => comparisonSaveGoals.clicked())
+            } else if (contestComparison.probingGoals === "remove" && !result.removed) {
+                Qt.callLater(() => comparisonRemoveGoals.clicked())
             } else if (contestComparison.probingGoals.length) {
-                console.warn("PROBE savedContestGoals saved=" + result.saved + " a=" + result.targetA + " b=" + result.targetB)
+                console.warn("PROBE savedContestGoals saved=" + result.saved + " a=" + result.targetA + " b=" + result.targetB + " removed=" + result.removed)
                 contestComparison.probingGoals=""
             }
         }
@@ -1130,10 +1132,10 @@ RoundedWindow {
         property string goalMessage:""; property string probingGoals:""
         function invalidateGoals() { goalsLoaded=false; goalRevisionA=-1; goalRevisionB=-1; goalMessage="" }
         function validGoalPeriods() { return comparisonContest.text.trim().length>0 && comparisonA.hasFrom && comparisonA.hasTo && comparisonB.hasFrom && comparisonB.hasTo && comparisonA.valid && comparisonB.valid }
-        function requestGoals(save) {
+        function requestGoals(save,remove) {
             goalMessage=""
             if (!validGoalPeriods()) { goalMessage=qsTr("Enter the contest ID and both dates for each period."); return }
-            if (!decolog.activation.requestContestGoals(comparisonContest.text.trim(),comparisonA.fromIso,comparisonA.toIso,comparisonB.fromIso,comparisonB.toIso,save,comparisonGoalA.value,comparisonGoalB.value,save ? goalRevisionA : 0,save ? goalRevisionB : 0))
+            if (!decolog.activation.requestContestGoals(comparisonContest.text.trim(),comparisonA.fromIso,comparisonA.toIso,comparisonB.fromIso,comparisonB.toIso,save,comparisonGoalA.value,comparisonGoalB.value,(save || remove) ? goalRevisionA : 0,(save || remove) ? goalRevisionB : 0,!!remove))
                 { goalsLoaded=false; goalMessage=qsTr("Cannot save or load these goals; reload them for the current log.") }
         }
         function goal(total,target) { return {percent:target>0 ? Math.round(total*100/target) : 0, remaining:Math.max(0,target-total)} }
@@ -1157,8 +1159,9 @@ RoundedWindow {
                 SpinBox { id:comparisonGoalB; from:0; to:100000; value:0; editable:true; enabled:!decolog.activation.contestReportBusy; Accessible.name:qsTr("Period B QSO goal") }
             }
             RowLayout {
-                GlassButton { id:comparisonLoadGoals; text:qsTr("Load goals"); enabled:!decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(false) }
-                GlassButton { id:comparisonSaveGoals; text:qsTr("Save goals"); enabled:contestComparison.goalsLoaded && !decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(true) }
+                GlassButton { id:comparisonLoadGoals; text:qsTr("Load goals"); enabled:!decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(false,false) }
+                GlassButton { id:comparisonSaveGoals; text:qsTr("Save goals"); enabled:contestComparison.goalsLoaded && !decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(true,false) }
+                GlassButton { id:comparisonRemoveGoals; text:qsTr("Remove saved A and B"); enabled:contestComparison.goalsLoaded && (contestComparison.goalRevisionA>0 || contestComparison.goalRevisionB>0) && !decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(false,true) }
                 Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap; text:contestComparison.goalMessage }
             }
             RowLayout {

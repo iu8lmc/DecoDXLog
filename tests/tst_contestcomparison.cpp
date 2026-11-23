@@ -36,33 +36,49 @@ class TestContestComparison : public QObject {
         const auto a0=QDate(2024,11,23), a1=QDate(2024,11,24), b0=QDate(2025,11,22), b1=QDate(2025,11,23);
         auto empty=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",a0,a1,b0,b1); QVERIFY(empty.error.isEmpty());
         QCOMPARE(empty.a.revision,0); QCOMPARE(empty.b.revision,0);
-        auto saved=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",a0,a1,b0,b1,5,7,0,0);
+        auto saved=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",a0,a1,b0,b1,5,7,0,0,0);
         QVERIFY2(saved.error.isEmpty(),qPrintable(saved.error)); QCOMPARE(saved.a.revision,1); QCOMPARE(saved.b.target,7);
         auto stale=contestcomparison::loadGoals(b.connection(),"CQ-WW-CW",a0,a1,b0,b1); QVERIFY(stale.error.isEmpty());
-        auto updated=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",a0,a1,b0,b1,10,20,1,1); QVERIFY(updated.error.isEmpty());
-        auto rejected=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",a0,a1,b0,b1,11,21,stale.a.revision,stale.b.revision);
+        auto updated=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",a0,a1,b0,b1,10,20,1,1,1); QVERIFY(updated.error.isEmpty());
+        auto rejected=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",a0,a1,b0,b1,11,21,stale.a.revision,stale.b.revision,stale.generation);
         QVERIFY(!rejected.error.isEmpty()); auto current=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",a0,a1,b0,b1);
         QCOMPARE(current.a.target,10); QCOMPARE(current.b.target,20); QCOMPARE(current.a.revision,2);
-        auto secondStale=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",a0,a1,b0,b1,50,60,2,1);
+        auto secondStale=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",a0,a1,b0,b1,50,60,2,1,2);
         QVERIFY(!secondStale.error.isEmpty()); current=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",a0,a1,b0,b1);
         QCOMPARE(current.a.target,10); QCOMPARE(current.a.revision,2); QCOMPARE(current.b.target,20);
         auto other=contestcomparison::loadGoals(a.connection(),"CQ-WW-SSB",a0,a1,b0,b1); QVERIFY(other.error.isEmpty()); QCOMPARE(other.a.revision,0);
-        auto wrongIdentity=contestcomparison::saveGoals(a.connection(),"wrong","CQ-WW-CW",a0,a1,b0,b1,12,22,2,2);
+        auto wrongIdentity=contestcomparison::saveGoals(a.connection(),"wrong","CQ-WW-CW",a0,a1,b0,b1,12,22,2,2,2);
         QVERIFY(!wrongIdentity.error.isEmpty()); QCOMPARE(a.qsoCount(),qint64(0));
     }
     void duplicatePeriodsAndGoalLimitAreSafe()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); const QDate a(2024,11,23),b(2025,11,22);
-        auto conflict=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,a,a,5,6,0,0);
+        auto conflict=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,a,a,5,6,0,0,0);
         QVERIFY(!conflict.error.isEmpty());
-        auto one=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,a,a,5,5,0,0);
+        auto one=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,a,a,5,5,0,0,0);
         QVERIFY2(one.error.isEmpty(),qPrintable(one.error)); QCOMPARE(one.a.revision,1); QCOMPARE(one.b.revision,1);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<998) INSERT INTO app_setting(key,value) SELECT printf('contest_goal.v1.fixture%04d',x),'{}' FROM n"));
-        auto failure=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,b,b,10,20,1,0);
+        auto failure=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,b,b,10,20,1,0,1);
         QVERIFY(failure.error.isEmpty());
-        const QDate c(2026,11,21); auto over=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,c,c,11,30,2,0);
+        const QDate c(2026,11,21); auto over=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,c,c,11,30,2,0,2);
         QVERIFY(!over.error.isEmpty()); auto current=contestcomparison::loadGoals(db.connection(),"CQ-WW-CW",a,a,b,b);
         QVERIFY(current.error.isEmpty()); QCOMPARE(current.a.target,10); QCOMPARE(current.a.revision,2); QCOMPARE(current.b.target,20);
+    }
+    void removeGoalsRejectsStaleAndPreventsRecreateAba()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase a,b; const auto path=dir.filePath("log.sqlite"); QVERIFY(a.open(path)); QVERIFY(b.open(path));
+        const QDate first(2024,11,23),second(2025,11,22); auto absent=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",first,first,second,second);
+        auto made=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",first,first,second,second,5,7,0,0,absent.generation); QVERIFY(made.error.isEmpty());
+        auto stale=contestcomparison::loadGoals(b.connection(),"CQ-WW-CW",first,first,second,second);
+        auto removed=contestcomparison::removeGoals(a.connection(),a.identity(),"CQ-WW-CW",first,first,second,second,made.a.revision,made.b.revision,made.generation);
+        QVERIFY2(removed.error.isEmpty(),qPrintable(removed.error)); QCOMPARE(removed.a.revision,0); QCOMPARE(removed.b.revision,0);
+        QSqlQuery count(a.connection()); QVERIFY(count.exec("SELECT COUNT(*) FROM app_setting WHERE key LIKE 'contest_goal.v1.%'")); QVERIFY(count.next()); QCOMPARE(count.value(0).toInt(),0);
+        auto oldAbsent=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",first,first,second,second,9,9,0,0,absent.generation); QVERIFY(!oldAbsent.error.isEmpty());
+        auto oldPresent=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",first,first,second,second,9,9,stale.a.revision,stale.b.revision,stale.generation); QVERIFY(!oldPresent.error.isEmpty());
+        auto fresh=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",first,first,second,second); QCOMPARE(fresh.a.revision,0); QCOMPARE(fresh.b.revision,0);
+        auto recreated=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",first,first,second,second,11,12,0,0,fresh.generation); QVERIFY(recreated.error.isEmpty());
+        auto staleDelete=contestcomparison::removeGoals(b.connection(),b.identity(),"CQ-WW-CW",first,first,second,second,made.a.revision,made.b.revision,made.generation); QVERIFY(!staleDelete.error.isEmpty());
+        auto current=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",first,first,second,second); QCOMPARE(current.a.target,11); QCOMPARE(current.b.target,12); QCOMPARE(a.qsoCount(),qint64(0));
     }
     void comparesRecordedContestQsosAcrossPeriods()
     {

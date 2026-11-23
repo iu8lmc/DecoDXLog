@@ -951,43 +951,46 @@ static QVariantMap contestReportResult(const core::contestreport::Report& report
 }
 
 bool ActivationController::requestContestGoals(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB,
-                                               bool save, int targetA, int targetB, int revisionA, int revisionB)
+                                               bool save, int targetA, int targetB, int revisionA, int revisionB, bool remove)
 {
-    if (m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
+    if ((save && remove) || m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
         m_ctx.db->path()==QLatin1String(":memory:") || contest.size()>64 || fromA.size()>10 || toA.size()>10 || fromB.size()>10 || toB.size()>10) return false;
     const QString path=m_ctx.db->path(), identity=m_ctx.db->identity(); const quint64 generation=m_ctx.db->openGeneration();
     if (identity.isEmpty()) return false;
     const QStringList selection{contest.trimmed().toUpper(),fromA,toA,fromB,toB};
-    if (save && (m_goalSelection!=selection || m_goalLogPath!=path || m_goalLogIdentity!=identity || m_goalLogGeneration!=generation ||
-                 m_goalRevisionA!=revisionA || m_goalRevisionB!=revisionB)) return false;
-    if (!save) { m_goalSelection.clear(); m_goalRevisionA=m_goalRevisionB=-1; }
+    const bool mutate=save || remove;
+    if (mutate && (m_goalSelection!=selection || m_goalLogPath!=path || m_goalLogIdentity!=identity || m_goalLogGeneration!=generation ||
+                 m_goalRevisionA!=revisionA || m_goalRevisionB!=revisionB || m_goalGeneration<0)) return false;
+    const int goalGeneration=m_goalGeneration;
+    if (!mutate) { m_goalSelection.clear(); m_goalRevisionA=m_goalRevisionB=m_goalGeneration=-1; }
     m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
-    m_contestReportPool.start([self,path,identity,generation,contest,fromA,toA,fromB,toB,save,targetA,targetB,revisionA,revisionB,selection] {
+    m_contestReportPool.start([self,path,identity,generation,contest,fromA,toA,fromB,toB,save,remove,mutate,targetA,targetB,revisionA,revisionB,selection,goalGeneration] {
         QVariantMap result{{QStringLiteral("contest"),contest},{QStringLiteral("fromA"),fromA},{QStringLiteral("toA"),toA},
-            {QStringLiteral("fromB"),fromB},{QStringLiteral("toB"),toB},{QStringLiteral("saved"),save}};
+            {QStringLiteral("fromB"),fromB},{QStringLiteral("toB"),toB},{QStringLiteral("saved"),save},{QStringLiteral("removed"),remove}};
         LogDatabase db;
-        if (!(save ? db.openExistingReadWrite(path) : db.openReadOnly(path))) result.insert(QStringLiteral("error"),db.lastError());
+        if (!(mutate ? db.openExistingReadWrite(path) : db.openReadOnly(path))) result.insert(QStringLiteral("error"),db.lastError());
         else if (db.identity()!=identity) result.insert(QStringLiteral("error"),tr("The log identity changed."));
         else {
             const QDate a=QDate::fromString(fromA,Qt::ISODate), ae=QDate::fromString(toA,Qt::ISODate),
                         b=QDate::fromString(fromB,Qt::ISODate), be=QDate::fromString(toB,Qt::ISODate);
-            const auto goals=save ? core::contestcomparison::saveGoals(db.connection(),identity,contest,a,ae,b,be,targetA,targetB,revisionA,revisionB)
-                                  : core::contestcomparison::loadGoals(db.connection(),contest,a,ae,b,be);
+            const auto goals=remove ? core::contestcomparison::removeGoals(db.connection(),identity,contest,a,ae,b,be,revisionA,revisionB,goalGeneration)
+                : save ? core::contestcomparison::saveGoals(db.connection(),identity,contest,a,ae,b,be,targetA,targetB,revisionA,revisionB,goalGeneration)
+                       : core::contestcomparison::loadGoals(db.connection(),contest,a,ae,b,be);
             result.insert(QStringLiteral("error"),goals.error); result.insert(QStringLiteral("targetA"),goals.a.target);
             result.insert(QStringLiteral("targetB"),goals.b.target); result.insert(QStringLiteral("revisionA"),goals.a.revision);
-            result.insert(QStringLiteral("revisionB"),goals.b.revision);
+            result.insert(QStringLiteral("revisionB"),goals.b.revision); result.insert(QStringLiteral("goalGeneration"),goals.generation);
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(),[self,path,identity,generation,result,selection,save] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,generation,result,selection,mutate] {
             if (!self) return;
             QVariantMap delivered=result;
             if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=path ||
                 self->m_ctx.db->openGeneration()!=generation || self->m_ctx.db->identity()!=identity)
-                delivered={{QStringLiteral("error"),save ? tr("The log changed; the save may have completed in the previous log.") : tr("The log changed; load goals again.")}};
+                delivered={{QStringLiteral("error"),mutate ? tr("The log changed; the change may have completed in the previous log.") : tr("The log changed; load goals again.")}};
             if (delivered.value(QStringLiteral("error")).toString().isEmpty()) {
                 self->m_goalSelection=selection; self->m_goalLogPath=path; self->m_goalLogIdentity=identity; self->m_goalLogGeneration=generation;
-                self->m_goalRevisionA=delivered.value(QStringLiteral("revisionA")).toInt(); self->m_goalRevisionB=delivered.value(QStringLiteral("revisionB")).toInt();
-            } else { self->m_goalSelection.clear(); self->m_goalRevisionA=self->m_goalRevisionB=-1; }
+                self->m_goalRevisionA=delivered.value(QStringLiteral("revisionA")).toInt(); self->m_goalRevisionB=delivered.value(QStringLiteral("revisionB")).toInt(); self->m_goalGeneration=delivered.value(QStringLiteral("goalGeneration")).toInt();
+            } else { self->m_goalSelection.clear(); self->m_goalRevisionA=self->m_goalRevisionB=self->m_goalGeneration=-1; }
             self->m_contestReportBusy=false; emit self->contestReportBusyChanged(); emit self->contestGoalsFinished(delivered);
         },Qt::QueuedConnection);
     });

@@ -166,6 +166,11 @@ private slots:
         QVERIFY2(saved.contains("PROBE savedContestGoals saved=true a=5 b=1") && !saved.contains("TypeError"),saved.constData());
         QVERIFY2(launch(dir,"contestloadgoalsprobe",loaded,4500),loaded.constData());
         QVERIFY2(loaded.contains("PROBE savedContestGoals saved=false a=5 b=1") && !loaded.contains("TypeError"),loaded.constData());
+        QByteArray removed,empty;
+        QVERIFY2(launch(dir,"contestremovegoalsprobe",removed,4500),removed.constData());
+        QVERIFY2(removed.contains("PROBE savedContestGoals saved=false a=0 b=0 removed=true") && !removed.contains("TypeError"),removed.constData());
+        QVERIFY2(launch(dir,"contestloadgoalsprobe",empty,4500),empty.constData());
+        QVERIFY2(empty.contains("PROBE savedContestGoals saved=false a=0 b=0 removed=false") && !empty.contains("TypeError"),empty.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
     void contestComparisonShowsTwoPeriodsInActualApp()

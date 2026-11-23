@@ -84,7 +84,7 @@ public:
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
     Q_INVOKABLE bool startContestComparison(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB);
     Q_INVOKABLE bool requestContestGoals(const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB,
-                                         bool save, int targetA, int targetB, int revisionA, int revisionB);
+                                         bool save, int targetA, int targetB, int revisionA, int revisionB, bool remove=false);
     Q_INVOKABLE bool startContestReportCandidates(const QVariantMap& row, int toleranceMinutes=0);
     Q_INVOKABLE bool isContestReportCandidateCurrent(qint64 id, const QString& uuid, int revision) const;
     Q_INVOKABLE bool archiveContestReportPreview();
@@ -223,7 +223,7 @@ private:
     QStringList m_goalSelection;
     QString m_goalLogPath, m_goalLogIdentity;
     quint64 m_goalLogGeneration{0};
-    int m_goalRevisionA{-1}, m_goalRevisionB{-1};
+    int m_goalRevisionA{-1}, m_goalRevisionB{-1}, m_goalGeneration{-1};
     QHash<qint64, QPair<QString,int>> m_contestCandidates;
     QString m_contestCandidatesLogPath;
     QString m_contestCandidatesLogIdentity;

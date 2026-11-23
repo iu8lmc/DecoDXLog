@@ -41,6 +41,33 @@ bool readGoal(const QSqlDatabase &db,const QString &contest,QDate from,QDate to,
     }
     goal={int(target),int(revision)}; return true;
 }
+const QString goalClock=QStringLiteral("contest_goal.clock");
+bool readClock(const QSqlDatabase &db,int &clock,QString &error)
+{
+    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); q.addBindValue(goalClock);
+    if (!q.exec()) { error=q.lastError().text(); return false; }
+    if (!q.next()) { clock=0; return true; }
+    bool ok=false; const int value=q.value(0).toString().toInt(&ok);
+    if (!ok || value<0 || value>=std::numeric_limits<int>::max()) { error=QStringLiteral("Invalid contest goal generation"); return false; }
+    clock=value; return true;
+}
+bool advanceClock(const QSqlDatabase &db,int expected,int &next,QString &error)
+{
+    int current=0; if (!readClock(db,current,error)) return false;
+    if (current!=expected || current>=std::numeric_limits<int>::max()-1) { error=QStringLiteral("Goals changed; reload before saving"); return false; }
+    next=current+1; QSqlQuery q(db);
+    q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
+    q.addBindValue(goalClock); q.addBindValue(QString::number(next));
+    if (!q.exec()) { error=q.lastError().text(); return false; } return true;
+}
+bool eraseGoal(const QSqlDatabase &db,const QString &contest,QDate from,QDate to,int revision,QString &error)
+{
+    Goal current; if (!readGoal(db,contest,from,to,current,error)) return false;
+    if (current.revision!=revision) { error=QStringLiteral("Goal changed; reload before removing"); return false; }
+    if (!revision) return true;
+    QSqlQuery q(db); q.prepare(QStringLiteral("DELETE FROM app_setting WHERE key=?")); q.addBindValue(goalKey(contest,from,to));
+    if (!q.exec() || q.numRowsAffected()!=1) { error=QStringLiteral("Cannot remove saved goal"); return false; } return true;
+}
 bool writeGoal(const QSqlDatabase &db,const QString &contest,QDate from,QDate to,int target,int expected,Goal &out,QString &error)
 {
     Goal current; if (!readGoal(db,contest,from,to,current,error)) return false;
@@ -60,14 +87,18 @@ GoalPair loadGoals(const QSqlDatabase &db,const QString &contestId,QDate fromA,Q
 {
     GoalPair result; const QString contest=contestId.trimmed().toUpper();
     if (!db.isOpen() || !validGoalKey(contest,fromA,toA) || !validGoalKey(contest,fromB,toB)) { result.error=QStringLiteral("Invalid contest or goal period"); return result; }
-    if (!readGoal(db,contest,fromA,toA,result.a,result.error)) return result;
-    readGoal(db,contest,fromB,toB,result.b,result.error); return result;
+    QSqlDatabase snapshot=db;
+    if (!snapshot.transaction()) { result.error=snapshot.lastError().text(); return result; }
+    if (!readClock(snapshot,result.generation,result.error) || !readGoal(snapshot,contest,fromA,toA,result.a,result.error) ||
+        !readGoal(snapshot,contest,fromB,toB,result.b,result.error)) { snapshot.rollback(); return result; }
+    if (!snapshot.commit()) { result.error=snapshot.lastError().text(); snapshot.rollback(); }
+    return result;
 }
-GoalPair saveGoals(const QSqlDatabase &database,const QString &expectedIdentity,const QString &contestId,QDate fromA,QDate toA,QDate fromB,QDate toB,int targetA,int targetB,int revisionA,int revisionB)
+GoalPair saveGoals(const QSqlDatabase &database,const QString &expectedIdentity,const QString &contestId,QDate fromA,QDate toA,QDate fromB,QDate toB,int targetA,int targetB,int revisionA,int revisionB,int expectedGeneration)
 {
     GoalPair result; const QString contest=contestId.trimmed().toUpper(); QSqlDatabase db=database;
     if (!db.isOpen() || expectedIdentity.isEmpty() || !validGoalKey(contest,fromA,toA) || !validGoalKey(contest,fromB,toB) ||
-        targetA<0 || targetA>100000 || targetB<0 || targetB>100000 || revisionA<0 || revisionB<0 ||
+        targetA<0 || targetA>100000 || targetB<0 || targetB>100000 || revisionA<0 || revisionB<0 || expectedGeneration<0 ||
         (fromA==fromB && toA==toB && (targetA!=targetB || revisionA!=revisionB))) {
         result.error=QStringLiteral("Invalid goals or duplicate periods with different goals"); return result;
     }
@@ -75,9 +106,27 @@ GoalPair saveGoals(const QSqlDatabase &database,const QString &expectedIdentity,
     QSqlQuery identity(db); if (!identity.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) || !identity.next() || identity.value(0).toString()!=expectedIdentity) {
         db.rollback(); result.error=QStringLiteral("Log identity changed"); return result;
     }
+    if (!advanceClock(db,expectedGeneration,result.generation,result.error)) { db.rollback(); return result; }
     if (!writeGoal(db,contest,fromA,toA,targetA,revisionA,result.a,result.error)) { db.rollback(); return result; }
     if (fromA==fromB && toA==toB) result.b=result.a;
     else if (!writeGoal(db,contest,fromB,toB,targetB,revisionB,result.b,result.error)) { db.rollback(); return result; }
+    if (!db.commit()) { result.error=db.lastError().text(); db.rollback(); }
+    return result;
+}
+GoalPair removeGoals(const QSqlDatabase &database,const QString &expectedIdentity,const QString &contestId,QDate fromA,QDate toA,QDate fromB,QDate toB,int revisionA,int revisionB,int expectedGeneration)
+{
+    GoalPair result; const QString contest=contestId.trimmed().toUpper(); QSqlDatabase db=database;
+    if (!db.isOpen() || expectedIdentity.isEmpty() || !validGoalKey(contest,fromA,toA) || !validGoalKey(contest,fromB,toB) ||
+        revisionA<0 || revisionB<0 || expectedGeneration<0 || (fromA==fromB && toA==toB && revisionA!=revisionB)) {
+        result.error=QStringLiteral("Invalid goal removal request"); return result;
+    }
+    QSqlQuery begin(db); if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.error=begin.lastError().text(); return result; }
+    QSqlQuery identity(db);
+    if (!identity.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) || !identity.next() || identity.value(0).toString()!=expectedIdentity) {
+        db.rollback(); result.error=QStringLiteral("Log identity changed"); return result;
+    }
+    if (!advanceClock(db,expectedGeneration,result.generation,result.error) || !eraseGoal(db,contest,fromA,toA,revisionA,result.error) ||
+        ((fromA!=fromB || toA!=toB) && !eraseGoal(db,contest,fromB,toB,revisionB,result.error))) { db.rollback(); return result; }
     if (!db.commit()) { result.error=db.lastError().text(); db.rollback(); }
     return result;
 }
