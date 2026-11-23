@@ -82,6 +82,7 @@ public:
     bool previewBusy() const { return m_previewBusy; }
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
+    Q_INVOKABLE bool startContestReportCandidates(const QVariantMap& row);
     Q_INVOKABLE bool archiveContestReportPreview();
     Q_INVOKABLE bool startContestReportHistory(qint64 beforeId = 0);
     Q_INVOKABLE bool startArchivedContestReportPreview(qint64 id, const QString& sha256);
@@ -199,6 +200,7 @@ signals:
     void previewChanged();
     void contestReportBusyChanged();
     void contestReportFinished(const QVariantMap& result);
+    void contestReportCandidatesFinished(const QVariantMap& result);
     void contestReportArchiveFinished(bool success, const QString& message);
     void contestReportHistoryFinished(const QVariantMap& result);
     void contestReportExportFinished(bool success, const QString& message);

@@ -23,6 +23,21 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestReportCandidateSearchIsReadOnlyAndBoundToLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        const auto inserted=db.insertQso(AdifRecord{{"CALL","DL1ABC"},{"QSO_DATE","20241123"},{"TIME_ON","120145"},
+          {"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","K1ABC"}},"fixture",{},true); QVERIFY(inserted.id>0);
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy done(&act,&ActivationController::contestReportCandidatesFinished);
+        QVariantMap row{{"call","DL1ABC"},{"date","2024-11-23"},{"time","1201"},{"frequency","14020"},{"mode","CW"},{"line",4}};
+        QVERIFY(act.startContestReportCandidates(row)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        const auto result=done.first().at(0).toMap(); QVERIFY2(result.value("error").toString().isEmpty(),qPrintable(result.value("error").toString()));
+        const auto matches=result.value("candidates").toList(); QCOMPARE(matches.size(),1); QCOMPARE(matches.first().toMap().value("id").toLongLong(),inserted.id);
+        QCOMPARE(matches.first().toMap().value("stationCall").toString(),QString("K1ABC"));
+        QVERIFY(act.startContestReportCandidates(row)); QVERIFY(db.open(dir.filePath("other.sqlite"))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
+        QVERIFY(!done.last().at(0).toMap().value("error").toString().isEmpty()); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void archiveDoesNotRecreateRemovedDatabase()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("active.sqlite"), moved=dir.filePath("moved.sqlite");

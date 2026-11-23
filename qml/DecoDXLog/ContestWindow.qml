@@ -17,6 +17,7 @@ RoundedWindow {
     property int revision: 0
     property bool reportProbe: false
     property bool reportProbeSave: false
+    property bool reportProbeFind: false
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
@@ -34,12 +35,18 @@ RoundedWindow {
         function onContestReportFinished(result) {
             reportReview.result = result
             reportReview.errorText = result.error || ""
-            const entries = (result.entries || []).map(e => ({line:e.line, text:e.original, kind:e.kind}))
+            const entries = (result.entries || []).map(e => ({line:e.line, text:e.original, kind:e.kind, row:e}))
             const unknown = (result.unknown || []).map(e => ({line:e.line, text:e.text, kind:"unrecognised"}))
             reportReview.entries = entries.concat(unknown)
             if (root.reportHistoryProbe) console.warn("PROBE lcr reopened " + result.total + " " + result.unknownTotal + " " + reportReview.errorText)
             if (root.reportProbe) console.warn("PROBE lcr ready " + result.total + " " + result.unknownTotal + " " + reportReview.entries.length + " " + reportReview.errorText)
             if (root.reportProbeSave && result.archiveReady) reportReview.saveSnapshot()
+            if (root.reportProbeFind && (result.entries || []).length) reportReview.findCandidates(result.entries[0])
+        }
+        function onContestReportCandidatesFinished(result) {
+            reportCandidates.result=result
+            reportCandidates.errorText=result.error || ""
+            if (root.reportProbeFind) console.warn("PROBE lcr candidates " + (result.candidates || []).length + " " + reportCandidates.errorText)
         }
         function onContestReportHistoryFinished(result) {
             reportHistory.result = result
@@ -913,6 +920,11 @@ RoundedWindow {
         property string errorText: ""
         property string saveMessage: ""
         property bool saveSuccess: false
+        function findCandidates(row) {
+            reportCandidates.result=({}); reportCandidates.errorText=""
+            reportCandidates.open()
+            if (!decolog.activation.startContestReportCandidates(row)) reportCandidates.errorText=qsTr("Cannot search this log now.")
+        }
         function saveSnapshot() {
             saveMessage = ""
             if (!decolog.activation.archiveContestReportPreview()) {
@@ -936,10 +948,14 @@ RoundedWindow {
             ListView {
                 id: reportRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:reportReview.entries
                 ScrollBar.vertical: PanelScrollBar {}
-                delegate: Text { required property var modelData; width:reportRows.width; wrapMode:Text.WrapAnywhere
-                    color:modelData.kind === "unrecognised" ? Theme.warningColor : Theme.textPrimary
-                    font.family:Theme.monoFamily; font.pixelSize:11
-                    text:qsTr("Line %1 · %2 · %3").arg(modelData.line).arg(modelData.kind).arg(modelData.text) }
+                delegate: RowLayout { required property var modelData; width:reportRows.width; spacing:6
+                    Text { Layout.fillWidth:true; wrapMode:Text.WrapAnywhere
+                        color:modelData.kind === "unrecognised" ? Theme.warningColor : Theme.textPrimary
+                        font.family:Theme.monoFamily; font.pixelSize:11
+                        text:qsTr("Line %1 · %2 · %3").arg(modelData.line).arg(modelData.kind).arg(modelData.text) }
+                    GlassButton { text:qsTr("Find QSO"); visible:!!modelData.row; enabled:!decolog.activation.contestReportBusy
+                        onClicked:reportReview.findCandidates(modelData.row) }
+                }
             }
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; visible:reportReview.saveMessage.length>0
                 color:reportReview.saveSuccess ? Theme.accentColor : Theme.errorColor; text:reportReview.saveMessage }
@@ -948,6 +964,29 @@ RoundedWindow {
                     onClicked:reportReview.saveSnapshot() }
                 GlassButton { text:qsTr("Close"); onClicked:reportReview.close() }
             }
+        }
+    }
+
+    DialogFrame {
+        id:reportCandidates
+        property var result:({})
+        property string errorText:""
+        dialogKey:"contestReportCandidates"; width:650; height:400
+        title:qsTr("Possible local QSO"); dotColor:Theme.primaryColor
+        ColumnLayout {
+            anchors.fill:parent; spacing:8
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
+                text:qsTr("Suggestions share the logged callsign, band, mode family and UTC minute. Check the station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.errorColor; visible:reportCandidates.errorText.length>0; text:reportCandidates.errorText }
+            Text { Layout.fillWidth:true; color:Theme.textSecondary
+                text:decolog.activation.contestReportBusy ? qsTr("Searching…") : qsTr("Line %1 · %2 · %3 shown%4").arg(reportCandidates.result.line || "—").arg(reportCandidates.result.call || "").arg((reportCandidates.result.candidates || []).length).arg(reportCandidates.result.truncated ? qsTr(" · more matches exist") : "") }
+            ListView {
+                id:candidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:reportCandidates.result.candidates || []
+                ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:candidateRows.width; wrapMode:Text.WordWrap; color:Theme.textPrimary; font.family:Theme.monoFamily
+                    text:qsTr("QSO #%1 · %2 · station %3 (%4)").arg(modelData.id).arg(modelData.utc).arg(modelData.stationCall || qsTr("unknown")).arg(modelData.stationSource) }
+            }
+            GlassButton { Layout.alignment:Qt.AlignRight; text:qsTr("Close"); onClicked:reportCandidates.close() }
         }
     }
 

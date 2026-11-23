@@ -1,11 +1,52 @@
 #include "core/ContestReport.h"
+#include "core/LogDatabase.h"
+#include "core/Bands.h"
 
 #include <QDate>
+#include <QDateTime>
+#include <QTimeZone>
+#include <QSqlQuery>
+#include <QSqlError>
 #include <QRegularExpression>
 #include <QStringDecoder>
 #include <QTime>
 
 namespace decolog::core::contestreport {
+
+CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
+{
+    CandidateResult result;
+    const QDate day=QDate::fromString(entry.date,Qt::ISODate);
+    const QTime minute=QTime::fromString(entry.time,QStringLiteral("HHmm"));
+    bool frequencyOk=false; const double khz=entry.frequencyKhz.toDouble(&frequencyOk);
+    const QString band=frequencyOk ? bands::fromMhz(khz/1000.0) : QString();
+    const QString mode=entry.mode.trimmed().toUpper();
+    QString modeClause;
+    if (mode == QLatin1String("CW")) modeClause=QStringLiteral("('CW','CW-R')");
+    else if (mode == QLatin1String("PH")) modeClause=QStringLiteral("('SSB','USB','LSB','AM','DSB')");
+    else if (mode == QLatin1String("RY")) modeClause=QStringLiteral("('RTTY')");
+    if (!db.isOpen() || !day.isValid() || !minute.isValid() || band.isEmpty() || modeClause.isEmpty() || entry.call.trimmed().isEmpty()) {
+        result.error=QStringLiteral("Cannot search this report row: invalid time, frequency, callsign or unsupported mode.");
+        return result;
+    }
+    const QDateTime start(day,minute,QTimeZone::UTC);
+    QSqlQuery q(db.connection());
+    q.prepare(QStringLiteral("SELECT q.id,q.uuid,q.qso_datetime_on,"
+        "COALESCE(NULLIF(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.STATION_CALLSIGN') END,''),p.station_callsign,''),"
+        "CASE WHEN NULLIF(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.STATION_CALLSIGN') END,'') IS NOT NULL THEN 'qso' "
+        "WHEN NULLIF(p.station_callsign,'') IS NOT NULL THEN 'profile' ELSE 'unknown' END "
+        "FROM qso q LEFT JOIN station_profile p ON p.id=q.station_profile_id "
+        "WHERE q.deleted=0 AND q.call=? AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
+        + modeClause + QStringLiteral(" ORDER BY q.qso_datetime_on,q.id LIMIT 6"));
+    q.addBindValue(entry.call.trimmed().toUpper()); q.addBindValue(band);
+    q.addBindValue(start.toString(Qt::ISODate)); q.addBindValue(start.addSecs(60).toString(Qt::ISODate));
+    if (!q.exec()) { result.error=q.lastError().text(); return result; }
+    while (q.next()) {
+        if (result.candidates.size()==5) { result.truncated=true; break; }
+        result.candidates.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toString(),q.value(4).toString()});
+    }
+    return result;
+}
 
 Report parseCqWw(const QByteArray& bytes)
 {

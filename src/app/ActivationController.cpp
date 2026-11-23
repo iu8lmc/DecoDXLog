@@ -934,7 +934,7 @@ static QVariantMap contestReportResult(const core::contestreport::Report& report
         else if (entry.kind == QLatin1String("incorrect_exchange")) ++exchanges;
         if (entries.size() < 500)
             entries << QVariantMap{{QStringLiteral("line"), entry.lineNumber}, {QStringLiteral("kind"), entry.kind},
-        {QStringLiteral("date"), entry.date}, {QStringLiteral("time"), entry.time},
+        {QStringLiteral("date"), entry.date}, {QStringLiteral("time"), entry.time}, {QStringLiteral("mode"), entry.mode},
         {QStringLiteral("frequency"), entry.frequencyKhz}, {QStringLiteral("call"), entry.call},
         {QStringLiteral("correction"), entry.correction}, {QStringLiteral("original"), entry.original.left(1024)}};
     }
@@ -946,6 +946,46 @@ static QVariantMap contestReportResult(const core::contestreport::Report& report
     result.insert(QStringLiteral("nil"), nil); result.insert(QStringLiteral("incorrectCall"), calls);
     result.insert(QStringLiteral("incorrectExchange"), exchanges);
     return result;
+}
+
+bool ActivationController::startContestReportCandidates(const QVariantMap& row)
+{
+    if (m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
+        m_ctx.db->path()==QLatin1String(":memory:")) return false;
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity();
+    const quint64 generation=m_ctx.db->openGeneration();
+    if (identity.isEmpty()) return false;
+    core::contestreport::Entry entry;
+    entry.call=row.value(QStringLiteral("call")).toString(); entry.date=row.value(QStringLiteral("date")).toString();
+    entry.time=row.value(QStringLiteral("time")).toString(); entry.frequencyKhz=row.value(QStringLiteral("frequency")).toString();
+    entry.mode=row.value(QStringLiteral("mode")).toString(); entry.lineNumber=row.value(QStringLiteral("line")).toInt();
+    m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self,path,identity,generation,entry] {
+        QVariantMap result{{QStringLiteral("line"),entry.lineNumber},{QStringLiteral("call"),entry.call}};
+        LogDatabase db;
+        if (!db.openReadOnly(path)) result.insert(QStringLiteral("error"),db.lastError());
+        else if (db.identity()!=identity) result.insert(QStringLiteral("error"),tr("The reviewed log identity changed."));
+        else {
+            const auto found=core::contestreport::findCandidates(db,entry); QVariantList candidates;
+            for (const auto& item : found.candidates)
+                candidates << QVariantMap{{QStringLiteral("id"),item.id},{QStringLiteral("uuid"),item.uuid},
+                    {QStringLiteral("utc"),item.utc},{QStringLiteral("stationCall"),item.stationCall},
+                    {QStringLiteral("stationSource"),item.stationSource}};
+            result.insert(QStringLiteral("error"),found.error); result.insert(QStringLiteral("candidates"),candidates);
+            result.insert(QStringLiteral("truncated"),found.truncated);
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,generation,result] {
+            if (!self) return;
+            QVariantMap delivered=result;
+            if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=path ||
+                self->m_ctx.db->openGeneration()!=generation || self->m_ctx.db->identity()!=identity)
+                delivered={{QStringLiteral("error"),tr("The log changed; search again.")}};
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged();
+            emit self->contestReportCandidatesFinished(delivered);
+        },Qt::QueuedConnection);
+    });
+    return true;
 }
 
 bool ActivationController::startContestReportPreview(const QUrl& file)
