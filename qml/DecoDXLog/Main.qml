@@ -1286,6 +1286,12 @@ RoundedWindow {
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
+        else if (what[0] === "contestserialpanelprobe" || what[0] === "contestserialwindowprobe") {
+            decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
+            decolog.net.configureDurableSerialAuthority("event","authority")
+            if (what[0] === "contestserialpanelprobe") window.openContestDesk(); else window.openContest()
+            contestSerialProbe.start()
+        }
         else if (what[0] === "serialqsoprobe") Qt.callLater(() => {
             const setup = decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
             const config = decolog.net.configureDurableSerialAuthority("event","authority")
@@ -1766,6 +1772,11 @@ RoundedWindow {
     Timer { id:cqwwHistoryProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportHistoryProbe=true; contestWindow.item.reportExportProbePath=startupShow.split(":")[0] === "cqwwexportprobe" ? startupShow.split(":").slice(1).join(":") : ""; contestWindow.item.probeReportHistory() } else console.warn("PROBE lcr history missing window") } }
     Timer { id:cqwwReportProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportProbeSave = startupShow.split(":")[0] === "cqwwarchiveprobe"; contestWindow.item.reportProbeFind = startupShow.split(":")[0] === "cqwwfindprobe" || startupShow.split(":")[0] === "cqwwopenprobe" || startupShow.split(":")[0] === "cqwwwindowprobe"; contestWindow.item.reportProbeWindow = startupShow.split(":")[0] === "cqwwwindowprobe"; contestWindow.item.reportProbeOpen = startupShow.split(":")[0] === "cqwwopenprobe"; contestWindow.item.inspectContestReport("file://" + startupShow.split(":").slice(1).join(":"), true) } else console.warn("PROBE lcr missing window") } }
     Timer { id:callQueueProbe; interval:1000; onTriggered: { const p=window.panelItem("newqso"); if (p && p.item) p.item.probeCallQueue(); else console.warn("PROBE callqueue missing panel") } }
+    Timer { id:contestSerialProbe; interval:1000; onTriggered: {
+        const panel = startupShow === "contestserialpanelprobe" ? contestLayout.panelFor("contest").item : contestWindow.item
+        if (panel) console.warn("PROBE contestSerial " + JSON.stringify(panel.probeExperimentalSerial()))
+        else console.warn("PROBE contestSerial missing panel")
+    } }
     Timer {
         id:typedFieldsProbe; interval:1000
         onTriggered: {

@@ -21,6 +21,23 @@ GlassPanel {
     readonly property var session: { revision; return act.state }
     readonly property var scoring: { revision; return act.score() }
     readonly property bool running: act.active
+    property var experimentalSelection: ({})
+    readonly property var experimentalGrant: { const status=decolog.net.durableSerialStatus; return decolog.net.durableSerialGrantForQso() }
+    function serialForExchange() { return useExperimentalSerial.checked ? String(experimentalSelection.serial || "") : String(root.session.nextSerial || 1) }
+    function selectedGrantCurrent() {
+        if (!useExperimentalSerial.checked) return true
+        const current=decolog.net.durableSerialGrantForQso(), selected=root.experimentalSelection
+        return !!selected.serial && current.serial===selected.serial && current.scope===selected.scope && current.authority===selected.authority && current.requester===selected.requester && current.requestId===selected.requestId
+    }
+    function probeExperimentalSerial() {
+        useExperimentalSerial.checked=true
+        const macro=root.macroContext().nr, saved=root.experimentalSelection
+        root.experimentalSelection=Object.assign({},saved,{serial:11})
+        root.sendKey(2)
+        const staleRejected=message.text.indexOf("selected serial grant changed")>=0
+        root.experimentalSelection=saved; callField.text="K1CONTEST"; rcvdNr.text="5"; root.logQso()
+        return {macro:macro,staleRejected:staleRejected,error:message.text}
+    }
 
     property string band: ""
     property string mode: ""
@@ -41,12 +58,13 @@ GlassPanel {
         return {
             call: callField.text.trim(),
             rst: sentRst.text.trim(),
-            nr: root.session.serialEnabled ? String(root.session.nextSerial || 1) : "",
+            nr: root.session.serialEnabled ? root.serialForExchange() : "",
             exch: rcvdNr.text.trim(),
             mode: root.mode
         }
     }
     function sendKey(index) {
+        if (!root.selectedGrantCurrent()) { message.text=qsTr("The selected serial grant changed; review it before transmitting."); return }
         decolog.functionKey(index, root.macroContext())
     }
     function enterPressed(field) {
@@ -282,13 +300,14 @@ GlassPanel {
             call: call, date: now.date, time: now.time,
             band: root.band, mode: root.mode,
             rst_sent: sentRst.text, rst_rcvd: rcvdRst.text,
-            srx: rcvdNr.text
+            srx: rcvdNr.text, experimental_serial: useExperimentalSerial.checked, experimental_serial_grant: root.experimentalSelection
         })
         if (error.length > 0) {
             message.text = error
             return
         }
         const problem = root.exchangeProblem
+        useExperimentalSerial.checked=false
         root.clearEntry()
         // Lo scambio storto non ferma il QSO — la stazione e' gia' passata — ma
         // si dice, cosi' si corregge adesso invece che a spoglio fatto.
@@ -349,7 +368,7 @@ GlassPanel {
         }
     }
     title: root.running ? qsTr("%1 · next %2").arg(root.session.title || qsTr("Contest"))
-                                              .arg(root.session.nextSerial || 1)
+                                              .arg(root.serialForExchange() || qsTr("Unavailable"))
                         : qsTr("Contest entry · no session")
     dotColor: root.running ? Theme.accentColor : Theme.textSecondary
 
@@ -484,7 +503,7 @@ GlassPanel {
                     Layout.preferredWidth: 72
                     fieldHeight: 40
                     readOnly: true
-                    text: root.session.serialEnabled ? String(root.session.nextSerial || 1) : "—"
+                    text: root.session.serialEnabled ? (root.serialForExchange() || qsTr("Unavailable")) : "—"
                 }
             }
             LabeledField {
@@ -522,6 +541,18 @@ GlassPanel {
                 onClicked: root.logQso()
             }
         }
+
+        CheckBox {
+            id:useExperimentalSerial
+            Layout.fillWidth:true
+            visible:root.session.serialEnabled && (decolog.net.durableSerialStatus || "").length>0
+            property var shownGrant: checked ? root.experimentalSelection : root.experimentalGrant
+            onCheckedChanged:root.experimentalSelection=checked ? Object.assign({},root.experimentalGrant) : ({})
+            text:shownGrant.serial ? qsTr("Use experimental serial %1 · scope %2 · authority %3").arg(shownGrant.serial).arg(shownGrant.scope).arg(shownGrant.authority) : qsTr("Use experimental serial: no grant available")
+            contentItem:Text { text:useExperimentalSerial.text; color:Theme.warningColor; wrapMode:Text.WordWrap; leftPadding:useExperimentalSerial.indicator.width+6 }
+        }
+        Text { Layout.fillWidth:true; visible:useExperimentalSerial.visible && useExperimentalSerial.checked; color:Theme.warningColor; wrapMode:Text.WordWrap; font.pixelSize:11
+            text:qsTr("UDP IDs are unauthenticated; multiple authorities can issue the same number. Verify before transmitting.") }
 
         // ── Super Check Partial e N+1 ──────────────────────────────────────
         // Mentre si scrive: i nominativi veri che contengono quello che c'e'

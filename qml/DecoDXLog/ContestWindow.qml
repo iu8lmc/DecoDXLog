@@ -231,6 +231,27 @@ RoundedWindow {
     // Punti, moltiplicatori e punteggio secondo il regolamento del contest.
     readonly property var scoring: { revision; return decolog.activation.score() }
     readonly property bool running: decolog.activation.active
+    property var experimentalSelection: ({})
+    readonly property var experimentalGrant: { const status=decolog.net.durableSerialStatus; return decolog.net.durableSerialGrantForQso() }
+    function serialForExchange() { return useExperimentalSerial.checked ? String(experimentalSelection.serial || "") : String(root.session.nextSerial || 1) }
+    function selectedGrantCurrent() {
+        if (!useExperimentalSerial.checked) return true
+        const current=decolog.net.durableSerialGrantForQso(), selected=root.experimentalSelection
+        return !!selected.serial && current.serial===selected.serial && current.scope===selected.scope && current.authority===selected.authority && current.requester===selected.requester && current.requestId===selected.requestId
+    }
+    function sendContestMacro(index,direct) {
+        if (!selectedGrantCurrent()) { message.text=qsTr("The selected serial grant changed; review it before transmitting."); return }
+        if (direct) decolog.rig.sendMacro(index,cwPanel.cwContext()); else decolog.functionKey(index,cwPanel.cwContext())
+    }
+    function probeExperimentalSerial() {
+        useExperimentalSerial.checked=true
+        const macro=cwPanel.cwContext().nr, saved=root.experimentalSelection
+        root.experimentalSelection=Object.assign({},saved,{serial:11})
+        root.sendContestMacro(0,false)
+        const staleRejected=message.text.indexOf("selected serial grant changed")>=0
+        root.experimentalSelection=saved; callField.text="K1CONTEST"; rcvdNr.text="5"; root.logQso()
+        return {macro:macro,staleRejected:staleRejected,error:message.text}
+    }
 
     property string band: ""
     property string mode: ""
@@ -465,7 +486,7 @@ RoundedWindow {
             call: call, date: now.date, time: now.time,
             band: root.band, mode: root.mode,
             rst_sent: sentRst.text, rst_rcvd: rcvdRst.text,
-            srx: rcvdNr.text
+            srx: rcvdNr.text, experimental_serial:useExperimentalSerial.checked, experimental_serial_grant:root.experimentalSelection
         })
         // Lo scambio storto non ferma il QSO — la stazione e' gia' passata — ma
         // si dice, cosi' si corregge adesso invece che a spoglio fatto.
@@ -475,6 +496,7 @@ RoundedWindow {
             message.text = error
             return
         }
+        useExperimentalSerial.checked=false
         root.clearEntry()
     }
 
@@ -527,7 +549,7 @@ RoundedWindow {
             }
             Text {
                 visible: root.running
-                text: "· " + (root.session.elapsed || "") + " · " + qsTr("next number %1").arg(root.session.nextSerial || 1)
+                text: "· " + (root.session.elapsed || "") + " · " + qsTr("next number %1").arg(root.serialForExchange() || qsTr("Unavailable"))
                 color: Theme.textSecondary
                 font.pixelSize: 12
             }
@@ -651,7 +673,7 @@ RoundedWindow {
                         Layout.preferredWidth: 90
                         fieldHeight: 38
                         readOnly: true
-                        text: root.session.serialEnabled ? String(root.session.nextSerial || 1) : "—"
+                        text: root.session.serialEnabled ? (root.serialForExchange() || qsTr("Unavailable")) : "—"
                     }
                 }
                 LabeledField {
@@ -695,6 +717,18 @@ RoundedWindow {
             }
         }
 
+        CheckBox {
+            id:useExperimentalSerial
+            Layout.fillWidth:true
+            visible:root.session.serialEnabled && (decolog.net.durableSerialStatus || "").length>0
+            property var shownGrant: checked ? root.experimentalSelection : root.experimentalGrant
+            onCheckedChanged:root.experimentalSelection=checked ? Object.assign({},root.experimentalGrant) : ({})
+            text:shownGrant.serial ? qsTr("Use experimental serial %1 · scope %2 · authority %3").arg(shownGrant.serial).arg(shownGrant.scope).arg(shownGrant.authority) : qsTr("Use experimental serial: no grant available")
+            contentItem:Text { text:useExperimentalSerial.text; color:Theme.warningColor; wrapMode:Text.WordWrap; leftPadding:useExperimentalSerial.indicator.width+6 }
+        }
+        Text { Layout.fillWidth:true; visible:useExperimentalSerial.visible && useExperimentalSerial.checked; color:Theme.warningColor; wrapMode:Text.WordWrap; font.pixelSize:11
+            text:qsTr("UDP IDs are unauthenticated; multiple authorities can issue the same number. Verify before transmitting.") }
+
         //  Macro CW: il manipolatore lo fa la radio, via Hamlib.
         GlassPanel {
             id: cwPanel
@@ -709,7 +743,7 @@ RoundedWindow {
                 return {
                     call: callField.text.trim(),
                     rst: sentRst.text.trim(),
-                    nr: root.session.serialEnabled ? String(root.session.nextSerial || 1) : "",
+                    nr: root.session.serialEnabled ? root.serialForExchange() : "",
                     exch: rcvdNr.text.trim()
                 }
             }
@@ -762,7 +796,7 @@ RoundedWindow {
                             fontPixelSize: 12
                             sendEnabled: (decolog.rig.connected || decolog.rig.keyerOn) && decolog.rig.canKeyCw
                             tone: decolog.rig.activeMacroIndex === index ? Theme.accentColor : "transparent"
-                            onSendRequested: (i) => decolog.rig.sendMacro(i, cwPanel.cwContext())
+                            onSendRequested: (i) => root.sendContestMacro(i,true)
                             onEditRequested: (i) => oneMacroEditor.openFor(i)
                         }
                     }
@@ -805,7 +839,7 @@ RoundedWindow {
                 Shortcut {
                     sequence: "F" + (index + 1)
                     enabled: decolog.rig.enabled && decolog.rig.connected && decolog.rig.canKeyCw
-                    onActivated: decolog.functionKey(index, cwPanel.cwContext())
+                    onActivated: root.sendContestMacro(index,false)
                 }
             }
         }

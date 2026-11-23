@@ -69,6 +69,22 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void contestSerialEntryUsesSelectedGrant_data()
+    {
+        QTest::addColumn<QString>("probe");
+        QTest::newRow("contest desk") << QStringLiteral("contestserialpanelprobe");
+        QTest::newRow("contest window") << QStringLiteral("contestserialwindowprobe");
+    }
+    void contestSerialEntryUsesSelectedGrant()
+    {
+        using namespace decolog::core; QFETCH(QString,probe); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings s(iniPath(dir),QSettings::IniFormat); s.setValue("net/id","client-a"); s.setValue("net/enabled",false); s.sync(); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QVERIFY(db.beginContestSerialRequest("event","client-a","req","authority",10).ok); QVERIFY(db.acceptContestSerialGrant("event","client-a","req","authority",10).ok); }
+        QByteArray output; QVERIFY2(launch(dir,probe,output,4000),output.constData());
+        QVERIFY2(output.contains("\"macro\":\"10\"") && output.contains("\"staleRejected\":true") && output.contains("\"error\":\"\""),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto grant=db.contestSerialRequest("event","client-a","req"); QCOMPARE(grant.state,QString("consumed"));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,uuid FROM qso WHERE call='K1CONTEST'")); QVERIFY(q.next()); const auto record=db.record(q.value(0).toLongLong()); QVERIFY(record); QCOMPARE(record->value("STX"),QString("10")); QCOMPARE(q.value(1).toString(),grant.useId);
+    }
     void experimentalSerialGrantIsBoundByManualQso()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
