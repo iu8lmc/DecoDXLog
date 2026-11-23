@@ -62,6 +62,17 @@ DialogFrame {
         activationReview.applyDraft(); root.save()
         console.warn("PROBE activation assignment saved " + (root.field("APP_DECOLOG_ACTIVATION_UUID") === "tracked-session" && !errorText.text))
     }
+    function probeActivationPagination() {
+        root.openActivationReview()
+        console.warn("PROBE activation page first " + activationReview.sessionRows.length + " next=" + activationNextPage.enabled)
+        activationNextPage.clicked()
+        console.warn("PROBE activation page second " + activationReview.sessionRows.length + " next=" + activationNextPage.enabled)
+        sessionChoice.activated(activationReview.sessionRows.length-1)
+        activationPreviousPage.clicked()
+        console.warn("PROBE activation page retained " + activationReview.selectedUuid + " page=" + activationReview.page)
+        activationReview.applyDraft(); root.save()
+        console.warn("PROBE activation page saved " + root.field("APP_DECOLOG_ACTIVATION_UUID") + " error=" + errorText.text)
+    }
 
     title: qsTr("QSO detail")
     dotColor: Theme.primaryColor
@@ -239,9 +250,9 @@ DialogFrame {
             ComboBox { id: sessionChoice; Layout.fillWidth: true; model: activationReview.sessionRows; textRole: "label"
                 onActivated: { activationReview.selectedUuid = activationReview.sessionRows[index].uuid; if (activationReview.selectedUuid) removeActivationLink.checked=false } }
             RowLayout {
-                GlassButton { text: qsTr("Previous sessions"); enabled: activationReview.page > 0; onClicked: { activationReview.page--; activationReview.loadSessions() } }
+                GlassButton { id: activationPreviousPage; text: qsTr("Previous sessions"); enabled: activationReview.page > 0; onClicked: { activationReview.page--; activationReview.loadSessions() } }
                 Text { text: qsTr("Page %1").arg(activationReview.page + 1); color: Theme.textSecondary }
-                GlassButton { text: qsTr("Next sessions"); enabled: activationReview.hasNextPage; onClicked: {
+                GlassButton { id: activationNextPage; text: qsTr("Next sessions"); enabled: activationReview.hasNextPage; onClicked: {
                     const rows=activationReview.sessionRows; const cursors=activationReview.cursors.slice(); cursors[activationReview.page+1]=rows[rows.length-1].rowid
                     activationReview.cursors=cursors; activationReview.page++; activationReview.loadSessions()
                 } }

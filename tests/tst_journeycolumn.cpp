@@ -1266,6 +1266,18 @@ private slots:
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso);
         QCOMPARE(qso->value("APP_DECOLOG_ACTIVATION_UUID"),QString("tracked-session")); QCOMPARE(qso->value("MY_POTA_REF"),QString("IT-0002")); QVERIFY(qso->value("APP_DECOLOG_ACTIVATION_REVIEW").isEmpty());
     }
+    void recoveredActivationAssignmentAcrossSessionPages()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.prepare("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES(?, '2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')"));
+          for (int i=0;i<105;++i) { q.bindValue(0,QString("session-%1").arg(i,3,10,QLatin1Char('0'))); QVERIFY(q.exec()); } }
+        QByteArray output; QVERIFY2(launch(dir,"activationpageprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE activation page first 101 next=true") && output.contains("PROBE activation page second 6 next=false") && output.contains("PROBE activation page retained session-000 page=0") && output.contains("PROBE activation page saved session-000 error="),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso); QCOMPARE(qso->value("APP_DECOLOG_ACTIVATION_UUID"),QString("session-000"));
+    }
     void recoveredRecordsUseTheirJournalPeriod()
     {
         using namespace decolog::core;

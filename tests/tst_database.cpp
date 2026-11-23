@@ -679,6 +679,16 @@ private slots:
         draft.set("APP_DECOLOG_ACTIVATION_UUID","tracked-session"); QCOMPARE(db.updateQsoGuarded(inserted.id,draft,-1,meta->uuid,meta->revision,{"APP_DECOLOG_ACTIVATION_UUID"}).status,InsertResult::Status::Inserted);
         QCOMPARE(db.record(inserted.id)->value("APP_DECOLOG_ACTIVATION_UUID"),QString("tracked-session"));
     }
+    void guardedActivationAssignmentRejectsDeletedSession()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase editor, other; const auto path=dir.filePath("log.sqlite"); QVERIFY(editor.open(path)); QVERIFY(other.open(path));
+        const auto inserted=editor.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true); QVERIFY(inserted.id>0);
+        QSqlQuery q(other.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,initial_json,last_json) VALUES('disappearing','2026-11-01T00:00:00Z','{}','{}')"));
+        auto draft=*editor.record(inserted.id); const auto before=editor.meta(inserted.id); QVERIFY(before); draft.set("APP_DECOLOG_ACTIVATION_UUID","disappearing");
+        QVERIFY(q.exec("DELETE FROM activation_run WHERE uuid='disappearing'"));
+        QCOMPARE(editor.updateQsoGuarded(inserted.id,draft,-1,before->uuid,before->revision,{"APP_DECOLOG_ACTIVATION_UUID"}).status,InsertResult::Status::Error);
+        QVERIFY(editor.record(inserted.id)->value("APP_DECOLOG_ACTIVATION_UUID").isEmpty()); QCOMPARE(editor.meta(inserted.id)->revision,before->revision);
+    }
     void ocrAcquisitionJournalExistsWithoutCreatingQsos()
     {
         LogDatabase db;
