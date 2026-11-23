@@ -59,6 +59,19 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void qslPlannerDesktopShowsBenefitsAndInvalidation()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1PAA"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"},{"QSL_VIA","M0ABC"}},"import").id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"qslplanprobe",output,7000),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan status 2 potential benefits · 1 candidate QSO"),output.constData());
+        QVERIFY2(output.contains("K1PAA") && output.contains("M0ABC"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan row K1PAA") && output.contains("DXCC 291"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan stale true"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+    }
     void recoveredRecordsUseTheirJournalPeriod()
     {
         using namespace decolog::core;

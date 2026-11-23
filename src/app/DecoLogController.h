@@ -229,6 +229,8 @@ class DecoLogController : public QObject {
     Q_PROPERTY(bool awardCount60m READ awardCount60m WRITE setAwardCount60m NOTIFY awardsChanged)
     Q_PROPERTY(int awardProfile READ awardProfile WRITE setAwardProfile NOTIFY awardsChanged)
     Q_PROPERTY(QString awardTag READ awardTag WRITE setAwardTag NOTIFY awardsChanged)
+    Q_PROPERTY(QVariantMap qslPlan READ qslPlan NOTIFY qslPlanChanged)
+    Q_PROPERTY(bool qslPlanBusy READ qslPlanBusy NOTIFY qslPlanChanged)
 
     // ── Callbook (QRZ.com / HamQTH) ────────────────────────────────────────
     Q_PROPERTY(QString callbookProvider READ callbookProvider WRITE setCallbookProvider NOTIFY callbookChanged)
@@ -518,6 +520,9 @@ public:
     void setAwardProfile(int profileId);
     QString awardTag() const { return m_awardFilter.tag; }
     void setAwardTag(const QString& tag);
+    QVariantMap qslPlan() const { return m_qslPlan; }
+    bool qslPlanBusy() const { return m_qslPlanBusy; }
+    Q_INVOKABLE void buildQslPlan(const QStringList& goals);
     // Gli elementi di un award per la tabella. `view`: "all", "unconfirmed" o
     // "missing" (quelli mai lavorati, per gli award con un elenco chiuso).
     Q_INVOKABLE QVariantList awardItems(const QString& awardId, const QString& search, const QString& view) const;
@@ -862,6 +867,7 @@ signals:
     void damagedFieldCountChanged();
     void dxccBatchFinished(bool historical, int changed, int failed);
     void awardsChanged();
+    void qslPlanChanged();
     void decoLinkChanged();
     void hamHubLinkChanged();
     void uiLanguageChanged();
@@ -991,6 +997,9 @@ private:
     core::CallbookProfileVerifier m_hamqthProfile{core::CallbookClient::Provider::HamQth};
     QSet<QString> m_primaryProfileAttempted;
     core::AwardFilter m_awardFilter;
+    QVariantMap m_qslPlan;
+    bool m_qslPlanBusy{false};
+    quint64 m_qslPlanGeneration{0};
     core::DecoLinkServer m_decoLink;
     core::DecoPortLogServer m_hamHubLink;
     bool      m_hamHubLinkEnabled{true};

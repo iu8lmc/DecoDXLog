@@ -25,5 +25,6 @@ struct Plan {
 };
 // Recomputed on demand from a read snapshot. The result is a potential plan;
 // it does not send requests, estimate success, or assert official eligibility.
-Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>& goals);
+Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>& goals,
+           const AwardCalculator& calculator = AwardCalculator{});
 }

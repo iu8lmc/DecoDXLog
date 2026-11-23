@@ -44,6 +44,115 @@ DialogFrame {
     property string vuccSite: ""
     property int vuccTarget: 100
     property var vuccResult: ({})
+    property var plannerGoals: ["dxcc"]
+    property bool plannerSelectionDirty: false
+
+    function togglePlannerGoal(id, enabled) {
+        let selected = plannerGoals.slice()
+        const at = selected.indexOf(id)
+        if (enabled && at < 0) selected.push(id)
+        if (!enabled && at >= 0) selected.splice(at, 1)
+        plannerGoals = selected
+        plannerSelectionDirty = true
+    }
+
+    function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
+    Timer {
+        id: plannerProbeStart; interval: 1000
+        onTriggered: { openPlannerButton.clicked(); root.plannerGoals = ["dxcc", "waz"]; root.plannerSelectionDirty = false; buildPlannerButton.clicked(); plannerProbeCheck.start() }
+    }
+    Timer {
+        id: plannerProbeCheck; interval: 100; repeat: true; property int tries: 0
+        onTriggered: {
+            if (decolog.qslPlanBusy && ++tries < 80) return
+            stop()
+            const plan = decolog.qslPlan
+            console.warn("PROBE qslplan " + JSON.stringify(plan))
+            console.warn("PROBE qslplan status " + qslPlanStatus.text)
+            const first = qslPlanCandidates.itemAtIndex(0)
+            console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
+            decolog.awardBand = "40m"
+            console.warn("PROBE qslplan stale " + decolog.qslPlan.stale)
+        }
+    }
+
+    DialogFrame {
+        id: qslPlanner
+        objectName: "qslPlannerWindow"
+        transientParent: root
+        title: qsTr("Potential QSL plan")
+        info: qsTr("Review before requesting; no messages are sent")
+        dialogKey: "qslPlanner"
+        width: 960; height: 650
+        body: ColumnLayout {
+            spacing: 8
+            Text {
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("Uses the current award filters and locally configured rules. Benefits are estimates, not official credits. Rebuild after changes.")
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                ScrollView {
+                    Layout.fillWidth: true; Layout.preferredHeight: 95; clip: true
+                    Flow {
+                        width: qslPlanner.width - 50; spacing: 6
+                        Repeater {
+                            model: root.summary
+                            CheckBox {
+                                required property var modelData
+                                text: modelData.title; checked: root.plannerGoals.indexOf(modelData.id) >= 0
+                                onToggled: root.togglePlannerGoal(modelData.id, checked)
+                            }
+                        }
+                    }
+                }
+                GlassButton {
+                    id: buildPlannerButton
+                    objectName: "buildQslPlanButton"
+                    text: decolog.qslPlanBusy ? qsTr("Calculating…") : qsTr("Build plan")
+                    enabled: !decolog.qslPlanBusy && root.plannerGoals.length > 0
+                    onClicked: { root.plannerSelectionDirty = false; decolog.buildQslPlan(root.plannerGoals) }
+                }
+            }
+            Text {
+                id: qslPlanStatus
+                objectName: "qslPlanStatus"
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: decolog.qslPlanBusy ? qsTr("Calculating from a log snapshot…")
+                      : (decolog.qslPlan.stale || root.plannerSelectionDirty) ? qsTr("The log or award settings changed. Rebuild the plan.")
+                      : decolog.qslPlan.error ? decolog.qslPlan.error
+                      : decolog.qslPlan.candidates ? qsTr("%1 potential benefits · %2 candidate QSO")
+                          .arg(decolog.qslPlan.uniqueBenefits).arg(decolog.qslPlan.candidates.length)
+                      : qsTr("Select awards and build a plan.")
+            }
+            ListView {
+                id: qslPlanCandidates
+                objectName: "qslPlanCandidates"
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 4
+                model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.candidates || [])
+                delegate: Rectangle {
+                    required property var modelData
+                    readonly property string probeText: candidateHeading.text + " " + candidateBenefits.text
+                    width: ListView.view.width; height: row.implicitHeight + 14; radius: 4
+                    color: Theme.glassOverlay; border.color: Theme.borderSoft
+                    ColumnLayout {
+                        id: row; anchors.fill: parent; anchors.margins: 7
+                        Text { id: candidateHeading; Layout.fillWidth: true; color: Theme.textPrimary; font.bold: true
+                            text: modelData.call + "  #" + modelData.id + "  ·  " + (modelData.manager || qsTr("manager unknown")) }
+                        Text { id: candidateBenefits; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                            text: modelData.benefits.map(b => b.award.toUpperCase() + " " + b.key + " [" + b.services.join(", ") + "]").join(" · ") }
+                        Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                            text: qsTr("Alternatives: %1 · pending: %2 · route source: %3 · observed: %4 · cost unknown")
+                                .arg(modelData.alternatives.join(", ") || qsTr("none"))
+                                .arg(modelData.pending.join(", ") || qsTr("none recorded"))
+                                .arg(modelData.managerSource || qsTr("unknown"))
+                                .arg(modelData.managerObservedAt || qsTr("unknown")) }
+                        GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
+                    }
+                }
+            }
+        }
+    }
 
     function toggleQso(id) {
         if (!id || id <= 0) return
@@ -225,6 +334,7 @@ DialogFrame {
                     tone: Theme.primaryColor
                 }
                 Item { Layout.fillWidth: true }
+                GlassButton { id: openPlannerButton; objectName: "openQslPlannerButton"; text: qsTr("QSL plan"); onClicked: qslPlanner.open() }
                 StyledComboBox {
                     visible: !root.mapView
                     Layout.preferredWidth: 150

@@ -6,6 +6,7 @@
 #include "core/Performance.h"
 #include "core/CloudSettings.h"
 #include "core/QslUpload.h"
+#include "core/QslPlanner.h"
 #include "core/ClubLogCtyRequest.h"
 #include "core/ClubLogAccessGuard.h"
 #include "core/LogMigration.h"
@@ -217,6 +218,15 @@ DecoLogController::DecoLogController(QObject* parent)
     : QObject(parent)
 {
     m_activityModel = new ActivityModel(kMaxActivity, this);
+    auto invalidateQslPlan = [this] {
+        if (!m_qslPlanBusy && m_qslPlan.isEmpty()) return;
+        ++m_qslPlanGeneration;
+        m_qslPlanBusy = false;
+        m_qslPlan.insert(QStringLiteral("stale"), true);
+        emit qslPlanChanged();
+    };
+    connect(this, &DecoLogController::awardsChanged, this, invalidateQslPlan);
+    connect(this, &DecoLogController::logChanged, this, invalidateQslPlan);
     m_traffic = new TrafficMonitor(&m_udp, &m_decoLink, this);
     // I conteggi si rifanno un attimo dopo che il log e' cambiato, non mentre
     // si registra: una raffica di QSO costa un conteggio solo.
@@ -2241,6 +2251,50 @@ AwardCalculator DecoLogController::awardCalculator(const QHash<int, QString>& na
         calc.setDxccRules(rules);
     }
     return calc;
+}
+
+void DecoLogController::buildQslPlan(const QStringList& requested)
+{
+    const QSet<QString> goals(requested.cbegin(), requested.cend());
+    if (goals.isEmpty() || !m_db.isOpen() || m_db.path().isEmpty() || m_db.path() == QLatin1String(":memory:")) {
+        m_qslPlan = {{QStringLiteral("error"), tr("Choose at least one award and open a log")}};
+        m_qslPlanBusy = false; ++m_qslPlanGeneration; emit qslPlanChanged(); return;
+    }
+    const QString path=m_db.path(); const AwardFilter filter=m_awardFilter;
+    QHash<int, QString> names;
+    for (const auto& entity : m_countries.entities()) names.insert(entity.dxcc,entity.name);
+    const AwardCalculator calc=awardCalculator(names);
+    const quint64 generation=++m_qslPlanGeneration;
+    m_qslPlan.clear(); m_qslPlanBusy=true; emit qslPlanChanged();
+    QPointer<DecoLogController> self(this);
+    m_statsPool.start([self,path,filter,goals,calc,generation] {
+        LogDatabase db; qslplanner::Plan plan;
+        if (!db.open(path)) plan.error=db.lastError();
+        else plan=qslplanner::build(db,filter,goals,calc);
+        QVariantList rows;
+        for (const auto& candidate : plan.candidates) {
+            QVariantList benefits;
+            for (const auto& benefit : candidate.benefits)
+                benefits << QVariantMap{{QStringLiteral("award"),benefit.award},{QStringLiteral("key"),benefit.key},{QStringLiteral("services"),benefit.acceptedServices}};
+            QVariantList alternatives;
+            QList<qint64> ids=candidate.alternativeQsoIds.values(); std::sort(ids.begin(),ids.end());
+            for (qint64 id : ids) alternatives << id;
+            rows << QVariantMap{{QStringLiteral("id"),candidate.qsoId},{QStringLiteral("call"),candidate.call},
+                {QStringLiteral("manager"),candidate.manager},{QStringLiteral("managerSource"),candidate.managerSource},
+                {QStringLiteral("managerObservedAt"),candidate.managerObservedAt.toString(Qt::ISODate)},
+                {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("benefits"),benefits},
+                {QStringLiteral("alternatives"),alternatives}};
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,generation,plan,rows] {
+            if (!self || generation!=self->m_qslPlanGeneration) return;
+            self->m_qslPlanBusy=false;
+            if (self->m_db.path()!=path) self->m_qslPlan={{QStringLiteral("stale"),true}};
+            else self->m_qslPlan={{QStringLiteral("error"),plan.error},{QStringLiteral("uniqueBenefits"),plan.uniqueBenefits},
+                                 {QStringLiteral("candidates"),rows},{QStringLiteral("stale"),false}};
+            emit self->qslPlanChanged();
+        },Qt::QueuedConnection);
+    });
 }
 
 void DecoLogController::loadClubLogCty()

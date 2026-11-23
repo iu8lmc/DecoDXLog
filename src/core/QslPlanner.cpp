@@ -4,19 +4,19 @@
 #include <algorithm>
 
 namespace decolog::core::qslplanner {
-Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>& goals)
+Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>& goals,
+           const AwardCalculator& calculator)
 {
     Plan result;
     if (!db.isOpen()) { result.error=QStringLiteral("Log is not open"); return result; }
-    // Construct the set from a single list: its iterators must share a lifetime.
-    const QStringList ids=AwardCalculator::awardIds();
-    const QSet<QString> allowed(ids.cbegin(),ids.cend());
-    for (const QString& goal : goals) if (!allowed.contains(goal)) { result.error=QStringLiteral("Unknown award: ")+goal; return result; }
     QSqlQuery savepoint(db.connection());
     if (!savepoint.exec(QStringLiteral("SAVEPOINT qsl_planner_read"))) { result.error=savepoint.lastError().text(); return result; }
     struct Scope { QSqlDatabase db; ~Scope() { QSqlQuery q(db); q.exec(QStringLiteral("RELEASE SAVEPOINT qsl_planner_read")); } } scope{db.connection()};
     AwardContributions contributions; contributions.awards=goals;
-    const auto results=AwardCalculator{}.compute(db,filter,&contributions);
+    const auto results=calculator.compute(db,filter,&contributions);
+    QSet<QString> available;
+    for (const auto& award : results) available.insert(award.id);
+    for (const QString& goal : goals) if (!available.contains(goal)) { result.error=QStringLiteral("Unknown award: ")+goal; return result; }
     QHash<qint64,Candidate> candidates;
     for (const auto& award : results) {
         if (!goals.contains(award.id)) continue;

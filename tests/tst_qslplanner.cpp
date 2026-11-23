@@ -5,6 +5,21 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void configuredAwardRulesAreUsed()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto insert=[&](const char* call, const char* dxcc) {
+            return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC",dxcc},{"CQZ","5"}},"import").id;
+        };
+        const qint64 valid=insert("K1AAA","291"), deleted=insert("K1BBB","110"); QVERIFY(valid>0 && deleted>0);
+        AwardCalculator calculator; calculator.setDxccRules({{},[](int dxcc) { return dxcc==110; }});
+        const auto package=awards::AwardRulePackage::fromJson(R"({"format":"decodxlog-award-rule-1","id":"test_local","title":"Local","source":"fixture","version":"1","validFrom":"2026-01-01","validTo":"2026-12-31","keyField":"DXCC","target":1})");
+        QVERIFY(package.has_value()); calculator.setRulePackages({*package});
+        const auto plan=qslplanner::build(db,{}, {"dxcc","test_local"},calculator);
+        QVERIFY2(plan.error.isEmpty(),qPrintable(plan.error)); QCOMPARE(plan.uniqueBenefits,3);
+        QCOMPARE(plan.candidates.size(),2); QCOMPARE(plan.candidates[0].benefits.size(),2);
+        QCOMPARE(plan.candidates[1].benefits.size(),1); QCOMPARE(plan.candidates[1].benefits.first().award,QString("test_local"));
+    }
     void alternativesAndConfirmationRebuild()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
