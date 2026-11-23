@@ -21,6 +21,7 @@ QByteArray reason(int status)
     case 201: return "Created";
     case 400: return "Bad Request";
     case 401: return "Unauthorized";
+    case 403: return "Forbidden";
     case 404: return "Not Found";
     case 405: return "Method Not Allowed";
     case 409: return "Conflict";
@@ -122,17 +123,24 @@ quint16 LocalApiServer::port() const
     return m_server ? m_server->serverPort() : 0;
 }
 
-bool LocalApiServer::authorized(const HttpRequest& request) const
+LocalApiServer::Access LocalApiServer::accessFor(const HttpRequest& request) const
 {
-    if (m_token.isEmpty())
-        return false;
     QByteArray given = request.headers.value("x-decodxlog-token");
     const QByteArray auth = request.headers.value("authorization");
     if (given.isEmpty() && auth.startsWith("Bearer "))
         given = auth.mid(7).trimmed();
     if (given.isEmpty())
         given = request.query.queryItemValue(QStringLiteral("token")).toLatin1();
-    return sameSecret(given, m_token.toLatin1());
+    if (given.isEmpty()) return Access::None;
+    const bool full = !m_token.isEmpty() && sameSecret(given, m_token.toLatin1());
+    const bool read = !m_readOnlyToken.isEmpty() && sameSecret(given, m_readOnlyToken.toLatin1());
+    if (full && read) return Access::None;
+    return full ? Access::Full : read ? Access::ReadOnly : Access::None;
+}
+
+bool LocalApiServer::authorized(const HttpRequest& request) const
+{
+    return accessFor(request) != Access::None;
 }
 
 void LocalApiServer::readFrom(QTcpSocket* socket)
@@ -200,9 +208,21 @@ void LocalApiServer::readFrom(QTcpSocket* socket)
         return;   // il resto del corpo arriva dopo
     request.body = buffer.mid(end + 4, length);
 
-    if (!authorized(request)) {
+    const Access access = accessFor(request);
+    if (access == Access::None) {
         answer(socket, HttpResponse::error(401, QStringLiteral("missing or wrong token")));
         return;
+    }
+    if (access == Access::ReadOnly) {
+        const QString path = request.path.endsWith(QLatin1Char('/')) ? request.path.chopped(1) : request.path;
+        const bool permitted = request.method == "GET" &&
+            (path == QLatin1String("/api/v1/capabilities") || path == QLatin1String("/api/v1/status") ||
+             path == QLatin1String("/api/v1/worked") || path == QLatin1String("/api/v1/qsos"));
+        if (!permitted) {
+            answer(socket, HttpResponse::error(403, QStringLiteral("read-only token")));
+            return;
+        }
+        request.readOnly = true;
     }
     answer(socket, m_handler ? m_handler(request) : HttpResponse::error(503, QStringLiteral("not ready")));
 }

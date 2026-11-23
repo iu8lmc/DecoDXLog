@@ -142,6 +142,23 @@ private slots:
         QVERIFY2(response.startsWith("HTTP/1.1 400"),response.constData());
     }
 
+    void readOnlyCredentialCannotWrite()
+    {
+        const QString readToken=LocalApiServer::newToken();
+        m_server.setReadOnlyToken(readToken);
+        const QList<QPair<QByteArray,QByteArray>> header{{"X-DecoDXLog-Token",readToken.toLatin1()}};
+        QCOMPARE(call(m_net,"GET",base("/api/v1/status"),{},header).status,200);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qso"),{},header).status,403);
+        QCOMPARE(call(m_net,"POST",base("/api/v1/qso"),"<EOR>",header).status,403);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/unknown"),{},header).status,403);
+        QCOMPARE(call(m_net,"POST",base("/api/v1/qso"),"<EOR>",{{"X-DecoDXLog-Token",m_token.toLatin1()}}).status,200);
+        m_server.setReadOnlyToken({});
+        QCOMPARE(call(m_net,"GET",base("/api/v1/status"),{},header).status,401);
+        m_server.setReadOnlyToken(m_token);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/status"),{},{{"X-DecoDXLog-Token",m_token.toLatin1()}}).status,401);
+        m_server.setReadOnlyToken({});
+    }
+
     void noKeyNoServer()
     {
         // Senza chiave anche con la chiave vuota si risponde 401.

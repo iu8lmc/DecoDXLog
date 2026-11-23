@@ -133,6 +133,7 @@ class DecoLogController : public QObject {
     // L'interfaccia HTTP locale per altri programmi (solo 127.0.0.1, con chiave).
     Q_PROPERTY(int apiPort READ apiPort WRITE setApiPort NOTIFY udpChanged)
     Q_PROPERTY(QString apiToken READ apiToken NOTIFY udpChanged)
+    Q_PROPERTY(QString apiReadOnlyToken READ apiReadOnlyToken NOTIFY udpChanged)
     Q_PROPERTY(bool apiListening READ apiListening NOTIFY udpChanged)
     Q_PROPERTY(QString apiError READ apiError NOTIFY udpChanged)
     Q_PROPERTY(bool preferLoggedAdif READ preferLoggedAdif WRITE setPreferLoggedAdif NOTIFY udpChanged)
@@ -390,10 +391,13 @@ public:
     int apiPort() const { return m_apiPort; }
     void setApiPort(int port);
     QString apiToken() const { return m_apiToken; }
+    QString apiReadOnlyToken() const { return m_apiReadOnlyToken; }
     bool apiListening() const { return m_api.isListening(); }
     QString apiError() const { return m_api.lastError(); }
     // Una chiave nuova: i programmi che usavano la vecchia vanno aggiornati.
     Q_INVOKABLE void newApiToken();
+    Q_INVOKABLE void newApiReadOnlyToken();
+    Q_INVOKABLE void revokeApiReadOnlyToken();
     void startApi();
     void setMulticastGroup(const QString& group);
     bool preferLoggedAdif() const { return m_udp.prefersLoggedAdif(); }
@@ -1210,6 +1214,7 @@ private:
     core::LocalApiServer m_api;
     int       m_apiPort{0};
     QString   m_apiToken;
+    QString   m_apiReadOnlyToken;
     void onN1mmReplaced(const core::AdifRecord& record, const QString& id);
     void onN1mmDeleted(const QString& id, const core::AdifRecord& record);
     QString   m_udpForwardError;

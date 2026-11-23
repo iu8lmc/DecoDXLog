@@ -241,6 +241,7 @@ private slots:
             probe.close();
             ini.setValue(QStringLiteral("api/port"), m_apiPort);
             ini.setValue(QStringLiteral("api/token"), QStringLiteral("0123456789abcdef0123456789abcdef"));
+            ini.setValue(QStringLiteral("api/readOnlyToken"), QStringLiteral("fedcba9876543210fedcba9876543210"));
             ini.setValue(QStringLiteral("watch/files"),
                          QVariantList{QVariantMap{{QStringLiteral("path"), QDir::fromNativeSeparators(fldigiLog)},
                                                   {QStringLiteral("label"), QStringLiteral("fldigi")},
@@ -508,6 +509,21 @@ private slots:
         QVERIFY(!capabilities.second.value("perExtensionPermissions").toBool());
         QVERIFY(!capabilities.second.value("durableAtomicIdempotency").toBool());
 
+        auto readRequest = [&](const QByteArray& method, const QString& path) {
+            QNetworkRequest r(QUrl(QStringLiteral("http://127.0.0.1:%1%2").arg(m_apiPort).arg(path)));
+            r.setRawHeader("X-DecoDXLog-Token", "fedcba9876543210fedcba9876543210");
+            QNetworkReply* reply=net.sendCustomRequest(r,method,"<CALL:5>W1BAD<EOR>");
+            QSignalSpy done(reply,&QNetworkReply::finished); done.wait(5000);
+            const auto status=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const auto json=QJsonDocument::fromJson(reply->readAll()).object(); reply->deleteLater();
+            return std::pair{status,json};
+        };
+        const auto readCaps=readRequest("GET",QStringLiteral("/api/v1/capabilities"));
+        QCOMPARE(readCaps.first,200); QCOMPARE(readCaps.second.value("permissionModel").toString(),QString("read-only-token"));
+        QVERIFY(!readCaps.second.value("operations").toArray().contains("qso.write"));
+        QCOMPARE(readRequest("GET",QStringLiteral("/api/v1/qsos")).first,200);
+        QCOMPARE(readRequest("POST",QStringLiteral("/api/v1/qso")).first,403);
+        QCOMPARE(countCall(QStringLiteral("W1BAD")),0);
         // Senza chiave, niente.
         QNetworkReply* anonymous = net.get(QNetworkRequest(QUrl(QStringLiteral("http://127.0.0.1:%1/api/v1/status").arg(m_apiPort))));
         QSignalSpy done(anonymous, &QNetworkReply::finished);

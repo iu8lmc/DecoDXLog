@@ -294,6 +294,7 @@ DecoLogController::DecoLogController(QObject* parent)
     m_n1mmPort = s.value(QStringLiteral("n1mm/port"), 0).toInt();
     m_apiPort = s.value(QStringLiteral("api/port"), 0).toInt();
     m_apiToken = s.value(QStringLiteral("api/token")).toString();
+    m_apiReadOnlyToken = s.value(QStringLiteral("api/readOnlyToken")).toString();
     connect(&m_n1mm, &N1mmReceiver::contactReceived, this, [this](const AdifRecord& record, const QString&) {
         onQsoReceived(record, QStringLiteral("n1mm"), QStringLiteral("N1MM Logger+"));
     });
@@ -3693,6 +3694,22 @@ void DecoLogController::newApiToken()
     emit udpChanged();
 }
 
+void DecoLogController::newApiReadOnlyToken()
+{
+    do { m_apiReadOnlyToken = LocalApiServer::newToken(); } while (m_apiReadOnlyToken == m_apiToken);
+    QSettings().setValue(QStringLiteral("api/readOnlyToken"), m_apiReadOnlyToken);
+    m_api.setReadOnlyToken(m_apiReadOnlyToken);
+    emit udpChanged();
+}
+
+void DecoLogController::revokeApiReadOnlyToken()
+{
+    m_apiReadOnlyToken.clear();
+    QSettings().remove(QStringLiteral("api/readOnlyToken"));
+    m_api.setReadOnlyToken({});
+    emit udpChanged();
+}
+
 void DecoLogController::startApi()
 {
     if (m_apiPort <= 0) {
@@ -3705,6 +3722,7 @@ void DecoLogController::startApi()
         QSettings().setValue(QStringLiteral("api/token"), m_apiToken);
     }
     m_api.setToken(m_apiToken);
+    m_api.setReadOnlyToken(m_apiReadOnlyToken);
     m_api.setHandler([this](const HttpRequest& r) { return handleApi(r); });
     if (m_api.start(static_cast<quint16>(m_apiPort)))
         addActivity(QStringLiteral("API"), tr("Local interface on http://127.0.0.1:%1/api/v1/").arg(m_apiPort));
@@ -3742,9 +3760,10 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
             return HttpResponse::error(400, QStringLiteral("unsupported API version"));
         return HttpResponse::json(200, QJsonObject{
             {QStringLiteral("apiVersion"), 1},
-            {QStringLiteral("permissionModel"), QStringLiteral("shared-token")},
-            {QStringLiteral("operations"), QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"),
-                                                       QStringLiteral("qso.read"), QStringLiteral("qso.write")}},
+            {QStringLiteral("permissionModel"), request.readOnly ? QStringLiteral("read-only-token") : QStringLiteral("shared-token")},
+            {QStringLiteral("operations"), request.readOnly
+                ? QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read")}
+                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("qso.write")}},
             {QStringLiteral("events"), false},
             {QStringLiteral("txControl"), false},
             {QStringLiteral("perExtensionPermissions"), false},

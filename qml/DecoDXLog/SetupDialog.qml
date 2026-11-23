@@ -800,7 +800,7 @@ DialogFrame {
                         LabeledField {
                             Layout.fillWidth: true
                             visible: decolog.apiToken.length > 0
-                            label: qsTr("Key (X-DecoDXLog-Token)")
+                            label: qsTr("Full access key (can log QSO)")
                             StyledTextField {
                                 Layout.fillWidth: true
                                 readOnly: true
@@ -821,6 +821,17 @@ DialogFrame {
                             tone: decolog.apiPort <= 0 ? Theme.textSecondary
                                 : decolog.apiListening ? Theme.accentColor : Theme.errorColor
                         }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: 12
+                        LabeledField {
+                            Layout.fillWidth: true
+                            visible: decolog.apiReadOnlyToken.length > 0
+                            label: qsTr("Read-only key (cannot log QSO)")
+                            StyledTextField { Layout.fillWidth: true; readOnly: true; selectByMouse: true; text: decolog.apiReadOnlyToken }
+                        }
+                        GlassButton { Layout.alignment: Qt.AlignBottom; text: decolog.apiReadOnlyToken.length ? qsTr("Replace read-only key") : qsTr("Create read-only key"); onClicked: decolog.newApiReadOnlyToken() }
+                        GlassButton { Layout.alignment: Qt.AlignBottom; visible: decolog.apiReadOnlyToken.length > 0; text: qsTr("Revoke"); onClicked: decolog.revokeApiReadOnlyToken() }
                     }
                     Note {
                         text: decolog.apiError.length && decolog.apiPort > 0 ? decolog.apiError

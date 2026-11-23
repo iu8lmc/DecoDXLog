@@ -20,6 +20,18 @@ provare a parlare con `127.0.0.1`, ma non conosce la chiave; e le risposte non h
 intestazioni CORS, quindi il browser non le fa leggere alle pagine. «Nuova chiave»
 ne fa un'altra: i programmi che usavano quella vecchia vanno aggiornati.
 
+## Chiave in sola lettura
+
+Nelle impostazioni dell'interfaccia locale si può creare, sostituire o revocare
+una seconda chiave in sola lettura. Questa consente esclusivamente `GET` di
+`/api/v1/capabilities`, `/status`, `/worked` e `/qsos`; ogni scrittura o altro
+percorso riceve `403`. Si presenta negli stessi tre modi della chiave completa.
+La revoca impedisce nuove richieste con la vecchia chiave. La chiave completa
+preesistente continua a consentire anche l'inserimento di QSO. Le chiavi sono
+conservate nelle impostazioni locali dell'applicazione, non nel portachiavi;
+chi può leggerle può usarle. C'è una sola chiave condivisa di sola lettura, non
+un'identità o una revoca indipendente per ogni estensione.
+
 ## Le richieste
 
 Tutte le risposte sono JSON.
@@ -27,9 +39,9 @@ Tutte le risposte sono JSON.
 ### `GET /api/v1/capabilities?apiVersion=1`
 
 Ritorna la versione del contratto e le operazioni effettivamente disponibili;
-una versione richiesta diversa da `1` produce `400`. Il campo `permissionModel`
-vale `shared-token`: la chiave attuale concede tutte le operazioni elencate,
-compresa la scrittura dei QSO. Non esistono ancora permessi per estensione,
+una versione richiesta diversa da `1` produce `400`. Il campo `permissionModel` vale `shared-token` per la chiave completa e
+`read-only-token` per quella in sola lettura; `operations` riporta soltanto
+le operazioni consentite alla chiave utilizzata. Non esistono ancora permessi per estensione,
 eventi, controllo TX o idempotenza transazionale durevole; i rispettivi campi
 booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
 

@@ -28,6 +28,7 @@ struct HttpRequest {
     QUrlQuery query;
     QHash<QByteArray, QByteArray> headers;   // nomi in minuscolo
     QByteArray body;
+    bool readOnly{false};
 };
 
 struct HttpResponse {
@@ -57,6 +58,7 @@ public:
 
     // Senza chiave il server risponde 401 a tutto: non c'e' un modo "aperto".
     void setToken(const QString& token) { m_token = token; }
+    void setReadOnlyToken(const QString& token) { m_readOnlyToken = token; }
     void setHandler(Handler handler) { m_handler = std::move(handler); }
 
     // Una chiave nuova, 32 caratteri esadecimali casuali.
@@ -69,11 +71,14 @@ signals:
     void listeningChanged();
 
 private:
+    enum class Access { None, ReadOnly, Full };
+    Access accessFor(const HttpRequest& request) const;
     void readFrom(QTcpSocket* socket);
     void answer(QTcpSocket* socket, const HttpResponse& response);
 
     QTcpServer* m_server{nullptr};
     QString m_token;
+    QString m_readOnlyToken;
     Handler m_handler;
     QString m_lastError;
     QHash<QTcpSocket*, QByteArray> m_buffers;
