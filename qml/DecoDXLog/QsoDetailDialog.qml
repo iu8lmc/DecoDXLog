@@ -231,8 +231,8 @@ DialogFrame {
             hasNextPage = runs.length > 100
             const rows = [{label: qsTr("Keep the existing association"), uuid: ""}]
             if (page === 0 && decolog.activation.active && decolog.activation.state.sessionUuid)
-                rows.push({label: qsTr("Active session: %1").arg(decolog.activation.title), uuid: String(decolog.activation.state.sessionUuid), token: decolog.activation.sessionReviewToken(decolog.activation.state.sessionUuid)})
-            for (const run of runs.slice(0,100)) rows.push({label: (run.title || run.uuid) + " · " + run.startedAt + " → " + run.endedAt, uuid: String(run.uuid), token: run.reviewToken, rowid: run.rowid})
+                rows.push({label: qsTr("Active session: %1").arg(decolog.activation.title), uuid: String(decolog.activation.state.sessionUuid), summary: decolog.activation.sessionReviewSummary(decolog.activation.state.sessionUuid)})
+            for (const run of runs.slice(0,100)) rows.push({label: (run.title || run.uuid) + " · " + run.startedAt + " → " + run.endedAt, uuid: String(run.uuid), summary: run.reviewSummary, rowid: run.rowid})
             sessionRows = rows; sessionChoice.currentIndex = 0
         }
         background: Rectangle { color: Theme.panelColor; border.color: Theme.warningColor; radius: 6 }
@@ -256,7 +256,17 @@ DialogFrame {
             CheckBox { id: removeActivationLink; visible: !!root.field("APP_DECOLOG_ACTIVATION_UUID"); text: qsTr("Remove this session association") }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; text: qsTr("Optional: choose a recorded session only after checking its dates and your records. Selection does not prove the QSO belongs to it.") }
             ComboBox { id: sessionChoice; Layout.fillWidth: true; model: activationReview.sessionRows; textRole: "label"
-                onActivated: { activationReview.selectedUuid = activationReview.sessionRows[index].uuid; activationReview.selectedToken = activationReview.sessionRows[index].token || ""; if (activationReview.selectedUuid) removeActivationLink.checked=false } }
+                onActivated: {
+                    const row=activationReview.sessionRows[index]; activationReview.selectedUuid=row.uuid; activationReview.selectedToken=""
+                    if (row.uuid) {
+                        removeActivationLink.checked=false
+                        const current=decolog.activation.sessionReviewTokens(row.uuid)
+                        if (row.summary && current.summary === row.summary) activationReview.selectedToken=current.token || ""
+                        else errorText.text=qsTr("The session could not be checked; reload and review it before saving.")
+                    }
+                } }
+            Text { Layout.fillWidth: true; visible: !!activationReview.selectedUuid && !activationReview.selectedToken; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: qsTr("The session could not be checked; reload and review it before saving.") }
             RowLayout {
                 GlassButton { id: activationPreviousPage; text: qsTr("Previous sessions"); enabled: activationReview.page > 0; onClicked: { activationReview.page--; activationReview.loadSessions() } }
                 Text { text: qsTr("Page %1").arg(activationReview.page + 1); color: Theme.textSecondary }

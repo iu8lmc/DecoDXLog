@@ -908,6 +908,21 @@ QString ActivationController::sessionReviewToken(const QString& uuid) const
 {
     return m_ctx.db && m_ctx.db->isOpen() ? m_ctx.db->activationRunToken(uuid) : QString();
 }
+QString ActivationController::sessionReviewSummary(const QString& uuid) const
+{
+    return m_ctx.db && m_ctx.db->isOpen() ? m_ctx.db->activationRunToken(uuid, false) : QString();
+}
+QVariantMap ActivationController::sessionReviewTokens(const QString& uuid) const
+{
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return {};
+    QSqlDatabase db=m_ctx.db->connection(); QSqlQuery scope(db);
+    if (!scope.exec(QStringLiteral("SAVEPOINT activation_review_tokens"))) return {};
+    const QString summary=m_ctx.db->activationRunToken(uuid,false);
+    const QString token=m_ctx.db->activationRunToken(uuid);
+    QSqlQuery release(db);
+    if (!release.exec(QStringLiteral("RELEASE SAVEPOINT activation_review_tokens")) || summary.isEmpty() || token.isEmpty()) return {};
+    return {{QStringLiteral("summary"),summary},{QStringLiteral("token"),token}};
+}
 
 QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
 {
@@ -924,7 +939,7 @@ QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
         rows << QVariantMap{{QStringLiteral("rowid"), q.value(0)}, {QStringLiteral("uuid"), q.value(1)},
             {QStringLiteral("startedAt"), q.value(2)}, {QStringLiteral("endedAt"), q.value(3)},
             {QStringLiteral("title"), state.value(QStringLiteral("title"))},
-            {QStringLiteral("reviewToken"), m_ctx.db->activationRunToken(q.value(1).toString())}};
+            {QStringLiteral("reviewSummary"), m_ctx.db->activationRunToken(q.value(1).toString(), false)}};
     }
     return rows;
 }

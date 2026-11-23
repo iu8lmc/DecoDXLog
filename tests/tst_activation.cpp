@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QElapsedTimer>
 
 #include <QFile>
 #include <QTemporaryDir>
@@ -23,6 +24,30 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void benchmarkClosedRunHistory()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_ACTIVATION_HISTORY")) QSKIP("Opt-in synthetic benchmark");
+        LogDatabase db; QVERIFY(db.open(":memory:")); QVERIFY(db.connection().transaction()); QSqlQuery run(db.connection()),event(db.connection());
+        QVERIFY(run.prepare("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES(?,'2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')"));
+        QVERIFY(event.prepare("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES(?,'2026-11-01T12:00:00Z','update',?)"));
+        for(int i=0;i<100;++i) { const QString uuid=QString("session-%1").arg(i,3,10,QLatin1Char('0')); run.bindValue(0,uuid); QVERIFY(run.exec());
+            for(int j=0;j<1000;++j) { event.bindValue(0,uuid); event.bindValue(1,QString("{\"note\":\"%1\"}").arg(j)); QVERIFY(event.exec()); } }
+        QVERIFY(db.connection().commit()); ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QElapsedTimer timer; timer.start(); const auto rows=act.closedRuns(); const qint64 listMs=timer.elapsed(); QCOMPARE(rows.size(),100);
+        timer.restart(); const auto token=act.sessionReviewToken("session-000"); const qint64 tokenMs=timer.elapsed(); QVERIFY(!token.isEmpty());
+        qInfo("ACTIVATION_BENCH list_ms=%lld selected_ms=%lld events=100000",static_cast<long long>(listMs),static_cast<long long>(tokenMs));
+    }
+    void sessionReviewSnapshotsDistinguishSummaryAndHistory()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db,other; const auto path=dir.filePath("log.sqlite"); QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        QSqlQuery q(other.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('reviewed','2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')"));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx)); const auto rows=act.closedRuns(); QCOMPARE(rows.size(),1);
+        const auto listed=rows.first().toMap().value("reviewSummary").toString(); QVERIFY(!listed.isEmpty()); const auto before=act.sessionReviewTokens("reviewed"); QCOMPARE(before.value("summary").toString(),listed); QVERIFY(!before.value("token").toString().isEmpty());
+        QVERIFY(q.exec("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES('reviewed','2026-11-01T12:00:00Z','update','{}')")); const auto history=act.sessionReviewTokens("reviewed");
+        QCOMPARE(history.value("summary"),before.value("summary")); QVERIFY(history.value("token")!=before.value("token"));
+        QVERIFY(q.exec("UPDATE activation_run SET ended_at='2026-11-01T14:00:00Z' WHERE uuid='reviewed'")); const auto changed=act.sessionReviewTokens("reviewed"); QVERIFY(changed.value("summary")!=listed);
+        QVERIFY(q.exec("DELETE FROM activation_run_change WHERE session_uuid='reviewed'")); QVERIFY(q.exec("DELETE FROM activation_run WHERE uuid='reviewed'")); QVERIFY(act.sessionReviewTokens("reviewed").isEmpty());
+    }
     void selectedContestFindingsAreReadOnlyAndBoundToLog()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

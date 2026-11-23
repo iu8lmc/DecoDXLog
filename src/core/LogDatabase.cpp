@@ -1419,7 +1419,7 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
     return result;
 }
 
-QString LogDatabase::activationRunToken(const QString& uuid) const
+QString LogDatabase::activationRunToken(const QString& uuid, bool includeHistory) const
 {
     if (uuid.isEmpty()) return {};
     QSqlDatabase db=connection(); QSqlQuery scope(db);
@@ -1430,6 +1430,7 @@ QString LogDatabase::activationRunToken(const QString& uuid) const
     QCryptographicHash hash(QCryptographicHash::Sha256);
     QJsonArray row; for (int i=0;i<5;++i) row.append(QJsonValue::fromVariant(run.value(i)));
     hash.addData(QJsonDocument(row).toJson(QJsonDocument::Compact));
+    if (!includeHistory) return QString::fromLatin1(hash.result().toHex());
     QSqlQuery events(db); events.prepare(QStringLiteral("SELECT id,changed_at,event,state_json FROM activation_run_change WHERE session_uuid=? ORDER BY id")); events.addBindValue(uuid);
     if (!events.exec()) return {};
     while (events.next()) {

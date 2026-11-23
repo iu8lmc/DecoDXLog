@@ -100,6 +100,8 @@ public:
     Q_INVOKABLE bool startRunPartitionPreview(const QString& uuid);
     Q_INVOKABLE QVariantList closedRuns(qint64 beforeRowId = 0) const;
     Q_INVOKABLE QString sessionReviewToken(const QString& uuid) const;
+    Q_INVOKABLE QString sessionReviewSummary(const QString& uuid) const;
+    Q_INVOKABLE QVariantMap sessionReviewTokens(const QString& uuid) const;
     Q_INVOKABLE void cancelPartitionPreview();
 
     // Da chiamare quando il log e' aperto: la sessione sopravvive a una chiusura

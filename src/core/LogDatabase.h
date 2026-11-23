@@ -339,7 +339,7 @@ public:
     InsertResult updateQsoGuarded(qint64 id, AdifRecord record, qint64 stationProfileId,
                                   const QString& expectedUuid, int expectedRevision,
                                   const QSet<QString>& touchedFields, const QString& activationToken = {});
-    QString activationRunToken(const QString& uuid) const;
+    QString activationRunToken(const QString& uuid, bool includeHistory = true) const;
 
     // Preserves the complete original report bytes, without changing QSO.
     qint64 archiveContestReport(const QByteArray& bytes, const QString& filename, QString* error = nullptr,
