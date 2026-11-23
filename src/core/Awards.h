@@ -232,6 +232,13 @@ struct AwardResult {
     QList<BandTotal> bandTotals(const QStringList& bands, bool officialOnly = false) const;
 };
 
+// Optional per-QSO provenance for selected awards. This is a potential
+// contribution under the same filters as the calculator, not award credit.
+struct AwardContributions {
+    QSet<QString> awards;
+    QHash<QString, QHash<QString, QSet<qint64>>> qsoIds;
+};
+
 class AwardCalculator {
 public:
     // Nome di un'entita' DXCC dal numero (lo fornisce il cty.csv).
@@ -252,7 +259,8 @@ public:
 
     static QStringList awardIds();
     // Tutti gli award in una passata sul log.
-    QList<AwardResult> compute(const LogDatabase& db, const AwardFilter& filter) const;
+    QList<AwardResult> compute(const LogDatabase& db, const AwardFilter& filter,
+                               AwardContributions* contributions = nullptr) const;
 
 private:
     DxccName m_dxccName;

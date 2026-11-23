@@ -915,9 +915,11 @@ bool keyLess(const AwardItem& a, const AwardItem& b)
 
 } // namespace
 
-QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFilter& filter) const
+QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFilter& filter,
+                                            AwardContributions* contributions) const
 {
     decolog::StartupSpan trace("AwardCalculator::compute");
+    if (contributions) contributions->qsoIds.clear();
     struct Builder {
         AwardResult result;
         QHash<QString, AwardItem> items;
@@ -1102,6 +1104,8 @@ QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFi
                          bool countsForAward = true) {
             if (key.isEmpty())
                 return;
+            if (countsForAward && contributions && contributions->awards.contains(QLatin1String(award)))
+                contributions->qsoIds[QLatin1String(award)][key].insert(id);
             Builder& b = builders[QLatin1String(award)];
             AwardItem& item = b.items[key];
             if (item.qsoCount == 0) {
