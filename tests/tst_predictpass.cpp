@@ -75,6 +75,31 @@ class TestPredictPass : public QObject {
         QCOMPARE(planner.pass().value("maxElevation").toInt(), 30);
         QCOMPARE(commands, QStringList({"GET_TLE OSCAR-7", "PREDICT \"OSCAR-7\" 1800000000", "GET_TLE OSCAR-7"}));
     }
+    void rejectsPassEndingBeforeRequestedTime()
+    {
+        QUdpSocket server;
+        QVERIFY(server.bind(QHostAddress::LocalHost, 0));
+        connect(&server, &QUdpSocket::readyRead, &server, [&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray cmd(int(server.pendingDatagramSize()), Qt::Uninitialized);
+                QHostAddress from; quint16 port;
+                server.readDatagram(cmd.data(), cmd.size(), &from, &port);
+                if (cmd.startsWith("GET_TLE"))
+                    server.writeDatagram("OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n", from, port);
+                else
+                    server.writeDatagram("1800000000 Fri 15Jan27 08:00:00 0 183\n1800000060 Fri 15Jan27 08:01:00 30 174\n1800000120 Fri 15Jan27 08:02:00 0 160\n\x1a\n", from, port);
+            }
+        });
+        PredictPassPlanner planner; QSignalSpy done(&planner, &PredictPassPlanner::finished);
+        QVERIFY(planner.request("127.0.0.1", server.localPort(), "OSCAR-7", 1800000121));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(!done.takeFirst().at(0).toBool());
+        QVERIFY(planner.pass().isEmpty());
+        // An ongoing pass remains usable when the request falls within it.
+        QVERIFY(planner.request("127.0.0.1", server.localPort(), "OSCAR-7", 1800000060));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 3000);
+        QVERIFY(done.takeFirst().at(0).toBool());
+    }
     void rejectsUnsafeOrIncompleteDataAndCancels()
     {
         QUdpSocket server;

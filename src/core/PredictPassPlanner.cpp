@@ -131,6 +131,12 @@ void PredictPassPlanner::receive()
                     fail(QStringLiteral("Incomplete pass prediction"));
                     return;
                 }
+                // A server can return an old pass despite the requested start.
+                // Allow a pass already in progress, but never publish one that ended.
+                if (m_points.last().toMap().value(QStringLiteral("time")).toLongLong() < m_start) {
+                    fail(QStringLiteral("Pass ended before the requested time"));
+                    return;
+                }
                 m_timeout.stop();
                 ++m_stage;
                 sendNext();
