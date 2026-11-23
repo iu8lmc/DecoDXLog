@@ -17,6 +17,7 @@ DialogFrame {
     property bool previewShown: false
     property bool probeAwaitPreview: false
     property bool probeAwaitExport: false
+    property int probeExportStep: 0
     property int previewPage: 0
     property var exportGroup: ({})
     property string partitionMessage: ""
@@ -52,6 +53,7 @@ DialogFrame {
         console.warn("PROBE multiInvalid blocked=" + (!root.act.active && errorText.text.length > 0))
         root.setProgram("sota", "I/LM-001")
         root.setProgram("wwff", "IFF-0123")
+        root.setProgram("iota", "EU-025")
         startSessionButton.clicked()
         console.warn("PROBE multiStarted active=" + root.act.active + " sota=" + root.act.state.programs.sota)
         const now = decolog.utcNow()
@@ -82,9 +84,14 @@ DialogFrame {
             errorText.text = success ? "" : message
             root.partitionMessage = success ? qsTr("Partition file saved. Review it before submission.") : ""
             if (root.probeAwaitExport) {
-                root.probeAwaitExport = false
-                console.warn("PROBE multiExport success=" + success + " error=" + message)
-                root.act.stop()
+                console.warn("PROBE multiExport step=" + root.probeExportStep + " success=" + success + " error=" + message)
+                if (!success || root.probeExportStep >= 2) { root.probeAwaitExport = false; root.act.stop(); return }
+                root.probeExportStep++
+                const program = root.probeExportStep === 1 ? "SOTA" : "IOTA"
+                const group = (root.partitionPreview.groups || []).find(g => g.program === program)
+                const started = group && root.act.startPartitionExport(group, "file://" + decolog.currentLogInfo().path + "." + program + ".adi")
+                console.warn("PROBE multiExport " + program + " started=" + !!started)
+                if (!started) { root.probeAwaitExport = false; root.act.stop() }
             }
         }
         function onPreviewFinished(success) {
@@ -502,7 +509,7 @@ DialogFrame {
                         .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
                 }
                 GlassButton {
-                    visible: modelData.program === "POTA" || modelData.program === "WWFF"
+                    visible: ["POTA", "WWFF", "SOTA", "IOTA"].indexOf(modelData.program) >= 0
                     enabled: !root.act.partitionExportBusy && !root.act.previewBusy
                     text: qsTr("Export…")
                     onClicked: { root.exportGroup = modelData; partitionExportDialog.open() }

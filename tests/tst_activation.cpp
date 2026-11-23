@@ -148,9 +148,9 @@ private slots:
         LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
         ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
         QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001,IT-0002"},
-                           {"programs", QVariantMap{{"wwff", "IFF-0123"}}}}).isEmpty());
+                           {"programs", QVariantMap{{"wwff", "IFF-0123"}, {"sota", "I/LM-001"}, {"iota", "EU-025"}}}}).isEmpty());
         AdifRecord r{{"CALL", "K1ABC"}, {"QSO_DATE", "20261231"}, {"TIME_ON", "235900"},
-                     {"BAND", "20m"}, {"MODE", "CW"}, {"POTA_REF", "US-1234"}, {"OPERATOR", "9H1AA"}};
+                     {"BAND", "20m"}, {"MODE", "CW"}, {"POTA_REF", "US-1234"}, {"SOTA_REF", "W2/WE-003"}, {"IOTA", "NA-001"}, {"OPERATOR", "9H1AA"}};
         act.session().applyTo(r, 0); const auto inserted = db.insertQso(r, "manual", {}, true, 0, false);
         QCOMPARE(inserted.status, InsertResult::Status::Inserted);
         AdifRecord next{{"CALL", "K1DEF"}, {"QSO_DATE", "20270101"}, {"TIME_ON", "000100"},
@@ -159,14 +159,16 @@ private slots:
         QCOMPARE(db.insertQso(next, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
         QSignalSpy previewed(&act, &ActivationController::previewFinished);
         QVERIFY(act.startPartitionPreview()); QTRY_COMPARE_WITH_TIMEOUT(previewed.size(), 1, 5000); QVERIFY(previewed.at(0).at(0).toBool());
-        QVariantMap chosen, wwff;
+        QVariantMap chosen, wwff, sota, iota;
         for (const auto& value : act.previewResult().value("groups").toList()) {
             const auto group = value.toMap();
             if (group.value("day") != "2026-12-31") continue;
             if (group.value("program") == "POTA" && group.value("reference") == "IT-0001") chosen = group;
             if (group.value("program") == "WWFF" && group.value("reference") == "IFF-0123") wwff = group;
+            if (group.value("program") == "SOTA") sota = group;
+            if (group.value("program") == "IOTA") iota = group;
         }
-        QVERIFY(!chosen.isEmpty()); QVERIFY(!wwff.isEmpty());
+        QVERIFY(!chosen.isEmpty()); QVERIFY(!wwff.isEmpty()); QVERIFY(!sota.isEmpty()); QVERIFY(!iota.isEmpty());
         QVERIFY(!act.startPartitionExport(chosen, QUrl::fromLocalFile(dir.filePath("log.sqlite"))));
         const QString path = dir.filePath("park.adi"); QSignalSpy exported(&act, &ActivationController::partitionExportFinished);
         QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
@@ -185,6 +187,16 @@ private slots:
         QCOMPARE(wwffRecords.size(), 1); QCOMPARE(wwffRecords.at(0).value("MY_SIG"), QString("WWFF"));
         QCOMPARE(wwffRecords.at(0).value("MY_SIG_INFO"), QString("IFF-0123"));
         QCOMPARE(wwffRecords.at(0).value("POTA_REF"), QString("US-1234"));
+        for (const auto& group : {sota, iota}) {
+            exported.clear(); const QString out = dir.filePath(group.value("program").toString() + ".adi");
+            QVERIFY(act.startPartitionExport(group, QUrl::fromLocalFile(out)));
+            QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY2(exported.at(0).at(0).toBool(), qPrintable(exported.at(0).at(1).toString()));
+            QFile output(out); QVERIFY(output.open(QIODevice::ReadOnly)); const auto selected = adif::parse(output.readAll()).records;
+            QCOMPARE(selected.size(), 1); QCOMPARE(selected.at(0).value("MY_SOTA_REF"), QString("I/LM-001"));
+            QCOMPARE(selected.at(0).value("SOTA_REF"), QString("W2/WE-003"));
+            QCOMPARE(selected.at(0).value("MY_IOTA"), QString("EU-025")); QCOMPARE(selected.at(0).value("IOTA"), QString("NA-001"));
+            QCOMPARE(selected.at(0).value("MY_SIG"), QString("POTA"));
+        }
         r.set("COMMENT", "changed after preview"); QCOMPARE(db.updateQso(inserted.id, r).status, InsertResult::Status::Inserted);
         exported.clear(); QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
         QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY(!exported.at(0).at(0).toBool());

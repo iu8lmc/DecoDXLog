@@ -789,7 +789,8 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
     if (m_partitionExportBusy || m_previewBusy || !destination.isLocalFile() || !m_session.active ||
         !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path() == QLatin1String(":memory:")) return false;
     const QString program = group.value(QStringLiteral("program")).toString();
-    if (program != QLatin1String("POTA") && program != QLatin1String("WWFF")) return false;
+    if (program != QLatin1String("POTA") && program != QLatin1String("WWFF") &&
+        program != QLatin1String("SOTA") && program != QLatin1String("IOTA")) return false;
     bool found = false;
     for (const auto& item : m_previewResult.value(QStringLiteral("groups")).toList())
         if (item.toMap() == group) { found = true; break; }
@@ -842,10 +843,13 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
             if (error.isEmpty()) {
                 const QString ref = group.value(QStringLiteral("reference")).toString();
                 for (AdifRecord& record : doc.records) {
-                    if (program == QLatin1String("POTA")) record.set(QStringLiteral("MY_POTA_REF"), ref);
-                    else record.set(QStringLiteral("MY_WWFF_REF"), ref);
-                    record.set(QStringLiteral("MY_SIG"), program);
-                    record.set(QStringLiteral("MY_SIG_INFO"), program == QLatin1String("POTA") ? ref.section(QLatin1Char('@'), 0, 0) : ref);
+                    if (program == QLatin1String("POTA") || program == QLatin1String("WWFF")) {
+                        record.set(program == QLatin1String("POTA") ? QStringLiteral("MY_POTA_REF") : QStringLiteral("MY_WWFF_REF"), ref);
+                        record.set(QStringLiteral("MY_SIG"), program);
+                        record.set(QStringLiteral("MY_SIG_INFO"), program == QLatin1String("POTA") ? ref.section(QLatin1Char('@'), 0, 0) : ref);
+                    } else {
+                        record.set(program == QLatin1String("SOTA") ? QStringLiteral("MY_SOTA_REF") : QStringLiteral("MY_IOTA"), ref);
+                    }
                 }
             }
             if (!db.connection().commit() && error.isEmpty()) error = tr("Cannot complete the export snapshot.");

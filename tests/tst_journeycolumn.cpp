@@ -64,13 +64,24 @@ private slots:
         QVERIFY2(output.contains("PROBE multiStarted active=true sota=I/LM-001"), output.constData());
         QVERIFY2(output.contains("PROBE multiInvalidUpdate blocked=true sota=I/LM-001"), output.constData());
         QVERIFY2(output.contains("PROBE multiSaved count=2 firstError= secondError="), output.constData());
-        QVERIFY2(output.contains("PROBE multiPreview reported=2 groups=5 error="), output.constData());
+        QVERIFY2(output.contains("PROBE multiPreview reported=2 groups=6 error="), output.constData());
         QVERIFY2(output.contains("PROBE multiExport started=true"), output.constData());
-        QVERIFY2(output.contains("PROBE multiExport success=true error="), output.constData());
+        QVERIFY2(output.contains("PROBE multiExport step=0 success=true error="), output.constData());
         QFile partition(dir.filePath("test.sqlite.probe.adi")); QVERIFY(partition.open(QIODevice::ReadOnly));
         const auto exported = decolog::core::adif::parse(partition.readAll()).records; QCOMPARE(exported.size(), 2);
         for (const auto& row : exported) { QCOMPARE(row.value("MY_POTA_REF"), QString("IT-0001"));
             QCOMPARE(row.value("MY_SIG"), QString("POTA")); QCOMPARE(row.value("MY_SIG_INFO"), QString("IT-0001")); }
+        QVERIFY2(output.contains("PROBE multiExport SOTA started=true"), output.constData());
+        QVERIFY2(output.contains("PROBE multiExport step=1 success=true error="), output.constData());
+        QVERIFY2(output.contains("PROBE multiExport IOTA started=true"), output.constData());
+        QVERIFY2(output.contains("PROBE multiExport step=2 success=true error="), output.constData());
+        QFile sota(dir.filePath("test.sqlite.SOTA.adi")); QVERIFY(sota.open(QIODevice::ReadOnly));
+        const auto summits = decolog::core::adif::parse(sota.readAll()).records; QCOMPARE(summits.size(), 1);
+        QCOMPARE(summits.at(0).value("MY_SOTA_REF"), QString("I/LM-001"));
+        QCOMPARE(summits.at(0).value("SOTA_REF"), QString("W2/WE-003"));
+        QFile iota(dir.filePath("test.sqlite.IOTA.adi")); QVERIFY(iota.open(QIODevice::ReadOnly));
+        const auto islands = decolog::core::adif::parse(iota.readAll()).records; QCOMPARE(islands.size(), 2);
+        QCOMPARE(islands.at(0).value("MY_IOTA"), QString("EU-025"));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(), 2);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,call FROM qso WHERE deleted=0 ORDER BY id"));
         QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1AAA"));
