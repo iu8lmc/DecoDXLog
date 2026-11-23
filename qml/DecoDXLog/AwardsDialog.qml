@@ -71,7 +71,7 @@ DialogFrame {
     Connections {
         target: decolog
         function onQslPlanChanged() {
-            if (decolog.qslPlanBusy || decolog.qslPlan.stale) alternativesDialog.close()
+            if (decolog.qslPlanBusy || decolog.qslPlan.stale) { alternativesDialog.close(); paperConfirm.close() }
             if (decolog.qslPlan.stale) root.schedulePlannerRefresh()
         }
     }
@@ -83,6 +83,7 @@ DialogFrame {
         if (!enabled && at >= 0) selected.splice(at, 1)
         plannerGoals = selected
         alternativesDialog.close()
+        paperConfirm.close()
         plannerSettings.goalsJson = JSON.stringify(selected)
         plannerSelectionDirty = true
         schedulePlannerRefresh()
@@ -146,6 +147,18 @@ DialogFrame {
             if ((decolog.qslPlanBusy || p.stale || !p.paperRoutes || !p.paperRoutes.length || !p.paperRoutes[0].cost) && ++tries < 20) return
             stop(); console.warn("PROBE qslplan saved cost " + JSON.stringify(p.paperRoutes || []))
             const row=paperRoutes.itemAtIndex(0); console.warn("PROBE qslplan cost row " + (row ? row.probeText : "missing"))
+            const first=qslPlanCandidates.itemAtIndex(0)
+            if (!first) { console.warn("PROBE qslplan queue candidate missing"); return }
+            first.probeOpenQueue(); cancelPaperQueue.clicked()
+            console.warn("PROBE qslplan queue cancelled " + (!paperConfirm.visible && !decolog.cards.operationBusy))
+            first.probeOpenQueue(); confirmPaperQueue.clicked(); plannerProbeQueue.start()
+        }
+    }
+    Timer {
+        id: plannerProbeQueue; interval: 200; repeat: true; property int tries: 0
+        onTriggered: {
+            if (decolog.cards.operationBusy && ++tries < 20) return
+            stop(); console.warn("PROBE qslplan enqueue " + decolog.cards.status)
             paperQueueButton.clicked(); decolog.cards.markReceived(2, true); plannerProbeConfirm.start()
         }
     }
@@ -259,6 +272,7 @@ DialogFrame {
                     required property var modelData
                     readonly property string probeText: candidateHeading.text + " " + candidatePriority.text + " " + candidateBenefits.text
                     readonly property string probeRoute: candidateRoute.text
+                    function probeOpenQueue() { reviewQueueButton.clicked() }
                     width: ListView.view.width; height: row.implicitHeight + 14; radius: 4
                     color: Theme.glassOverlay; border.color: Theme.borderSoft
                     ColumnLayout {
@@ -287,11 +301,55 @@ DialogFrame {
                         RowLayout {
                             GlassButton { text: qsTr("Open QSO"); onClicked: root.openQso(modelData.id) }
                             GlassButton { text: qsTr("View all alternatives"); onClicked: alternativesDialog.showCandidate(modelData) }
+                            GlassButton {
+                                id: reviewQueueButton
+                                text: qsTr("Review paper queue")
+                                enabled: !decolog.cards.operationBusy && modelData.benefits.some(b => b.services.indexOf("card") >= 0)
+                                onClicked: paperConfirm.review(modelData,decolog.qslPlan.logPath)
+                            }
                         }
                     }
                 }
             }
             GlassButton { id: paperQueueButton; text: qsTr("Open paper QSL queue"); onClicked: root.openPaperQueue() }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary; text: decolog.cards.status || "" }
+        }
+    }
+
+    DialogFrame {
+        id: paperConfirm
+        transientParent: qslPlanner
+        title: qsTr("Review paper QSL queue")
+        info: qsTr("No QSL will be sent")
+        width: 600; height: 290
+        property var candidate: ({})
+        property string logPath: ""
+        function review(c,path) { candidate=c; logPath=path || ""; paperChannel.currentIndex=c.paperChannel === "D" ? 1 : 0; paperError.text=""; open() }
+        body: ColumnLayout {
+            spacing: 10
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
+                text: qsTr("Add %1 · QSO #%2 to the paper queue?").arg(paperConfirm.candidate.call || "").arg(paperConfirm.candidate.id || "") }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("Review the QSO and route first. Already queued, sent, confirmed, edited or changed-route records are left unchanged. This does not send a request.") }
+            StyledComboBox { id: paperChannel; Layout.preferredWidth: 180; model: [qsTr("Bureau"),qsTr("Direct")] }
+            Text { id: paperError; Layout.fillWidth: true; color: Theme.warningColor; wrapMode: Text.Wrap }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                GlassButton {
+                    id: confirmPaperQueue
+                    text: qsTr("Confirm queue")
+                    enabled: !decolog.cards.operationBusy
+                    onClicked: {
+                        const c=paperConfirm.candidate
+                        if (root.plannerSelectionDirty || decolog.qslPlan.stale || !paperConfirm.logPath || paperConfirm.logPath !== decolog.qslPlan.logPath) { paperError.text=qsTr("The plan changed. Rebuild and review the QSO."); return }
+                        if (!decolog.cards.enqueueIfUnsent(c.id,c.uuid,c.revision,paperChannel.currentIndex === 0 ? "B" : "D",paperConfirm.logPath)) {
+                            paperError.text=qsTr("The operation could not be started. Check the log and queue status."); return
+                        }
+                        paperConfirm.close()
+                    }
+                }
+                GlassButton { id: cancelPaperQueue; text: qsTr("Cancel"); onClicked: paperConfirm.close() }
+            }
         }
     }
 

@@ -83,6 +83,9 @@ public:
     Q_INVOKABLE QVariantList rows(const QString& state, int limit = 0) const;
     // Mette in coda: `via` e' B (bureau), D (diretta) o E (elettronica).
     Q_INVOKABLE void enqueue(const QVariantList& ids, const QString& via);
+    // Explicit planner handoff. True means completed in-memory or accepted for
+    // asynchronous execution; status reports the eventual result.
+    Q_INVOKABLE bool enqueueIfUnsent(qint64 id, const QString& uuid, int revision, const QString& via, const QString& expectedLogPath);
     // Tutte le QSL ricevute a cui non si e' ancora risposto.
     // Returns the count for an in-memory log; -1 means queued in the worker.
     Q_INVOKABLE int enqueueUnanswered(const QString& via);
@@ -148,7 +151,8 @@ private:
     void note(const QString& text, const QString& level);
     void touch(qint64 id, const QString& sent, const QString& rcvd, const QString& via);
     int changeCards(const QList<qint64>& ids, const QString& sent, const QString& via,
-                    bool unanswered = false, const QString& received = {});
+                    bool unanswered = false, const QString& received = {},
+                    const QString& expectedUuid = {}, bool onlyUnsent = false, int expectedRevision = -1);
     void ensureCacheIdentity() const;
     void startOutput(int kind, const QString& path, const QVariantList& ids,
                      const QString& sheetId, int perPage, bool guides);

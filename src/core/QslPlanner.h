@@ -29,6 +29,8 @@ struct Benefit {
 };
 struct Candidate {
     qint64 qsoId{0};
+    QString qsoUuid;
+    int revision{-1};
     QString call;
     QString manager;
     QString managerSource;

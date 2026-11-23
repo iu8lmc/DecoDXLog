@@ -94,6 +94,8 @@ private slots:
         QVERIFY2(output.contains("PROBE qslplan group M0ABC · bureau · QSO: 1, 2 · potential benefits: 2 · cost unknown"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan saved cost") && output.contains("\"amount\":\"12.50\"") && output.contains("\"basis\":\"estimate\""),output.constData());
         QVERIFY2(output.contains("12.50 EUR · operator estimate"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan queue cancelled true"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan enqueue 1 QSO"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan paperqueue queue"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan confirmation") && output.contains("\"uniqueBenefits\":1"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan stale true"),output.constData());
@@ -102,7 +104,7 @@ private slots:
         QByteArray reopened; QVERIFY2(launch(dir,"qslplanrestoreprobe",reopened,4500),reopened.constData());
         QVERIFY2(reopened.contains("PROBE qslplan restored [\"dxcc\",\"waz\"]"),reopened.constData());
         QVERIFY2(reopened.contains("PROBE qslplan restored result") && reopened.contains("\"uniqueBenefits\":0"),reopened.constData());
-        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost.has_value()); QCOMPARE(cost->amount,QString("12.50")); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost.has_value()); QCOMPARE(cost->amount,QString("12.50")); QCOMPARE(db.qslStatus(1).first().sent,QString("Q")); }
     }
     void recoveredRecordsUseTheirJournalPeriod()
     {

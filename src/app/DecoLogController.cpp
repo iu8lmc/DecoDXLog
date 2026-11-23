@@ -2307,7 +2307,9 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
                     {QStringLiteral("pendingAlternativeCount"),benefit.alternativeCount(candidate.qsoId,true)}};
             }
             rows << QVariantMap{{QStringLiteral("id"),candidate.qsoId},{QStringLiteral("call"),candidate.call},
+                {QStringLiteral("uuid"),candidate.qsoUuid},{QStringLiteral("revision"),candidate.revision},
                 {QStringLiteral("manager"),candidate.manager},{QStringLiteral("managerSource"),candidate.managerSource},
+                {QStringLiteral("paperChannel"),candidate.paperChannel},
                 {QStringLiteral("managerObservedAt"),candidate.managerObservedAt.toString(Qt::ISODate)},
                 {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("benefits"),benefits},
                 {QStringLiteral("priorityRank"),candidate.priorityRank},{QStringLiteral("marginalBenefits"),marginal},
@@ -2320,6 +2322,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
             self->m_qslPlanBusy=false;
             if (self->m_db.path()!=path) self->m_qslPlan={{QStringLiteral("stale"),true}};
             else { self->m_qslPlanSnapshot=snapshot; self->m_qslPlan={{QStringLiteral("error"),snapshot->error},{QStringLiteral("uniqueBenefits"),snapshot->uniqueBenefits},
+                                 {QStringLiteral("logPath"),path},
                                  {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},
                                  {QStringLiteral("ungroupedPaperQsoIds"),ungrouped},{QStringLiteral("stale"),false}}; }
             emit self->qslPlanChanged();

@@ -67,6 +67,7 @@ QList<QVariantMap> chosenCardRows(LogDatabase& db, const QList<qint64>& ids)
 struct CardBatchResult {
     int changed{0};
     int failed{0};
+    int skipped{0};
     QString error;
 };
 
@@ -74,7 +75,7 @@ struct CardBatchResult {
 // transaction small allows other log operations to obtain the writer lock.
 CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QString& sent,
                                 const QString& via, bool unanswered, const QString& received,
-                                const QString& expectedUuid = {})
+                                const QString& expectedUuid = {}, bool onlyUnsent = false, int expectedRevision = -1)
 {
     CardBatchResult result;
     if (unanswered) {
@@ -105,7 +106,7 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
         ++done;
         if (!expectedUuid.isEmpty()) {
             const auto meta = db.meta(id);
-            if (!meta || meta->uuid != expectedUuid) {
+            if (!meta || meta->deleted || meta->uuid != expectedUuid || (expectedRevision>=0 && meta->revision!=expectedRevision)) {
                 ++result.failed;
                 result.error = QObject::tr("The original QSO no longer matches the log.");
                 connection.rollback();
@@ -116,6 +117,15 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
         QslState card; card.service = QStringLiteral("card");
         for (const QslState& existing : db.qslStatus(id)) {
             if (existing.service == QLatin1String("card")) { card = existing; break; }
+        }
+        if (onlyUnsent) {
+            const QString wasSent=card.sent.trimmed().toUpper(), wasReceived=card.rcvd.trimmed().toUpper();
+            const QString previousVia=card.via.trimmed().toUpper();
+            if ((!wasSent.isEmpty() && wasSent!=QLatin1String("N") && wasSent!=QLatin1String("I")) ||
+                (!wasReceived.isEmpty() && wasReceived!=QLatin1String("N")) ||
+                (!previousVia.isEmpty() && previousVia!=via)) {
+                connection.rollback(); ++result.skipped; return result;
+            }
         }
         if (!sent.isEmpty()) {
             if (sent == QLatin1String("Y") && card.sent != QLatin1String("Y")) card.sentDate = today();
@@ -364,7 +374,8 @@ void QslCardController::touch(qint64 id, const QString& sent, const QString& rcv
 }
 
 int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent,
-                                   const QString& via, bool unanswered, const QString& received)
+                                   const QString& via, bool unanswered, const QString& received,
+                                   const QString& expectedUuid, bool onlyUnsent, int expectedRevision)
 {
     if (!m_ctx.db || !m_ctx.db->isOpen() || (!unanswered && ids.isEmpty())) return 0;
     if (m_operationBusy) {
@@ -383,21 +394,23 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
                                                   : tr("%n QSO taken out of the queue", nullptr, result.changed);
         if (result.failed > 0)
             m_status += tr("; %1 failed: %2").arg(result.failed).arg(result.error);
+        if (result.skipped > 0)
+            m_status += tr("; unchanged: already queued, sent, confirmed or route changed");
         note(m_status, result.failed ? QStringLiteral("warning") : QStringLiteral("info"));
         refresh();
     };
     if (path.isEmpty() || path == QLatin1String(":memory:")) {
-        const CardBatchResult result = changeCardBatch(*m_ctx.db, ids, sent, via, unanswered, received);
+        const CardBatchResult result = changeCardBatch(*m_ctx.db, ids, sent, via, unanswered, received,expectedUuid,onlyUnsent,expectedRevision);
         done(result);
         return result.changed;
     }
     m_operationBusy = true;
     emit operationChanged();
     QPointer<QslCardController> self(this);
-    m_cardPool.start([self, path, ids, sent, via, unanswered, received] {
+    m_cardPool.start([self, path, ids, sent, via, unanswered, received, expectedUuid, onlyUnsent, expectedRevision] {
         LogDatabase db;
         CardBatchResult result;
-        if (db.open(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received);
+        if (db.open(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received,expectedUuid,onlyUnsent,expectedRevision);
         else { result.failed = qMax(1, int(ids.size())); result.error = db.lastError(); }
         QMetaObject::invokeMethod(self.data(), [self, path, sent, unanswered, received, result] {
             if (!self) return;
@@ -417,6 +430,8 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
                                                : self->tr("%n QSO taken out of the queue", nullptr, result.changed);
             if (result.failed > 0)
                 self->m_status += self->tr("; %1 failed: %2").arg(result.failed).arg(result.error);
+            if (result.skipped > 0)
+                self->m_status += self->tr("; unchanged: already queued, sent, confirmed or route changed");
             self->note(self->m_status, result.failed ? QStringLiteral("warning") : QStringLiteral("info"));
             self->refresh();
         }, Qt::QueuedConnection);
@@ -427,6 +442,14 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
 void QslCardController::enqueue(const QVariantList& ids, const QString& via)
 {
     changeCards(toIds(ids), QStringLiteral("Q"), via);
+}
+
+bool QslCardController::enqueueIfUnsent(qint64 id, const QString& uuid, int revision, const QString& via, const QString& expectedLogPath)
+{
+    const QString channel=via.trimmed().toUpper();
+    if (!m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path()!=expectedLogPath || id<=0 || revision<0 || uuid.trimmed().isEmpty() ||
+        (channel!=QLatin1String("B") && channel!=QLatin1String("D"))) return false;
+    return changeCards({id},QStringLiteral("Q"),channel,false,{},uuid,true,revision)!=0;
 }
 
 int QslCardController::enqueueUnanswered(const QString& via)

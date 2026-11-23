@@ -110,6 +110,50 @@ private:
     QTemporaryDir m_dir;
 
 private slots:
+    void plannerQueuePreservesExistingOrChangedState()
+    {
+        core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const char* call) { return db.insertQso(core::AdifRecord{{"CALL",call},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import").id; };
+        const qint64 fresh=add("K1AAA"), sent=add("K1BBB"), received=add("K1CCC"), changed=add("K1DDD");
+        QVERIFY(fresh && sent && received && changed);
+        core::QslState state; state.service="card"; state.sent="Y"; state.via="B"; QVERIFY(db.setCardState(sent,state));
+        state.sent="N"; state.rcvd="Y"; QVERIFY(db.setCardState(received,state));
+        state.rcvd="N"; state.via="D"; QVERIFY(db.setCardState(changed,state));
+        QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx);
+        const auto run=[&](qint64 id,const QString& uuid,const QString& route) { return cards.enqueueIfUnsent(id,uuid,db.meta(id)->revision,route,db.path()); };
+        QVERIFY(run(fresh,db.meta(fresh)->uuid,"B")); QCOMPARE(db.qslStatus(fresh).first().sent,QString("Q"));
+        QVERIFY(!run(fresh,db.meta(fresh)->uuid,"B"));
+        QVERIFY(!run(sent,db.meta(sent)->uuid,"B")); QCOMPARE(db.qslStatus(sent).first().sent,QString("Y"));
+        QVERIFY(!run(received,db.meta(received)->uuid,"B")); QCOMPARE(db.qslStatus(received).first().rcvd,QString("Y"));
+        QVERIFY(!run(changed,db.meta(changed)->uuid,"B")); QCOMPARE(db.qslStatus(changed).first().via,QString("D"));
+        QVERIFY(!run(changed,"different-uuid","D")); QVERIFY(!cards.enqueueIfUnsent(changed,db.meta(changed)->uuid,db.meta(changed)->revision+1,"D",db.path()));
+        QVERIFY(!cards.enqueueIfUnsent(changed,db.meta(changed)->uuid,db.meta(changed)->revision,"D","other-log"));
+    }
+    void plannerQueueRunsOnFileBackedLog()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("planner-queue.sqlite")));
+        const auto added=db.insertQso(core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import");
+        QVERIFY(added.id>0); const auto meta=db.meta(added.id); QVERIFY(meta.has_value());
+        QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx);
+        QVERIFY(cards.enqueueIfUnsent(added.id,meta->uuid,meta->revision,"B",db.path()));
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),10000); QCOMPARE(db.qslStatus(added.id).first().sent,QString("Q"));
+        QVERIFY(cards.enqueueIfUnsent(added.id,meta->uuid,meta->revision,"B",db.path()));
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),10000); QVERIFY(cards.status().contains("unchanged"));
+        QCOMPARE(db.qslStatus(added.id).first().sent,QString("Q"));
+    }
+    void plannerQueueDoesNotOverwriteConcurrentSentState()
+    {
+        core::LogDatabase db; QVERIFY(db.open(m_dir.filePath("planner-concurrent.sqlite")));
+        const auto added=db.insertQso(core::AdifRecord{{"CALL","K1DEF"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import");
+        QVERIFY(added.id>0); const auto meta=db.meta(added.id); QVERIFY(meta.has_value());
+        QVERIFY(db.connection().transaction()); core::QslState sent; sent.service="card"; sent.sent="Y"; sent.via="B";
+        QVERIFY(db.setCardState(added.id,sent));
+        QslCardController::Context ctx; ctx.db=&db; QslCardController cards(ctx);
+        QVERIFY(cards.enqueueIfUnsent(added.id,meta->uuid,meta->revision,"B",db.path()));
+        QTest::qWait(150); QVERIFY(db.connection().commit());
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),10000);
+        QCOMPARE(db.qslStatus(added.id).first().sent,QString("Y"));
+    }
     void initTestCase()
     {
         // Le impostazioni vanno in un temporaneo: una prova non tocca quelle di

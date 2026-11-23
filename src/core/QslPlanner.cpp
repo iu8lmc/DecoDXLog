@@ -123,6 +123,9 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         Candidate& candidate=it.value();
         const auto record=db.record(candidate.qsoId);
         if (!record) { result.error=QStringLiteral("QSO unavailable while planning"); result.candidates.clear(); return result; }
+        const auto meta=db.meta(candidate.qsoId);
+        if (!meta || meta->deleted || meta->uuid.isEmpty()) { result.error=QStringLiteral("QSO identity unavailable while planning"); result.candidates.clear(); return result; }
+        candidate.qsoUuid=meta->uuid; candidate.revision=meta->revision;
         candidate.call=record->value(QStringLiteral("CALL"));
         candidate.manager=record->value(QStringLiteral("QSL_VIA")).trimmed();
         if (!candidate.manager.isEmpty()) candidate.managerSource=QStringLiteral("QSO");
