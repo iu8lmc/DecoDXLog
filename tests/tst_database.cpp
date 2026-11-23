@@ -26,7 +26,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 27;
+constexpr int kSchemaVersion = 28;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -62,6 +62,63 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestNetJournalBatchCostComparison()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QList<qint64> durations;
+        for (bool enabled : {false,true}) {
+            LogDatabase db; QVERIFY(db.open(dir.filePath(enabled?"journal.sqlite":"baseline.sqlite")));
+            QSqlQuery q(db.connection()); if (!enabled) { QVERIFY(q.exec("DROP TRIGGER contest_net_qso_insert")); QVERIFY(q.exec("DROP TRIGGER contest_net_qso_revision")); }
+            QVERIFY(q.exec("BEGIN IMMEDIATE")); QElapsedTimer timer; timer.start();
+            for (int i=0;i<1000;++i) {
+                AdifRecord record{{"CALL",QString("K%1TEST").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+                QVERIFY(db.insertQso(record,"fixture",{},true,0,false).status==InsertResult::Status::Inserted);
+            }
+            QVERIFY(q.exec("COMMIT")); durations.append(timer.elapsed());
+            QVERIFY(q.exec("SELECT COUNT(*) FROM contest_net_change")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),enabled?1000:0);
+        }
+        qInfo("Journal A/B 1000 synthetic QSO in one transaction: disabled=%lld ms enabled=%lld ms",durations.at(0),durations.at(1));
+    }
+    void contestNetJournalTracksCommittedQsoRevisions()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("journal.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); AdifRecord qso{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+        auto empty=db.contestNetChangesAfter(0,10); QVERIFY(empty.ok); QVERIFY(empty.changes.isEmpty());
+        QVERIFY(!db.contestNetChangesAfter(-1,10).ok); QVERIFY(!db.contestNetChangesAfter(0,0).ok); QVERIFY(!db.contestNetChangesAfter(0,501).ok);
+        QSqlQuery transaction(db.connection()); QVERIFY(transaction.exec("BEGIN IMMEDIATE"));
+        const auto rolled=db.insertQso(qso,"manual"); QVERIFY(rolled.id>0); QVERIFY(transaction.exec("ROLLBACK"));
+        empty=db.contestNetChangesAfter(0,10); QVERIFY(empty.ok); QVERIFY(empty.changes.isEmpty());
+        const auto inserted=db.insertQso(qso,"manual"); QVERIFY(inserted.id>0); const auto uuid=db.meta(inserted.id)->uuid;
+        QVERIFY(transaction.exec("BEGIN IMMEDIATE")); auto undone=*db.record(inserted.id); undone.set("NAME","Rolled back");
+        QCOMPARE(db.updateQso(inserted.id,undone).status,InsertResult::Status::Inserted); QVERIFY(transaction.exec("ROLLBACK"));
+        QCOMPARE(db.meta(inserted.id)->revision,1); QCOMPARE(db.contestNetChangesAfter(0,10).changes.size(),1);
+        QVERIFY(db.markSynced(inserted.id,0)); QCOMPARE(db.contestNetChangesAfter(0,10).changes.size(),1);
+        auto edited=*db.record(inserted.id); edited.set("NAME","First edit"); QCOMPARE(db.updateQso(inserted.id,edited).status,InsertResult::Status::Inserted);
+        QVERIFY(db.softDeleteQso(inserted.id));
+        auto first=db.contestNetChangesAfter(0,2); QVERIFY(first.ok); QCOMPARE(first.changes.size(),2); QVERIFY(first.hasMore);
+        QCOMPARE(first.changes.at(0).qsoUuid,uuid); QCOMPARE(first.changes.at(0).revision,1); QVERIFY(!first.changes.at(0).deleted);
+        QCOMPARE(first.changes.at(1).qsoUuid,uuid); QCOMPARE(first.changes.at(1).revision,2); QVERIFY(!first.changes.at(1).deleted);
+        const auto last=db.contestNetChangesAfter(first.changes.last().sequence,2); QVERIFY(last.ok); QCOMPARE(last.changes.size(),1); QVERIFY(!last.hasMore);
+        QCOMPARE(last.changes.first().revision,3); QVERIFY(last.changes.first().deleted); QVERIFY(last.changes.first().sequence>first.changes.last().sequence);
+        db.close(); QVERIFY(db.open(path)); const auto reopened=db.contestNetChangesAfter(0,10); QVERIFY(reopened.ok); QCOMPARE(reopened.changes.size(),3);
+    }
+    void contestNetJournalMigrationDoesNotInventHistory()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("migration.sqlite"); qint64 id=0;
+        { LogDatabase db; QVERIFY(db.open(path)); const auto inserted=db.insertQso(AdifRecord{{"CALL","K1OLD"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(inserted.id>0); id=inserted.id;
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TRIGGER contest_net_qso_insert")); QVERIFY(q.exec("DROP TRIGGER contest_net_qso_revision")); QVERIFY(q.exec("DROP TABLE contest_net_change")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=28")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.qsoCount(),qint64(1)); const auto before=db.contestNetChangesAfter(0,10); QVERIFY(before.ok); QVERIFY(before.changes.isEmpty());
+          auto record=*db.record(id); record.set("NAME","Updated after migration"); QVERIFY(db.updateQso(id,record).status==InsertResult::Status::Inserted);
+          const auto after=db.contestNetChangesAfter(0,10); QVERIFY(after.ok); QCOMPARE(after.changes.size(),1); QCOMPARE(after.changes.first().revision,2); }
+    }
+    void contestNetJournalRecordsCloudUuidAdoption()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"manual"); QVERIFY(qso.id>0);
+        const auto oldUuid=db.meta(qso.id)->uuid; QVERIFY(db.adoptUuid(qso.id,"server-uuid"));
+        const auto page=db.contestNetChangesAfter(0,10); QVERIFY(page.ok); QCOMPARE(page.changes.size(),2);
+        QCOMPARE(page.changes.last().previousQsoUuid,oldUuid); QCOMPARE(page.changes.last().qsoUuid,QString("server-uuid"));
+        QCOMPARE(page.changes.last().revision,1); QVERIFY(!page.changes.last().deleted);
+    }
     void contestSerialCannotBeBoundToTwoConcurrentQsos()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("contest.sqlite");

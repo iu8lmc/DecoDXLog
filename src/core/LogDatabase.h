@@ -30,6 +30,21 @@ struct InsertResult {
     QString message;
 };
 
+struct ContestNetChange {
+    qint64 sequence{0};
+    QString qsoUuid;
+    QString previousQsoUuid;
+    int revision{0};
+    bool deleted{false};
+};
+
+struct ContestNetChangePage {
+    bool ok{false};
+    bool hasMore{false};
+    QList<ContestNetChange> changes;
+    QString error;
+};
+
 struct ArchivedContestReport {
     qint64 id{0};
     QString sha256;
@@ -307,6 +322,9 @@ public:
                                             const QString& requestId, const QString& authority,
                                             const QString& sourceApp = {}, bool manual = false,
                                             qint64 stationProfileId = 0, bool checkDuplicate = true);
+    // Metadata only, from schema 28 onwards. Existing QSO need an initial
+    // inventory; the sequence is local to this database, not a peer ACK.
+    ContestNetChangePage contestNetChangesAfter(qint64 sequence, int limit) const;
 
     // Riscrive un QSO: la versione precedente va in qso_history, revision sale di
     // uno, dirty torna a 1. `stationProfileId` < 0 lascia il profilo com'e'.

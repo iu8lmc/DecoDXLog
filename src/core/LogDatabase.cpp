@@ -524,6 +524,14 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_serial_request_active ON contest_serial_request(scope,requester) WHERE state IN ('pending','granted')"),
               QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_serial_request_grant ON contest_serial_request(scope,authority,serial) WHERE serial IS NOT NULL"),
               QStringLiteral("CREATE UNIQUE INDEX IF NOT EXISTS idx_serial_request_use ON contest_serial_request(scope,requester,use_id) WHERE use_id IS NOT NULL")}, nullptr},
+        {28, {QStringLiteral("CREATE TABLE IF NOT EXISTS contest_net_change ("
+              "sequence INTEGER PRIMARY KEY AUTOINCREMENT, qso_uuid TEXT NOT NULL, previous_qso_uuid TEXT, revision INTEGER NOT NULL, "
+              "deleted INTEGER NOT NULL CHECK(deleted IN (0,1)), recorded_at TEXT NOT NULL)"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qso_insert AFTER INSERT ON qso BEGIN "
+              "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) VALUES(NEW.uuid,NEW.revision,NEW.deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now')); END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qso_revision AFTER UPDATE OF uuid,revision,deleted ON qso "
+              "WHEN OLD.uuid<>NEW.uuid OR OLD.revision<>NEW.revision OR OLD.deleted<>NEW.deleted BEGIN "
+              "INSERT INTO contest_net_change(qso_uuid,previous_qso_uuid,revision,deleted,recorded_at) VALUES(NEW.uuid,CASE WHEN OLD.uuid<>NEW.uuid THEN OLD.uuid ELSE NULL END,NEW.revision,NEW.deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now')); END")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1142,6 +1150,23 @@ InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, co
     if (!q.exec() || q.numRowsAffected()!=1) return fail(q.lastError().text().isEmpty()?QStringLiteral("Could not bind the serial to the QSO"):q.lastError().text());
     if (!db.commit()) return fail(db.lastError().text());
     return result;
+}
+
+ContestNetChangePage LogDatabase::contestNetChangesAfter(qint64 sequence, int limit) const
+{
+    ContestNetChangePage page;
+    if (!isOpen()) { page.error=QStringLiteral("database not open"); return page; }
+    if (sequence<0 || limit<1 || limit>500) { page.error=QStringLiteral("Invalid journal cursor or page size"); return page; }
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral("SELECT sequence,qso_uuid,previous_qso_uuid,revision,deleted FROM contest_net_change WHERE sequence>? ORDER BY sequence LIMIT ?"));
+    q.addBindValue(sequence); q.addBindValue(limit+1);
+    if (!q.exec()) { page.error=q.lastError().text(); return page; }
+    while (q.next()) {
+        if (page.changes.size()==limit) { page.hasMore=true; break; }
+        page.changes.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toInt(),q.value(4).toBool()});
+    }
+    page.ok=true;
+    return page;
 }
 
 QString LogDatabase::snapshotJson(qint64 id) const
