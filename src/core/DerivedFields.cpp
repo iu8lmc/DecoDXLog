@@ -2,6 +2,8 @@
 #include <QHash>
 #include <QSet>
 #include <QVector>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <cmath>
 #include <functional>
 #include <optional>
@@ -144,5 +146,73 @@ DerivedValuesResult computeDerivedValues(const QVariantList& definitions,const Q
         if (n) out.values.insert(name,QString::number(*n,'g',15));
     }
     return out;
+}
+QString makeDerivedTrace(const QVariantList& definitions,const QVariantMap& allValues,const QVariantMap& computed,const QLocale& locale)
+{
+    if (computed.isEmpty()) return {};
+    const auto checked=validateCustomFields(definitions); if (!checked.ok()) return {};
+    const auto compiled=compileDefinitions(checked.fields); if (!compiled.error.isEmpty()) return {};
+    QJsonObject fields;
+    for (const QVariant& value : checked.fields) {
+        const auto definition=value.toMap(); const QString name=definition.value(QStringLiteral("name")).toString();
+        if (!computed.contains(name)) continue;
+        if (!compiled.programs.contains(name) || allValues.value(name).toString().trimmed()!=computed.value(name).toString()) return {};
+        QJsonObject inputs;
+        for (const QString& ref : compiled.programs.value(name).refs) {
+            const QString raw=allValues.value(ref).toString().trimmed(); if (raw.isEmpty()) return {};
+            inputs.insert(ref,raw);
+        }
+        fields.insert(name,QJsonObject{{QStringLiteral("expression"),definition.value(QStringLiteral("formula")).toString()},
+            {QStringLiteral("unit"),definition.value(QStringLiteral("unit")).toString()},
+            {QStringLiteral("result"),computed.value(name).toString()},{QStringLiteral("inputs"),inputs}});
+    }
+    if (fields.size()!=computed.size()) return {};
+    const QJsonObject trace{{QStringLiteral("version"),2},{QStringLiteral("inputLocale"),locale.name()},
+        {QStringLiteral("outputFormat"),QStringLiteral("C decimal, 15 significant digits")},{QStringLiteral("fields"),fields}};
+    return QString::fromUtf8(QJsonDocument(trace).toJson(QJsonDocument::Compact));
+}
+QVariantMap inspectDerivedTrace(const QVariantMap& values)
+{
+    auto result=[](const QString& state,const QStringList& affected=QStringList{}) { return QVariantMap{{QStringLiteral("state"),state},{QStringLiteral("affected"),affected}}; };
+    QVariantMap normalized;
+    for (auto it=values.cbegin();it!=values.cend();++it) {
+        const QString key=normalizeAdifName(it.key()); if (normalized.contains(key)) return result(QStringLiteral("unknown"));
+        normalized.insert(key,it.value().toString().trimmed());
+    }
+    const QString raw=normalized.value(QStringLiteral("APP_DECOLOG_DERIVED_V1")).toString();
+    if (raw.isEmpty()) return result(QStringLiteral("none"));
+    if (raw.size()>65536) return result(QStringLiteral("unknown"));
+    QJsonParseError error; const auto doc=QJsonDocument::fromJson(raw.toUtf8(),&error);
+    if (error.error!=QJsonParseError::NoError || !doc.isObject()) return result(QStringLiteral("unknown"));
+    const QJsonObject trace=doc.object(); if (trace.value(QStringLiteral("version")).toInt()!=2 || !trace.value(QStringLiteral("fields")).isObject() ||
+        !trace.value(QStringLiteral("inputLocale")).isString() || trace.value(QStringLiteral("inputLocale")).toString().isEmpty()) return result(QStringLiteral("unknown"));
+    const QJsonObject fields=trace.value(QStringLiteral("fields")).toObject(); if (fields.isEmpty() || fields.size()>kMaxCustomFields) return result(QStringLiteral("unknown"));
+    QHash<QString,QStringList> dependencies; QSet<QString> stale;
+    for (auto it=fields.begin();it!=fields.end();++it) {
+        const QString name=it.key(); if (name!=normalizeAdifName(name) || !isValidAdifName(name) || !it.value().isObject()) return result(QStringLiteral("unknown"));
+        const QJsonObject entry=it.value().toObject(); if (!entry.value(QStringLiteral("expression")).isString() || !entry.value(QStringLiteral("result")).isString() || !entry.value(QStringLiteral("inputs")).isObject()) return result(QStringLiteral("unknown"));
+        const auto program=Parser(entry.value(QStringLiteral("expression")).toString()).parse(); if (!program) return result(QStringLiteral("unknown"));
+        const QJsonObject inputs=entry.value(QStringLiteral("inputs")).toObject(); QSet<QString> expected(program->refs.cbegin(),program->refs.cend());
+        if (inputs.size()!=expected.size()) return result(QStringLiteral("unknown"));
+        for (auto input=inputs.begin();input!=inputs.end();++input) {
+            if (!expected.contains(input.key()) || !input.value().isString() || input.value().toString().isEmpty()) return result(QStringLiteral("unknown"));
+            if (normalized.value(input.key()).toString()!=input.value().toString()) stale.insert(name);
+        }
+        if (normalized.value(name).toString()!=entry.value(QStringLiteral("result")).toString()) stale.insert(name);
+        dependencies.insert(name,program->refs);
+    }
+    QHash<QString,int> state;
+    std::function<bool(const QString&)> visit=[&](const QString& name) {
+        if (state.value(name)==1) return false; if (state.value(name)==2) return true; state[name]=1;
+        for (const auto& ref : dependencies.value(name)) if (dependencies.contains(ref) && !visit(ref)) return false;
+        state[name]=2; return true;
+    };
+    for (auto it=dependencies.cbegin();it!=dependencies.cend();++it) if (!visit(it.key())) return result(QStringLiteral("unknown"));
+    bool changed=true; while (changed) { changed=false; for (auto it=dependencies.cbegin();it!=dependencies.cend();++it) {
+        if (stale.contains(it.key())) continue;
+        for (const QString& ref : it.value()) if (stale.contains(ref)) { stale.insert(it.key()); changed=true; break; }
+    } }
+    QStringList affected(stale.cbegin(),stale.cend()); affected.sort();
+    return result(affected.isEmpty()?QStringLiteral("matches"):QStringLiteral("stale"),affected);
 }
 }

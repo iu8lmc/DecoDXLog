@@ -770,6 +770,7 @@ public:
 
     // Scheda di un QSO: campi ADIF, dati di sync, QSL, storico, effetto sugli award.
     Q_INVOKABLE QVariantMap qsoDetail(qint64 id) const;
+    Q_INVOKABLE QVariantMap inspectDerivedQso(const QVariantMap& fields) const;
     // `fields` e' la mappa ADIF completa (come in qsoDetail().fields).
     Q_INVOKABLE QString saveQso(qint64 id, const QVariantMap& fields, qint64 stationProfileId,
                                 const QStringList& touchedFields);

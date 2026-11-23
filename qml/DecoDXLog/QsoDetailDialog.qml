@@ -48,6 +48,17 @@ DialogFrame {
         eqsl: ["EQSL_QSL_SENT", "EQSL_QSLSDATE", "EQSL_QSL_RCVD", "EQSL_QSLRDATE"],
         card: ["QSL_SENT", "QSLSDATE", "QSL_RCVD", "QSLRDATE"]
     })
+    readonly property var derivedInspection: { root.formRev; root.editRev; return decolog.inspectDerivedQso(root.fields) }
+    function probeDerivedEdit() {
+        console.warn("PROBE derived before " + root.derivedInspection.state)
+        root.setField("APP_A","6")
+        Qt.callLater(function() {
+            console.warn("PROBE derived editing " + root.derivedInspection.state + " " + derivedWarning.visible + " " + (root.derivedInspection.affected || []).join(","))
+            root.save()
+            console.warn("PROBE derived saved " + root.derivedInspection.state + " " + derivedWarning.visible + " " + errorText.text)
+        })
+    }
+    function probeDerivedRestore() { console.warn("PROBE derived restored " + root.derivedInspection.state + " " + derivedWarning.visible + " " + (root.derivedInspection.affected || []).join(",")) }
 
     function openFor(id) {
         qsoId = id
@@ -203,6 +214,13 @@ DialogFrame {
 
     body: ColumnLayout {
         spacing: 0
+        Text {
+            id:derivedWarning; objectName:"derivedProvenanceWarning"
+            Layout.fillWidth:true; Layout.leftMargin:14; Layout.rightMargin:14; Layout.topMargin:6
+            visible:root.derivedInspection.state === "stale" || root.derivedInspection.state === "unknown"
+            wrapMode:Text.Wrap; color:Theme.warningColor
+            text:root.derivedInspection.state === "stale" ? qsTr("Derived values may be stale: %1. Recorded inputs or results changed; values are not recalculated automatically.").arg((root.derivedInspection.affected || []).join(", ")) : qsTr("Derived-field provenance cannot be checked for this QSO. Review the stored values and formula manually.")
+        }
 
         // ── Intestazione: nominativo, dove, come ────────────────────────────
         RowLayout {

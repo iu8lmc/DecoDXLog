@@ -60,6 +60,8 @@ QString validateCustomValues(const QVariantList& definitions, const QVariantMap&
 // Derived outputs use canonical C-locale decimal text; original inputs are untouched.
 DerivedValuesResult computeDerivedValues(const QVariantList& definitions, const QVariantMap& values, const QLocale& locale);
 QString validateDerivedFormulas(const QVariantList& definitions, QString* invalidField = nullptr);
+QString makeDerivedTrace(const QVariantList& definitions, const QVariantMap& allValues, const QVariantMap& computed, const QLocale& locale);
+QVariantMap inspectDerivedTrace(const QVariantMap& values);
 
 QString encodeCustomFields(const QVariantList& fields);
 QVariantList decodeCustomFields(const QString& json, bool* legacyIota = nullptr);

@@ -67,6 +67,25 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void qsoEditorWarnsWhenDerivedInputsChange()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString originalTrace;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const QVariantList defs{QVariantMap{{"name","APP_A"},{"type","number"}},QVariantMap{{"name","APP_B"},{"type","number"},{"formula","{APP_A} * 2"}},QVariantMap{{"name","APP_C"},{"type","number"},{"formula","{APP_B} + 1"}}};
+          QVariantMap values{{"APP_A","5"}}; const auto computed=newqso::computeDerivedValues(defs,values,QLocale::c()); QVERIFY(computed.error.isEmpty());
+          for (auto it=computed.values.cbegin();it!=computed.values.cend();++it) values.insert(it.key(),it.value());
+          originalTrace=newqso::makeDerivedTrace(defs,values,computed.values,QLocale::c()); QVERIFY(!originalTrace.isEmpty());
+          AdifRecord record{{"CALL","K1DER"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+          for (auto it=values.cbegin();it!=values.cend();++it) record.set(it.key(),it.value().toString()); record.set("APP_DECOLOG_DERIVED_V1",originalTrace);
+          QVERIFY(db.insertQso(record,"fixture",{},true).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"derivededitprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE derived before matches") && output.contains("PROBE derived editing stale true APP_B,APP_C") && output.contains("PROBE derived saved stale true"),output.constData());
+        QByteArray reopened; QVERIFY2(launch(dir,"derivedrestoreprobe",reopened,3000),reopened.constData());
+        QVERIFY2(reopened.contains("PROBE derived restored stale true APP_B,APP_C"),reopened.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto record=db.record(1); QVERIFY(record);
+        QCOMPARE(record->value("APP_A"),QString("6")); QCOMPARE(record->value("APP_B"),QString("10")); QCOMPARE(record->value("APP_C"),QString("11"));
+        QCOMPARE(record->value("APP_DECOLOG_DERIVED_V1"),originalTrace); QCOMPARE(db.qsoCount(),qint64(1));
+    }
     void namedReportsSurviveRestartAndSupportExplicitRemoval()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
@@ -185,8 +204,9 @@ private slots:
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(1));
         const auto record=db.record(1); QVERIFY(record); QCOMPARE(record->value("APP_TYPED_POWER"),QString("12")); QCOMPARE(record->value("APP_TYPED_NOTE"),QString("portable"));
         QCOMPARE(record->value("APP_TYPED_DOUBLE"),QString("24"));
-        const auto trace=QJsonDocument::fromJson(record->value("APP_DECOLOG_DERIVED_V1").toUtf8()).object(); QCOMPARE(trace.value("version").toInt(),1);
+        const auto trace=QJsonDocument::fromJson(record->value("APP_DECOLOG_DERIVED_V1").toUtf8()).object(); QCOMPARE(trace.value("version").toInt(),2);
         QVERIFY(!trace.value("inputLocale").toString().isEmpty()); QCOMPARE(trace.value("fields").toObject().value("APP_TYPED_DOUBLE").toObject().value("expression").toString(),QString("{APP_TYPED_POWER} * 2"));
+        QCOMPARE(trace.value("fields").toObject().value("APP_TYPED_DOUBLE").toObject().value("inputs").toObject().value("APP_TYPED_POWER").toString(),QString("12"));
         QVERIFY(db.exportAdif(QList<qint64>{1}).contains("<app_typed_power:2>12"));
         QVERIFY(db.exportAdif(QList<qint64>{1}).contains("<app_typed_double:2>24"));
         decolog::core::LogDatabase roundtrip; QVERIFY(roundtrip.open(":memory:")); QCOMPARE(roundtrip.importAdif(db.exportAdif(QList<qint64>{1})).inserted,1);

@@ -2,6 +2,8 @@
 #include "core/LogDatabase.h"
 
 #include <QTest>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 using namespace decolog::core;
 
@@ -158,6 +160,29 @@ private slots:
         const auto requiredDefs=newqso::validateCustomFields(required); QVERIFY(requiredDefs.ok());
         const auto noInput=newqso::computeDerivedValues(requiredDefs.fields,{{"APP_SWITCH","Y"}},QLocale::c()); QVERIFY(noInput.error.isEmpty()); QVERIFY(noInput.values.isEmpty());
         QVERIFY(!newqso::validateCustomValues(requiredDefs.fields,{{"APP_SWITCH","Y"}},QLocale::c()).isEmpty());
+    }
+    void derivedProvenanceDetectsChangedInputsAndTransitiveResults()
+    {
+        const QVariantList defs{QVariantMap{{"name","APP_A"},{"type","number"}},
+            QVariantMap{{"name","APP_B"},{"type","number"},{"formula","{APP_A} * 2"}},
+            QVariantMap{{"name","APP_C"},{"type","number"},{"formula","{APP_B} + 1"}}};
+        const auto checked=newqso::validateCustomFields(defs); QVERIFY(checked.ok()); QVariantMap values{{"APP_A","5"}};
+        const auto computed=newqso::computeDerivedValues(checked.fields,values,QLocale::c()); QVERIFY(computed.error.isEmpty());
+        for (auto it=computed.values.cbegin();it!=computed.values.cend();++it) values.insert(it.key(),it.value());
+        values.insert("APP_DECOLOG_DERIVED_V1",newqso::makeDerivedTrace(checked.fields,values,computed.values,QLocale::c()));
+        auto status=newqso::inspectDerivedTrace(values); QCOMPARE(status.value("state").toString(),QString("matches"));
+        values.insert("APP_UNRELATED","hello"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("matches"));
+        values.insert("APP_A","6"); status=newqso::inspectDerivedTrace(values); QCOMPARE(status.value("state").toString(),QString("stale"));
+        const auto affected=status.value("affected").toStringList(); QVERIFY(affected.contains("APP_B") && affected.contains("APP_C"));
+        values.insert("APP_A","5"); values.insert("APP_B","999"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("stale"));
+        auto trace=QJsonDocument::fromJson(values.value("APP_DECOLOG_DERIVED_V1").toString().toUtf8()).object();
+        auto fields=trace.value("fields").toObject(), entry=fields.value("APP_B").toObject(); entry.insert("inputs",QJsonObject{}); fields.insert("APP_B",entry); trace.insert("fields",fields);
+        values.insert("APP_DECOLOG_DERIVED_V1",QString::fromUtf8(QJsonDocument(trace).toJson(QJsonDocument::Compact))); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("unknown"));
+        entry.insert("expression","{APP_B}"); entry.insert("inputs",QJsonObject{{"APP_B","10"}}); fields.insert("APP_B",entry); trace.insert("fields",fields);
+        values.insert("APP_DECOLOG_DERIVED_V1",QString::fromUtf8(QJsonDocument(trace).toJson(QJsonDocument::Compact))); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("unknown"));
+        values.insert("APP_DECOLOG_DERIVED_V1",R"({"version":1,"fields":{}})"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("unknown"));
+        values.insert("APP_DECOLOG_DERIVED_V1","not json"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("unknown"));
+        values.remove("APP_DECOLOG_DERIVED_V1"); QCOMPARE(newqso::inspectDerivedTrace(values).value("state").toString(),QString("none"));
     }
 };
 

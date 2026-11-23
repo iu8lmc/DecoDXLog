@@ -4175,16 +4175,9 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     if (!derived.values.isEmpty()) {
         const QString traceField=QStringLiteral("APP_DECOLOG_DERIVED_V1");
         if (customFields.contains(traceField)) return tr("%1 conflicts with derived-field provenance; remove that custom value before logging.").arg(traceField);
-        QJsonObject formulas;
-        for (const QVariant& value : definitions) {
-            const auto definition=value.toMap(); const QString name=definition.value(QStringLiteral("name")).toString();
-            if (!derived.values.contains(name)) continue;
-            formulas.insert(name,QJsonObject{{QStringLiteral("expression"),definition.value(QStringLiteral("formula")).toString()},
-                                             {QStringLiteral("unit"),definition.value(QStringLiteral("unit")).toString()}});
-        }
-        const QJsonObject trace{{QStringLiteral("version"),1},{QStringLiteral("inputLocale"),QLocale().name()},
-                                {QStringLiteral("outputFormat"),QStringLiteral("C decimal, 15 significant digits")},{QStringLiteral("fields"),formulas}};
-        r.set(traceField,QString::fromUtf8(QJsonDocument(trace).toJson(QJsonDocument::Compact)));
+        const QString trace=newqso::makeDerivedTrace(definitions,customFields,derived.values,QLocale());
+        if (trace.isEmpty()) return tr("Cannot record derived-field provenance");
+        r.set(traceField,trace);
     }
     if (historical)
         r.set(QStringLiteral("APP_DECOLOG_ENTRY_CONTEXT"), QStringLiteral("HISTORICAL"));
@@ -4297,6 +4290,10 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
 
 // ── Scheda QSO ────────────────────────────────────────────────────────────────
 
+QVariantMap DecoLogController::inspectDerivedQso(const QVariantMap& fields) const
+{
+    return newqso::inspectDerivedTrace(fields);
+}
 QVariantMap DecoLogController::qsoDetail(qint64 id) const
 {
     decolog::StartupSpan trace("QSO detail read");
