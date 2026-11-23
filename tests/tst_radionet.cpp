@@ -29,6 +29,27 @@ class TestRadioNet : public QObject {
         QCOMPARE(first.insertQso(record,"manual",{},true,0,false).status,InsertResult::Status::Inserted); QCOMPARE(first.qsoCount(),qint64(2));
         QCOMPARE(first.insertQso(record,"import",{},false,0,false).status,InsertResult::Status::Inserted);
     }
+    void radioNetGuardAndContestSerialCommitTogether()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); LogDatabase db,other; QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        RadioNet net(&db); QVERIFY(net.start("Net")); QVERIFY(net.checkIn("K1ABC","Alice","")); const qint64 sessionId=net.session().value("id").toLongLong();
+        QSqlQuery q(db.connection()); q.prepare("SELECT s.uuid,m.id FROM radio_net_session s JOIN radio_net_member m ON m.session_id=s.id WHERE s.id=? AND m.call='K1ABC'"); q.addBindValue(sessionId); QVERIFY(q.exec()); QVERIFY(q.next()); const QString uuid=q.value(0).toString(); const qint64 memberId=q.value(1).toLongLong(); q.finish();
+        AdifRecord record{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_RADIO_NET_SESSION",uuid},{"APP_DECOLOG_RADIO_NET_CALL","K1ABC"}};
+        auto grant=[&](const QString& request,int serial) { const QString node=request==QLatin1String("legacy") ? QStringLiteral("node2") : QStringLiteral("node"); return db.beginContestSerialRequest("event",node,request,"authority",serial).ok && db.acceptContestSerialGrant("event",node,request,"authority",serial).ok; };
+        QVERIFY(grant("first",10)); auto wrong=record; wrong.set("APP_DECOLOG_RADIO_NET_CALL","K1OTHER");
+        QVERIFY(db.insertQsoWithContestSerial(wrong,"manual","event","node","first","authority",{},true,0,false,sessionId,memberId).status!=InsertResult::Status::Inserted);
+        QCOMPARE(db.contestSerialRequest("event","node","first").state,QString("granted")); QCOMPARE(db.qsoCount(),qint64(0));
+        const auto inserted=db.insertQsoWithContestSerial(record,"manual","event","node","first","authority",{},true,0,false,sessionId,memberId);
+        QCOMPARE(inserted.status,InsertResult::Status::Inserted); const auto meta=db.meta(inserted.id); QVERIFY(meta); const auto stored=db.record(inserted.id); QVERIFY(stored);
+        QCOMPARE(stored->value("STX"),QString("10")); QCOMPARE(stored->value("APP_DECOLOG_RADIO_NET_SESSION"),uuid);
+        QCOMPARE(db.contestSerialRequest("event","node","first").state,QString("consumed")); QCOMPARE(db.contestSerialRequest("event","node","first").useId,meta->uuid);
+        QVERIFY(grant("second",11)); QVERIFY(grant("legacy",12)); RadioNet otherNet(&other); QVERIFY(otherNet.selectSession(sessionId)); QVERIFY(otherNet.closeSession());
+        QVERIFY(db.insertQsoWithContestSerial(record,"manual","event","node","second","authority",{},true,0,false,sessionId,memberId).status!=InsertResult::Status::Inserted);
+        QCOMPARE(db.contestSerialRequest("event","node","second").state,QString("granted")); QCOMPARE(db.qsoCount(),qint64(1));
+        QCOMPARE(db.insertQsoWithContestSerial(record,"manual","event","node2","legacy","authority",{},true,0,false).status,InsertResult::Status::Inserted);
+        QCOMPARE(db.contestSerialRequest("event","node2","legacy").state,QString("consumed")); QCOMPARE(db.qsoCount(),qint64(2));
+        db.close(); QVERIFY(db.open(path)); QCOMPARE(db.contestSerialRequest("event","node","second").state,QString("granted")); QCOMPARE(db.contestSerialRequest("event","node","first").useId,meta->uuid); QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void reportedQsoHistoryIsPagedAndSessionScoped()
     {
         LogDatabase db;
