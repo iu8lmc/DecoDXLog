@@ -19,6 +19,7 @@ DialogFrame {
     property bool probeAwaitExport: false
     property int probeExportStep: 0
     property bool probeClosedMode: false
+    property bool probeExclusionMode: false
     property int previewPage: 0
     property int excludedPage: 0
     property var historyRows: []
@@ -52,6 +53,11 @@ DialogFrame {
         if (String(value).trim().length) programs[key] = value
         else delete programs[key]
         root.set("programs", programs)
+    }
+    function probeExclusions() {
+        root.openDialog("pota")
+        root.probeExclusionMode = true
+        Qt.callLater(() => { const row = historyRepeater.itemAt(0); if (row) row.probeClick() })
     }
     function probeMultiProgram() {
         root.openDialog("pota")
@@ -114,6 +120,26 @@ DialogFrame {
             }
         }
         function onPreviewFinished(success) {
+            if (root.probeExclusionMode) {
+                root.probeExclusionMode = false
+                Qt.callLater(() => {
+                    const first = exclusionRepeater.itemAt(0)
+                    if (!first) return
+                    console.warn("PROBE exclusions total=" + root.partitionPreview.excluded.length + " first=" + first.modelData.call + " reason=" + first.modelData.reason + " text=" + first.text)
+                    exclusionNext.clicked()
+                    Qt.callLater(() => {
+                        const next = exclusionRepeater.itemAt(0)
+                        if (!next) return
+                        console.warn("PROBE exclusions next=" + next.modelData.call + " reason=" + next.modelData.reason + " page=" + root.excludedPage + " text=" + next.text)
+                        exclusionPrevious.clicked()
+                        Qt.callLater(() => {
+                            const back = exclusionRepeater.itemAt(0)
+                            if (back) console.warn("PROBE exclusions back=" + back.modelData.call + " page=" + root.excludedPage)
+                        })
+                    })
+                })
+                return
+            }
             if (root.probeClosedMode) {
                 console.warn("PROBE closedPreview success=" + success + " reported=" + root.partitionPreview.reportedCount)
                 const group = (root.partitionPreview.groups || []).find(g => g.program === "POTA" && g.reference === "IT-0001")
@@ -561,6 +587,7 @@ DialogFrame {
             text: qsTr("Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references. %3 groups.").arg(root.partitionPreview.missingDate || 0).arg(root.partitionPreview.missingReference || 0).arg((root.partitionPreview.groups || []).length)
         }
         Repeater {
+            id: exclusionRepeater
             model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.excluded || []).slice(root.excludedPage * 100, (root.excludedPage + 1) * 100) : []
             Note {
                 required property var modelData
@@ -571,9 +598,9 @@ DialogFrame {
         }
         RowLayout {
             visible: root.previewShown && (root.partitionPreview.excluded || []).length > 100
-            GlassButton { text: qsTr("Previous exclusions"); enabled: root.excludedPage > 0; onClicked: root.excludedPage-- }
+            GlassButton { id: exclusionPrevious; text: qsTr("Previous exclusions"); enabled: root.excludedPage > 0; onClicked: root.excludedPage-- }
             Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.excludedPage + 1) }
-            GlassButton { text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < root.partitionPreview.excluded.length; onClicked: root.excludedPage++ }
+            GlassButton { id: exclusionNext; text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < (root.partitionPreview.excluded || []).length; onClicked: root.excludedPage++ }
         }
         Note {
             visible: root.previewShown && !root.partitionPreview.error
@@ -604,7 +631,7 @@ DialogFrame {
             visible: root.previewShown && (root.partitionPreview.groups || []).length > 100
             GlassButton { text: qsTr("Previous groups"); enabled: root.previewPage > 0; onClicked: root.previewPage-- }
             Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.previewPage + 1) }
-            GlassButton { text: qsTr("Next groups"); enabled: (root.previewPage + 1) * 100 < root.partitionPreview.groups.length; onClicked: root.previewPage++ }
+            GlassButton { text: qsTr("Next groups"); enabled: (root.previewPage + 1) * 100 < (root.partitionPreview.groups || []).length; onClicked: root.previewPage++ }
         }
         Text {
             id: errorText

@@ -55,6 +55,32 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void activationExclusionsAreShownAndPaged()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        {
+            using namespace decolog::core;
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            QSqlQuery q(db.connection());
+            QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('fixture-session','2026-11-01T00:00:00Z','2026-11-02T00:00:00Z','{}','{\"title\":\"Fixture\"}')"));
+            qint64 last = 0;
+            for (int i = 0; i < 101; ++i) {
+                AdifRecord r{{"CALL", QString("K%1AAA").arg(i)}, {"QSO_DATE", "20261101"}, {"TIME_ON", "120000"},
+                             {"BAND", "20m"}, {"MODE", "CW"}, {"APP_DECOLOG_ACTIVATION_UUID", "fixture-session"}};
+                const auto inserted = db.insertQso(r, "manual", {}, true, 0, false);
+                QCOMPARE(inserted.status, InsertResult::Status::Inserted); last = inserted.id;
+            }
+            q.prepare("UPDATE qso SET qso_datetime_on='invalid' WHERE id=?"); q.addBindValue(last); QVERIFY(q.exec());
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("exclusionprobe"), output), output.constData());
+        QVERIFY2(output.contains("PROBE exclusions total=101 first=K0AAA reason=missingReference"), output.constData());
+        QVERIFY2(output.contains("PROBE exclusions next=K100AAA reason=missingDate page=1"), output.constData());
+        QVERIFY2(output.contains("PROBE exclusions back=K0AAA page=0"), output.constData());
+        QVERIFY2(output.contains("no operator programme reference"), output.constData());
+        QVERIFY2(output.contains("missing or invalid UTC date"), output.constData());
+        QVERIFY2(!output.contains("TypeError: Cannot read property 'length' of undefined"), output.constData());
+    }
     void multiProgramActivationKeepsOwnAndCounterpartReferencesDistinct()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

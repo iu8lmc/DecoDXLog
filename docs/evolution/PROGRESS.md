@@ -412,3 +412,12 @@ The grouping preview retains QSO ID, call, stored UTC timestamp and a reason for
 A/B: before this increment the preview returned the exclusion count but no individual rows. The synthetic fixture now identifies the reference-free K1DDD record and its reason, then deliberately corrupts another QSO's stored date and identifies K1EEE with the date reason. `tst_activation` passed 24 tests; the existing offscreen desktop multiprogram and closed-session probe passed after rebuilding on macOS arm64/Qt 6.11.2. That desktop probe has no excluded rows, so the rendered exclusion rows and their page buttons have not yet been exercised.
 
 The result retains excluded rows in memory; large exclusion sets and concurrent writes were not benchmarked. Programme-specific exclusion details, duplicate and eligibility rules, local catalogues, review of all included records, importer acceptance and physical/RF operation remain open, along with the other desktop roadmap work.
+
+
+## 2026-11-23 — G06 exclusion review desktop verification
+
+A new offscreen app fixture creates a separate synthetic log containing one closed tracked session and 101 reported contacts: 100 without an operator programme reference and one with a deliberately invalid stored UTC date. The test opens the closed session from the desktop dialog, checks the displayed delegate text and reason on the first page, activates Next, checks the final contact and date reason, then activates Previous and verifies the original first row. It does not use a user log.
+
+A/B: before this increment the new desktop probe did not run and its baseline surfaced two `ActivationDialog.qml` TypeErrors caused by reading `.length` on undefined preview arrays before a result existed. Those bindings now use empty-array fallbacks. The revised desktop exclusion probe and existing multiprogram/closed-session probe passed; `tst_activation` passed 24 tests. Tests ran offscreen with programmatic actions on macOS arm64/Qt 6.11.2. This checks the QML delegate text and controls, not physical interaction or visual inspection of the screenshot.
+
+Grouping exclusions remain limited to invalid date and missing operator references; per-programme eligibility, catalogues, concurrent writes, large-log performance, official importer acceptance, RF and the remaining desktop roadmap work are still open.
