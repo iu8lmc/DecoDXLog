@@ -154,6 +154,9 @@ private slots:
         contestqso::Receiver receiver("node","transfer"); QVERIFY(receiver.accept("node",sender.frame(sender.count()-1)));
         auto req=receiver.missingRequest(0); QVERIFY(!req.isEmpty()); auto frames=sender.framesForRequest(req); QCOMPARE(frames.size(),32);
         auto bad=req; bad.insert("sha256",QString(64,QLatin1Char('0'))); QVERIFY(sender.framesForRequest(bad).isEmpty());
+        auto changedRecord=record; changedRecord.set("COMMENT",QString(40000,QLatin1Char('s'))); auto changedRow=row;
+        changedRow.adifPayload=adif::writeRecord(changedRecord).toUtf8(); changedRow.contentHash=ContestNetInventory::fingerprint(changedRecord);
+        contestqso::Encoder changedSender("transfer","log",changedRow); QVERIFY(changedSender.ok()); QVERIFY(changedSender.framesForRequest(req).isEmpty());
         for (const auto& frame:frames) QVERIFY(receiver.accept("node",frame));
         QVERIFY(!receiver.complete());
         while (!receiver.complete()) {
@@ -266,6 +269,66 @@ private slots:
         QVERIFY(source.softDeleteQso(initial.id)); auto deletion=receive("delete"); QVERIFY(deletion.complete()); QVERIFY(deletion.row().deleted);
         review=contestqso::reviewExisting(target,target.identity(),deletion); QVERIFY(review.ok); changed=contestqso::applyReviewed(target,target.identity(),deletion,review);
         QVERIFY2(changed.ok,qPrintable(changed.error)); QVERIFY(target.meta(add.id)->deleted);
+    }
+    void threeNodeQsoRejoinRequiresExplicitConflictReview()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("origin.sqlite"); LogDatabase origin,one,two;
+        QVERIFY(origin.open(path)); QVERIFY(one.open(dir.filePath("one.sqlite"))); QVERIFY(two.open(dir.filePath("two.sqlite")));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(1800,'a')}};
+        const auto inserted=origin.insertQso(record,"fixture"); QVERIFY(inserted.id>0); const QString uuid=origin.meta(inserted.id)->uuid;
+        QUdpSocket sender,first,second; QVERIFY(sender.bind(QHostAddress::LocalHost,0)); QVERIFY(first.bind(QHostAddress::LocalHost,0)); QVERIFY(second.bind(QHostAddress::LocalHost,0));
+        auto snapshot=[&](ContestNetInventoryRow& row,QString& identity) {
+            ContestNetInventory inv; if (!inv.begin(path)) return false; const auto page=inv.findUuid(uuid); if (!page.ok || page.rows.size()!=1) return false;
+            row=page.rows.first(); identity=inv.logIdentity(); return true;
+        };
+        auto receive=[&](const ContestNetInventoryRow& row,const QString& identity,const QString& transfer,QUdpSocket& destination,contestqso::Receiver& receiver,bool restartSource) {
+            contestqso::Encoder encoder(transfer,identity,row); if (!encoder.ok() || encoder.count()<2) return false;
+            auto send=[&](const QJsonObject& body) {
+                const auto packet=ContestNet::pack("FIELD","origin","qso_chunk_v1",body);
+                if (sender.writeDatagram(packet,QHostAddress::LocalHost,destination.localPort())!=packet.size() || !destination.waitForReadyRead(3000)) return false;
+                QByteArray bytes(int(destination.pendingDatagramSize()),0); if (destination.readDatagram(bytes.data(),bytes.size())!=bytes.size()) return false;
+                QString from,type; QJsonObject decoded; return ContestNet::unpack(bytes,"FIELD",&from,&type,&decoded) && type=="qso_chunk_v1" && receiver.accept(from,decoded);
+            };
+            // Omit index zero, send the rest backwards, and replay one fragment.
+            for (int i=encoder.count()-1;i>0;--i) if (!send(encoder.frame(i))) return false;
+            if (receiver.complete() || !send(encoder.frame(1))) return false;
+            const auto request=ContestNet::pack("FIELD","peer","qso_missing_v1",receiver.missingRequest(0));
+            if (destination.writeDatagram(request,QHostAddress::LocalHost,sender.localPort())!=request.size() || !sender.waitForReadyRead(3000)) return false;
+            QByteArray bytes(int(sender.pendingDatagramSize()),0); if (sender.readDatagram(bytes.data(),bytes.size())!=bytes.size()) return false;
+            QString from,type; QJsonObject decoded; if (!ContestNet::unpack(bytes,"FIELD",&from,&type,&decoded) || type!="qso_missing_v1") return false;
+            QList<QJsonObject> retry;
+            if (restartSource) {
+                origin.close(); if (!origin.open(path)) return false;
+                ContestNetInventoryRow reopened; QString reopenedIdentity; if (!snapshot(reopened,reopenedIdentity)) return false;
+                contestqso::Encoder resumed(transfer,reopenedIdentity,reopened); if (!resumed.ok()) return false;
+                retry=resumed.framesForRequest(decoded);
+            } else retry=encoder.framesForRequest(decoded);
+            if (retry.size()!=1) return false;
+            return send(retry.first()) && receiver.complete();
+        };
+        ContestNetInventoryRow row; QString identity; QVERIFY(snapshot(row,identity));
+        contestqso::Receiver initialOne("origin","initial-one"),initialTwo("origin","initial-two");
+        QVERIFY(receive(row,identity,"initial-one",first,initialOne,true)); QVERIFY(contestqso::applyMissing(one,one.identity(),initialOne).ok);
+        // Second station is partitioned until this point: no local QSO exists.
+        QCOMPARE(two.idForUuid(uuid),qint64(0)); QVERIFY(receive(row,identity,"initial-two",second,initialTwo,false)); QVERIFY(contestqso::applyMissing(two,two.identity(),initialTwo).ok);
+        const auto idOne=one.idForUuid(uuid),idTwo=two.idForUuid(uuid); QVERIFY(idOne>0 && idTwo>0);
+        record.set("NAME","Origin edit"); QVERIFY(origin.updateQso(inserted.id,record).status==InsertResult::Status::Inserted); QVERIFY(snapshot(row,identity));
+        contestqso::Receiver editOne("origin","edit-one"),editTwo("origin","edit-two"); QVERIFY(receive(row,identity,"edit-one",first,editOne,false)); QVERIFY(receive(row,identity,"edit-two",second,editTwo,false));
+        auto reviewOne=contestqso::reviewExisting(one,one.identity(),editOne),reviewTwo=contestqso::reviewExisting(two,two.identity(),editTwo); QVERIFY(reviewOne.ok && reviewTwo.ok);
+        auto concurrent=*two.record(idTwo); concurrent.set("NAME","Local edit"); QVERIFY(two.updateQso(idTwo,concurrent).status==InsertResult::Status::Inserted);
+        QVERIFY(contestqso::applyReviewed(one,one.identity(),editOne,reviewOne).ok); QVERIFY(!contestqso::applyReviewed(two,two.identity(),editTwo,reviewTwo).ok);
+        QCOMPARE(two.record(idTwo)->value("NAME"),QString("Local edit")); two.close(); QVERIFY(two.open(dir.filePath("two.sqlite")));
+        reviewTwo=contestqso::reviewExisting(two,two.identity(),editTwo); QVERIFY(reviewTwo.ok); QVERIFY(contestqso::applyReviewed(two,two.identity(),editTwo,reviewTwo).ok);
+        QCOMPARE(ContestNetInventory::fingerprint(*one.record(idOne)),ContestNetInventory::fingerprint(*two.record(idTwo)));
+        QVERIFY(origin.softDeleteQso(inserted.id)); QVERIFY(snapshot(row,identity)); QVERIFY(row.deleted);
+        contestqso::Receiver deleteOne("origin","delete-one"),deleteTwo("origin","delete-two"); QVERIFY(receive(row,identity,"delete-one",first,deleteOne,false)); QVERIFY(receive(row,identity,"delete-two",second,deleteTwo,false));
+        reviewOne=contestqso::reviewExisting(one,one.identity(),deleteOne); reviewTwo=contestqso::reviewExisting(two,two.identity(),deleteTwo); QVERIFY(reviewOne.ok && reviewTwo.ok);
+        concurrent=*two.record(idTwo); concurrent.set("NAME","Edit before delete"); QVERIFY(two.updateQso(idTwo,concurrent).status==InsertResult::Status::Inserted);
+        QVERIFY(contestqso::applyReviewed(one,one.identity(),deleteOne,reviewOne).ok); QVERIFY(!contestqso::applyReviewed(two,two.identity(),deleteTwo,reviewTwo).ok); QVERIFY(!two.meta(idTwo)->deleted);
+        reviewTwo=contestqso::reviewExisting(two,two.identity(),deleteTwo); QVERIFY(reviewTwo.ok); QVERIFY(contestqso::applyReviewed(two,two.identity(),deleteTwo,reviewTwo).ok);
+        QVERIFY(one.meta(idOne)->deleted && two.meta(idTwo)->deleted);
+        one.close(); two.close(); QVERIFY(one.open(dir.filePath("one.sqlite"))); QVERIFY(two.open(dir.filePath("two.sqlite")));
+        QVERIFY(one.meta(idOne)->deleted && two.meta(idTwo)->deleted); QCOMPARE(one.idForUuid(uuid),idOne); QCOMPARE(two.idForUuid(uuid),idTwo);
     }
     void qsoTransferRejectsMalformedFragments()
     {
