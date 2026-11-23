@@ -1,5 +1,6 @@
 // La rete multi-operatore: messaggi impacchettati e ricevuti.
 #include "core/ContestNet.h"
+#include "core/ContestNetQsoTransfer.h"
 #include "core/ContestSerialProtocol.h"
 #include "core/LogDatabase.h"
 
@@ -95,6 +96,77 @@ private slots:
         QVERIFY(sender.readDatagram(bytes.data(),bytes.size())>0); QString from,type; QJsonObject body;
         QVERIFY(ContestNet::unpack(bytes,"FIELD",&from,&type,&body)); QCOMPARE(type,QString("serial_grant_v3"));
         const auto accepted=contestserial::acceptGrant(client,"event","node","authority",from,body); QVERIFY2(accepted.ok,qPrintable(accepted.error)); QCOMPARE(accepted.serial,1);
+    }
+    void qsoTransferReordersAndRejectsCorruption()
+    {
+        AdifRecord record{{"CALL", "9H1SR"}, {"COMMENT", QString(1500, QLatin1Char('x'))}};
+        ContestNetInventoryRow row; row.uuid="qso-1"; row.revision=3;
+        row.adifPayload=adif::writeRecord(record).toUtf8(); row.contentHash=ContestNetInventory::fingerprint(record);
+        contestqso::Encoder encoder("transfer-1", "log-1", row);
+        QVERIFY2(encoder.ok(), qPrintable(encoder.error())); QVERIFY(encoder.count()>2);
+        contestqso::Receiver receiver("node-1", "transfer-1");
+        for (int i=encoder.count()-1; i>0; --i) {
+            auto frame=encoder.frame(i); const auto packed=ContestNet::pack("FIELD","node-1","qso_chunk_v1",frame);
+            QVERIFY(packed.size()<1400); QString from,type; QJsonObject decoded;
+            QVERIFY(ContestNet::unpack(packed,"FIELD",&from,&type,&decoded));
+            QVERIFY(receiver.accept(from,decoded)); QVERIFY(!receiver.complete());
+            QVERIFY(receiver.accept(from,decoded));
+        }
+        QVERIFY(!receiver.accept("impostor",encoder.frame(0))); QVERIFY(!receiver.complete());
+        QVERIFY(receiver.accept("node-1",encoder.frame(0))); QVERIFY(receiver.complete());
+        QCOMPARE(receiver.row().adifPayload,row.adifPayload); QCOMPARE(receiver.row().contentHash,row.contentHash);
+        contestqso::Receiver damaged("node-1","transfer-1");
+        for (int i=0;i<encoder.count();++i) {
+            auto frame=encoder.frame(i);
+            if (i==0) { auto bytes=QByteArray::fromBase64(frame.value("data").toString().toLatin1()); bytes[0]='Z'; frame.insert("data",QString::fromLatin1(bytes.toBase64())); }
+            const bool accepted=damaged.accept("node-1",frame);
+            if (i==encoder.count()-1) QVERIFY(!accepted); else QVERIFY(accepted);
+        }
+        QVERIFY(!damaged.complete()); QVERIFY(damaged.row().adifPayload.isEmpty());
+        contestqso::Receiver invalid("node-1","transfer-1"); auto frame=encoder.frame(0); frame.insert("count",1e20);
+        QVERIFY(!invalid.accept("node-1",frame));
+    }
+    void qsoTransferOverLoopbackWithLossAndRetry()
+    {
+        AdifRecord record{{"CALL", "9H1SR"}, {"COMMENT", QString(1400, QLatin1Char('a'))}};
+        ContestNetInventoryRow row; row.uuid="qso-1"; row.revision=1; row.adifPayload=adif::writeRecord(record).toUtf8();
+        row.contentHash=ContestNetInventory::fingerprint(record);
+        contestqso::Encoder encoder("transfer-2","log-1",row); QVERIFY(encoder.ok());
+        QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost,0)); const auto port=probe.localPort(); probe.close();
+        ContestNet net; QVERIFY(net.start(port,"FIELD","receiver")); QUdpSocket sender;
+        contestqso::Receiver receiver("node-1","transfer-2"); int accepted=0;
+        connect(&net,&ContestNet::received,&net,[&](const QString& from,const QString& type,const QJsonObject& body,const QHostAddress&) {
+            if (type=="qso_chunk_v1" && receiver.accept(from,body)) ++accepted;
+        });
+        auto send=[&](int index) { const auto bytes=ContestNet::pack("FIELD","node-1","qso_chunk_v1",encoder.frame(index)); return sender.writeDatagram(bytes,QHostAddress::LocalHost,port)==bytes.size(); };
+        for (int i=encoder.count()-1;i>0;--i) QVERIFY(send(i));
+        QTRY_COMPARE(accepted,encoder.count()-1); QVERIFY(!receiver.complete());
+        QVERIFY(send(1)); QTRY_COMPARE(accepted,encoder.count()); QVERIFY(!receiver.complete());
+        QVERIFY(send(0)); QTRY_VERIFY(receiver.complete()); QCOMPARE(receiver.row().adifPayload,row.adifPayload);
+    }
+    void qsoTransferAcceptsInventorySnapshot()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("source.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString::fromUtf8("Città 😀 <tag>")}};
+        const auto inserted=db.insertQso(record,"fixture"); QVERIFY(inserted.id>0);
+        ContestNetInventory inventory; QVERIFY(inventory.begin(path)); const auto page=inventory.next(10); QVERIFY(page.ok); QCOMPARE(page.rows.size(),1);
+        const auto original=page.rows.first(); contestqso::Encoder encoder("transfer",inventory.logIdentity(),original); QVERIFY2(encoder.ok(),qPrintable(encoder.error()));
+        contestqso::Receiver receiver("node","transfer"); for (int i=0;i<encoder.count();++i) QVERIFY(receiver.accept("node",encoder.frame(i)));
+        QVERIFY(receiver.complete()); QCOMPARE(receiver.row().uuid,original.uuid); QCOMPARE(receiver.row().adifPayload,original.adifPayload);
+        QCOMPARE(receiver.sourceLog(),inventory.logIdentity()); QCOMPARE(db.record(inserted.id)->value("COMMENT"),record.value("COMMENT"));
+    }
+    void qsoTransferRejectsMalformedFragments()
+    {
+        AdifRecord record{{"CALL","9H1SR"},{"COMMENT",QString(700,QLatin1Char('b'))}};
+        ContestNetInventoryRow row; row.uuid="qso"; row.revision=2; row.adifPayload=adif::writeRecord(record).toUtf8(); row.contentHash=ContestNetInventory::fingerprint(record);
+        contestqso::Encoder encoder("transfer","log",row); QVERIFY(encoder.ok());
+        for (const QJsonValue value : {QJsonValue(1.5), QJsonValue(-1), QJsonValue("1"), QJsonValue(1e20)}) {
+            contestqso::Receiver r("node","transfer"); auto f=encoder.frame(0); f.insert("size",value); QVERIFY(!r.accept("node",f));
+        }
+        contestqso::Receiver r("node","transfer"); auto f=encoder.frame(0); f.insert("data","!!!!"); QVERIFY(!r.accept("node",f));
+        QVERIFY(r.accept("node",encoder.frame(0))); f=encoder.frame(0); auto bytes=QByteArray::fromBase64(f.value("data").toString().toLatin1()); bytes[0]='z'; f.insert("data",QString::fromLatin1(bytes.toBase64()));
+        QVERIFY(!r.accept("node",f)); QVERIFY(!r.complete()); QVERIFY(r.accept("node",encoder.frame(1))); QVERIFY(r.complete());
+        row.adifPayload=QByteArray(4*1024*1024+1,'x'); contestqso::Encoder large("transfer","log",row); QVERIFY(!large.ok()); QCOMPARE(large.count(),0);
     }
     void packUnpack()
     {
