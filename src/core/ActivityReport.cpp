@@ -4,6 +4,12 @@
 #include <QVariantMap>
 #include <QDateTime>
 #include <QMap>
+#include <QPdfWriter>
+#include <QPainter>
+#include <QFontMetrics>
+#include <QPageLayout>
+#include <QPageSize>
+#include <QIODevice>
 
 namespace decolog::core::activityreport {
 Result run(const QSqlDatabase& db,int utcYear,const QString& band)
@@ -123,5 +129,63 @@ QByteArray clubCsv(const Result& result)
             escape(row.value(QStringLiteral("operator")).toString())+','+QByteArray::number(row.value(QStringLiteral("count")).toLongLong())+"\r\n";
     }
     return out;
+}
+bool writePdf(QIODevice* output,const QVariantMap& snapshot,QString* error)
+{
+    auto fail=[error](const QString& message) { if (error) *error=message; return false; };
+    const QString kind=snapshot.value(QStringLiteral("kind")).toString();
+    if (!output || !output->isWritable() || snapshot.value(QStringLiteral("truncated")).toBool() ||
+        !snapshot.value(QStringLiteral("error")).toString().isEmpty() ||
+        (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation") && kind!=QLatin1String("club"))) return fail(QStringLiteral("Invalid or incomplete report"));
+    QPdfWriter writer(output); writer.setResolution(72); writer.setPageSize(QPageSize(QPageSize::A4));
+    writer.setPageOrientation(QPageLayout::Landscape); writer.setPageMargins(QMarginsF(32,32,32,32),QPageLayout::Point);
+    writer.setTitle(QStringLiteral("DecoDXLog report")); writer.setCreator(QStringLiteral("DecoDXLog"));
+    QPainter painter; if (!painter.begin(&writer)) return fail(QStringLiteral("Cannot start PDF painter"));
+    painter.setRenderHint(QPainter::Antialiasing,true);
+    const QString title=kind==QLatin1String("club") ? QStringLiteral("Annual station activity") : kind==QLatin1String("confirmation") ? QStringLiteral("Observed confirmation times") : QStringLiteral("Recorded station activity");
+    const QStringList keys=kind==QLatin1String("club") ? QStringList{"year","station","operator","count"} : kind==QLatin1String("confirmation") ? QStringList{"service","confirmed","dated","missing","invalid","earlier","averageDays"} : QStringList{"antenna","band","grid","count"};
+    const QStringList headings=kind==QLatin1String("club") ? QStringList{"UTC year","Station","Operator","QSO"} : kind==QLatin1String("confirmation") ? QStringList{"Service","Confirmed","Dated","Missing","Invalid","Earlier","Mean days"} : QStringList{"Antenna","Band","Own grid","QSO"};
+    const QList<qreal> fractions=kind==QLatin1String("club") ? QList<qreal>{0.13,0.30,0.42,0.15} : kind==QLatin1String("confirmation") ? QList<qreal>{0.20,0.14,0.12,0.12,0.12,0.12,0.18} : QList<qreal>{0.39,0.14,0.32,0.15};
+    const qreal width=writer.width(), height=writer.height(); const qreal footerY=height-12; qreal y=0; int page=0;
+    QFont titleFont=painter.font(); titleFont.setPointSize(16); titleFont.setBold(true);
+    QFont bodyFont=painter.font(); bodyFont.setPointSize(9);
+    QFont headFont=bodyFont; headFont.setBold(true);
+    const QString year=snapshot.value(QStringLiteral("year")).toInt() ? snapshot.value(QStringLiteral("year")).toString() : QStringLiteral("all");
+    const QString band=snapshot.value(QStringLiteral("band")).toString().isEmpty() ? QStringLiteral("all") : snapshot.value(QStringLiteral("band")).toString();
+    const QString station=snapshot.value(QStringLiteral("station")).toString();
+    const QString metadata=QStringLiteral("Snapshot %1 | UTC year: %2 | Band: %3%4").arg(snapshot.value(QStringLiteral("generatedAt")).toString(),year,band,kind==QLatin1String("club") ? QStringLiteral(" | Station: ")+(station.isEmpty()?QStringLiteral("all"):station) : QString());
+    const QString note=kind==QLatin1String("confirmation") ? QStringLiteral("Local recorded states only; missing, invalid and earlier dates are excluded from the mean. Not award credit.") : kind==QLatin1String("club") ? QStringLiteral("Recorded station and operator only; missing values are not inferred. Membership is not verified.") : QStringLiteral("Only recorded per-QSO antenna and own grid are used; missing values are not inferred.");
+    auto footer=[&] { painter.setFont(bodyFont); painter.setPen(QColor("#555555")); painter.drawText(QRectF(0,footerY,width,12),Qt::AlignRight|Qt::AlignVCenter,QStringLiteral("Page %1").arg(page)); };
+    auto header=[&] {
+        ++page; y=0; painter.setPen(QColor("#183344")); painter.setFont(titleFont); painter.drawText(QRectF(0,y,width,24),Qt::AlignLeft|Qt::AlignVCenter,title); y+=27;
+        painter.setFont(bodyFont); painter.setPen(Qt::black); painter.drawText(QRectF(0,y,width,14),Qt::AlignLeft|Qt::AlignVCenter,metadata); y+=17;
+        painter.drawText(QRectF(0,y,width,14),Qt::AlignLeft|Qt::AlignVCenter,note); y+=15;
+        painter.drawText(QRectF(0,y,width,14),Qt::AlignLeft|Qt::AlignVCenter,QStringLiteral("Long cells are abbreviated and line breaks flattened; CSV retains full values.")); y+=19;
+        painter.fillRect(QRectF(0,y,width,20),QColor("#e6eff2")); painter.setFont(headFont); qreal x=0;
+        for (int i=0;i<headings.size();++i) { const qreal w=width*fractions[i]; painter.drawText(QRectF(x+4,y,w-8,20),Qt::AlignLeft|Qt::AlignVCenter,headings[i]); x+=w; }
+        y+=20; painter.setFont(bodyFont);
+    };
+    header(); const auto rows=snapshot.value(QStringLiteral("rows")).toList();
+    if (rows.isEmpty()) { painter.drawText(QRectF(4,y,width-8,20),Qt::AlignLeft|Qt::AlignVCenter,QStringLiteral("No matching records.")); y+=20; }
+    for (int rowIndex=0;rowIndex<rows.size();++rowIndex) {
+        const QVariantMap row=rows[rowIndex].toMap(); QStringList values; qreal rowHeight=18; const QFontMetrics fm(bodyFont);
+        for (int i=0;i<keys.size();++i) {
+            QString value;
+            if (keys[i]==QLatin1String("averageDays")) value=row.contains(keys[i]) ? QString::number(row.value(keys[i]).toDouble(),'f',2) : QStringLiteral("-");
+            else value=row.value(keys[i]).toString();
+            if (value.isEmpty()) value=QStringLiteral("(not recorded)");
+            value.replace(QLatin1Char('\n'),QLatin1Char(' ')); value.replace(QLatin1Char('\r'),QLatin1Char(' ')); value.replace(QLatin1Char('\t'),QLatin1Char(' '));
+            if (value.size()>160) value=value.left(157)+QStringLiteral("...");
+            values << value;
+            const QRect bounds=fm.boundingRect(QRect(0,0,int(width*fractions[i]-8),1000),Qt::TextWordWrap|Qt::TextWrapAnywhere,value);
+            rowHeight=qMax(rowHeight,qreal(bounds.height()+8));
+        }
+        if (y+rowHeight>footerY-8) { footer(); if (!writer.newPage()) { painter.end(); return fail(QStringLiteral("Cannot add PDF page")); } header(); }
+        if (rowIndex%2) painter.fillRect(QRectF(0,y,width,rowHeight),QColor("#f6f8f9"));
+        painter.setPen(QColor("#24343c")); qreal x=0;
+        for (int i=0;i<values.size();++i) { const qreal w=width*fractions[i]; painter.drawText(QRectF(x+4,y+4,w-8,rowHeight-8),Qt::AlignLeft|Qt::AlignTop|Qt::TextWordWrap|Qt::TextWrapAnywhere,values[i]); x+=w; }
+        y+=rowHeight; painter.setPen(QColor("#d5dfe3")); painter.drawLine(QPointF(0,y),QPointF(width,y));
+    }
+    footer(); if (!painter.end()) return fail(QStringLiteral("Cannot finish PDF")); if (error) error->clear(); return true;
 }
 }

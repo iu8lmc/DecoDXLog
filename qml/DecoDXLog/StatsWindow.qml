@@ -22,6 +22,14 @@ RoundedWindow {
     property bool activityBusy:false
     property string reportMessage:""
     property url reportProbePath:""
+    property bool reportProbePdf:false
+    property bool reportPdfBusy:false
+    function beginReportPdf(path) {
+        const error=decolog.exportActivityReportPdf(path)
+        reportMessage=error
+        if (!error.length) reportPdfBusy=true
+        else if (reportProbePdf) console.warn("PROBE activityreport pdf start error=" + error)
+    }
     function chosenReportKind() { return reportKind.currentIndex===2 ? "club" : reportKind.currentIndex===1 ? "confirmation" : "activity" }
     function runActivityReport() {
         const value=reportYear.text.trim()
@@ -31,11 +39,11 @@ RoundedWindow {
         else if (reportKind.currentIndex===1) decolog.requestConfirmationReport(value.length ? Number(value) : 0,reportBand.text)
         else decolog.requestActivityReport(value.length ? Number(value) : 0,reportBand.text)
     }
-    function probeReport(path,kind) {
+    function probeReport(path,kind,pdf) {
         page=2; reportYear.text="2026"; reportBand.text="20m"; reportKind.currentIndex=kind==="club" ? 2 : kind==="confirmation" ? 1 : 0; reportStation.text=kind==="club" ? "9H1SR" : ""
         console.warn("PROBE activityreport prior settings " + JSON.stringify(decolog.activityReportSettings()))
         console.warn("PROBE activityreport saved " + (kind==="club" ? decolog.saveClubReportSettings(2026,"20m",reportStation.text) : decolog.saveSelectedReportSettings(kind || "activity",2026,"20m")))
-        reportProbePath=path; runActivityReport()
+        reportProbePath=path; reportProbePdf=!!pdf; runActivityReport()
     }
 
     // Le statistiche si contano su un altro filo e arrivano tutte insieme: su
@@ -108,12 +116,17 @@ RoundedWindow {
             root.reportMessage=result.error || ""
             if (String(root.reportProbePath).length) {
                 console.warn("PROBE activityreport result " + JSON.stringify(result))
-                console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
+                if (root.reportProbePdf) { console.warn("PROBE activityreport pdf protected " + decolog.exportActivityReportPdf("file://" + decolog.currentLogInfo().path)); root.beginReportPdf(root.reportProbePath) }
+                else console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
                 console.warn("PROBE activityreport protected " + decolog.exportActivityReport("file://" + decolog.currentLogInfo().path))
                 console.warn("PROBE activityreport settings " + JSON.stringify(decolog.activityReportSettings()))
                 Qt.callLater(function() { const row=activityRows.itemAtIndex(0); console.warn("PROBE activityreport rendered " + (row ? row.text : "missing")) })
                 root.reportProbePath=""
             }
+        }
+        function onActivityReportPdfFinished(success,error) {
+            root.reportPdfBusy=false; root.reportMessage=success ? qsTr("PDF exported.") : error
+            if (root.reportProbePdf) { console.warn("PROBE activityreport pdf success=" + success + " error=" + error); root.reportProbePdf=false }
         }
     }
     FileDialog {
@@ -121,6 +134,7 @@ RoundedWindow {
         nameFilters:[qsTr("CSV files (*.csv)")]
         onAccepted: { const error=decolog.exportActivityReport(selectedFile); root.reportMessage=error || qsTr("CSV exported.") }
     }
+    FileDialog { id:reportPdfFile; title:qsTr("Export report PDF"); fileMode:FileDialog.SaveFile; nameFilters:[qsTr("PDF files (*.pdf)")]; onAccepted:root.beginReportPdf(selectedFile) }
 
     function maxOf(list) {
         let m = 0
@@ -488,6 +502,7 @@ RoundedWindow {
                 GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; const year=value.length ? Number(value) : 0; root.reportMessage=(reportKind.currentIndex===2 ? decolog.saveClubReportSettings(year,reportBand.text,reportStation.text) : decolog.saveSelectedReportSettings(root.chosenReportKind(),year,reportBand.text)) || qsTr("Filters saved in this log.") } }
                 GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; reportKind.currentIndex=s.kind==="club" ? 2 : s.kind==="confirmation" ? 1 : 0; reportStation.text=s.station || ""; root.reportMessage=qsTr("Filters loaded from this log.") } }
                 GlassButton { text:qsTr("Export CSV…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportFile.open() }
+                GlassButton { text:qsTr("Export PDF…"); enabled:!root.activityBusy && !root.reportPdfBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportPdfFile.open() }
             }
             StyledTextField { id:reportStation; Layout.fillWidth:true; visible:reportKind.currentIndex===2; placeholderText:qsTr("Recorded club station callsign (all if blank)"); Accessible.name:qsTr("Recorded club station callsign") }
             Text { Layout.fillWidth:true; visible:root.activityBusy; text:qsTr("Preparing report…"); color:Theme.secondaryColor }

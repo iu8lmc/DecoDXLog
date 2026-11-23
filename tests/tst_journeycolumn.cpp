@@ -7,6 +7,8 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSettings>
+#include <QStandardPaths>
+#include <QRegularExpression>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
@@ -62,6 +64,28 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void activityReportExportsMultipagePdf()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (int i=0;i<100;++i) {
+              const QString antenna=QString("Antenna %1").arg(i,3,10,QLatin1Char('0')) + (i==0 ? QString("\n")+QString(200,QLatin1Char('X')) : QString());
+              QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",QString("K%1AA").arg(i)},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"MY_ANTENNA",antenna},{"MY_GRIDSQUARE","JM75"}},"fixture",{},true).id>0);
+          } }
+        const QString file=dir.filePath("activity.pdf"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("activitypdfprobe:")+file,output,7000),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport pdf success=true"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport pdf protected Choose a file other than the log database"),output.constData());
+        QFile pdf(file); QVERIFY(pdf.open(QIODevice::ReadOnly)); QVERIFY(pdf.read(5)==QByteArray("%PDF-")); QVERIFY(pdf.size()>1000); pdf.close();
+        const QString pdfinfo=QStandardPaths::findExecutable("pdfinfo");
+        if (!pdfinfo.isEmpty()) { QProcess p; p.start(pdfinfo,{file}); QVERIFY(p.waitForFinished(10000)); QCOMPARE(p.exitCode(),0);
+            const auto match=QRegularExpression("Pages:\\s+(\\d+)").match(QString::fromUtf8(p.readAllStandardOutput())); QVERIFY(match.hasMatch()); QVERIFY(match.captured(1).toInt()>1); }
+        const QString pdftotext=QStandardPaths::findExecutable("pdftotext");
+        if (!pdftotext.isEmpty()) { QProcess p; p.start(pdftotext,{"-layout",file,"-"}); QVERIFY(p.waitForFinished(10000)); QCOMPARE(p.exitCode(),0);
+            const QByteArray text=p.readAllStandardOutput(); QVERIFY(text.contains("Antenna 099")); QVERIFY(text.contains("Snapshot")); QVERIFY(text.contains("Page 1")); }
+        const QString copy=qEnvironmentVariable("DECO_REPORT_PDF_COPY"); if (!copy.isEmpty()) QVERIFY(QFile::copy(file,copy));
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(100));
+    }
     void activityReportRunsAndExportsRecordedStationData()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
@@ -92,6 +116,9 @@ private slots:
         QVERIFY2(output.contains("PROBE activityreport rendered card · 2 · 1 · 1 · 0 · 0 · 2.00"),output.constData());
         QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"kind\":\"confirmation\",\"year\":2026}"),output.constData());
         QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("service,confirmed,dated,missing_date,invalid_date,earlier_date,average_days\r\n\"card\",2,1,1,0,0,2.00\r\n"));
+        const QString pdfPath=dir.filePath("confirmation.pdf"); QByteArray pdfOutput; QVERIFY2(launch(dir,QStringLiteral("confirmationpdfprobe:")+pdfPath,pdfOutput,5000),pdfOutput.constData());
+        QVERIFY2(pdfOutput.contains("PROBE activityreport pdf success=true"),pdfOutput.constData()); QFile pdf(pdfPath); QVERIFY(pdf.open(QIODevice::ReadOnly)); QCOMPARE(pdf.read(5),QByteArray("%PDF-")); pdf.close();
+        const QString pdfCopy=qEnvironmentVariable("DECO_CONFIRM_PDF_COPY"); if (!pdfCopy.isEmpty()) QVERIFY(QFile::copy(pdfPath,pdfCopy));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }
     void clubReportFiltersRecordedStationAndExports()
@@ -106,6 +133,9 @@ private slots:
         QVERIFY2(output.contains("PROBE activityreport rendered 2026 · 9H1SR · 9H1AA · 2"),output.constData());
         QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"kind\":\"club\",\"station\":\"9H1SR\",\"year\":2026}"),output.constData());
         QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("utc_year,station_callsign,operator,qso_count\r\n\"2026\",\"9H1SR\",\"9H1AA\",2\r\n"));
+        const QString pdfPath=dir.filePath("club.pdf"); QByteArray pdfOutput; QVERIFY2(launch(dir,QStringLiteral("clubpdfprobe:")+pdfPath,pdfOutput,5000),pdfOutput.constData());
+        QVERIFY2(pdfOutput.contains("PROBE activityreport pdf success=true"),pdfOutput.constData()); QFile pdf(pdfPath); QVERIFY(pdf.open(QIODevice::ReadOnly)); QCOMPARE(pdf.read(5),QByteArray("%PDF-")); pdf.close();
+        const QString pdfCopy=qEnvironmentVariable("DECO_CLUB_PDF_COPY"); if (!pdfCopy.isEmpty()) QVERIFY(QFile::copy(pdfPath,pdfCopy));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
     }
     void typedCustomFieldsValidateBeforeSavingQso()

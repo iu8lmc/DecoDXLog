@@ -7769,6 +7769,30 @@ QString DecoLogController::exportActivityReport(const QUrl& file)
     QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !out.commit()) return tr("Cannot write the CSV file");
     return {};
 }
+QString DecoLogController::exportActivityReportPdf(const QUrl& file)
+{
+    if (m_activityPdfBusy) return tr("A report PDF is already being exported");
+    if (m_activityReport.isEmpty() || !m_db.isOpen() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() ||
+        !m_activityReport.value(QStringLiteral("error")).toString().isEmpty() || m_activityReport.value(QStringLiteral("truncated")).toBool()) return tr("Run a complete report for the current log first");
+    if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local PDF file");
+    const QFileInfo target(file.toLocalFile()),source(m_db.path()); const QString targetPath=target.absoluteFilePath(),sourcePath=source.absoluteFilePath();
+    if (targetPath==sourcePath || targetPath==sourcePath+QStringLiteral("-wal") || targetPath==sourcePath+QStringLiteral("-shm") || targetPath==sourcePath+QStringLiteral("-journal") ||
+        (!target.canonicalFilePath().isEmpty() && target.canonicalFilePath()==source.canonicalFilePath())) return tr("Choose a file other than the log database");
+    const QVariantMap snapshot=m_activityReport; const QString path=file.toLocalFile(); QPointer<DecoLogController> self(this);
+    m_activityPdfBusy=true; ++m_exportsPending; emit exportBusyChanged();
+    m_exportPool.start([self,snapshot,path] {
+        QString error; QSaveFile output(path);
+        if (!output.open(QIODevice::WriteOnly)) error=output.errorString();
+        else if (!activityreport::writePdf(&output,snapshot,&error)) output.cancelWriting();
+        else if (!output.commit()) error=output.errorString();
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,error] {
+            if (!self) return; self->m_activityPdfBusy=false; --self->m_exportsPending; emit self->exportBusyChanged();
+            emit self->activityReportPdfFinished(error.isEmpty(),error);
+        },Qt::QueuedConnection);
+    });
+    return {};
+}
 
 void DecoLogController::requestStats(const QString& mode, int year)
 {

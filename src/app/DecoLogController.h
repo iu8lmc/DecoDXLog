@@ -580,6 +580,7 @@ public:
     QString saveStationReportSettings(const QString& kind, int year, const QString& band, const QString& station);
     Q_INVOKABLE QVariantMap activityReportSettings() const;
     Q_INVOKABLE QString exportActivityReport(const QUrl& file);
+    Q_INVOKABLE QString exportActivityReportPdf(const QUrl& file);
     Q_INVOKABLE QStringList statsYears() const;
     Q_INVOKABLE QVariantMap statsSummary(const QString& mode = {}, int year = 0) const;
     Q_INVOKABLE QVariantList statsByYear(const QString& mode = {}) const;
@@ -889,6 +890,7 @@ signals:
     void backupInspected(const QVariantMap& info);
     void statsReady(const QVariantMap& stats);
     void activityReportReady(const QVariantMap& report);
+    void activityReportPdfFinished(bool success, const QString& error);
     void cloudChanged();
     void countriesChanged();
     void callbookChanged();
@@ -1240,6 +1242,7 @@ private:
     QThreadPool m_activityReportPool;
     quint64 m_activityReportGeneration{0};
     QVariantMap m_activityReport;
+    bool m_activityPdfBusy{false};
     // L'ultima richiesta di statistiche: le altre, ancora in coda, si saltano.
     std::shared_ptr<std::atomic<int>> m_statsLatest{std::make_shared<std::atomic<int>>(0)};
     double m_importProgress{-1};

@@ -3,6 +3,7 @@
 #include <QSqlDatabase>
 #include <QString>
 #include <QVariantList>
+class QIODevice;
 
 namespace decolog::core::activityreport {
 struct Result { QVariantList rows; bool truncated{false}; QString error; };
@@ -14,4 +15,5 @@ Result runClub(const QSqlDatabase& db, int utcYear, const QString& band, const Q
 QByteArray csv(const Result& result);
 QByteArray confirmationsCsv(const Result& result);
 QByteArray clubCsv(const Result& result);
+bool writePdf(QIODevice* output, const QVariantMap& snapshot, QString* error = nullptr);
 }
