@@ -45,6 +45,11 @@ RoundedWindow {
         contestAudioFind.clicked()
         contestAudioDialog.qsoUtc="2026-11-23T12:00:00.500Z"
     }
+    function probeContestAudioDevices() {
+        contestAudioDialog.open()
+        const i=decolog.contestAudio.inputIndex, o=decolog.contestAudio.outputIndex
+        console.warn("PROBE contestDevices input=" + (i>=0 ? decolog.contestAudio.inputs[i] : "missing") + " output=" + (o>=0 ? decolog.contestAudio.outputs[o] : "missing"))
+    }
     function probeContestAudioRestore() {
         contestAudioDialog.probingFind=true
         console.warn("PROBE contestAudio restored=" + (String(contestAudioDialog.folder).length>0))
@@ -1093,6 +1098,8 @@ RoundedWindow {
                 StyledComboBox { Layout.fillWidth:true; model:decolog.contestAudio.inputs; currentIndex:decolog.contestAudio.inputIndex
                     enabled:!decolog.contestAudio.recording; onActivated:decolog.contestAudio.chooseInput(currentIndex) }
             }
+            Text { Layout.fillWidth:true; visible:decolog.contestAudio.inputIndex<0; color:Theme.warningColor; wrapMode:Text.Wrap
+                text:qsTr("The saved audio input is unavailable. Choose an input before recording.") }
             RowLayout {
                 Layout.fillWidth:true
                 GlassButton { text:qsTr("Choose folder…"); enabled:!decolog.contestAudio.recording; onClicked:contestAudioFolder.open() }
@@ -1150,6 +1157,8 @@ RoundedWindow {
                     onClicked:decolog.contestAudio.playForQso(contestAudioDialog.playbackFile,contestAudioDialog.qsoUtc) }
                 GlassButton { id:contestAudioStopPlayback; text:qsTr("Stop playback"); enabled:decolog.contestAudio.playing; onClicked:decolog.contestAudio.stopPlayback() }
             }
+            Text { Layout.fillWidth:true; visible:decolog.contestAudio.outputIndex<0; color:Theme.warningColor; wrapMode:Text.Wrap
+                text:qsTr("The saved audio output is unavailable. Choose an output before playback.") }
             RowLayout {
                 Layout.fillWidth:true
                 GlassButton { id:contestAudioBack; text:qsTr("−10 s"); enabled:decolog.contestAudio.playbackDurationMs>0 && !decolog.contestAudio.recording; onClicked:decolog.contestAudio.seekPlayback(-10) }

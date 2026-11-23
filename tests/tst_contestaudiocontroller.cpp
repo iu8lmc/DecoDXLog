@@ -9,6 +9,8 @@
 #include <QtEndian>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QCoreApplication>
+#include <QSettings>
 #include <QTest>
 class Feed : public QIODevice {
     Q_OBJECT
@@ -101,6 +103,20 @@ class TestContestAudioController : public QObject {
         QCOMPARE(result.value("matches").toList().first().toMap().value("url").toUrl(),QUrl::fromLocalFile(path));
         QCOMPARE(result.value("qsoUtc").toString(),QString("2026-11-23T12:00:01Z")); QVERIFY(QFile::exists(path));
     }
+    void missingSavedDevicesAreNotReplacedByDefaults()
+    {
+        QSettings settings; settings.clear();
+        settings.setValue("contestAudio/inputDefault",false); settings.setValue("contestAudio/inputId",QByteArray("missing-input"));
+        settings.setValue("contestAudio/outputDefault",false); settings.setValue("contestAudio/outputId",QByteArray("missing-output")); settings.sync();
+        { decolog::app::ContestAudioController recorder; QCOMPARE(recorder.inputIndex(),-1); QCOMPARE(recorder.outputIndex(),-1);
+          QTemporaryDir dir; QVERIFY(dir.isValid()); QVERIFY(!recorder.start(QUrl::fromLocalFile(dir.path()),1));
+          decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+          QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000));
+          QString wav; QVERIFY(writer.finish(&wav)); QVERIFY(!recorder.playForQso(QUrl::fromLocalFile(wav),"2026-11-23T12:00:01Z"));
+          recorder.chooseInput(0); recorder.chooseOutput(0); }
+        { decolog::app::ContestAudioController recorder; QCOMPARE(recorder.inputIndex(),0); QCOMPARE(recorder.outputIndex(),0); }
+        settings.clear(); settings.sync();
+    }
     void capturesStreamAndStopsAtLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); Feed feed;
@@ -155,5 +171,12 @@ class TestContestAudioController : public QObject {
         QCOMPARE(finished.size(),1); QVERIFY(!finished.first().at(0).toBool()); QVERIFY(!recorder.recording());
     }
 };
-QTEST_GUILESS_MAIN(TestContestAudioController)
+int main(int argc, char **argv)
+{
+    QCoreApplication app(argc,argv); QTemporaryDir settingsDir;
+    if (!settingsDir.isValid()) return 1;
+    QCoreApplication::setOrganizationName("DecoAudioFixture"); QCoreApplication::setApplicationName("Tests");
+    QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,settingsDir.path());
+    TestContestAudioController test; return QTest::qExec(&test,argc,argv);
+}
 #include "tst_contestaudiocontroller.moc"

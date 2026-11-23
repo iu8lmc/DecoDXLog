@@ -134,6 +134,20 @@ private slots:
         QVERIFY2(output.contains("PROBE contestFind count=1 selected=true qso=2026-11-23T12:00:00.500Z") && !output.contains("TypeError"),output.constData());
         QVERIFY(QFile::exists(path));
     }
+    void contestAudioDevicesSurviveAppRestartWhenConfigured()
+    {
+        if (qEnvironmentVariable("DECOLOG_TEST_LOOPBACK") != QLatin1String("BlackHole 2ch")) QSKIP("Set DECOLOG_TEST_LOOPBACK=BlackHole 2ch");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray capture,playback,restored;
+        QVERIFY2(launch(dir,QStringLiteral("contestaudioprobe:")+dir.path(),capture,4000),capture.constData());
+        QVERIFY2(capture.contains("PROBE contestAudio started=true"),capture.constData());
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000));
+        QString path; QVERIFY(writer.finish(&path));
+        QVERIFY2(launch(dir,QStringLiteral("contestaudioplayprobe:")+path,playback,4000),playback.constData());
+        QVERIFY2(playback.contains("PROBE contestPlayback playing=true"),playback.constData());
+        QVERIFY2(launch(dir,QStringLiteral("contestaudiodevicesprobe"),restored,3000),restored.constData());
+        QVERIFY2(restored.contains("PROBE contestDevices input=BlackHole 2ch output=BlackHole 2ch") && !restored.contains("TypeError"),restored.constData());
+    }
     void contestReportFindsCandidateInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

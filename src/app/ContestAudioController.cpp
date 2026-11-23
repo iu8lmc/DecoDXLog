@@ -6,12 +6,18 @@
 #include <QAudioSink>
 #include <QFile>
 #include <QMediaDevices>
+#include <QSettings>
 #include <QIODevice>
 #include <QtEndian>
 
 namespace decolog::app {
 ContestAudioController::ContestAudioController(QObject *parent) : QObject(parent), m_devices(new QMediaDevices(this))
 {
+    QSettings settings;
+    m_defaultInput=settings.value(QStringLiteral("contestAudio/inputDefault"),true).toBool();
+    m_inputId=settings.value(QStringLiteral("contestAudio/inputId")).toByteArray();
+    m_defaultOutput=settings.value(QStringLiteral("contestAudio/outputDefault"),true).toBool();
+    m_outputId=settings.value(QStringLiteral("contestAudio/outputId")).toByteArray();
     connect(m_devices,&QMediaDevices::audioInputsChanged,this,&ContestAudioController::devicesChanged);
     connect(m_devices,&QMediaDevices::audioOutputsChanged,this,&ContestAudioController::devicesChanged);
     m_searchPool.setMaxThreadCount(1);
@@ -30,6 +36,7 @@ QStringList ContestAudioController::inputs() const
 int ContestAudioController::inputIndex() const
 {
     if (m_defaultInput) return 0;
+    if (m_inputId.isEmpty()) return -1;
     const auto list=QMediaDevices::audioInputs();
     for (int i=0;i<list.size();++i) if (list.at(i).id()==m_inputId) return i+1;
     return -1;
@@ -43,6 +50,7 @@ QStringList ContestAudioController::outputs() const
 int ContestAudioController::outputIndex() const
 {
     if (m_defaultOutput) return 0;
+    if (m_outputId.isEmpty()) return -1;
     const auto list=QMediaDevices::audioOutputs();
     for (int i=0;i<list.size();++i) if (list.at(i).id()==m_outputId) return i+1;
     return -1;
@@ -60,7 +68,9 @@ void ContestAudioController::chooseOutput(int index)
     if (playing()) return;
     const auto list=QMediaDevices::audioOutputs();
     if (index<0 || index>list.size()) return;
-    m_defaultOutput=index==0; m_outputId=index ? list.at(index-1).id() : QByteArray(); emit devicesChanged();
+    m_defaultOutput=index==0; m_outputId=index ? list.at(index-1).id() : QByteArray();
+    QSettings settings; settings.setValue(QStringLiteral("contestAudio/outputDefault"),m_defaultOutput);
+    settings.setValue(QStringLiteral("contestAudio/outputId"),m_outputId); emit devicesChanged();
 }
 bool ContestAudioController::playForQso(const QUrl &wav, const QString &qsoUtc)
 {
@@ -72,7 +82,7 @@ bool ContestAudioController::playForQso(const QUrl &wav, const QString &qsoUtc)
     if (!location.error.isEmpty()) { m_message=location.error; emit changed(); return false; }
     QAudioDevice device;
     if (m_defaultOutput) device=QMediaDevices::defaultAudioOutput();
-    else for (const auto &item:QMediaDevices::audioOutputs()) if (item.id()==m_outputId) { device=item; break; }
+    else for (const auto &item:QMediaDevices::audioOutputs()) if (!m_outputId.isEmpty() && item.id()==m_outputId) { device=item; break; }
     QAudioFormat format; format.setSampleRate(location.sampleRate); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
     if (device.isNull() || !device.isFormatSupported(format)) {
         m_message=tr("Selected playback output is unavailable or does not support this recording format."); emit changed(); return false;
@@ -154,7 +164,8 @@ void ContestAudioController::chooseInput(int index)
     const auto list=QMediaDevices::audioInputs();
     if (index < 0 || index > list.size()) return;
     m_defaultInput=index==0; m_inputId=index ? list.at(index-1).id() : QByteArray();
-    emit devicesChanged();
+    QSettings settings; settings.setValue(QStringLiteral("contestAudio/inputDefault"),m_defaultInput);
+    settings.setValue(QStringLiteral("contestAudio/inputId"),m_inputId); emit devicesChanged();
 }
 bool ContestAudioController::start(const QUrl &directory, int limitMiB)
 {
@@ -164,7 +175,7 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
     stopPlayback();
     QAudioDevice device;
     if (m_defaultInput) device=QMediaDevices::defaultAudioInput();
-    else for (const auto &item : QMediaDevices::audioInputs()) if (item.id()==m_inputId) { device=item; break; }
+    else for (const auto &item : QMediaDevices::audioInputs()) if (!m_inputId.isEmpty() && item.id()==m_inputId) { device=item; break; }
     QAudioFormat format; format.setSampleRate(16000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
     if (device.isNull()) { m_message=tr("Selected audio input is unavailable."); emit changed(); return false; }
     if (!device.isFormatSupported(format)) format=device.preferredFormat();
