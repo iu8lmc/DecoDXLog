@@ -52,7 +52,9 @@ con satellite, azimut, elevazione, Doppler a 100 MHz, istante di ricezione, nume
 epoca TLE. Le due righe sono controllate per lunghezza, numero di catalogo,
 checksum ed epoca; il controllo non autentica la sorgente né valida l'orbita. `available` indica che esiste una lettura; `fresh` vale solo entro
 10 secondi e mentre non è in corso un'altra richiesta; `orbitalFresh` indica
-un'epoca TLE non futura e non più vecchia di 14 giorni. È un'istantanea, non
+un'epoca TLE non futura e non più vecchia di 14 giorni. Le due letture del TLE
+e del modo devono coincidere attorno alla lettura di posizione e Doppler;
+l'istante di ricezione è quello della risposta di posizione. È un'istantanea, non
 una prova di connessione attuale, visibilità, validità della propagazione o
 possibilità di contatto. Non avvia richieste al tracker e non controlla radio,
 rotore o TX. La capacità corrispondente è `tracker.read`.

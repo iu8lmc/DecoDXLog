@@ -87,6 +87,72 @@ class TestPredictTracker : public QObject {
         QVERIFY(!done.takeFirst().at(0).toBool());
         QVERIFY(tracker.satellites().isEmpty());
     }
+    void rejectsTleChangeDuringSnapshot()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0)); int tleCount=0; QStringList commands;
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress host; quint16 port;
+                server.readDatagram(request.data(),request.size(),&host,&port); commands << QString::fromLatin1(request).trimmed(); QByteArray response;
+                if (request.startsWith("GET_MODE")) response="MULTI\n";
+                else if (request.startsWith("GET_SAT ")) response="OSCAR-7\n1\n2\n3\n4\n1800000000\n6\n7\n8\n9\n10\nD\n";
+                else if (request.startsWith("GET_DOPPLER ")) response="10\n";
+                else {
+                    ++tleCount;
+                    auto line=QByteArray("1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999");
+                    if (tleCount>1) line[30]='2';
+                    response=QByteArray("OSCAR-7\n")+checksummed(line)+"\n"+checksummed("2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425")+"\n";
+                }
+                server.writeDatagram(response,host,port);
+            }
+        });
+        PredictTracker tracker; QSignalSpy done(&tracker,&PredictTracker::finished);
+        QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000);
+        QVERIFY(!done.first().at(0).toBool()); QVERIFY(tracker.snapshot().isEmpty()); QCOMPARE(tleCount,2);
+        QCOMPARE(commands,QStringList({"GET_MODE","GET_TLE OSCAR-7","GET_SAT OSCAR-7","GET_DOPPLER OSCAR-7","GET_TLE OSCAR-7"}));
+    }
+    void snapshotAgeStartsAtPositionReceipt()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0));
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress host; quint16 port;
+                server.readDatagram(request.data(),request.size(),&host,&port);
+                if (request.startsWith("GET_DOPPLER ")) {
+                    QTimer::singleShot(350,&server,[&server,host,port] { server.writeDatagram("10\n",host,port); });
+                    continue;
+                }
+                QByteArray response;
+                if (request.startsWith("GET_MODE")) response="MULTI\n";
+                else if (request.startsWith("GET_SAT ")) response="OSCAR-7\n1\n2\n3\n4\n1800000000\n6\n7\n8\n9\n10\nD\n";
+                else response="OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n";
+                server.writeDatagram(response,host,port);
+            }
+        });
+        PredictTracker tracker; QSignalSpy done(&tracker,&PredictTracker::finished);
+        QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000);
+        QVERIFY2(done.first().at(0).toBool(),qPrintable(done.first().at(1).toString()));
+        const auto received=tracker.snapshot().value("receivedAt").toDateTime(); QVERIFY(received.isValid());
+        QVERIFY(received.msecsTo(QDateTime::currentDateTimeUtc())>=300);
+    }
+    void rejectsChangeBetweenTwoOtherwiseSupportedTrackingModes()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0)); int modes=0;
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress host; quint16 port;
+                server.readDatagram(request.data(),request.size(),&host,&port); QByteArray response;
+                if (request.startsWith("GET_MODE")) response=++modes==1 ? "MULTI\n" : "OSCAR-7\n";
+                else if (request.startsWith("GET_SAT ")) response="OSCAR-7\n1\n2\n3\n4\n1800000000\n6\n7\n8\n9\n10\nD\n";
+                else if (request.startsWith("GET_DOPPLER ")) response="10\n";
+                else response="OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n";
+                server.writeDatagram(response,host,port);
+            }
+        });
+        PredictTracker tracker; QSignalSpy done(&tracker,&PredictTracker::finished);
+        QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000);
+        QVERIFY(!done.first().at(0).toBool()); QVERIFY(tracker.snapshot().isEmpty()); QCOMPARE(modes,2);
+    }
     void rejectsCorruptTleWithoutPublishingSnapshot()
     {
         QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0));
@@ -194,7 +260,7 @@ class TestPredictTracker : public QObject {
         QVERIFY(qAbs(corrected.value("rxMHz").toDouble() - 435.00418357878315) < 1e-9);
         QVERIFY(!tracker.correctedFrequencies(-1, 435).value("ok").toBool());
         QCOMPARE(commands,
-                 QStringList({"GET_MODE", "GET_SAT FO-29", "GET_DOPPLER FO-29", "GET_TLE FO-29", "GET_MODE"}));
+                 QStringList({"GET_MODE", "GET_TLE FO-29", "GET_SAT FO-29", "GET_DOPPLER FO-29", "GET_TLE FO-29", "GET_MODE"}));
         doppler = "-961.742249\n";
         done.clear();
         QVERIFY(tracker.request("127.0.0.1", server.localPort(), "FO-29"));
@@ -204,7 +270,7 @@ class TestPredictTracker : public QObject {
         QVERIFY(receding.value("ok").toBool());
         QVERIFY(qAbs(receding.value("txMHz").toDouble() - 146.00140414368354) < 1e-9);
         QVERIFY(qAbs(receding.value("rxMHz").toDouble() - 434.99581642121685) < 1e-9);
-        QTest::qWait(11000);
+        QTest::qWait(10500);
         QVERIFY(!tracker.correctedFrequencies(146, 435).value("ok").toBool());
         QVERIFY(!tracker.publicStatus().value("fresh").toBool());
         epoch = "18001.00000000";

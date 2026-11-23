@@ -48,7 +48,7 @@ QVariantMap PredictTracker::correctedFrequencies(double txMHz, double rxMHz) con
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const QDateTime received = m_snapshot.value(QStringLiteral("receivedAt")).toDateTime();
     const QDateTime epoch = m_snapshot.value(QStringLiteral("tleEpoch")).toDateTime();
-    if (!received.isValid() || received > now || received.secsTo(now) > 10)
+    if (!received.isValid() || received > now || received.msecsTo(now) > 10000)
         return failResult(tr("The tracker reading has expired; read it again"));
     if (!epoch.isValid() || epoch > now || epoch.secsTo(now) > 14 * 86400)
         return failResult(tr("Orbital data is old or dated in the future"));
@@ -74,6 +74,7 @@ bool PredictTracker::request(const QString &host, int port, const QString &satel
     m_stage = 0;
     m_listing = false;
     m_pending.clear();
+    m_pendingTle.clear();
     m_snapshot.clear();
     m_busy = true;
     emit changed();
@@ -111,17 +112,17 @@ void PredictTracker::sendNext()
         emit satellitesFinished(true, {});
         return;
     }
-    if (!m_listing && m_stage == 5) {
+    if (!m_listing && m_stage == 6) {
         m_snapshot = m_pending;
         m_busy = false;
         emit changed();
         emit finished(true, {});
         return;
     }
-    static const char *commands[] = {"GET_MODE", "GET_SAT ", "GET_DOPPLER ", "GET_TLE ", "GET_MODE"};
+    static const char *commands[] = {"GET_MODE", "GET_TLE ", "GET_SAT ", "GET_DOPPLER ", "GET_TLE ", "GET_MODE"};
     QByteArray command = m_listing ? (m_stage == 1 ? QByteArrayLiteral("GET_LIST") : QByteArrayLiteral("GET_MODE"))
                                    : QByteArray(commands[m_stage]);
-    if (!m_listing && m_stage > 0 && m_stage < 4)
+    if (!m_listing && m_stage > 0 && m_stage < 5)
         command += m_satellite.toLatin1();
     command += '\n';
     m_socket = new QUdpSocket(this);
@@ -184,14 +185,15 @@ void PredictTracker::receive()
                     return;
                 }
             }
-        } else if (m_stage == 0 || m_stage == 4) {
+        } else if (m_stage == 0 || m_stage == 5) {
             const QString mode = QString::fromLatin1(raw).trimmed();
-            if (mode != QLatin1String("MULTI") && mode.compare(m_satellite, Qt::CaseInsensitive) != 0) {
+            if ((mode != QLatin1String("MULTI") && mode.compare(m_satellite, Qt::CaseInsensitive) != 0) ||
+                (m_stage == 5 && mode.compare(m_pending.value(QStringLiteral("trackingMode")).toString(), Qt::CaseInsensitive) != 0)) {
                 fail(QStringLiteral("PREDICT is not tracking the selected satellite"));
                 return;
             }
             m_pending.insert(QStringLiteral("trackingMode"), mode);
-        } else if (m_stage == 1) {
+        } else if (m_stage == 2) {
             if (lines.size() < 12 ||
                 QString::fromLatin1(lines[0]).trimmed().compare(m_satellite, Qt::CaseInsensitive) != 0) {
                 fail(QStringLiteral("Invalid PREDICT position response"));
@@ -205,11 +207,12 @@ void PredictTracker::receive()
                 fail(QStringLiteral("Invalid PREDICT position values"));
                 return;
             }
+            m_pending.insert(QStringLiteral("receivedAt"), QDateTime::currentDateTimeUtc());
             m_pending.insert(QStringLiteral("satellite"), m_satellite);
             m_pending.insert(QStringLiteral("azimuth"), az);
             m_pending.insert(QStringLiteral("elevation"), el);
             m_pending.insert(QStringLiteral("nextEventUnix"), next);
-        } else if (m_stage == 2) {
+        } else if (m_stage == 3) {
             bool ok = false;
             const double shift = raw.trimmed().toDouble(&ok);
             if (!ok || !std::isfinite(shift)) {
@@ -217,7 +220,7 @@ void PredictTracker::receive()
                 return;
             }
             m_pending.insert(QStringLiteral("doppler100MHz"), shift);
-        } else if (m_stage == 3) {
+        } else if (m_stage == 1 || m_stage == 4) {
             if (lines.size() < 3 ||
                 QString::fromLatin1(lines[0]).trimmed().compare(m_satellite, Qt::CaseInsensitive) != 0 ||
                 !lines[1].startsWith("1 ") || !lines[2].startsWith("2 ") || lines[1].size() < 32) {
@@ -229,9 +232,15 @@ void PredictTracker::receive()
                 fail(QStringLiteral("Invalid PREDICT TLE: %1").arg(checked.error));
                 return;
             }
-            m_pending.insert(QStringLiteral("tleEpoch"),checked.epoch);
-            m_pending.insert(QStringLiteral("tleCatalogue"),checked.catalogue);
-            m_pending.insert(QStringLiteral("receivedAt"), QDateTime::currentDateTimeUtc());
+            const QByteArray currentTle=lines[1].trimmed() + '\n' + lines[2].trimmed();
+            if (m_stage == 1) {
+                m_pendingTle=currentTle;
+                m_pending.insert(QStringLiteral("tleEpoch"),checked.epoch);
+                m_pending.insert(QStringLiteral("tleCatalogue"),checked.catalogue);
+            } else if (currentTle!=m_pendingTle) {
+                fail(QStringLiteral("Orbital data changed during tracker reading"));
+                return;
+            }
         }
         ++m_stage;
         sendNext();
@@ -247,6 +256,7 @@ void PredictTracker::fail(const QString &error)
         m_socket = nullptr;
     }
     m_pending.clear();
+    m_pendingTle.clear();
     if (m_listing) {
         m_pendingSatellites.clear();
         m_satellites.clear();

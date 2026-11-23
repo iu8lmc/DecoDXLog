@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix="decolog-tracker-extension-") as tmp:
                 raise AssertionError("read-only token accepted a write")
             except urllib.error.HTTPError as error:
                 assert error.code == 403, error.code
-            expected = ["GET_MODE", "GET_SAT OSCAR-7", "GET_DOPPLER OSCAR-7", "GET_TLE OSCAR-7", "GET_MODE"]
+            expected = ["GET_MODE", "GET_TLE OSCAR-7", "GET_SAT OSCAR-7", "GET_DOPPLER OSCAR-7", "GET_TLE OSCAR-7", "GET_MODE"]
             assert server.commands == expected, server.commands
         finally:
             app.terminate()

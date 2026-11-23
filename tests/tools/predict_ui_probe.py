@@ -67,7 +67,7 @@ for stopped in (False, True):
             expected = 'PROBE predict success=false' if stopped else 'PROBE predict success=true satellite=OSCAR-7 old=true rendered=true warning=true'
             if result.returncode or expected not in output:
                 raise SystemExit(f'FAIL stopped={stopped}: {output}; requests={server.commands}')
-            expected_commands = ['GET_MODE'] if stopped else ['GET_MODE', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']
+            expected_commands = ['GET_MODE'] if stopped else ['GET_MODE', 'GET_TLE OSCAR-7', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']
             if server.commands != expected_commands:
                 raise SystemExit(f'Unexpected commands: {server.commands}')
             with sqlite3.connect(root/'test.sqlite') as db:
@@ -195,7 +195,7 @@ for fresh, save_mode in ((False, ''), (True, ''), (True, 'CW'), (True, 'FM')):
                                         capture_output=True, text=True, timeout=15)
                 if verify.returncode:
                     raise SystemExit(f'FAIL ADIF roundtrip {save_mode}: {verify.stdout} {verify.stderr}')
-            if server.commands != ['GET_MODE', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']:
+            if server.commands != ['GET_MODE', 'GET_TLE OSCAR-7', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']:
                 raise SystemExit(f'Unexpected draft commands: {server.commands}')
             server.shutdown()
             print(f'PASS draft fresh={fresh}')

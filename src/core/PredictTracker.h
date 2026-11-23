@@ -36,6 +36,7 @@ class PredictTracker : public QObject {
     QString m_satellite;
     int m_stage{0};
     QVariantMap m_pending;
+    QByteArray m_pendingTle;
     QVariantMap m_snapshot;
     QStringList m_satellites;
     QStringList m_pendingSatellites;
