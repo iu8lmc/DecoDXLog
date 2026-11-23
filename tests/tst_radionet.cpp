@@ -14,6 +14,21 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void guardedManualInsertRejectsSessionClosedByAnotherConnection()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); LogDatabase first,other; QVERIFY(first.open(path)); QVERIFY(other.open(path));
+        RadioNet net(&first); QVERIFY(net.start("Net")); QVERIFY(net.checkIn("K1ABC","Alice",""));
+        const auto session=net.session(); const qint64 sessionId=session.value("id").toLongLong();
+        QSqlQuery q(first.connection()); q.prepare("SELECT uuid FROM radio_net_session WHERE id=?"); q.addBindValue(sessionId); QVERIFY(q.exec()); QVERIFY(q.next()); const QString uuid=q.value(0).toString(); q.finish();
+        q.prepare("SELECT id FROM radio_net_member WHERE session_id=? AND call=?"); q.addBindValue(sessionId); q.addBindValue("K1ABC"); QVERIFY(q.exec()); QVERIFY(q.next()); const qint64 memberId=q.value(0).toLongLong(); q.finish();
+        AdifRecord record{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_RADIO_NET_SESSION",uuid},{"APP_DECOLOG_RADIO_NET_CALL","K1ABC"}};
+        QCOMPARE(first.insertQso(record,"manual",{},true,0,false,sessionId,memberId).status,InsertResult::Status::Inserted);
+        RadioNet otherNet(&other); QVERIFY(otherNet.selectSession(sessionId)); QVERIFY(otherNet.closeSession());
+        const auto rejected=first.insertQso(record,"manual",{},true,0,false,sessionId,memberId); QVERIFY(rejected.status!=InsertResult::Status::Inserted); QCOMPARE(first.qsoCount(),qint64(1));
+        // Comparison with the previous unguarded insertion path after the same closure.
+        QCOMPARE(first.insertQso(record,"manual",{},true,0,false).status,InsertResult::Status::Inserted); QCOMPARE(first.qsoCount(),qint64(2));
+        QCOMPARE(first.insertQso(record,"import",{},false,0,false).status,InsertResult::Status::Inserted);
+    }
     void reportedQsoHistoryIsPagedAndSessionScoped()
     {
         LogDatabase db;

@@ -1084,7 +1084,7 @@ bool LogDatabase::writeQsl(qint64 qsoId, const QList<QslState>& states, bool kee
 
 InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& source,
                                     const QString& sourceApp, bool manual, qint64 stationProfileId,
-                                    bool checkDuplicate)
+                                    bool checkDuplicate, qint64 radioSessionId, qint64 radioMemberId)
 {
     InsertResult result;
     if (!isOpen()) {
@@ -1135,6 +1135,20 @@ InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& sour
         rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_insert_qso"));
         rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_insert_qso"));
     };
+    if (radioSessionId || radioMemberId) {
+        QSqlQuery radio(db);
+        radio.prepare(QStringLiteral("SELECT s.uuid,m.call,COALESCE(s.station_profile_id,0) FROM radio_net_session s "
+                                     "JOIN radio_net_member m ON m.session_id=s.id "
+                                     "WHERE s.id=? AND m.id=? AND s.ended_at IS NULL"));
+        radio.addBindValue(radioSessionId); radio.addBindValue(radioMemberId);
+        if (!radio.exec() || !radio.next() || radio.value(0).toString()!=input.value(QStringLiteral("APP_DECOLOG_RADIO_NET_SESSION")) ||
+            radio.value(1).toString().compare(p->call,Qt::CaseInsensitive)!=0 ||
+            radio.value(1).toString().compare(input.value(QStringLiteral("APP_DECOLOG_RADIO_NET_CALL")),Qt::CaseInsensitive)!=0 ||
+            (radio.value(2).toLongLong()>0 && radio.value(2).toLongLong()!=stationProfileId)) {
+            rollbackInsert(); result.message=QStringLiteral("The radio net session or participant no longer matches this QSO.");
+            m_lastError=result.message; return result;
+        }
+    }
     QSqlQuery q(db);
     QStringList marks;
     marks.fill(QStringLiteral("?"), columns.size());
@@ -1174,7 +1188,8 @@ InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, co
                                                      const QString& scope, const QString& requester,
                                                      const QString& requestId, const QString& authority,
                                                      const QString& sourceApp, bool manual,
-                                                     qint64 stationProfileId, bool checkDuplicate)
+                                                     qint64 stationProfileId, bool checkDuplicate,
+                                                     qint64 radioSessionId, qint64 radioMemberId)
 {
     InsertResult result;
     if (!isOpen()) { result.message=QStringLiteral("database not open"); return result; }
@@ -1202,7 +1217,7 @@ InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, co
         if (!ok || number!=serial) return fail(QStringLiteral("The numeric sent exchange differs from the granted serial"));
     }
     AdifRecord record=input; if (existing.isEmpty()) record.set(QStringLiteral("STX"),QString::number(serial));
-    result=insertQso(record,source,sourceApp,manual,stationProfileId,checkDuplicate);
+    result=insertQso(record,source,sourceApp,manual,stationProfileId,checkDuplicate,radioSessionId,radioMemberId);
     if (result.status!=InsertResult::Status::Inserted) { db.rollback(); return result; }
     const auto qso=meta(result.id);
     if (!qso || qso->uuid.isEmpty()) return fail(QStringLiteral("Cannot identify the inserted QSO"));

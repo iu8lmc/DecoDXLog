@@ -4606,8 +4606,8 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     const InsertResult res = experimentalSerial
         ? m_db.insertQsoWithContestSerial(r, QStringLiteral("manual"), serialGrant.value(QStringLiteral("scope")).toString(),
             serialGrant.value(QStringLiteral("requester")).toString(), serialGrant.value(QStringLiteral("requestId")).toString(),
-            serialGrant.value(QStringLiteral("authority")).toString(), QStringLiteral("DecoDXLog ") + version(), true, profileId, false)
-        : m_db.insertQso(r, QStringLiteral("manual"), QStringLiteral("DecoDXLog ") + version(), true, profileId, false);
+            serialGrant.value(QStringLiteral("authority")).toString(), QStringLiteral("DecoDXLog ") + version(), true, profileId, false, radioSessionId, radioMemberId)
+        : m_db.insertQso(r, QStringLiteral("manual"), QStringLiteral("DecoDXLog ") + version(), true, profileId, false, radioSessionId, radioMemberId);
     switch (res.status) {
     case InsertResult::Status::Inserted: {
         if (experimentalSerial) m_net->durableSerialQsoSaved();

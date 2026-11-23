@@ -318,12 +318,14 @@ public:
                            const QString& sourceApp = {},
                            bool manual = false,
                            qint64 stationProfileId = 0,
-                           bool checkDuplicate = true);
+                           bool checkDuplicate = true,
+                           qint64 radioSessionId = 0, qint64 radioMemberId = 0);
     InsertResult insertQsoWithContestSerial(const AdifRecord& record, const QString& source,
                                             const QString& scope, const QString& requester,
                                             const QString& requestId, const QString& authority,
                                             const QString& sourceApp = {}, bool manual = false,
-                                            qint64 stationProfileId = 0, bool checkDuplicate = true);
+                                            qint64 stationProfileId = 0, bool checkDuplicate = true,
+                                            qint64 radioSessionId = 0, qint64 radioMemberId = 0);
     // Metadata only, from schema 28 onwards. Existing QSO need an initial
     // inventory; the sequence is local to this database, not a peer ACK.
     ContestNetChangePage contestNetChangesAfter(qint64 sequence, int limit) const;
