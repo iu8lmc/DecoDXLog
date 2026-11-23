@@ -222,6 +222,27 @@ private slots:
         QVERIFY(q.exec("SELECT COUNT(*) FROM qso WHERE call='K1NOGRANT'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
         QVERIFY(q.exec("SELECT id FROM qso WHERE call='K1LEGACY'")); QVERIFY(q.next()); const auto legacy=db.record(q.value(0).toLongLong()); QVERIFY(legacy); QCOMPARE(legacy->value("STX"),QString("11"));
     }
+    void qslCostEditorRejectsReplacedCloneAtSamePath()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("test.sqlite"), clone=dir.filePath("clone.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+          const auto qso=db.insertQso({{"CALL","K1PAA"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"},{"QSL_VIA","M0ABC"}},"fixture"); QVERIFY(qso.id>0);
+          QslState card; card.service="card"; card.via="B"; QVERIFY(db.setCardState(qso.id,card)); QString error; QVERIFY(qslplanner::saveRouteCost(db,"M0ABC","B",{"9.99","EUR","estimate","",""},&error));
+          q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY(q.exec()); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software"); env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","14000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","qslcostfileprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE cost file ready") && timer.elapsed()<9000) { app.waitForReadyRead(200); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE cost file ready"),output.constData());
+        if (!QFile::rename(path,path+".original")) { app.kill(); app.waitForFinished(); QSKIP("Platform does not allow replacing an open SQLite file"); }
+        QVERIFY(QFile::rename(clone,path)); timer.restart();
+        while (!output.contains("PROBE cost file clear") && timer.elapsed()<7000) { app.waitForReadyRead(200); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE cost file save true") && output.contains("PROBE cost file clear true") && (output.contains("The reviewed log or plan changed") || output.contains("Il log o il piano verificato")),output.constData());
+        app.kill(); app.waitForFinished();
+        LogDatabase db; QVERIFY(db.open(path)); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost); QCOMPARE(cost->amount,QString("9.99"));
+    }
     void qslPlannerRejectsReplacedCloneAtSamePath()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

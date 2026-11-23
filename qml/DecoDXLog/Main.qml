@@ -1291,6 +1291,7 @@ RoundedWindow {
         else if (what[0] === "importguideprobe") Qt.callLater(() => importSourceGuide.probe())
         else if (what[0] === "qslplanprobe") Qt.callLater(() => awardsDialog.probeQslPlan())
         else if (what[0] === "qslstalecostprobe") Qt.callLater(() => awardsDialog.probeQslStaleCost())
+        else if (what[0] === "qslcostfileprobe") Qt.callLater(() => awardsDialog.probeQslCostFile())
         else if (what[0] === "qslscopesprobe") Qt.callLater(() => awardsDialog.probeQslScopes(what[1] === "restore"))
         else if (what[0] === "qslaccountsprobe") Qt.callLater(() => awardsDialog.probeQslAccounts(what[1] === "restore"))
         else if (what[0] === "qslexternalprobe") Qt.callLater(() => awardsDialog.probeQslExternal())
