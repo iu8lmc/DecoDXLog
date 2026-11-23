@@ -59,6 +59,12 @@ QString normalizedCategory(const QString& value)
 {
     return value.trimmed().toLower();
 }
+const QSet<QString>& supportedBands()
+{
+    static const QSet<QString> bands{QStringLiteral("160m"),QStringLiteral("80m"),QStringLiteral("60m"),QStringLiteral("40m"),
+        QStringLiteral("30m"),QStringLiteral("20m"),QStringLiteral("17m"),QStringLiteral("15m"),QStringLiteral("12m"),QStringLiteral("10m"),QStringLiteral("6m")};
+    return bands;
+}
 
 bool categoryMatches(const Entry& entry, const QString& category)
 {
@@ -88,6 +94,10 @@ bool Result::isValid(QString* error) const
     }
     if (rules.maxPerEntity < 1 || rules.maxPerEntity > 10) {
         if (error) *error = QStringLiteral("invalid CQ DX Marathon entity limit");
+        return false;
+    }
+    if (!rules.band.trimmed().isEmpty() && !supportedBands().contains(rules.band.trimmed().toLower())) {
+        if (error) *error=QStringLiteral("unsupported CQ DX Marathon band filter");
         return false;
     }
     return true;
@@ -129,10 +139,11 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             result.exclusions << QStringLiteral("QSO %1: category mismatch").arg(entry.qsoId);
             continue;
         }
+        if (!rules.band.trimmed().isEmpty() && entry.band.trimmed().compare(rules.band.trimmed(),Qt::CaseInsensitive)!=0) {
+            result.exclusions << QStringLiteral("QSO %1: band mismatch").arg(entry.qsoId); continue;
+        }
         if (rules.year==2026) {
-            static const QSet<QString> bands{QStringLiteral("160M"),QStringLiteral("80M"),QStringLiteral("60M"),QStringLiteral("40M"),
-                QStringLiteral("30M"),QStringLiteral("20M"),QStringLiteral("17M"),QStringLiteral("15M"),QStringLiteral("12M"),QStringLiteral("10M"),QStringLiteral("6M")};
-            if (!bands.contains(entry.band.trimmed().toUpper())) {
+            if (!supportedBands().contains(entry.band.trimmed().toLower())) {
                 result.exclusions << QStringLiteral("QSO %1: outside supported 2026 bands").arg(entry.qsoId); continue;
             }
             const QString call=entry.call.trimmed().toUpper();
@@ -242,6 +253,7 @@ bool restoreReviewChoices(Result& result, const QJsonObject& file, const QString
         file.value(QStringLiteral("selectionKind")).toString()!=QLatin1String("reviewed") ||
         file.value(QStringLiteral("edition")).toInt(-1)!=result.rules.year ||
         file.value(QStringLiteral("category")).toString()!=normalizedCategory(result.rules.category) ||
+        file.value(QStringLiteral("band")).toString()!=result.rules.band.trimmed().toLower() ||
         file.value(QStringLiteral("maxPerEntity")).toInt(-1)!=result.rules.maxPerEntity ||
         file.value(QStringLiteral("stationProfileId")).toDouble(-1)!=double(result.rules.stationProfileId)) return fail();
     const auto ids=[](const QJsonValue& value,QList<qint64>& out) {
@@ -325,7 +337,7 @@ QJsonDocument Result::toJson() const
     for (const QString& value : this->exclusions) exclusions.append(value);
     QJsonArray warnings;
     for (const QString& value : this->warnings) warnings.append(value);
-    return QJsonDocument(QJsonObject{{QStringLiteral("format"), QStringLiteral("decodxlog-cq-marathon-1")},
+    QJsonObject object{{QStringLiteral("format"), QStringLiteral("decodxlog-cq-marathon-1")},
                                      {QStringLiteral("edition"), rules.year},
                                      {QStringLiteral("selectionKind"), reviewed ? QStringLiteral("reviewed") : QStringLiteral("automatic")},
                                      {QStringLiteral("exclusionsScope"), QStringLiteral("automatic selection")},
@@ -342,7 +354,9 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("entityListVersion"), rules.year == 2026 ? QStringLiteral("DX Marathon v1.1; list as of 2023") : QString()},
                                      {QStringLiteral("officialRulesVerified"), false},
                                      {QStringLiteral("warnings"), warnings},
-                                     {QStringLiteral("exclusions"), exclusions}});
+                                     {QStringLiteral("exclusions"), exclusions}};
+    if (!rules.band.trimmed().isEmpty()) object.insert(QStringLiteral("band"),rules.band.trimmed().toLower());
+    return QJsonDocument(object);
 }
 
 } // namespace decolog::core::cqmarathon

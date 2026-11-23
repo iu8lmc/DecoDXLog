@@ -69,6 +69,18 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonSingleBandPreviewAndJson()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","20m"),qMakePair("DL1AAA","40m")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND",item.second},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"}},"fixture",{},true,profile,false).id>0); }
+        const QString path=dir.filePath("review.json"); QByteArray output;
+        QVERIFY2(launch(dir,"marathonbandprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("band=20m count=1 zones=1 saved= loaded=") && output.contains("band mismatch") && !output.contains("TypeError"),output.constData());
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const auto json=QJsonDocument::fromJson(file.readAll()).object();
+        QCOMPARE(json.value("band").toString(),QString("20m")); QCOMPARE(json.value("selected").toArray().size(),1);
+    }
     void marathonReviewShowsOperatingGridEvidence()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

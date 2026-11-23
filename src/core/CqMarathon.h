@@ -29,6 +29,7 @@ struct Rules {
     QString category; // e.g. "mixed", "cw", "phone", "digital"
     int maxPerEntity{1};
     qint64 stationProfileId{0}; // mandatory scope when non-zero
+    QString band; // empty means all bands
 };
 
 struct Result {

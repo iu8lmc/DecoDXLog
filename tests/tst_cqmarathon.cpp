@@ -11,6 +11,23 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void singleBandAndModeAreIndependent()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","CW",when}, {2,"DL1AAA",230,14,"40m","CW",when},
+                                   {3,"JA1AAA",339,25,"20m","SSB",when}};
+        Rules rules{2026,"cw",1}; rules.band="20m";
+        auto single=select(entries,rules); QCOMPARE(single.selected.size(),1); QCOMPARE(single.zoneCandidates.size(),1);
+        QVERIFY(single.exclusions.join('\n').contains("band mismatch"));
+        QCOMPARE(single.toJson().object().value("band").toString(),QString("20m"));
+        auto reviewed=single; QString error; QVERIFY(applyReviewChoices(reviewed,{1},{1},&error));
+        auto file=reviewed.toJson().object(); file.insert("previewSnapshot","test");
+        QVERIFY(restoreReviewChoices(single,file,"test",&error));
+        auto different=select(entries,{2026,"cw",1}); QVERIFY(!restoreReviewChoices(different,file,"test",&error));
+        rules.band.clear(); QCOMPARE(select(entries,rules).selected.size(),2);
+        rules.category="mixed"; rules.band="20M"; QCOMPARE(select(entries,rules).selected.size(),2);
+        rules.band="2m"; QVERIFY(!select(entries,rules).isValid());
+    }
     void reviewedJsonRoundTripRequiresMatchingSnapshot()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

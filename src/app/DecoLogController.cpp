@@ -3146,13 +3146,14 @@ QVariantList DecoLogController::awardBandTotals(const QString& awardId) const
 }
 
 QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& category,
-                                                  int maxPerEntity, qint64 stationProfileId) const
+                                                  int maxPerEntity, qint64 stationProfileId, const QString& band) const
 {
     core::cqmarathon::Rules rules;
     rules.year = year;
     rules.category = category;
     rules.maxPerEntity = maxPerEntity;
     rules.stationProfileId = stationProfileId;
+    rules.band = band;
 
     QString error;
     const QList<core::cqmarathon::Entry> entries = core::cqmarathon::loadEntries(m_db, &error);
@@ -3180,6 +3181,7 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))},
                        {QStringLiteral("edition"), rules.year},
                        {QStringLiteral("category"), rules.category.trimmed().toLower()},
+                       {QStringLiteral("band"), rules.band.trimmed().toLower()},
                        {QStringLiteral("maxPerEntity"), rules.maxPerEntity},
                        {QStringLiteral("stationProfileId"), rules.stationProfileId}};
 }
@@ -3206,7 +3208,7 @@ bool DecoLogController::saveCqMarathonExport(const QUrl& file, int year, const Q
 
 QString DecoLogController::saveReviewedCqMarathonExport(const QUrl& file, int year, const QString& category,
         int maxPerEntity, qint64 stationProfileId, const QString& snapshot,
-        const QVariantList& entityIds, const QVariantList& zoneIds) const
+        const QVariantList& entityIds, const QVariantList& zoneIds, const QString& band) const
 {
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local JSON file");
     if (!m_db.isOpen() || m_db.identity().isEmpty() || stationProfileId<=0 || !m_db.stationProfile(stationProfileId))
@@ -3215,7 +3217,7 @@ QString DecoLogController::saveReviewedCqMarathonExport(const QUrl& file, int ye
     QString error;
     const auto entries=cqmarathon::loadEntries(m_db,&error);
     if (!error.isEmpty()) return error;
-    auto result=cqmarathon::select(entries,{year,category,maxPerEntity,stationProfileId});
+    auto result=cqmarathon::select(entries,{year,category,maxPerEntity,stationProfileId,band});
     if (!result.isValid(&error)) return error;
     if (snapshot.isEmpty() || snapshot!=marathonSnapshot(result,m_db.identity())) return tr("The preview changed; refresh it before exporting");
     const auto ids=[](const QVariantList& values, QList<qint64>& out) {
@@ -3234,7 +3236,7 @@ QString DecoLogController::saveReviewedCqMarathonExport(const QUrl& file, int ye
 }
 
 QVariantMap DecoLogController::loadReviewedCqMarathonExport(const QUrl& file, int year, const QString& category,
-        int maxPerEntity, qint64 stationProfileId, const QString& snapshot) const
+        int maxPerEntity, qint64 stationProfileId, const QString& snapshot, const QString& band) const
 {
     const auto fail=[](const QString& error) { return QVariantMap{{QStringLiteral("error"),error}}; };
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return fail(tr("Choose a local JSON file"));
@@ -3246,7 +3248,7 @@ QVariantMap DecoLogController::loadReviewedCqMarathonExport(const QUrl& file, in
     if (parseError.error!=QJsonParseError::NoError || !json.isObject()) return fail(tr("Invalid review JSON"));
     QString error; const auto entries=cqmarathon::loadEntries(m_db,&error);
     if (!error.isEmpty()) return fail(error);
-    auto result=cqmarathon::select(entries,{year,category,maxPerEntity,stationProfileId});
+    auto result=cqmarathon::select(entries,{year,category,maxPerEntity,stationProfileId,band});
     if (!result.isValid(&error)) return fail(error);
     if (snapshot.isEmpty() || snapshot!=marathonSnapshot(result,m_db.identity())) return fail(tr("The preview changed; refresh it before importing"));
     const QString savedSnapshot=json.object().value(QStringLiteral("previewSnapshot")).toString();

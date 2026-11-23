@@ -39,6 +39,7 @@ DialogFrame {
     readonly property var claims: { revision; return decolog.awardClaims() }
     property int marathonYear: new Date().getUTCFullYear()
     property string marathonCategory: "mixed"
+    property string marathonBand: ""
     property int marathonMaxPerEntity: 1
     property var marathonPreview: ({})
     property var marathonWorkingEntities: []
@@ -47,6 +48,7 @@ DialogFrame {
     property string marathonImportNotice: ""
     onMarathonYearChanged: marathonPreview=({})
     onMarathonCategoryChanged: marathonPreview=({})
+    onMarathonBandChanged: marathonPreview=({})
     onMarathonMaxPerEntityChanged: marathonPreview=({})
     property string marathonAdifMessage: ""
     property int marathonAdifYear: 0
@@ -504,7 +506,7 @@ DialogFrame {
     function refreshMarathon() {
         marathonExportMessage = ""
         marathonPreview = decolog.cqMarathonPreview(marathonYear, marathonCategory,
-                                                     marathonMaxPerEntity, decolog.awardProfile)
+                                                     marathonMaxPerEntity, decolog.awardProfile, marathonBand)
         marathonWorkingEntities = (marathonPreview.selected || []).slice()
         marathonWorkingZones = (marathonPreview.zoneCandidates || []).slice()
     }
@@ -541,19 +543,21 @@ DialogFrame {
     function saveMarathonReviewed(file, snapshot) {
         if (marathonPreview.valid !== true || marathonPreview.stationProfileId !== decolog.awardProfile ||
             marathonPreview.edition !== marathonYear || marathonPreview.category !== marathonCategory ||
+            marathonPreview.band !== marathonBand ||
             marathonPreview.maxPerEntity !== marathonMaxPerEntity || !marathonPreview.snapshot)
             return qsTr("The preview changed; refresh it before exporting")
         return decolog.saveReviewedCqMarathonExport(file, marathonPreview.edition, marathonPreview.category,
                  marathonPreview.maxPerEntity, marathonPreview.stationProfileId, snapshot,
-                 marathonWorkingEntities.map(x => x.qsoId), marathonWorkingZones.map(x => x.qsoId))
+                 marathonWorkingEntities.map(x => x.qsoId), marathonWorkingZones.map(x => x.qsoId), marathonBand)
     }
     function loadMarathonReviewed(file) {
         if (marathonPreview.valid !== true || marathonPreview.stationProfileId !== decolog.awardProfile ||
             marathonPreview.edition !== marathonYear || marathonPreview.category !== marathonCategory ||
+            marathonPreview.band !== marathonBand ||
             marathonPreview.maxPerEntity !== marathonMaxPerEntity || !marathonPreview.snapshot)
             return qsTr("The preview changed; refresh it before importing")
         const result=decolog.loadReviewedCqMarathonExport(file,marathonPreview.edition,marathonPreview.category,
-                     marathonPreview.maxPerEntity,marathonPreview.stationProfileId,marathonPreview.snapshot)
+                     marathonPreview.maxPerEntity,marathonPreview.stationProfileId,marathonPreview.snapshot,marathonBand)
         if (result.error) return result.error
         marathonWorkingEntities=result.selected; marathonWorkingZones=result.zoneCandidates
         marathonImportNotice=result.notice || ""
@@ -566,6 +570,13 @@ DialogFrame {
         refreshMarathon(); const before=marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId
         const loaded=loadMarathonReviewed("file://"+path)
         console.warn("PROBE marathonReviewedRoundTrip saved="+saved+" before="+before+" loaded="+loaded+" after="+marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId)
+    }
+    function probeMarathonSingleBand(path,profile) {
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="cw"; marathonBand="20m"; refreshMarathon()
+        const count=marathonWorkingEntities.length, zones=marathonWorkingZones.length
+        const saved=saveMarathonReviewed("file://"+path,marathonPreview.snapshot)
+        const loaded=loadMarathonReviewed("file://"+path)
+        console.warn("PROBE marathonSingleBand band="+marathonPreview.band+" count="+count+" zones="+zones+" saved="+saved+" loaded="+loaded+" exclusions="+marathonPreview.exclusions.join("|"))
     }
     function probeMarathonReviewedImport(path,profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
@@ -1044,14 +1055,22 @@ DialogFrame {
                                      && root.marathonPreview.stationProfileId === decolog.awardProfile
                                      && root.marathonPreview.edition === root.marathonYear
                                      && root.marathonPreview.category === root.marathonCategory
+                                     && root.marathonPreview.band === root.marathonBand
                                      && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity
                             text: qsTr("Export JSON")
                             onClicked: marathonFileDialog.open()
                         }
                         GlassButton { text:qsTr("Export review ADIF"); enabled:decolog.awardProfile>0 && !decolog.exportBusy
                             onClicked: { root.marathonAdifYear=root.marathonYear; root.marathonAdifProfile=decolog.awardProfile; marathonAdifDialog.open() } }
-                        GlassButton { text:qsTr("Open reviewed JSON"); enabled:root.marathonPreview.valid === true && root.marathonPreview.stationProfileId === decolog.awardProfile && root.marathonPreview.edition === root.marathonYear && root.marathonPreview.category === root.marathonCategory && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity; onClicked:marathonImportDialog.open() }
-                        GlassButton { text:qsTr("Review candidates"); enabled:root.marathonPreview.valid === true && root.marathonPreview.stationProfileId === decolog.awardProfile && root.marathonPreview.edition === root.marathonYear && root.marathonPreview.category === root.marathonCategory && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity; onClicked:marathonReview.open() }
+                        GlassButton { text:qsTr("Open reviewed JSON"); enabled:root.marathonPreview.valid === true && root.marathonPreview.stationProfileId === decolog.awardProfile && root.marathonPreview.edition === root.marathonYear && root.marathonPreview.category === root.marathonCategory && root.marathonPreview.band === root.marathonBand && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity; onClicked:marathonImportDialog.open() }
+                        GlassButton { text:qsTr("Review candidates"); enabled:root.marathonPreview.valid === true && root.marathonPreview.stationProfileId === decolog.awardProfile && root.marathonPreview.edition === root.marathonYear && root.marathonPreview.category === root.marathonCategory && root.marathonPreview.band === root.marathonBand && root.marathonPreview.maxPerEntity === root.marathonMaxPerEntity; onClicked:marathonReview.open() }
+                    }
+                    RowLayout { Layout.fillWidth:true
+                        Text { text:qsTr("Band filter"); color:Theme.textSecondary }
+                        StyledComboBox { Accessible.name:qsTr("CQ DX Marathon band filter"); Layout.preferredWidth:140
+                            model:[qsTr("All bands"),"160m","80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"]
+                            readonly property var values:["","160m","80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"]
+                            currentIndex:Math.max(0,values.indexOf(root.marathonBand)); onActivated:root.marathonBand=values[currentIndex] }
                     }
                     Text {
                         Layout.fillWidth: true

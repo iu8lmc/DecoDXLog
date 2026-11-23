@@ -561,14 +561,14 @@ public:
     // Anteprima/export deterministico dei QSO per CQ DX Marathon. Non modifica
     // il log e non dichiara il risultato ufficiale dell'ente organizzatore.
     Q_INVOKABLE QVariantMap cqMarathonPreview(int year, const QString& category,
-                                               int maxPerEntity = 1, qint64 stationProfileId = 0) const;
+                                               int maxPerEntity = 1, qint64 stationProfileId = 0, const QString& band = {}) const;
     Q_INVOKABLE bool saveCqMarathonExport(const QUrl& file, int year, const QString& category,
                                           int maxPerEntity = 1, qint64 stationProfileId = 0) const;
     Q_INVOKABLE QString saveReviewedCqMarathonExport(const QUrl& file, int year, const QString& category,
                                           int maxPerEntity, qint64 stationProfileId, const QString& snapshot,
-                                          const QVariantList& entityIds, const QVariantList& zoneIds) const;
+                                          const QVariantList& entityIds, const QVariantList& zoneIds, const QString& band = {}) const;
     Q_INVOKABLE QVariantMap loadReviewedCqMarathonExport(const QUrl& file, int year, const QString& category,
-                                          int maxPerEntity, qint64 stationProfileId, const QString& snapshot) const;
+                                          int maxPerEntity, qint64 stationProfileId, const QString& snapshot, const QString& band = {}) const;
     Q_INVOKABLE QString exportCqMarathonReviewAdif(const QUrl& file, int year, qint64 stationProfileId);
     // VUCC resta separato dal conteggio statistico dei locatori.
     Q_INVOKABLE QVariantMap vuccPreview(const QString& band, const QString& account = {},
