@@ -1276,6 +1276,7 @@ RoundedWindow {
         else if (what[0] === "new") newQsoDialog.open()
         else if (what[0] === "historical") historicalQsoDialog.open()
         else if (what[0] === "qslplanprobe") Qt.callLater(() => awardsDialog.probeQslPlan())
+        else if (what[0] === "qslexternalprobe") Qt.callLater(() => awardsDialog.probeQslExternal())
         else if (what[0] === "qslplanrestoreprobe") Qt.callLater(() => awardsDialog.probeQslPlanRestore())
         else if (what[0] === "qslpagesprobe") Qt.callLater(() => awardsDialog.probeAlternativePages())
         else if (what[0] === "dxcampaignprobe") { window.showPanel("dxcalendar"); dxCampaignProbe.start() }

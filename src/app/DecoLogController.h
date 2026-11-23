@@ -550,6 +550,7 @@ public:
     QVariantMap qslPlan() const { return m_qslPlan; }
     bool qslPlanBusy() const { return m_qslPlanBusy; }
     Q_INVOKABLE void buildQslPlan(const QStringList& goals);
+    Q_INVOKABLE bool qslPlanCurrent() const;
     Q_INVOKABLE QVariantMap qslPlanAlternativePage(qint64 id, const QString& award, const QString& key, int offset) const;
     Q_INVOKABLE QString saveQslRouteCost(const QString& manager, const QString& channel, const QVariantMap& cost);
     Q_INVOKABLE QString clearQslRouteCost(const QString& manager, const QString& channel);
@@ -1080,6 +1081,10 @@ private:
     std::shared_ptr<const core::qslplanner::Plan> m_qslPlanSnapshot;
     bool m_qslPlanBusy{false};
     quint64 m_qslPlanGeneration{0};
+    qint64 m_qslPlanDataVersion{-1};
+    quint64 m_qslPlanOpenGeneration{0};
+    QString m_qslPlanIdentity;
+    QTimer m_qslPlanVersionTimer;
     QThreadPool m_qslPlanPool;
     core::DecoLinkServer m_decoLink;
     core::DecoPortLogServer m_hamHubLink;

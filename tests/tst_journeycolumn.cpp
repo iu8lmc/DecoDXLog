@@ -69,6 +69,24 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void qslPlannerDetectsExternalLogChanges()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"}},"fixture").id>0); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","14000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{QStringLiteral("--software-renderer"),QStringLiteral("--settings"),dir.filePath("settings"),
+            QStringLiteral("--db"),dir.filePath("test.sqlite"),QStringLiteral("--port"),QStringLiteral("0"),QStringLiteral("--show"),QStringLiteral("qslexternalprobe"),QStringLiteral("--grab"),dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE qslExternal ready") && timer.elapsed()<9000) { app.waitForReadyRead(200); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE qslExternal ready"),output.constData());
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET call='K1CHANGED' WHERE call='K1AAA'")); }
+        timer.restart(); while (!output.contains("PROBE qslExternal refreshed") && timer.elapsed()<7000) { app.waitForReadyRead(200); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE qslExternal guard") && output.contains("Plan is no longer current") && output.contains("PROBE qslExternal stale") && output.contains("PROBE qslExternal refreshed") && output.contains("K1CHANGED"),output.constData());
+        app.kill(); app.waitForFinished();
+    }
     void marathonUnknownModeRequiresClassification()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

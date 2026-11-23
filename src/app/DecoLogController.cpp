@@ -309,11 +309,18 @@ DecoLogController::DecoLogController(QObject* parent)
         m_qslPlanPool.clear();
         m_qslPlanSnapshot.reset();
         m_qslPlanBusy = false;
+        m_qslPlanDataVersion=-1;
+        m_qslPlanVersionTimer.stop();
         m_qslPlan.insert(QStringLiteral("stale"), true);
         emit qslPlanChanged();
     };
     connect(this, &DecoLogController::awardsChanged, this, invalidateQslPlan);
     connect(this, &DecoLogController::logChanged, this, invalidateQslPlan);
+    m_qslPlanVersionTimer.setInterval(1000);
+    connect(&m_qslPlanVersionTimer,&QTimer::timeout,this,[this,invalidateQslPlan] {
+        if (m_qslPlanDataVersion<0 || !m_db.isOpen() || m_db.openGeneration()!=m_qslPlanOpenGeneration ||
+            m_db.dataVersion()!=m_qslPlanDataVersion) invalidateQslPlan();
+    });
     m_traffic = new TrafficMonitor(&m_udp, &m_decoLink, this);
     // I conteggi si rifanno un attimo dopo che il log e' cambiato, non mentre
     // si registra: una raffica di QSO costa un conteggio solo.
@@ -2550,10 +2557,18 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
     const QSet<QString> goals(requested.cbegin(), requested.cend());
     if (goals.isEmpty() || !m_db.isOpen() || m_db.path().isEmpty() || m_db.path() == QLatin1String(":memory:")) {
         m_qslPlanSnapshot.reset(); m_qslPlanPool.clear();
+        m_qslPlanVersionTimer.stop(); m_qslPlanDataVersion=-1;
         m_qslPlan = {{QStringLiteral("error"), tr("Choose at least one award and open a log")}};
         m_qslPlanBusy = false; ++m_qslPlanGeneration; emit qslPlanChanged(); return;
     }
-    const QString path=m_db.path(); const AwardFilter filter=m_awardFilter;
+    const QString path=m_db.path(), identity=m_db.identity(); const AwardFilter filter=m_awardFilter;
+    const qint64 dataVersion=m_db.dataVersion(); const quint64 openGeneration=m_db.openGeneration(), logVersion=m_logVersion;
+    if (identity.isEmpty() || dataVersion<0) {
+        m_qslPlanSnapshot.reset(); m_qslPlanPool.clear(); m_qslPlanVersionTimer.stop(); m_qslPlanDataVersion=-1;
+        m_qslPlan={{QStringLiteral("error"),tr("Cannot verify the log snapshot")}}; m_qslPlanBusy=false; ++m_qslPlanGeneration; emit qslPlanChanged(); return;
+    }
+    m_qslPlanDataVersion=dataVersion; m_qslPlanOpenGeneration=openGeneration; m_qslPlanIdentity=identity;
+    m_qslPlanVersionTimer.start();
     QHash<int, QString> names;
     for (const auto& entity : m_countries.entities()) names.insert(entity.dxcc,entity.name);
     const AwardCalculator calc=awardCalculator(names);
@@ -2561,9 +2576,10 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
     m_qslPlanSnapshot.reset(); m_qslPlan.clear(); m_qslPlanBusy=true; emit qslPlanChanged();
     QPointer<DecoLogController> self(this);
     m_qslPlanPool.clear();
-    m_qslPlanPool.start([self,path,filter,goals,calc,generation] {
+    m_qslPlanPool.start([self,path,identity,dataVersion,openGeneration,logVersion,filter,goals,calc,generation] {
         LogDatabase db; qslplanner::Plan plan;
-        if (!db.open(path)) plan.error=db.lastError();
+        if (!db.openReadOnly(path)) plan.error=db.lastError();
+        else if (db.identity()!=identity) plan.error=QStringLiteral("Log identity changed");
         else plan=qslplanner::build(db,filter,goals,calc);
         QVariantList rows;
         QVariantList routes;
@@ -2609,10 +2625,13 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         }
         if (!self) return;
         const auto snapshot=std::make_shared<const qslplanner::Plan>(std::move(plan));
-        QMetaObject::invokeMethod(self.data(),[self,path,generation,snapshot,rows,routes,ungrouped] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,dataVersion,openGeneration,logVersion,generation,snapshot,rows,routes,ungrouped] {
             if (!self || generation!=self->m_qslPlanGeneration) return;
             self->m_qslPlanBusy=false;
-            if (self->m_db.path()!=path) self->m_qslPlan={{QStringLiteral("stale"),true}};
+            if (self->m_db.path()!=path || self->m_db.identity()!=identity || self->m_db.openGeneration()!=openGeneration ||
+                self->m_db.dataVersion()!=dataVersion || self->m_logVersion!=logVersion) {
+                self->m_qslPlanVersionTimer.stop(); self->m_qslPlanDataVersion=-1; self->m_qslPlan={{QStringLiteral("stale"),true}};
+            }
             else { self->m_qslPlanSnapshot=snapshot; self->m_qslPlan={{QStringLiteral("error"),snapshot->error},{QStringLiteral("uniqueBenefits"),snapshot->uniqueBenefits},
                                  {QStringLiteral("logPath"),path},
                                  {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},
@@ -2622,9 +2641,16 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
     });
 }
 
+bool DecoLogController::qslPlanCurrent() const
+{
+    return !m_qslPlanBusy && m_qslPlanSnapshot && !m_qslPlan.value(QStringLiteral("stale")).toBool() &&
+           m_qslPlanDataVersion>=0 && m_db.isOpen() && m_db.openGeneration()==m_qslPlanOpenGeneration &&
+           m_db.identity()==m_qslPlanIdentity && m_db.dataVersion()==m_qslPlanDataVersion;
+}
+
 QVariantMap DecoLogController::qslPlanAlternativePage(qint64 id, const QString& award, const QString& key, int offset) const
 {
-    if (!m_qslPlanSnapshot || m_qslPlan.value(QStringLiteral("stale")).toBool()) return {{QStringLiteral("error"),tr("Plan is no longer current")}};
+    if (!qslPlanCurrent()) return {{QStringLiteral("error"),tr("Plan is no longer current")}};
     const auto& candidates=m_qslPlanSnapshot->candidates;
     const auto candidate=std::lower_bound(candidates.cbegin(),candidates.cend(),id,
         [](const qslplanner::Candidate& c,qint64 value) { return c.qsoId<value; });

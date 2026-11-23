@@ -68,6 +68,8 @@ DialogFrame {
     onVuccScopeChanged: vuccResult=({})
     property var plannerGoals: ["dxcc"]
     property bool plannerSelectionDirty: false
+    property bool plannerExternalProbe: false
+    property bool plannerExternalSawStale: false
     Settings { id: plannerSettings; category: "qslPlanner"; property string goalsJson: '["dxcc"]' }
 
     Component.onCompleted: {
@@ -91,6 +93,10 @@ DialogFrame {
     Connections {
         target: decolog
         function onQslPlanChanged() {
+            if (root.plannerExternalProbe && decolog.qslPlan.stale) { root.plannerExternalSawStale=true; console.warn("PROBE qslExternal stale"); console.warn("PROBE qslExternal guard "+JSON.stringify(decolog.qslPlanAlternativePage(1,"dxcc","291",0))) }
+            if (root.plannerExternalProbe && root.plannerExternalSawStale && !decolog.qslPlanBusy && !decolog.qslPlan.stale && decolog.qslPlan.candidates) {
+                console.warn("PROBE qslExternal refreshed "+JSON.stringify(decolog.qslPlan)); root.plannerExternalProbe=false
+            }
             if (decolog.qslPlanBusy || decolog.qslPlan.stale) { alternativesDialog.close(); paperConfirm.close() }
             if (decolog.qslPlan.stale) root.schedulePlannerRefresh()
         }
@@ -110,6 +116,15 @@ DialogFrame {
     }
 
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
+    function probeQslExternal() { openAt("dxcc"); plannerExternalStart.start() }
+    Timer { id:plannerExternalStart; interval:1000
+        onTriggered: { openPlannerButton.clicked(); plannerRefresh.stop(); root.plannerGoals=["dxcc"]; root.plannerSelectionDirty=false; buildPlannerButton.clicked(); plannerExternalReady.start() } }
+    Timer { id:plannerExternalReady; interval:100; repeat:true; property int tries:0
+        onTriggered: { if ((decolog.qslPlanBusy || !decolog.qslPlan.candidates) && ++tries<60) return
+            stop(); root.plannerExternalProbe=true; plannerExternalGuard.start(); console.warn("PROBE qslExternal ready "+JSON.stringify(decolog.qslPlan)) } }
+    Timer { id:plannerExternalGuard; interval:50; repeat:true
+        onTriggered: { if (!root.plannerExternalProbe) { stop(); return }
+            if (!decolog.qslPlanCurrent()) { stop(); console.warn("PROBE qslExternal guard "+JSON.stringify(decolog.qslPlanAlternativePage(1,"dxcc","291",0))) } } }
     function pendingDetailText(p) { return p.service + ": " + (p.dateStatus === "valid" ? qsTr("recorded sent %1 · %2 days ago (UTC)").arg(p.date).arg(p.days) : p.dateStatus === "future" ? qsTr("recorded sent date %1 is in the future; verify").arg(p.date) : p.dateStatus === "missing" ? qsTr("sent date not recorded") : qsTr("invalid sent date: %1").arg(p.rawDate)) }
     function probeQslPlanRestore() { openAt("dxcc"); plannerProbeRestore.start() }
     function probeAlternativePages() { openAt("dxcc"); plannerPagesStart.start() }
@@ -365,7 +380,7 @@ DialogFrame {
                     enabled: !decolog.cards.operationBusy
                     onClicked: {
                         const c=paperConfirm.candidate
-                        if (root.plannerSelectionDirty || decolog.qslPlan.stale || !paperConfirm.logPath || paperConfirm.logPath !== decolog.qslPlan.logPath) { paperError.text=qsTr("The plan changed. Rebuild and review the QSO."); return }
+                        if (root.plannerSelectionDirty || !decolog.qslPlanCurrent() || !paperConfirm.logPath || paperConfirm.logPath !== decolog.qslPlan.logPath) { paperError.text=qsTr("The plan changed. Rebuild and review the QSO."); return }
                         if (!decolog.cards.enqueueIfUnsent(c.id,c.uuid,c.revision,paperChannel.currentIndex === 0 ? "B" : "D",paperConfirm.logPath)) {
                             paperError.text=qsTr("The operation could not be started. Check the log and queue status."); return
                         }
