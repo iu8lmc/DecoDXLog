@@ -25,8 +25,9 @@ struct ContestNetInventoryPage {
 // Close promptly: a long SQLite snapshot can retain WAL pages or block writers.
 class ContestNetInventory {
 public:
+    enum class Order { RowId, Uuid };
     ~ContestNetInventory();
-    bool begin(const QString& path);
+    bool begin(const QString& path, Order order = Order::RowId);
     // Payload budget applies to returned UTF-8 ADIF bytes, not temporary
     // SQLite/QString allocations. A too-large first record is never skipped.
     ContestNetInventoryPage next(int limit, qint64 maxPayloadBytes = 1024 * 1024);
@@ -34,6 +35,7 @@ public:
     QString error() const { return m_error; }
     QString logIdentity() const { return m_identity; }
     QByteArray fileIdentity() const { return m_fileIdentity; }
+    bool fileIdentityCurrent() const { return m_transaction && m_db.fileIdentityMatchesOpen(); }
     qint64 journalWatermark() const { return m_watermark; }
     // SHA-256 of versioned, sorted ADIF names and exact values; excludes UUID,
     // revision, attachments and metadata that recordChecked() does not export.
@@ -46,6 +48,8 @@ private:
     QByteArray m_fileIdentity;
     qint64 m_watermark{0};
     qint64 m_afterId{std::numeric_limits<qint64>::min()};
+    QString m_afterUuid;
+    Order m_order{Order::RowId};
     bool m_transaction{false};
     bool m_done{false};
     bool m_started{false};

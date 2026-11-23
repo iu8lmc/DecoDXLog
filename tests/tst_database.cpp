@@ -1,6 +1,7 @@
 // Database: schema, inserimento, duplicati e import/export senza perdite.
 #include "core/LogDatabase.h"
 #include "core/ContestNetInventory.h"
+#include "core/ContestNetReconcile.h"
 #include "core/Maidenhead.h"
 
 #include <QCoreApplication>
@@ -63,6 +64,74 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestNetReconcileReportsDifferencesWithoutOverwriting()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString leftPath=dir.filePath("left.sqlite"), rightPath=dir.filePath("right.sqlite");
+        LogDatabase left,right; QVERIFY(left.open(leftPath)); QVERIFY(right.open(rightPath));
+        auto add=[](LogDatabase& db,const QString& uuid,const QString& call,const QString& name) {
+            AdifRecord record{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME",name}};
+            const auto r=db.insertQso(record,"fixture",{},false,0,false); if (r.id>0 && db.adoptUuid(r.id,uuid)) return r.id; return qint64(0);
+        };
+        const auto leftB=add(left,"b","K1BBB","Local"), leftA=add(left,"a","K1AAA","Same"), leftC=add(left,"c","K1CCC","Same"), leftD=add(left,"d","K1DDD","Local only"), leftF=add(left,"f","K1FFF","Same");
+        const auto rightF=add(right,"f","K1FFF","Same"), rightC=add(right,"c","K1CCC","Same"), rightB=add(right,"b","K1BBB","Remote"), rightE=add(right,"e","K1EEE","Remote only"), rightA=add(right,"a","K1AAA","Same");
+        QVERIFY(leftA>0 && leftB>0 && leftC>0 && leftD>0 && leftF>0 && rightA>0 && rightB>0 && rightC>0 && rightE>0 && rightF>0);
+        QVERIFY(left.softDeleteQso(leftC)); QVERIFY(right.markSynced(rightF,4));
+        ContestNetReconcile comparison; QVERIFY2(comparison.begin(leftPath,rightPath),qPrintable(comparison.error()));
+        QVERIFY(!comparison.next(0).ok); QVERIFY(!comparison.next(501).ok);
+        const auto leftWatermark=comparison.localWatermark(), rightWatermark=comparison.remoteWatermark();
+        auto changed=*left.record(leftA); changed.set("NAME","After snapshot"); QVERIFY(left.updateQso(leftA,changed).status==InsertResult::Status::Inserted);
+        QMap<QString,ContestNetDifference::Kind> found; QStringList order; bool more=true;
+        while (more) { const auto page=comparison.next(2); QVERIFY2(page.ok,qPrintable(page.error)); QVERIFY(page.rows.size()<=2);
+            for (const auto& row:page.rows) { order << row.uuid; found.insert(row.uuid,row.kind); } more=page.hasMore; }
+        QCOMPARE(order,QStringList({"a","b","c","d","e","f"}));
+        QCOMPARE(found.value("a"),ContestNetDifference::Kind::MatchingFingerprint); QCOMPARE(found.value("b"),ContestNetDifference::Kind::ContentConflict);
+        QCOMPARE(found.value("c"),ContestNetDifference::Kind::DeletionConflict); QCOMPARE(found.value("d"),ContestNetDifference::Kind::LocalOnly);
+        QCOMPARE(found.value("e"),ContestNetDifference::Kind::RemoteOnly); QCOMPARE(found.value("f"),ContestNetDifference::Kind::RevisionDifference);
+        QVERIFY(!left.contestNetChangesAfter(leftWatermark,10).changes.isEmpty()); QVERIFY(right.contestNetChangesAfter(rightWatermark,10).changes.isEmpty());
+        QCOMPARE(left.record(leftB)->value("NAME"),QString("Local")); QCOMPARE(right.record(rightB)->value("NAME"),QString("Remote"));
+        comparison.close(); QVERIFY(!comparison.next(1).ok);
+    }
+    void contestNetReconcileUsesSqliteBinaryUuidOrder()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto l=dir.filePath("l.sqlite"),r=dir.filePath("r.sqlite"); LogDatabase left,right; QVERIFY(left.open(l)); QVERIFY(right.open(r));
+        const QString bmp=QString::fromUtf8("\xEE\x80\x80"), supplementary=QString::fromUtf8("\xF0\x90\x80\x80");
+        auto add=[](LogDatabase& db,const QString& uuid,const QString& call) { const auto qso=db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false); return qso.id>0 && db.adoptUuid(qso.id,uuid); };
+        QVERIFY(add(left,supplementary,"K1AAA")); QVERIFY(add(left,bmp,"K1BBB")); QVERIFY(add(right,bmp,"K1BBB")); QVERIFY(add(right,supplementary,"K1AAA"));
+        ContestNetReconcile comparison; QVERIFY(comparison.begin(l,r)); const auto one=comparison.next(1),two=comparison.next(1);
+        QVERIFY(one.ok && two.ok); QCOMPARE(one.rows.size(),1); QCOMPARE(two.rows.size(),1); QCOMPARE(one.rows.first().uuid,bmp); QCOMPARE(two.rows.first().uuid,supplementary);
+        QCOMPARE(one.rows.first().kind,ContestNetDifference::Kind::MatchingFingerprint); QCOMPARE(two.rows.first().kind,ContestNetDifference::Kind::MatchingFingerprint); QVERIFY(!two.hasMore);
+    }
+    void contestNetReconcileRejectsReplacementWhileRowsBuffered()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("left.sqlite"), clone=dir.filePath("clone.sqlite"), remote=dir.filePath("right.sqlite");
+        LogDatabase left,right; QVERIFY(left.open(path)); QVERIFY(right.open(remote));
+        for (const auto& call : {QStringLiteral("K1AAA"),QStringLiteral("K1BBB")}) QVERIFY(left.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false).id>0);
+        QSqlQuery q(left.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
+        ContestNetReconcile comparison; QVERIFY(comparison.begin(path,remote)); const auto first=comparison.next(1); QVERIFY(first.ok); QVERIFY(first.hasMore);
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path)); const auto second=comparison.next(1); QVERIFY(!second.ok); QVERIFY(second.rows.isEmpty()); QVERIFY(second.error.contains("changed"));
+    }
+    void contestNetReconcileRejectsOversizedSourceWithoutPartialResults()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto l=dir.filePath("l.sqlite"), r=dir.filePath("r.sqlite"); LogDatabase left,right; QVERIFY(left.open(l)); QVERIFY(right.open(r));
+        QVERIFY(left.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(1024,'x')}},"fixture").id>0);
+        ContestNetReconcile comparison; QVERIFY(comparison.begin(l,r,100)); const auto page=comparison.next(10);
+        QVERIFY(!page.ok); QVERIFY(page.rows.isEmpty()); QVERIFY(page.error.contains("budget")); QVERIFY(!comparison.next(10).ok);
+        QCOMPARE(left.qsoCount(),1); QCOMPARE(right.qsoCount(),0);
+    }
+    void contestNetReconcileThousandRowTiming()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("source.sqlite"), copy=dir.filePath("copy.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("BEGIN IMMEDIATE"));
+        for (int i=0;i<1000;++i) {
+            AdifRecord row{{"CALL",QString("K%1TEST").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+            QVERIFY(db.insertQso(row,"fixture",{},true,0,false).status==InsertResult::Status::Inserted);
+        }
+        QVERIFY(q.exec("COMMIT")); q.prepare("VACUUM INTO ?"); q.addBindValue(copy); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
+        ContestNetReconcile comparison; QElapsedTimer timer; timer.start(); QVERIFY(comparison.begin(path,copy)); int count=0; bool more=true;
+        while (more) { const auto page=comparison.next(100); QVERIFY2(page.ok,qPrintable(page.error)); for (const auto& row:page.rows) { QCOMPARE(row.kind,ContestNetDifference::Kind::MatchingFingerprint); ++count; } more=page.hasMore; }
+        const auto elapsed=timer.elapsed(); QCOMPARE(count,1000); qInfo("Compare 1000 synthetic matching QSO in two SQLite snapshots: %lld ms",elapsed);
+    }
     void contestNetInventoryReturnsBoundedRoundTripPayloads()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("payload.sqlite"); LogDatabase db; QVERIFY(db.open(path));

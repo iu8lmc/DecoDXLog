@@ -234,6 +234,8 @@ add_library(decolog_core STATIC
     src/core/ContestSerialProtocol.h
     src/core/ContestNetInventory.cpp
     src/core/ContestNetInventory.h
+    src/core/ContestNetReconcile.cpp
+    src/core/ContestNetReconcile.h
     src/core/SharedSerials.h
     src/core/SerialPorts.cpp
     src/core/SerialPorts.h

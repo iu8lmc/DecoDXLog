@@ -24,9 +24,10 @@ QByteArray ContestNetInventory::fingerprint(const AdifRecord& record)
     return QCryptographicHash::hash(canonical,QCryptographicHash::Sha256);
 }
 
-bool ContestNetInventory::begin(const QString& path)
+bool ContestNetInventory::begin(const QString& path, Order order)
 {
     close(); m_error.clear();
+    m_order=order;
     if (path.isEmpty() || path==QLatin1String(":memory:")) { m_error=QStringLiteral("A file-backed log is required"); return false; }
     if (!m_db.openReadOnly(path)) { m_error=m_db.lastError(); close(); return false; }
     if (m_db.openFileIdentity().isEmpty() || !m_db.fileIdentityMatchesOpen()) { m_error=QStringLiteral("Log file identity unavailable"); close(); return false; }
@@ -61,9 +62,13 @@ ContestNetInventoryPage ContestNetInventory::next(int limit, qint64 maxPayloadBy
     if (m_done) { page.ok=true; return page; }
     {
         QSqlQuery q(m_db.connection());
-        q.prepare(m_started ? QStringLiteral("SELECT id,uuid,revision,deleted FROM qso WHERE id>? ORDER BY id LIMIT ?")
-                            : QStringLiteral("SELECT id,uuid,revision,deleted FROM qso ORDER BY id LIMIT ?"));
-        if (m_started) q.addBindValue(m_afterId);
+        if (m_order==Order::Uuid)
+            q.prepare(m_started ? QStringLiteral("SELECT id,uuid,revision,deleted FROM qso WHERE uuid>? COLLATE BINARY ORDER BY uuid COLLATE BINARY LIMIT ?")
+                                : QStringLiteral("SELECT id,uuid,revision,deleted FROM qso ORDER BY uuid COLLATE BINARY LIMIT ?"));
+        else
+            q.prepare(m_started ? QStringLiteral("SELECT id,uuid,revision,deleted FROM qso WHERE id>? ORDER BY id LIMIT ?")
+                                : QStringLiteral("SELECT id,uuid,revision,deleted FROM qso ORDER BY id LIMIT ?"));
+        if (m_started) q.addBindValue(m_order==Order::Uuid ? QVariant(m_afterUuid) : QVariant(m_afterId));
         q.addBindValue(limit+1);
         if (!q.exec()) page.error=q.lastError().text();
         else {
@@ -94,7 +99,7 @@ ContestNetInventoryPage ContestNetInventory::next(int limit, qint64 maxPayloadBy
         payloadBytes+=row.adifPayload.size();
     }
     if (!m_db.fileIdentityMatchesOpen()) { page.rows.clear(); page.error=QStringLiteral("Log file changed during inventory"); close(); return page; }
-    if (!page.rows.isEmpty()) m_afterId=page.rows.last().id;
+    if (!page.rows.isEmpty()) { m_afterId=page.rows.last().id; m_afterUuid=page.rows.last().uuid; }
     m_started=true; m_done=!page.hasMore; page.ok=true; return page;
 }
 
@@ -102,7 +107,7 @@ void ContestNetInventory::close()
 {
     if (m_transaction && m_db.isOpen()) { QSqlQuery q(m_db.connection()); q.exec(QStringLiteral("ROLLBACK")); }
     m_transaction=false; m_db.close(); m_identity.clear(); m_fileIdentity.clear();
-    m_watermark=0; m_afterId=std::numeric_limits<qint64>::min(); m_done=false; m_started=false;
+    m_watermark=0; m_afterId=std::numeric_limits<qint64>::min(); m_afterUuid.clear(); m_done=false; m_started=false; m_order=Order::RowId;
 }
 
 } // namespace decolog::core
