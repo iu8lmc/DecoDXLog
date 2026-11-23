@@ -15,6 +15,26 @@ RoundedWindow {
     id: root
 
     property int revision: 0
+    property bool reportProbe: false
+    function inspectContestReport(url, probe) {
+        reportProbe = !!probe
+        reportReview.result = ({})
+        reportReview.entries = []
+        reportReview.errorText = ""
+        reportReview.open()
+        if (!decolog.activation.startContestReportPreview(url)) reportReview.errorText = qsTr("Cannot start report review.")
+    }
+    Connections {
+        target: decolog.activation
+        function onContestReportFinished(result) {
+            reportReview.result = result
+            reportReview.errorText = result.error || ""
+            const entries = (result.entries || []).map(e => ({line:e.line, text:e.original, kind:e.kind}))
+            const unknown = (result.unknown || []).map(e => ({line:e.line, text:e.text, kind:"unrecognised"}))
+            reportReview.entries = entries.concat(unknown)
+            if (root.reportProbe) console.warn("PROBE lcr ready " + result.total + " " + result.unknownTotal + " " + reportReview.entries.length + " " + reportReview.errorText)
+        }
+    }
     readonly property var session: { revision; return decolog.activation.state }
     readonly property var recent: { revision; return decolog.activation.recentQsos(14) }
     readonly property var rate: { revision; return decolog.activation.rate() }
@@ -761,6 +781,11 @@ RoundedWindow {
                 enabled: root.running && (root.session.qsoCount || 0) > 0
                 onClicked: adifDialog.open()
             }
+            GlassButton {
+                text: qsTr("Review CQ WW report…"); buttonHeight: 26; fontPixelSize: 12
+                enabled: !decolog.activation.contestReportBusy
+                onClicked: contestReportFile.open()
+            }
             Item { Layout.fillWidth: true }
             Text {
                 text: qsTr("Enter logs · Esc clears · space moves to the report")
@@ -771,9 +796,46 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !reportReview.visible && !contestReportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !reportReview.visible && !contestReportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !reportReview.visible && !contestReportFile.visible; onActivated: root.clearEntry() }
+
+    FileDialog {
+        id: contestReportFile
+        title: qsTr("Choose a CQ WW log checking report")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("Text reports (*.rpt *.txt)"), qsTr("All files (*)")]
+        onAccepted: root.inspectContestReport(selectedFile, false)
+    }
+    DialogFrame {
+        id: reportReview
+        property var result: ({})
+        property var entries: []
+        property string errorText: ""
+        dialogKey: "contestReportReview"; width: 800; height: 600
+        title: qsTr("CQ WW report review"); dotColor: Theme.primaryColor
+        ColumnLayout {
+            anchors.fill: parent; spacing: 8
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.textSecondary
+                text:qsTr("Read-only review. Only three own-log error sections are interpreted; line previews are limited to 1024 characters. The original file and QSO are unchanged.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.errorColor; visible:reportReview.errorText.length>0; text:reportReview.errorText }
+            Text { Layout.fillWidth:true; color:Theme.textPrimary; wrapMode:Text.WordWrap
+                text:decolog.activation.contestReportBusy ? qsTr("Reading report…") : reportReview.result.contest ?
+                    qsTr("%1 · %2 · NIL %3 · calls %4 · exchanges %5 · unrecognised %6").arg(reportReview.result.contest).arg(reportReview.result.ownCall).arg(reportReview.result.nil).arg(reportReview.result.incorrectCall).arg(reportReview.result.incorrectExchange).arg(reportReview.result.unknownTotal) : "" }
+            Text { Layout.fillWidth:true; color:Theme.warningColor; wrapMode:Text.WordWrap
+                visible:(reportReview.result.total || 0)>500 || (reportReview.result.unknownTotal || 0)>200
+                text:qsTr("Showing up to 500 findings and 200 unrecognised lines; review the original file for the complete text.") }
+            ListView {
+                id: reportRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:reportReview.entries
+                ScrollBar.vertical: PanelScrollBar {}
+                delegate: Text { required property var modelData; width:reportRows.width; wrapMode:Text.WrapAnywhere
+                    color:modelData.kind === "unrecognised" ? Theme.warningColor : Theme.textPrimary
+                    font.family:Theme.monoFamily; font.pixelSize:11
+                    text:qsTr("Line %1 · %2 · %3").arg(modelData.line).arg(modelData.kind).arg(modelData.text) }
+            }
+            GlassButton { Layout.alignment:Qt.AlignRight; text:qsTr("Close"); onClicked:reportReview.close() }
+        }
+    }
 
     FileDialog {
         id: adifDialog

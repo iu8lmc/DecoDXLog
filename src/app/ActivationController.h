@@ -31,6 +31,7 @@ class ActivationController : public QObject {
     Q_PROPERTY(QObject* sotaCatalogue READ sotaCatalogue CONSTANT)
     Q_PROPERTY(QObject* potaCatalogue READ potaCatalogue CONSTANT)
     Q_PROPERTY(bool previewBusy READ previewBusy NOTIFY previewChanged)
+    Q_PROPERTY(bool contestReportBusy READ contestReportBusy NOTIFY contestReportBusyChanged)
     Q_PROPERTY(bool partitionExportBusy READ partitionExportBusy NOTIFY partitionExportChanged)
     Q_PROPERTY(QVariantMap previewResult READ previewResult NOTIFY previewChanged)
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
@@ -79,6 +80,8 @@ public:
     QObject* sotaCatalogue() const;
     QObject* potaCatalogue() const;
     bool previewBusy() const { return m_previewBusy; }
+    bool contestReportBusy() const { return m_contestReportBusy; }
+    Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
     bool partitionExportBusy() const { return m_partitionExportBusy; }
     Q_INVOKABLE bool startPartitionExport(const QVariantMap& group, const QUrl& destination);
     Q_INVOKABLE void cancelPartitionExport();
@@ -190,6 +193,8 @@ public:
 signals:
     void changed();
     void previewChanged();
+    void contestReportBusyChanged();
+    void contestReportFinished(const QVariantMap& result);
     void previewFinished(bool success);
     void partitionExportChanged();
     void partitionExportFinished(bool success, const QString& message);
@@ -199,6 +204,8 @@ private:
     core::SotaCatalogue* m_sotaCatalogue{nullptr};
     core::PotaCatalogue* m_potaCatalogue{nullptr};
     QThreadPool m_previewPool;
+    QThreadPool m_contestReportPool;
+    bool m_contestReportBusy{false};
     QThreadPool m_partitionExportPool;
     std::shared_ptr<std::atomic_bool> m_partitionExportCancel;
     bool m_partitionExportBusy{false};

@@ -23,6 +23,41 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void cqWwReportPreviewIsReadOnlyAndShowsUnknownRows()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("report.rpt");
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray original="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n"
+            "****** Incorrect Call ******\n 14020 CW 2024-11-23 1201 K1ABC 05 DL1BAD 14 correct DL1GOOD\n"
+            "unexpected line\n****** Summary ******\nunchanged\n";
+        QCOMPARE(file.write(original),original.size()); file.close();
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        const auto qso=db.insertQso(AdifRecord{{"CALL","DL1BAD"},{"QSO_DATE","20241123"},{"TIME_ON","1201"},
+              {"BAND","20m"},{"MODE","CW"}},"test",{},true); QVERIFY(qso.id>0);
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy done(&act,&ActivationController::contestReportFinished);
+        QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,5000);
+        const auto result=done.first().at(0).toMap(); QVERIFY2(result.value("error").toString().isEmpty(),qPrintable(result.value("error").toString()));
+        QCOMPARE(result.value("total").toInt(),1); QCOMPARE(result.value("unknownTotal").toInt(),1);
+        QCOMPARE(result.value("entries").toList().first().toMap().value("call").toString(),QString("DL1BAD"));
+        QCOMPARE(result.value("unknown").toList().first().toMap().value("text").toString(),QString("unexpected line"));
+        QCOMPARE(db.qsoCount(),qint64(1)); QCOMPARE(db.record(qso.id)->value("CALL"),QString("DL1BAD"));
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(),original);
+    }
+    void cqWwReportPreviewBoundsRowsWithoutHidingTotals()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile file(dir.filePath("large.rpt")); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n");
+        for (int i=0;i<501;++i) file.write("14020 CW 2024-11-23 1201 K1ABC 05 DL1ABC 14\n");
+        for (int i=0;i<201;++i) file.write("unrecognised row\n");
+        file.close(); ActivationController::Context ctx; ActivationController act(std::move(ctx));
+        QSignalSpy done(&act,&ActivationController::contestReportFinished);
+        QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(file.fileName()))); QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,5000);
+        const auto result=done.first().at(0).toMap(); QVERIFY(result.value("error").toString().isEmpty());
+        QCOMPARE(result.value("total").toInt(),501); QCOMPARE(result.value("unknownTotal").toInt(),201);
+        QCOMPARE(result.value("entries").toList().size(),500); QCOMPARE(result.value("unknown").toList().size(),200);
+    }
     void recoveredQsoUsesOnlyUnambiguousJournalPeriod()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;

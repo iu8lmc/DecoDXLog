@@ -67,6 +67,19 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void contestReportReviewShowsRecognisedAndUnknownLines()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("report.rpt"); QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray source="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n"
+            "****** Incorrect Call ******\n 14020 CW 2024-11-23 1201 K1ABC 05 DL1BAD 14 correct DL1GOOD\n"
+            "unknown row\n****** Summary ******\nother text\n";
+        QCOMPARE(file.write(source),source.size()); file.close();
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("cqwwreportprobe:")+path,output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE lcr ready 1 1 2 ") && !output.contains("TypeError"),output.constData());
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(),source);
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void callQueueDoesNotOverwriteCurrentQso()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

@@ -4,6 +4,7 @@
 #include "core/Awards.h"
 #include "core/Cabrillo.h"
 #include "core/ContestRules.h"
+#include "core/ContestReport.h"
 #include "core/Contests.h"
 #include "core/LogDatabase.h"
 #include "core/Spots.h"
@@ -105,6 +106,7 @@ ActivationController::~ActivationController()
     if (m_previewCancel) m_previewCancel->store(true);
     if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     m_previewPool.waitForDone();
+    m_contestReportPool.waitForDone();
     m_partitionExportPool.waitForDone();
 }
 
@@ -914,6 +916,59 @@ QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
             {QStringLiteral("title"), state.value(QStringLiteral("title"))}};
     }
     return rows;
+}
+
+bool ActivationController::startContestReportPreview(const QUrl& file)
+{
+    if (m_contestReportBusy || !file.isLocalFile() || file.toLocalFile().isEmpty()) return false;
+    const QString path = file.toLocalFile();
+    m_contestReportBusy = true; emit contestReportBusyChanged();
+    QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self, path] {
+        QVariantMap result;
+        QFile input(path);
+        if (!QFileInfo(path).isFile() || !input.open(QIODevice::ReadOnly)) {
+            result.insert(QStringLiteral("error"), tr("Cannot open the selected report file."));
+        } else {
+            const QByteArray bytes = input.read(2 * 1024 * 1024 + 1);
+            auto report = core::contestreport::parseCqWw(bytes);
+            if (input.error() != QFileDevice::NoError) {
+                report = {};
+                report.error = tr("Could not read the complete report file.");
+            }
+            result.insert(QStringLiteral("error"), report.error);
+            result.insert(QStringLiteral("contest"), report.contest);
+            result.insert(QStringLiteral("ownCall"), report.ownCall);
+            result.insert(QStringLiteral("total"), report.entries.size());
+            result.insert(QStringLiteral("unknownTotal"), report.unrecognizedLines.size());
+            QVariantList entries, unknown;
+            int nil=0, calls=0, exchanges=0;
+            for (const auto& entry : report.entries) {
+                if (entry.kind == QLatin1String("not_in_log")) ++nil;
+                else if (entry.kind == QLatin1String("incorrect_call")) ++calls;
+                else if (entry.kind == QLatin1String("incorrect_exchange")) ++exchanges;
+                if (entries.size() < 500)
+                    entries << QVariantMap{{QStringLiteral("line"), entry.lineNumber}, {QStringLiteral("kind"), entry.kind},
+                        {QStringLiteral("date"), entry.date}, {QStringLiteral("time"), entry.time},
+                        {QStringLiteral("frequency"), entry.frequencyKhz}, {QStringLiteral("call"), entry.call},
+                        {QStringLiteral("correction"), entry.correction}, {QStringLiteral("original"), entry.original.left(1024)}};
+            }
+            for (int index : report.unrecognizedLines) {
+                if (unknown.size() >= 200) break;
+                unknown << QVariantMap{{QStringLiteral("line"), index+1}, {QStringLiteral("text"), report.lines.at(index).left(1024)}};
+            }
+            result.insert(QStringLiteral("entries"), entries); result.insert(QStringLiteral("unknown"), unknown);
+            result.insert(QStringLiteral("nil"), nil); result.insert(QStringLiteral("incorrectCall"), calls);
+            result.insert(QStringLiteral("incorrectExchange"), exchanges);
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, result] {
+            if (!self) return;
+            self->m_contestReportBusy = false; emit self->contestReportBusyChanged();
+            emit self->contestReportFinished(result);
+        }, Qt::QueuedConnection);
+    });
+    return true;
 }
 
 bool ActivationController::startPartitionPreview()
