@@ -571,7 +571,10 @@ public:
     // arriva con statsReady(), con mode e year di chi l'ha chiesto.
     Q_INVOKABLE void requestStats(const QString& mode, int year);
     Q_INVOKABLE void requestActivityReport(int year, const QString& band);
+    Q_INVOKABLE void requestConfirmationReport(int year, const QString& band);
+    void startStationReport(const QString& kind, int year, const QString& band);
     Q_INVOKABLE QString saveActivityReportSettings(int year, const QString& band);
+    Q_INVOKABLE QString saveSelectedReportSettings(const QString& kind, int year, const QString& band);
     Q_INVOKABLE QVariantMap activityReportSettings() const;
     Q_INVOKABLE QString exportActivityReport(const QUrl& file);
     Q_INVOKABLE QStringList statsYears() const;

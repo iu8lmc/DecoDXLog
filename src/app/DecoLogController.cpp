@@ -7680,28 +7680,36 @@ QVariantMap computeStats(const LogDatabase& db, const QString& mode, int year)
 
 void DecoLogController::requestActivityReport(int year,const QString& requestedBand)
 {
+    startStationReport(QStringLiteral("activity"),year,requestedBand);
+}
+void DecoLogController::requestConfirmationReport(int year,const QString& requestedBand)
+{
+    startStationReport(QStringLiteral("confirmation"),year,requestedBand);
+}
+void DecoLogController::startStationReport(const QString& kind,int year,const QString& requestedBand)
+{
     const QString path=m_db.path(), band=requestedBand.trimmed().toLower(); const quint64 generation=++m_activityReportGeneration;
     m_activityReport.clear(); m_activityReportPool.clear();
     if (!m_db.isOpen() || path.isEmpty() || path==QLatin1String(":memory:") || year<0 || year>9999 || band.size()>24) {
         emit activityReportReady({{QStringLiteral("error"),tr("Choose a file-backed log and valid report filters")}}); return;
     }
     QPointer<DecoLogController> self(this);
-    m_activityReportPool.start([self,path,band,year,generation] {
+    m_activityReportPool.start([self,path,band,year,generation,kind] {
         activityreport::Result report; const QString connection=QStringLiteral("activity-report-")+QUuid::createUuid().toString();
         {
             QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
             db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=250")); db.setDatabaseName(path);
-            if (db.open()) report=activityreport::run(db,year,band); else report.error=QStringLiteral("Cannot open log for report");
+            if (db.open()) report=kind==QLatin1String("confirmation") ? activityreport::runConfirmations(db,year,band) : activityreport::run(db,year,band); else report.error=QStringLiteral("Cannot open log for report");
             db.close();
         }
         QSqlDatabase::removeDatabase(connection); if (!self) return;
         const QString generated=QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-        QMetaObject::invokeMethod(self.data(),[self,path,band,year,generation,report,generated] {
+        QMetaObject::invokeMethod(self.data(),[self,path,band,year,generation,report,generated,kind] {
             if (!self || self->m_shuttingDown || generation!=self->m_activityReportGeneration) return;
             if (!self->m_db.isOpen() || self->m_db.path()!=path) {
                 self->m_activityReport.clear(); emit self->activityReportReady({{QStringLiteral("error"),self->tr("The open log changed")}}); return;
             }
-            self->m_activityReport={{QStringLiteral("path"),path},{QStringLiteral("band"),band},{QStringLiteral("year"),year},
+            self->m_activityReport={{QStringLiteral("path"),path},{QStringLiteral("band"),band},{QStringLiteral("year"),year},{QStringLiteral("kind"),kind},
                 {QStringLiteral("generatedAt"),generated},{QStringLiteral("rows"),report.rows},
                 {QStringLiteral("truncated"),report.truncated},{QStringLiteral("error"),report.error}};
             emit self->activityReportReady(self->m_activityReport);
@@ -7710,9 +7718,13 @@ void DecoLogController::requestActivityReport(int year,const QString& requestedB
 }
 QString DecoLogController::saveActivityReportSettings(int year,const QString& rawBand)
 {
+    return saveSelectedReportSettings(QStringLiteral("activity"),year,rawBand);
+}
+QString DecoLogController::saveSelectedReportSettings(const QString& kind,int year,const QString& rawBand)
+{
     const QString band=rawBand.trimmed().toLower();
-    if (!m_db.isOpen() || year<0 || year>9999 || band.size()>24) return tr("Invalid report filters");
-    const QString json=QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("year"),year},{QStringLiteral("band"),band}}).toJson(QJsonDocument::Compact));
+    if (!m_db.isOpen() || year<0 || year>9999 || band.size()>24 || (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation"))) return tr("Invalid report filters");
+    const QString json=QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),kind}}).toJson(QJsonDocument::Compact));
     QSqlQuery q(m_db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES('activity_report_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")); q.addBindValue(json);
     return q.exec() ? QString() : tr("Cannot save report filters");
 }
@@ -7721,8 +7733,9 @@ QVariantMap DecoLogController::activityReportSettings() const
     if (!m_db.isOpen()) return {};
     const auto doc=QJsonDocument::fromJson(m_db.setting(QStringLiteral("activity_report_v1")).toUtf8());
     if (!doc.isObject()) return {}; const auto o=doc.object(); const int year=o.value(QStringLiteral("year")).toInt(-1); const QString band=o.value(QStringLiteral("band")).toString();
-    if (year<0 || year>9999 || band.size()>24) return {};
-    return {{QStringLiteral("year"),year},{QStringLiteral("band"),band}};
+    const QString kind=o.value(QStringLiteral("kind")).toString(QStringLiteral("activity"));
+    if (year<0 || year>9999 || band.size()>24 || (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation"))) return {};
+    return {{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),kind}};
 }
 QString DecoLogController::exportActivityReport(const QUrl& file)
 {
@@ -7733,7 +7746,8 @@ QString DecoLogController::exportActivityReport(const QUrl& file)
     const QString targetPath=target.absoluteFilePath(), sourcePath=source.absoluteFilePath();
     if (targetPath==sourcePath || targetPath==sourcePath+QStringLiteral("-wal") || targetPath==sourcePath+QStringLiteral("-shm") || targetPath==sourcePath+QStringLiteral("-journal") ||
         (!target.canonicalFilePath().isEmpty() && target.canonicalFilePath()==source.canonicalFilePath())) return tr("Choose a file other than the log database");
-    activityreport::Result report; report.rows=m_activityReport.value(QStringLiteral("rows")).toList(); const QByteArray bytes=activityreport::csv(report);
+    activityreport::Result report; report.rows=m_activityReport.value(QStringLiteral("rows")).toList();
+    const QByteArray bytes=m_activityReport.value(QStringLiteral("kind")).toString()==QLatin1String("confirmation") ? activityreport::confirmationsCsv(report) : activityreport::csv(report);
     QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !out.commit()) return tr("Cannot write the CSV file");
     return {};
 }

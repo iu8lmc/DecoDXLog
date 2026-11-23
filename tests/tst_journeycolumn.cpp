@@ -68,15 +68,31 @@ private slots:
         { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           for (const QString& call : {QString("K1AAA"),QString("K1BBB")})
               QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"MY_ANTENNA","Dipole"},{"MY_GRIDSQUARE","JM75"}},"fixture",{},true).id>0);
-          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1CCC"},{"QSO_DATE","20250102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"MY_ANTENNA","Yagi"}},"fixture",{},true).id>0); }
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1CCC"},{"QSO_DATE","20250102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"MY_ANTENNA","Yagi"}},"fixture",{},true).id>0);
+          db.setSetting("activity_report_v1",R"({"year":2024,"band":"40m"})"); }
         const QString file=dir.filePath("report.csv"); QByteArray output;
         QVERIFY2(launch(dir,QStringLiteral("activityreportprobe:")+file,output,5000),output.constData());
         QVERIFY2(output.contains("PROBE activityreport result") && output.contains("\"antenna\":\"Dipole\"") && output.contains("\"count\":2") && output.contains("PROBE activityreport export "),output.constData());
-        QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"year\":2026}"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"kind\":\"activity\",\"year\":2026}"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport prior settings {\"band\":\"40m\",\"kind\":\"activity\",\"year\":2024}"),output.constData());
         QVERIFY2(output.contains("PROBE activityreport protected Choose a file other than the log database"),output.constData());
         QVERIFY2(output.contains("PROBE activityreport rendered Dipole · 20m · JM75 · 2"),output.constData());
         QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("antenna,band,own_grid,qso_count\r\n\"Dipole\",\"20m\",\"JM75\",2\r\n"));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3)); QVERIFY(db.setting("activity_report_v1").contains("2026"));
+    }
+    void confirmationReportShowsMissingDatesAndExports()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString& call : {QString("K1AAA"),QString("K1BBB")})
+              QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd,rcvd_date) VALUES(1,'card','Y','20260104'),(2,'card','Y',NULL)")); }
+        const QString file=dir.filePath("confirmation.csv"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("confirmationreportprobe:")+file,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport rendered card · 2 · 1 · 1 · 0 · 0 · 2.00"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"kind\":\"confirmation\",\"year\":2026}"),output.constData());
+        QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("service,confirmed,dated,missing_date,invalid_date,earlier_date,average_days\r\n\"card\",2,1,1,0,0,2.00\r\n"));
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }
     void typedCustomFieldsValidateBeforeSavingQso()
     {

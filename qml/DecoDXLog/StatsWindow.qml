@@ -26,11 +26,13 @@ RoundedWindow {
         const value=reportYear.text.trim()
         if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }
         activityBusy=true; reportMessage=""; activityReport=({})
-        decolog.requestActivityReport(value.length ? Number(value) : 0,reportBand.text)
+        if (reportKind.currentIndex===1) decolog.requestConfirmationReport(value.length ? Number(value) : 0,reportBand.text)
+        else decolog.requestActivityReport(value.length ? Number(value) : 0,reportBand.text)
     }
-    function probeReport(path) {
-        page=2; reportYear.text="2026"; reportBand.text="20m"
-        console.warn("PROBE activityreport saved " + decolog.saveActivityReportSettings(2026,"20m"))
+    function probeReport(path,kind) {
+        page=2; reportYear.text="2026"; reportBand.text="20m"; reportKind.currentIndex=kind==="confirmation" ? 1 : 0
+        console.warn("PROBE activityreport prior settings " + JSON.stringify(decolog.activityReportSettings()))
+        console.warn("PROBE activityreport saved " + decolog.saveSelectedReportSettings(kind || "activity",2026,"20m"))
         reportProbePath=path; runActivityReport()
     }
 
@@ -474,27 +476,28 @@ RoundedWindow {
         ColumnLayout {
             visible:root.page===2; Layout.fillWidth:true; Layout.fillHeight:true; spacing:8
             Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
-                text:qsTr("Activity by reported antenna, band and own grid. Blank values were not recorded in the QSO; current station profiles are not used to fill gaps. Results are a read snapshot and may not include later changes.") }
+                text:(root.activityReport.kind || (reportKind.currentIndex===1 ? "confirmation" : "activity"))==="confirmation" ? qsTr("Confirmed records by service and elapsed UTC calendar days from QSO to recorded receipt date. Missing, invalid or earlier dates are excluded from the average. A QSO can appear under multiple services; this is not official award credit. Results are a read snapshot and may not include later changes.") : qsTr("Activity by reported antenna, band and own grid. Blank values were not recorded in the QSO; current station profiles are not used to fill gaps. Results are a read snapshot and may not include later changes.") }
             RowLayout {
                 Layout.fillWidth:true
+                StyledComboBox { id:reportKind; Layout.preferredWidth:200; model:[qsTr("Station activity"),qsTr("Confirmation times")]; Accessible.name:qsTr("Report type") }
                 StyledTextField { id:reportYear; Layout.preferredWidth:150; placeholderText:qsTr("UTC year (all)"); Accessible.name:qsTr("Report UTC year") }
                 StyledTextField { id:reportBand; Layout.preferredWidth:150; placeholderText:qsTr("Band (all)"); Accessible.name:qsTr("Report band") }
                 GlassButton { text:qsTr("Run report"); enabled:!root.activityBusy; onClicked:root.runActivityReport() }
-                GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; root.reportMessage=decolog.saveActivityReportSettings(value.length ? Number(value) : 0,reportBand.text) || qsTr("Filters saved in this log.") } }
-                GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; root.reportMessage=qsTr("Filters loaded from this log.") } }
+                GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; root.reportMessage=decolog.saveSelectedReportSettings(reportKind.currentIndex===1 ? "confirmation" : "activity",value.length ? Number(value) : 0,reportBand.text) || qsTr("Filters saved in this log.") } }
+                GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; reportKind.currentIndex=s.kind==="confirmation" ? 1 : 0; root.reportMessage=qsTr("Filters loaded from this log.") } }
                 GlassButton { text:qsTr("Export CSV…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportFile.open() }
             }
             Text { Layout.fillWidth:true; visible:root.activityBusy; text:qsTr("Preparing report…"); color:Theme.secondaryColor }
             Text { Layout.fillWidth:true; visible:root.reportMessage.length>0; text:root.reportMessage; color:Theme.warningColor; wrapMode:Text.Wrap }
             Text { Layout.fillWidth:true; visible:!!root.activityReport.generatedAt; color:Theme.textSecondary; wrapMode:Text.Wrap
                 text:qsTr("Snapshot %1 · year %2 · band %3 · %4 groups%5").arg(root.activityReport.generatedAt || "").arg(root.activityReport.year || qsTr("all")).arg(root.activityReport.band || qsTr("all")).arg((root.activityReport.rows || []).length).arg(root.activityReport.truncated ? qsTr(" · truncated; refine filters before export") : "") }
-            Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:qsTr("Antenna · band · own grid · QSO") }
+            Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:root.activityReport.kind==="confirmation" ? qsTr("Service · confirmed · dated · missing · invalid · earlier · average days") : qsTr("Antenna · band · own grid · QSO") }
             ListView {
                 id:activityRows
                 Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.activityReport.rows || []
                 ScrollBar.vertical:ScrollBar {}
                 delegate:Text { required property var modelData; width:ListView.view.width; color:Theme.textPrimary; textFormat:Text.PlainText; elide:Text.ElideRight
-                    text:(modelData.antenna || qsTr("(not recorded)"))+" · "+(modelData.band || qsTr("(not recorded)"))+" · "+(modelData.grid || qsTr("(not recorded)"))+" · "+modelData.count }
+                    text:root.activityReport.kind==="confirmation" ? (modelData.service || qsTr("(not recorded)"))+" · "+modelData.confirmed+" · "+modelData.dated+" · "+modelData.missing+" · "+modelData.invalid+" · "+modelData.earlier+" · "+(modelData.averageDays === undefined ? "—" : Number(modelData.averageDays).toFixed(2)) : (modelData.antenna || qsTr("(not recorded)"))+" · "+(modelData.band || qsTr("(not recorded)"))+" · "+(modelData.grid || qsTr("(not recorded)"))+" · "+modelData.count }
             }
         }
     }

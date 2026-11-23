@@ -8,6 +8,25 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void confirmationTimesKeepServicesAndMissingDatesSeparate()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const QString& call : {QString("K1AAA"),QString("K1BBB"),QString("K1CCC"),QString("K1DDD"),QString("K1EEE")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id>0);
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1FFF"},{"QSO_DATE","20250101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id>0);
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1GGG"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","40m"},{"MODE","CW"}},"fixture",{},true).id>0);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd,rcvd_date) VALUES (1,'card','Y','20260101'),(2,'card','Y','20260103'),(3,'card','Y',NULL),(4,'card','Y','20260230'),(5,'card','Y','20251231'),(1,'lotw','Y','20260111'),(2,'eqsl','N','20260104'),(3,'qrz','Y',NULL)"));
+        QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd,rcvd_date) VALUES (6,'card','Y','20250102'),(7,'card','Y','20260102')"));
+        const auto result=activityreport::runConfirmations(db.connection(),2026,"20m"); QVERIFY2(result.error.isEmpty(),qPrintable(result.error));
+        QCOMPARE(result.rows.size(),3); const auto card=result.rows[0].toMap(); const auto lotw=result.rows[1].toMap();
+        QCOMPARE(card.value("service").toString(),QString("card")); QCOMPARE(card.value("confirmed").toInt(),5);
+        QCOMPARE(card.value("dated").toInt(),2); QCOMPARE(card.value("missing").toInt(),1); QCOMPARE(card.value("invalid").toInt(),1); QCOMPARE(card.value("earlier").toInt(),1);
+        QCOMPARE(card.value("averageDays").toDouble(),1.0); QCOMPARE(lotw.value("averageDays").toDouble(),10.0);
+        QVERIFY(!result.rows[2].toMap().contains("averageDays"));
+        QVERIFY(activityreport::confirmationsCsv(result).contains("\"card\",5,2,1,1,1,1.00"));
+        QCOMPARE(db.qsoCount(),qint64(7));
+    }
     void groupsRecordedValuesAndExportsCsv()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
