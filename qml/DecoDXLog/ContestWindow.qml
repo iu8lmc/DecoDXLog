@@ -29,6 +29,7 @@ RoundedWindow {
         comparisonContest.text="CQ-WW-CW"
         comparisonA.setTexts(decolog.showDate("2024-11-23"),decolog.showDate("2024-11-23"))
         comparisonB.setTexts(decolog.showDate("2025-11-22"),decolog.showDate("2025-11-22"))
+        comparisonGoalA.value=5; comparisonGoalB.value=1
         comparisonButton.clicked()
         contestComparison.probing=true
         contestComparison.probingStale=!!stale
@@ -127,6 +128,10 @@ RoundedWindow {
             contestComparison.errorText=result.error || ""
             if (contestComparison.probing) {
                 console.warn("PROBE contestComparison a=" + result.totalA + " b=" + result.totalB + " rows=" + (result.rows || []).length + " error=" + contestComparison.errorText)
+                const a=contestComparison.goal(result.totalA,comparisonGoalA.value), b=contestComparison.goal(result.totalB,comparisonGoalB.value)
+                console.warn("PROBE contestGoals a=" + result.totalA + "/" + comparisonGoalA.value + ":" + a.percent + ":" + a.remaining + " b=" + result.totalB + "/" + comparisonGoalB.value + ":" + b.percent + ":" + b.remaining)
+                comparisonGoalB.value=0; comparisonGoalA.value=1
+                console.warn("PROBE contestGoals edge=" + (goalAStatus.visible && goalAStatus.text.indexOf("200%")>=0 && !goalBStatus.visible))
                 contestComparison.probing=false
             }
         }
@@ -1091,21 +1096,29 @@ RoundedWindow {
     }
 
     DialogFrame {
-        id:contestComparison; dialogKey:"contestComparison"; width:760; height:560
+        id:contestComparison; dialogKey:"contestComparison"; width:760; height:620
         title:qsTr("Compare contest periods"); dotColor:Theme.primaryColor
         property var result:({}); property string errorText:""; property bool probing:false; property bool probingStale:false; property int startLogRevision:0
-        Connections { target:comparisonA; function onFromIsoChanged() { contestComparison.result=({}) } function onToIsoChanged() { contestComparison.result=({}) } }
-        Connections { target:comparisonB; function onFromIsoChanged() { contestComparison.result=({}) } function onToIsoChanged() { contestComparison.result=({}) } }
+        function goal(total,target) { return {percent:target>0 ? Math.round(total*100/target) : 0, remaining:Math.max(0,target-total)} }
+        Connections { target:comparisonA; function onFromIsoChanged() { contestComparison.result=({}); comparisonGoalA.value=0 } function onToIsoChanged() { contestComparison.result=({}); comparisonGoalA.value=0 } }
+        Connections { target:comparisonB; function onFromIsoChanged() { contestComparison.result=({}); comparisonGoalB.value=0 } function onToIsoChanged() { contestComparison.result=({}); comparisonGoalB.value=0 } }
         ColumnLayout {
             anchors.fill:parent; spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Missing operator or own radio stays unknown. Overlapping dates count in both periods. These are logged activity counts, not scores, credit or eligibility.") }
+                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Missing operator or own radio stays unknown. Overlapping dates count in both periods. QSO goals are temporary and optional. These are logged activity counts, not scores, credit or eligibility.") }
             RowLayout { Layout.fillWidth:true
                 Text { text:qsTr("Contest ID"); color:Theme.textSecondary }
-                StyledTextField { id:comparisonContest; Layout.fillWidth:true; placeholderText:qsTr("Recorded CONTEST_ID"); onTextChanged:contestComparison.result=({}) }
+                StyledTextField { id:comparisonContest; Layout.fillWidth:true; placeholderText:qsTr("Recorded CONTEST_ID"); onTextChanged: { contestComparison.result=({}); comparisonGoalA.value=0; comparisonGoalB.value=0 } }
             }
             DatePeriodFields { id:comparisonA; fromLabel:qsTr("Period A from") }
             DatePeriodFields { id:comparisonB; fromLabel:qsTr("Period B from") }
+            RowLayout {
+                Text { color:Theme.textSecondary; text:qsTr("QSO goals (0 = unset)") }
+                Text { color:Theme.textSecondary; text:qsTr("A") }
+                SpinBox { id:comparisonGoalA; from:0; to:100000; value:0; editable:true; Accessible.name:qsTr("Period A QSO goal") }
+                Text { color:Theme.textSecondary; text:qsTr("B") }
+                SpinBox { id:comparisonGoalB; from:0; to:100000; value:0; editable:true; Accessible.name:qsTr("Period B QSO goal") }
+            }
             RowLayout {
                 GlassButton { id:comparisonButton; text:qsTr("Compare"); enabled:!decolog.activation.contestReportBusy
                     onClicked: {
@@ -1117,6 +1130,12 @@ RoundedWindow {
                 }
                 Text { color:Theme.textPrimary; text:decolog.activation.contestReportBusy ? qsTr("Comparing…") : qsTr("A: %1 QSO · B: %2 QSO").arg(contestComparison.result.totalA || 0).arg(contestComparison.result.totalB || 0) }
             }
+            Text { id:goalAStatus; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                visible:contestComparison.result.totalA !== undefined && comparisonGoalA.value>0
+                text:qsTr("Goal A: %1 / %2 · %3% · %4 remaining").arg(contestComparison.result.totalA || 0).arg(comparisonGoalA.value).arg(contestComparison.goal(contestComparison.result.totalA || 0,comparisonGoalA.value).percent).arg(contestComparison.goal(contestComparison.result.totalA || 0,comparisonGoalA.value).remaining) }
+            Text { id:goalBStatus; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                visible:contestComparison.result.totalB !== undefined && comparisonGoalB.value>0
+                text:qsTr("Goal B: %1 / %2 · %3% · %4 remaining").arg(contestComparison.result.totalB || 0).arg(comparisonGoalB.value).arg(contestComparison.goal(contestComparison.result.totalB || 0,comparisonGoalB.value).percent).arg(contestComparison.goal(contestComparison.result.totalB || 0,comparisonGoalB.value).remaining) }
             Text { Layout.fillWidth:true; color:Theme.errorColor; wrapMode:Text.Wrap; visible:contestComparison.errorText.length>0; text:contestComparison.errorText }
             Text { Layout.fillWidth:true; color:Theme.warningColor; wrapMode:Text.Wrap; visible:(contestComparison.result.invalidTimestamp || 0)>0
                 text:qsTr("%1 records have an invalid UTC timestamp and were excluded.").arg(contestComparison.result.invalidTimestamp) }
