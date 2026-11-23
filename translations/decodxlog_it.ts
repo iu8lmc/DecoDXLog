@@ -5237,6 +5237,12 @@ Risultato stimato: %3 nuovi · %4 duplicati · %5 respinti.
 Stato QSL: %6 · UTC incompleto: %7.
 Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</translation>
     </message>
+    <message>
+        <source>Program-field mappings detected in the source (including records that may be rejected or duplicates):
+%1</source>
+        <translation>Mappature dei campi del programma rilevate nella sorgente (inclusi record che potrebbero essere respinti o duplicati):
+%1</translation>
+    </message>
 </context>
 <context>
     <name>MapPanel</name>

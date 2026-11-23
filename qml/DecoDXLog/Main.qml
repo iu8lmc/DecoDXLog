@@ -2405,8 +2405,8 @@ RoundedWindow {
         title: qsTr("Import preview")
         dialogKey: "import-preview"
         dotColor: Theme.primaryColor
-        width: 600
-        height: 300
+        width: 700
+        height: 430
         onAccepted: decolog.importAdif(window.pendingImport)
         onRejected: decolog.cancelImportPreview()
         body: ColumnLayout {
@@ -2425,6 +2425,13 @@ RoundedWindow {
                           .arg((window.importPreview.extraFields || []).join(", ") || qsTr("none"))
                       : qsTr("Cannot preview this import: %1").arg(window.importPreview.error || qsTr("unknown error"))
                 color: Theme.textPrimary
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: !!window.importPreview.ok && (window.importPreview.mappedFields || []).length > 0
+                wrapMode: Text.Wrap
+                color: Theme.textSecondary
+                text: qsTr("Program-field mappings detected in the source (including records that may be rejected or duplicates):\n%1").arg((window.importPreview.mappedFields || []).join("\n"))
             }
             Text {
                 Layout.fillWidth: true

@@ -5953,6 +5953,7 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
     int missingUtc = 0;
     int qsl = 0;
     QSet<QString> extra;
+    QMap<QString, int> mappedFields;
     const QSet<QString> known{QStringLiteral("CALL"), QStringLiteral("QSO_DATE"), QStringLiteral("TIME_ON"),
                               QStringLiteral("BAND"), QStringLiteral("MODE"), QStringLiteral("SUBMODE"),
                               QStringLiteral("LOTW_QSL_RCVD"), QStringLiteral("EQSL_QSL_RCVD"),
@@ -5963,12 +5964,22 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
     for (const AdifRecord& record : doc.records) {
         if (!record.contains(QStringLiteral("QSO_DATE")) || !record.contains(QStringLiteral("TIME_ON")))
             ++missingUtc;
-        if (record.contains(QStringLiteral("LOTW_QSL_RCVD")) || record.contains(QStringLiteral("EQSL_QSL_RCVD"))
-            || record.contains(QStringLiteral("QSL_RCVD")))
-            ++qsl;
         for (const AdifField& field : record.fields())
             if (!known.contains(field.name))
                 extra.insert(field.name);
+        AdifRecord mapped = record;
+        migration::mapProgramFields(mapped);
+        if (mapped.contains(QStringLiteral("LOTW_QSL_RCVD")) || mapped.contains(QStringLiteral("EQSL_QSL_RCVD"))
+            || mapped.contains(QStringLiteral("QSL_RCVD")) || mapped.contains(QStringLiteral("CARD_QSL_RCVD"))
+            || mapped.contains(QStringLiteral("QRZCOM_QSO_DOWNLOAD_STATUS")))
+            ++qsl;
+        const QList<QPair<QString, QString>> mappings{
+            {QStringLiteral("APP_QRZLOG_STATUS"), QStringLiteral("QRZCOM_QSO_DOWNLOAD_STATUS")},
+            {QStringLiteral("APP_QRZLOG_QSLDATE"), QStringLiteral("QRZCOM_QSO_DOWNLOAD_DATE")},
+            {QStringLiteral("APP_EQSL_QSL_RCVD"), QStringLiteral("EQSL_QSL_RCVD")}};
+        for (const auto& mapping : mappings)
+            if (mapped.value(mapping.second) != record.value(mapping.second))
+                ++mappedFields[mapping.first + QStringLiteral(" -> ") + mapping.second];
     }
     out.insert(QStringLiteral("ok"), true);
     out.insert(QStringLiteral("kind"), kind);
@@ -5978,6 +5989,10 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
     QStringList extraFields = extra.values();
     extraFields.sort();
     out.insert(QStringLiteral("extraFields"), extraFields);
+    QStringList mappingSummary;
+    for (auto it = mappedFields.cbegin(); it != mappedFields.cend(); ++it)
+        mappingSummary << QStringLiteral("%1: %2").arg(it.key()).arg(it.value());
+    out.insert(QStringLiteral("mappedFields"), mappingSummary);
 
     // Dry-run against a private in-memory copy of the current log.  This gives
     // the operator a before/after comparison without writing the real log.

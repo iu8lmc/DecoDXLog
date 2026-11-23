@@ -517,6 +517,19 @@ private slots:
         LogDatabase verify; QVERIFY(verify.open(dir.filePath("test.sqlite"))); QCOMPARE(verify.qsoCount(),qint64(1));
         const auto ids=verify.latestIds({},10); QCOMPARE(ids.size(),1); const auto record=verify.record(ids.first()); QVERIFY(record); QCOMPARE(record->value("CALL"),QString("K2EXT"));
     }
+    void importPreviewExplainsProgramFieldMappings()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("mapping.adi"); QFile input(path); QVERIFY(input.open(QIODevice::WriteOnly));
+        input.write("<CALL:5>K1AAA<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<APP_QRZLOG_STATUS:1>C<APP_QRZLOG_QSLDATE:8>20261102<APP_EQSL_QSL_RCVD:1>Y<EOR>\n"
+                    "<CALL:5>K1BBB<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<APP_EQSL_QSL_RCVD:1>Y<EQSL_QSL_RCVD:1>N<EOR>\n"); input.close();
+        QByteArray output; QVERIFY2(launch(dir,"importsnapshotprobe:"+path,output,7000),output.constData());
+        QVERIFY2(output.contains("\"qslRecords\":2") && output.contains("\"mappedFields\"") && output.contains("APP_QRZLOG_STATUS -> QRZCOM_QSO_DOWNLOAD_STATUS: 1") && output.contains("APP_QRZLOG_QSLDATE -> QRZCOM_QSO_DOWNLOAD_DATE: 1") && output.contains("APP_EQSL_QSL_RCVD -> EQSL_QSL_RCVD: 1"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+        const auto first=db.latestIds("K1AAA",1); const auto second=db.latestIds("K1BBB",1); QCOMPARE(first.size(),1); QCOMPARE(second.size(),1);
+        QMap<QString,QslState> firstStates,secondStates; for (const auto& state:db.qslStatus(first.first())) firstStates.insert(state.service,state); for (const auto& state:db.qslStatus(second.first())) secondStates.insert(state.service,state);
+        QCOMPARE(firstStates.value("qrz").rcvd,QString("Y")); QCOMPARE(firstStates.value("eqsl").rcvd,QString("Y")); QCOMPARE(secondStates.value("eqsl").rcvd,QString("N"));
+    }
     void importPreviewReportsAndPreservesProprietaryFields()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
