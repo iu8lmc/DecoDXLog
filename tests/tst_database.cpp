@@ -668,6 +668,17 @@ private slots:
         QCOMPARE(editor.updateQsoGuarded(inserted.id,explicitEdit,-1,next->uuid,next->revision,{"EQSL_QSL_SENT"}).status,InsertResult::Status::Inserted);
         QCOMPARE(editor.record(inserted.id)->value("EQSL_QSL_SENT"),QString("N"));
     }
+    void guardedQsoSessionAssignmentRequiresTrackedRun()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto inserted=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true); QVERIFY(inserted.id>0);
+        const auto meta=db.meta(inserted.id); QVERIFY(meta); auto draft=*db.record(inserted.id); draft.set("APP_DECOLOG_ACTIVATION_UUID","missing-session");
+        const auto rejected=db.updateQsoGuarded(inserted.id,draft,-1,meta->uuid,meta->revision,{"APP_DECOLOG_ACTIVATION_UUID"});
+        QCOMPARE(rejected.status,InsertResult::Status::Error); QVERIFY(db.record(inserted.id)->value("APP_DECOLOG_ACTIVATION_UUID").isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,initial_json,last_json) VALUES('tracked-session','2026-11-01T00:00:00Z','{}','{}')"));
+        draft.set("APP_DECOLOG_ACTIVATION_UUID","tracked-session"); QCOMPARE(db.updateQsoGuarded(inserted.id,draft,-1,meta->uuid,meta->revision,{"APP_DECOLOG_ACTIVATION_UUID"}).status,InsertResult::Status::Inserted);
+        QCOMPARE(db.record(inserted.id)->value("APP_DECOLOG_ACTIVATION_UUID"),QString("tracked-session"));
+    }
     void ocrAcquisitionJournalExistsWithoutCreatingQsos()
     {
         LogDatabase db;

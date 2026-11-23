@@ -1254,6 +1254,18 @@ private slots:
         QCOMPARE(qso->value("COMMENT"),QString("concurrent review edit")); QVERIFY(!qso->value("APP_DECOLOG_ACTIVATION_REVIEWED_AT").isEmpty());
         QVERIFY(qso->value("APP_DECOLOG_ACTIVATION_UUID").isEmpty());
     }
+    void recoveredActivationCanBeAssignedToRecordedSession()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso({{"CALL","K1HBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('tracked-session','2026-11-01T11:00:00Z','2026-11-01T13:00:00Z','{}','{}')")); }
+        QByteArray output; QVERIFY2(launch(dir,"activationassignprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE activation assignment sessions 2") && output.contains("PROBE activation assignment saved true"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.record(1); QVERIFY(qso);
+        QCOMPARE(qso->value("APP_DECOLOG_ACTIVATION_UUID"),QString("tracked-session")); QCOMPARE(qso->value("MY_POTA_REF"),QString("IT-0002")); QVERIFY(qso->value("APP_DECOLOG_ACTIVATION_REVIEW").isEmpty());
+    }
     void recoveredRecordsUseTheirJournalPeriod()
     {
         using namespace decolog::core;

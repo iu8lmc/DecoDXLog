@@ -1444,6 +1444,18 @@ InsertResult LogDatabase::updateQsoGuarded(qint64 id, AdifRecord record, qint64 
         result.message = QStringLiteral("The QSO changed; reload and review before saving.");
         return result;
     }
+    const QString activationKey = QStringLiteral("APP_DECOLOG_ACTIVATION_UUID");
+    const QString activationUuid = record.value(activationKey).trimmed();
+    if (touchedFields.contains(activationKey) && !activationUuid.isEmpty()) {
+        QSqlQuery run(db);
+        run.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=?"));
+        run.addBindValue(activationUuid);
+        if (!run.exec() || !run.next()) {
+            db.rollback();
+            result.message = QStringLiteral("The selected activation session is unavailable; reload and review before saving.");
+            return result;
+        }
+    }
     mergeUneditedQslFields(record, *current, touchedFields);
     result = updateQso(id, record, stationProfileId);
     if (result.status != InsertResult::Status::Inserted) {

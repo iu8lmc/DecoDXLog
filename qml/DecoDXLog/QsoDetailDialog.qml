@@ -38,6 +38,8 @@ DialogFrame {
         activationReview.keys = ["MY_POTA_REF", "MY_SOTA_REF", "MY_WWFF_REF", "MY_IOTA", "MY_GRIDSQUARE", "STATION_CALLSIGN", "OPERATOR"]
         activationReview.values = activationReview.keys.map(k => String(root.field(k)))
         removeActivationLink.checked = false
+        activationReview.selectedUuid = ""
+        activationReview.cursors = [0]; activationReview.page = 0; activationReview.loadSessions()
         activationReview.open()
     }
     function probeActivationReview() {
@@ -51,6 +53,14 @@ DialogFrame {
         removeActivationLink.checked = true
         activationReview.applyDraft(); root.save()
         console.warn("PROBE activation review saved " + (root.field("APP_DECOLOG_ACTIVATION_REVIEW") === "" && root.field("MY_POTA_REF") === "IT-0002" && !errorText.text))
+    }
+    function probeActivationAssignment() {
+        root.openActivationReview()
+        console.warn("PROBE activation assignment sessions " + activationReview.sessionRows.length)
+        if (activationReview.sessionRows.length > 1) activationReview.selectedUuid = activationReview.sessionRows[1].uuid
+        activationReview.values = ["IT-0002", "", "", "", "JM76", "", ""]
+        activationReview.applyDraft(); root.save()
+        console.warn("PROBE activation assignment saved " + (root.field("APP_DECOLOG_ACTIVATION_UUID") === "tracked-session" && !errorText.text))
     }
 
     title: qsTr("QSO detail")
@@ -191,13 +201,28 @@ DialogFrame {
     }
     Popup {
         id: activationReview
-        anchors.centerIn: Overlay.overlay; modal: true; padding: 16; width: 620; height: 570
+        anchors.centerIn: Overlay.overlay; modal: true; padding: 16; width: 700; height: 650
         property var keys: []
         property var values: []
+        property var cursors: [0]
+        property int page: 0
+        property var sessionRows: []
+        property bool hasNextPage: false
+        property string selectedUuid: ""
+        function loadSessions() {
+            const runs = decolog.activation.closedRuns(cursors[page])
+            hasNextPage = runs.length > 100
+            const rows = [{label: qsTr("Keep the existing association"), uuid: ""}]
+            if (page === 0 && decolog.activation.active && decolog.activation.state.sessionUuid)
+                rows.push({label: qsTr("Active session: %1").arg(decolog.activation.title), uuid: String(decolog.activation.state.sessionUuid)})
+            for (const run of runs.slice(0,100)) rows.push({label: (run.title || run.uuid) + " · " + run.startedAt + " → " + run.endedAt, uuid: String(run.uuid), rowid: run.rowid})
+            sessionRows = rows; sessionChoice.currentIndex = 0
+        }
         background: Rectangle { color: Theme.panelColor; border.color: Theme.warningColor; radius: 6 }
         function applyDraft() {
             for (let i=0; i<keys.length; ++i) root.setField(keys[i], String(values[i]).trim().toUpperCase())
             if (removeActivationLink.checked) root.setField("APP_DECOLOG_ACTIVATION_UUID", "")
+            else if (selectedUuid) root.setField("APP_DECOLOG_ACTIVATION_UUID", selectedUuid)
             root.setField("APP_DECOLOG_ACTIVATION_REVIEW", "")
             root.setField("APP_DECOLOG_ACTIVATION_REVIEWED_AT", new Date().toISOString())
             root.activationReviewApplied=true; root.formRev++; close()
@@ -210,6 +235,18 @@ DialogFrame {
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
                 text: qsTr("Existing session identifier: %1").arg(root.field("APP_DECOLOG_ACTIVATION_UUID") || "—") }
             CheckBox { id: removeActivationLink; visible: !!root.field("APP_DECOLOG_ACTIVATION_UUID"); text: qsTr("Remove this session association") }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; text: qsTr("Optional: choose a recorded session only after checking its dates and your records. Selection does not prove the QSO belongs to it.") }
+            ComboBox { id: sessionChoice; Layout.fillWidth: true; model: activationReview.sessionRows; textRole: "label"
+                onActivated: { activationReview.selectedUuid = activationReview.sessionRows[index].uuid; if (activationReview.selectedUuid) removeActivationLink.checked=false } }
+            RowLayout {
+                GlassButton { text: qsTr("Previous sessions"); enabled: activationReview.page > 0; onClicked: { activationReview.page--; activationReview.loadSessions() } }
+                Text { text: qsTr("Page %1").arg(activationReview.page + 1); color: Theme.textSecondary }
+                GlassButton { text: qsTr("Next sessions"); enabled: activationReview.hasNextPage; onClicked: {
+                    const rows=activationReview.sessionRows; const cursors=activationReview.cursors.slice(); cursors[activationReview.page+1]=rows[rows.length-1].rowid
+                    activationReview.cursors=cursors; activationReview.page++; activationReview.loadSessions()
+                } }
+                Text { Layout.fillWidth: true; elide: Text.ElideMiddle; color: Theme.textSecondary; text: activationReview.selectedUuid ? qsTr("Selected: %1").arg(activationReview.selectedUuid) : "" }
+            }
             GridLayout {
                 columns: 2; Layout.fillWidth: true
                 Repeater {

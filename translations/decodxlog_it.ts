@@ -6829,6 +6829,12 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>QsoDetailDialog</name>
+    <message><source>Keep the existing association</source><translation>Mantieni l'associazione esistente</translation></message>
+    <message><source>Active session: %1</source><translation>Sessione attiva: %1</translation></message>
+    <message><source>Optional: choose a recorded session only after checking its dates and your records. Selection does not prove the QSO belongs to it.</source><translation>Facoltativo: scegli una sessione registrata solo dopo averne verificato le date e consultato i tuoi registri. La scelta non dimostra che il QSO ne faccia parte.</translation></message>
+    <message><source>Previous sessions</source><translation>Sessioni precedenti</translation></message>
+    <message><source>Next sessions</source><translation>Sessioni successive</translation></message>
+    <message><source>Selected: %1</source><translation>Selezionata: %1</translation></message>
     <message><source>Review recovered activation</source><translation>Verifica attivazione recuperata</translation></message>
     <message><source>The QSO overlaps an uncertain activation period. Check the original records and enter only known values. Review any existing session association below. Applying changes the draft; save the QSO separately.</source><translation>Il QSO ricade in un periodo di attivazione incerto. Consulta i registri originali e inserisci solo i valori conosciuti. Verifica l'eventuale associazione a una sessione indicata sotto. Applica le modifiche alla bozza e salva separatamente il QSO.</translation></message>
     <message><source>Existing session identifier: %1</source><translation>Identificativo della sessione esistente: %1</translation></message>
