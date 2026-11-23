@@ -62,6 +62,22 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void activityReportRunsAndExportsRecordedStationData()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString& call : {QString("K1AAA"),QString("K1BBB")})
+              QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"MY_ANTENNA","Dipole"},{"MY_GRIDSQUARE","JM75"}},"fixture",{},true).id>0);
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1CCC"},{"QSO_DATE","20250102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"MY_ANTENNA","Yagi"}},"fixture",{},true).id>0); }
+        const QString file=dir.filePath("report.csv"); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("activityreportprobe:")+file,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport result") && output.contains("\"antenna\":\"Dipole\"") && output.contains("\"count\":2") && output.contains("PROBE activityreport export "),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport settings {\"band\":\"20m\",\"year\":2026}"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport protected Choose a file other than the log database"),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport rendered Dipole · 20m · JM75 · 2"),output.constData());
+        QFile csv(file); QVERIFY(csv.open(QIODevice::ReadOnly)); QCOMPARE(csv.readAll(),QByteArray("antenna,band,own_grid,qso_count\r\n\"Dipole\",\"20m\",\"JM75\",2\r\n"));
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3)); QVERIFY(db.setting("activity_report_v1").contains("2026"));
+    }
     void typedCustomFieldsValidateBeforeSavingQso()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;

@@ -1603,6 +1603,7 @@ RoundedWindow {
             Qt.callLater(topBar.openContestMenu)
         }
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
+        else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "cards") { openCards(what[1])
                                        if (what[2] === "menu" && cardsWindow.item)
                                            cardsWindow.item.showCardMenu()
@@ -1712,6 +1713,10 @@ RoundedWindow {
     Timer { id: cwMacrosTimer; interval: 800
            onTriggered: { const it = window.panelItem("cw"); if (it) it.showMacros(parseInt(startupShow.split(":")[1] || "-1")) } }
     Timer { id: combo2Timer; interval: 900; onTriggered: newQsoDialog.showBandCombo() }
+    Timer {
+        id:activityReportProbe; interval:1000
+        onTriggered: { if (statsWindow.item) statsWindow.item.probeReport("file://" + startupShow.split(":")[1]); else console.warn("PROBE activityreport missing window") }
+    }
     Timer {
         id:typedFieldsProbe; interval:1000
         onTriggered: {

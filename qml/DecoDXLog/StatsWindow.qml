@@ -6,6 +6,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import QtCore
 import Decodium.UI
 
@@ -17,6 +18,21 @@ RoundedWindow {
     property int revision: 0
     // 0 = l'andamento del log, 1 = diplomi e classifiche.
     property int page: 0
+    property var activityReport: ({})
+    property bool activityBusy:false
+    property string reportMessage:""
+    property url reportProbePath:""
+    function runActivityReport() {
+        const value=reportYear.text.trim()
+        if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }
+        activityBusy=true; reportMessage=""; activityReport=({})
+        decolog.requestActivityReport(value.length ? Number(value) : 0,reportBand.text)
+    }
+    function probeReport(path) {
+        page=2; reportYear.text="2026"; reportBand.text="20m"
+        console.warn("PROBE activityreport saved " + decolog.saveActivityReportSettings(2026,"20m"))
+        reportProbePath=path; runActivityReport()
+    }
 
     // Le statistiche si contano su un altro filo e arrivano tutte insieme: su
     // un log grande sono secondi, e la finestra intanto resta viva.
@@ -83,6 +99,23 @@ RoundedWindow {
             root.stats = result
             root.counting = false
         }
+        function onActivityReportReady(result) {
+            root.activityBusy=false; root.activityReport=result
+            root.reportMessage=result.error || ""
+            if (String(root.reportProbePath).length) {
+                console.warn("PROBE activityreport result " + JSON.stringify(result))
+                console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
+                console.warn("PROBE activityreport protected " + decolog.exportActivityReport("file://" + decolog.currentLogInfo().path))
+                console.warn("PROBE activityreport settings " + JSON.stringify(decolog.activityReportSettings()))
+                Qt.callLater(function() { const row=activityRows.itemAtIndex(0); console.warn("PROBE activityreport rendered " + (row ? row.text : "missing")) })
+                root.reportProbePath=""
+            }
+        }
+    }
+    FileDialog {
+        id:reportFile; title:qsTr("Export activity report"); fileMode:FileDialog.SaveFile
+        nameFilters:[qsTr("CSV files (*.csv)")]
+        onAccepted: { const error=decolog.exportActivityReport(selectedFile); root.reportMessage=error || qsTr("CSV exported.") }
     }
 
     function maxOf(list) {
@@ -177,16 +210,18 @@ RoundedWindow {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
-            Text { text: qsTr("Mode"); color: Theme.textSecondary; font.pixelSize: 12 }
+            Text { visible:root.page!==2; text: qsTr("Mode"); color: Theme.textSecondary; font.pixelSize: 12 }
             StyledComboBox {
+                visible:root.page!==2
                 Layout.preferredWidth: 160
                 readonly property var values: ["", "FT2", "FT8", "FT4", "CW", "SSB", "RTTY", "JTTY"]
                 model: [qsTr("All modes"), "FT2", "FT8", "FT4", "CW", "SSB", "RTTY", "JTTY"]
                 currentIndex: Math.max(0, values.indexOf(root.mode))
                 onActivated: root.mode = values[currentIndex]
             }
-            Text { text: qsTr("Year"); color: Theme.textSecondary; font.pixelSize: 12 }
+            Text { visible:root.page!==2; text: qsTr("Year"); color: Theme.textSecondary; font.pixelSize: 12 }
             StyledComboBox {
+                visible:root.page!==2
                 Layout.preferredWidth: 140
                 readonly property var values: [""].concat(root.years)
                 model: [qsTr("All years")].concat(root.years)
@@ -212,10 +247,12 @@ RoundedWindow {
                 filled: root.page === 1
                 onClicked: root.page = 1
             }
+            GlassButton { text:qsTr("Activity report"); tone:Theme.primaryColor; filled:root.page===2; onClicked:root.page=2 }
             GlassButton { text: qsTr("Refresh"); onClicked: root.revision++ }
         }
 
         RowLayout {
+            visible:root.page!==2
             Layout.fillWidth: true
             spacing: 8
             StatTile { Layout.fillWidth: true; label: qsTr("QSO"); value: root.summary.qsos || 0 }
@@ -433,6 +470,32 @@ RoundedWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             stats: root.stats
+        }
+        ColumnLayout {
+            visible:root.page===2; Layout.fillWidth:true; Layout.fillHeight:true; spacing:8
+            Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
+                text:qsTr("Activity by reported antenna, band and own grid. Blank values were not recorded in the QSO; current station profiles are not used to fill gaps. Results are a read snapshot and may not include later changes.") }
+            RowLayout {
+                Layout.fillWidth:true
+                StyledTextField { id:reportYear; Layout.preferredWidth:150; placeholderText:qsTr("UTC year (all)"); Accessible.name:qsTr("Report UTC year") }
+                StyledTextField { id:reportBand; Layout.preferredWidth:150; placeholderText:qsTr("Band (all)"); Accessible.name:qsTr("Report band") }
+                GlassButton { text:qsTr("Run report"); enabled:!root.activityBusy; onClicked:root.runActivityReport() }
+                GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; root.reportMessage=decolog.saveActivityReportSettings(value.length ? Number(value) : 0,reportBand.text) || qsTr("Filters saved in this log.") } }
+                GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; root.reportMessage=qsTr("Filters loaded from this log.") } }
+                GlassButton { text:qsTr("Export CSV…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportFile.open() }
+            }
+            Text { Layout.fillWidth:true; visible:root.activityBusy; text:qsTr("Preparing report…"); color:Theme.secondaryColor }
+            Text { Layout.fillWidth:true; visible:root.reportMessage.length>0; text:root.reportMessage; color:Theme.warningColor; wrapMode:Text.Wrap }
+            Text { Layout.fillWidth:true; visible:!!root.activityReport.generatedAt; color:Theme.textSecondary; wrapMode:Text.Wrap
+                text:qsTr("Snapshot %1 · year %2 · band %3 · %4 groups%5").arg(root.activityReport.generatedAt || "").arg(root.activityReport.year || qsTr("all")).arg(root.activityReport.band || qsTr("all")).arg((root.activityReport.rows || []).length).arg(root.activityReport.truncated ? qsTr(" · truncated; refine filters before export") : "") }
+            Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:qsTr("Antenna · band · own grid · QSO") }
+            ListView {
+                id:activityRows
+                Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.activityReport.rows || []
+                ScrollBar.vertical:ScrollBar {}
+                delegate:Text { required property var modelData; width:ListView.view.width; color:Theme.textPrimary; textFormat:Text.PlainText; elide:Text.ElideRight
+                    text:(modelData.antenna || qsTr("(not recorded)"))+" · "+(modelData.band || qsTr("(not recorded)"))+" · "+(modelData.grid || qsTr("(not recorded)"))+" · "+modelData.count }
+            }
         }
     }
 }

@@ -570,6 +570,10 @@ public:
     // log grande sono secondi, e la finestra non si deve fermare. Il risultato
     // arriva con statsReady(), con mode e year di chi l'ha chiesto.
     Q_INVOKABLE void requestStats(const QString& mode, int year);
+    Q_INVOKABLE void requestActivityReport(int year, const QString& band);
+    Q_INVOKABLE QString saveActivityReportSettings(int year, const QString& band);
+    Q_INVOKABLE QVariantMap activityReportSettings() const;
+    Q_INVOKABLE QString exportActivityReport(const QUrl& file);
     Q_INVOKABLE QStringList statsYears() const;
     Q_INVOKABLE QVariantMap statsSummary(const QString& mode = {}, int year = 0) const;
     Q_INVOKABLE QVariantList statsByYear(const QString& mode = {}) const;
@@ -878,6 +882,7 @@ signals:
     void duplicatesChanged();
     void backupInspected(const QVariantMap& info);
     void statsReady(const QVariantMap& stats);
+    void activityReportReady(const QVariantMap& report);
     void cloudChanged();
     void countriesChanged();
     void callbookChanged();
@@ -1226,6 +1231,9 @@ private:
     qint64 m_importPreviewProfile{0};
     quint64 m_importPreviewLogVersion{0};
     QThreadPool m_statsViewPool;
+    QThreadPool m_activityReportPool;
+    quint64 m_activityReportGeneration{0};
+    QVariantMap m_activityReport;
     // L'ultima richiesta di statistiche: le altre, ancora in coda, si saltano.
     std::shared_ptr<std::atomic<int>> m_statsLatest{std::make_shared<std::atomic<int>>(0)};
     double m_importProgress{-1};
