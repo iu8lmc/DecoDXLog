@@ -46,9 +46,14 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
                 candidate.managerObservedAt=QDateTime::fromString(entry.acquiredAt,Qt::ISODate);
             }
         }
-        for (const QslState& state : db.qslStatus(candidate.qsoId))
+        for (const QslState& state : db.qslStatus(candidate.qsoId)) {
             if (state.sent.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0 && state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)!=0)
                 candidate.pendingServices.append(state.service);
+            if (state.service==QLatin1String("card")) {
+                const QString via=state.via.trimmed().toUpper();
+                if (via==QLatin1String("B") || via==QLatin1String("D")) candidate.paperChannel=via;
+            }
+        }
         std::sort(candidate.benefits.begin(),candidate.benefits.end(),[](const Benefit& a,const Benefit& b) { return a.award==b.award ? a.key<b.key : a.award<b.award; });
     }
     for (auto it=candidates.begin(); it!=candidates.end(); ++it) {
@@ -68,6 +73,22 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         result.candidates.append(candidate);
     }
     std::sort(result.candidates.begin(),result.candidates.end(),[](const Candidate& a,const Candidate& b) { return a.qsoId<b.qsoId; });
+    struct Group { QList<qint64> ids; QSet<QPair<QString,QString>> benefits; };
+    QMap<QPair<QString,QString>,Group> routes;
+    for (const Candidate& candidate : result.candidates) {
+        QSet<QPair<QString,QString>> paperBenefits;
+        for (const Benefit& benefit : candidate.benefits)
+            if (benefit.acceptedServices.contains(QStringLiteral("card"))) paperBenefits.insert({benefit.award,benefit.key});
+        if (paperBenefits.isEmpty()) continue;
+        const QString manager=candidate.manager.simplified().toUpper();
+        if (manager.isEmpty() || candidate.paperChannel.isEmpty()) {
+            result.ungroupedPaperQsoIds.append(candidate.qsoId); continue;
+        }
+        Group& group=routes[{manager,candidate.paperChannel}];
+        group.ids.append(candidate.qsoId); group.benefits.unite(paperBenefits);
+    }
+    for (auto it=routes.cbegin(); it!=routes.cend(); ++it)
+        result.paperRoutes.append({it.key().first,it.key().second,it->ids,int(it->benefits.size())});
     return result;
 }
 }

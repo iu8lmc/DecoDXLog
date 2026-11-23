@@ -112,6 +112,8 @@ DialogFrame {
             const first = qslPlanCandidates.itemAtIndex(0)
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
             console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
+            const grouped = paperRoutes.itemAtIndex(0)
+            console.warn("PROBE qslplan group " + (grouped ? grouped.text : "missing"))
             paperQueueButton.clicked()
             decolog.cards.markReceived(2, true)
             plannerProbeConfirm.start()
@@ -192,6 +194,24 @@ DialogFrame {
                       : decolog.qslPlan.candidates ? qsTr("%1 potential benefits · %2 candidate QSO")
                           .arg(decolog.qslPlan.uniqueBenefits).arg(decolog.qslPlan.candidates.length)
                       : qsTr("Select awards and build a plan.")
+            }
+            Text {
+                Layout.fillWidth: true; color: Theme.textSecondary; wrapMode: Text.Wrap
+                visible: !decolog.qslPlan.stale && !root.plannerSelectionDirty && !!decolog.qslPlan.paperRoutes
+                text: qsTr("Paper routes by recorded QSL via text and channel; group benefits can overlap · %1 candidate(s) missing one or both")
+                    .arg((decolog.qslPlan.ungroupedPaperQsoIds || []).length)
+            }
+            ListView {
+                id: paperRoutes; Layout.fillWidth: true; Layout.preferredHeight: Math.min(90, contentHeight)
+                clip: true; spacing: 3
+                model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.paperRoutes || [])
+                delegate: Text {
+                    required property var modelData
+                    width: ListView.view.width; color: Theme.textPrimary; wrapMode: Text.Wrap
+                    text: modelData.manager + " · " + (modelData.channel === "B" ? qsTr("bureau") : qsTr("direct"))
+                        + " · " + qsTr("QSO: %1 · potential benefits: %2 · cost unknown")
+                            .arg(modelData.qsoIds.join(", ")).arg(modelData.uniqueBenefits)
+                }
             }
             ListView {
                 id: qslPlanCandidates

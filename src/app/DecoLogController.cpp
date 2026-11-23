@@ -2277,6 +2277,13 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         if (!db.open(path)) plan.error=db.lastError();
         else plan=qslplanner::build(db,filter,goals,calc);
         QVariantList rows;
+        QVariantList routes;
+        for (const auto& route : plan.paperRoutes) {
+            QVariantList ids; for (qint64 id : route.qsoIds) ids << id;
+            routes << QVariantMap{{QStringLiteral("manager"),route.manager},{QStringLiteral("channel"),route.channel},
+                {QStringLiteral("qsoIds"),ids},{QStringLiteral("uniqueBenefits"),route.uniqueBenefits}};
+        }
+        QVariantList ungrouped; for (qint64 id : plan.ungroupedPaperQsoIds) ungrouped << id;
         for (const auto& candidate : plan.candidates) {
             QVariantList benefits;
             for (const auto& benefit : candidate.benefits) {
@@ -2299,12 +2306,13 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
                 {QStringLiteral("alternatives"),alternatives}};
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(),[self,path,generation,plan,rows] {
+        QMetaObject::invokeMethod(self.data(),[self,path,generation,plan,rows,routes,ungrouped] {
             if (!self || generation!=self->m_qslPlanGeneration) return;
             self->m_qslPlanBusy=false;
             if (self->m_db.path()!=path) self->m_qslPlan={{QStringLiteral("stale"),true}};
             else self->m_qslPlan={{QStringLiteral("error"),plan.error},{QStringLiteral("uniqueBenefits"),plan.uniqueBenefits},
-                                 {QStringLiteral("candidates"),rows},{QStringLiteral("stale"),false}};
+                                 {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},
+                                 {QStringLiteral("ungroupedPaperQsoIds"),ungrouped},{QStringLiteral("stale"),false}};
             emit self->qslPlanChanged();
         },Qt::QueuedConnection);
     });

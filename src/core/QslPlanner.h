@@ -16,12 +16,21 @@ struct Candidate {
     QString manager;
     QString managerSource;
     QDateTime managerObservedAt;
+    QString paperChannel; // B or D only when explicitly recorded
     QStringList pendingServices;
     QList<Benefit> benefits;
     QSet<qint64> alternativeQsoIds;
 };
+struct PaperRoute {
+    QString manager;
+    QString channel;
+    QList<qint64> qsoIds;
+    int uniqueBenefits{0};
+};
 struct Plan {
     QList<Candidate> candidates;
+    QList<PaperRoute> paperRoutes;
+    QList<qint64> ungroupedPaperQsoIds;
     int uniqueBenefits{0};
     QString error;
 };

@@ -5,6 +5,22 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void groupsOnlyRecordedManagerAndPaperChannel()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const char* call,const char* manager,const char* channel) {
+            const qint64 id=db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"},{"QSL_VIA",manager}},"import").id;
+            QslState state; state.service="card"; state.via=channel; if (id>0 && !db.setCardState(id,state)) return qint64(0); return id;
+        };
+        const qint64 a=add("K1AAA","M0ABC","B"), b=add("K1BBB","m0abc","B"), c=add("K1CCC","M0ABC","D");
+        const qint64 d=add("K1DDD","","B"), e=add("K1EEE","M0ABC",""); QVERIFY(a && b && c && d && e);
+        const auto plan=qslplanner::build(db,{}, {"dxcc","waz"});
+        QCOMPARE(plan.paperRoutes.size(),2);
+        QCOMPARE(plan.paperRoutes[0].manager,QString("M0ABC")); QCOMPARE(plan.paperRoutes[0].channel,QString("B"));
+        QCOMPARE(plan.paperRoutes[0].qsoIds,QList<qint64>({a,b})); QCOMPARE(plan.paperRoutes[0].uniqueBenefits,2);
+        QCOMPARE(plan.paperRoutes[1].channel,QString("D")); QCOMPARE(plan.paperRoutes[1].qsoIds,QList<qint64>({c}));
+        QCOMPARE(plan.ungroupedPaperQsoIds,QList<qint64>({d,e}));
+    }
     void configuredAwardRulesAreUsed()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

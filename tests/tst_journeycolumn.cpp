@@ -67,13 +67,14 @@ private slots:
           auto insert=[&](const char* call,const char* dxcc) { return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC",dxcc},{"CQZ","5"},{"QSL_VIA","M0ABC"}},"import").id; };
           const qint64 first=insert("K1PAA","291"); QVERIFY(first>0); const qint64 pending=insert("K1PBB","291"); QVERIFY(pending>0); QVERIFY(insert("K1PCC","110")>0);
           EnrichmentEntry route; route.qsoId=first; route.field="QSL_VIA"; route.value="M0ABC"; route.source="fixture"; route.kind="received"; route.acquiredAt="2020-01-01T00:00:00Z"; QVERIFY(db.recordEnrichment({route}));
-          QslState card; card.service="card"; card.sent="Y"; QVERIFY(db.setCardState(pending,card)); }
+          QslState card; card.service="card"; card.via="B"; QVERIFY(db.setCardState(first,card)); card.sent="Y"; QVERIFY(db.setCardState(pending,card)); }
         QByteArray output; QVERIFY2(launch(dir,"qslplanprobe",output,7000),output.constData());
         QVERIFY2(output.contains("PROBE qslplan status 3 potential benefits · 3 candidate QSO"),output.constData());
         QVERIFY2(output.contains("K1PAA") && output.contains("M0ABC"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan row K1PAA") && output.contains("DXCC 291"),output.constData());
         QVERIFY2(output.contains("sent/unconfirmed alternatives: 2"),output.constData());
         QVERIFY2(output.contains("route evidence older than 180 days; verify") && output.contains("route source: fixture"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan group M0ABC · bureau · QSO: 1, 2 · potential benefits: 2 · cost unknown"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan paperqueue queue"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan confirmation") && output.contains("\"uniqueBenefits\":1"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan stale true"),output.constData());
