@@ -541,6 +541,16 @@ private slots:
         QVERIFY(summary.value("sampleSize").toInt()>0);
         QVERIFY(summary.value("byBand").toObject().value("20m").toInt()>0);
         QCOMPARE(countCall(QStringLiteral("W1BAD")),0);
+        QProcess harness;
+        harness.setProcessEnvironment(reportEnv);
+        harness.start(python,{QStringLiteral(DECODXLOG_SOURCE_DIR) + "/tools/extension_harness.py",
+                              QStringLiteral(DECODXLOG_SOURCE_DIR) + "/examples/extensions/recent_activity.manifest.json",
+                              "--port",QString::number(m_apiPort)});
+        QVERIFY(harness.waitForStarted(5000)); QVERIFY(harness.waitForFinished(15000));
+        QCOMPARE(harness.exitCode(),0);
+        const auto harnessOutput=QJsonDocument::fromJson(harness.readAllStandardOutput()).object();
+        QCOMPARE(harnessOutput.value("scope").toString(),QString("recent_sample"));
+        QVERIFY(harnessOutput.value("sampleSize").toInt()>0);
         QProcess privilegedReport;
         reportEnv.insert("DECODXLOG_READ_TOKEN","0123456789abcdef0123456789abcdef");
         privilegedReport.setProcessEnvironment(reportEnv);
@@ -550,6 +560,22 @@ private slots:
         QCOMPARE(privilegedReport.exitCode(),1);
         QVERIFY(!privilegedReport.readAllStandardError().contains("0123456789abcdef"));
         QCOMPARE(scalar(QStringLiteral("SELECT COUNT(*) FROM qso")),qsoCountBefore);
+        const QString extensionDir=m_dir.filePath(QStringLiteral("hung-extension"));
+        QVERIFY(QDir().mkpath(extensionDir));
+        QFile stuck(extensionDir + "/stuck.py"); QVERIFY(stuck.open(QIODevice::WriteOnly));
+        stuck.write("import time\ntime.sleep(30)\n"); stuck.close();
+        QFile manifest(extensionDir + "/manifest.json"); QVERIFY(manifest.open(QIODevice::WriteOnly));
+        manifest.write(R"({"schemaVersion":1,"apiVersion":1,"id":"org.test.stuck","version":"1.0.0","entrypoint":"stuck.py","permissions":["qso.read"]})"); manifest.close();
+        QProcess stuckCheck; reportEnv.insert("DECODXLOG_READ_TOKEN","fedcba9876543210fedcba9876543210");
+        stuckCheck.setProcessEnvironment(reportEnv);
+        stuckCheck.start(python,{QStringLiteral(DECODXLOG_SOURCE_DIR) + "/tools/extension_harness.py",
+                                 manifest.fileName(),"--port",QString::number(m_apiPort),"--timeout","2"});
+        QVERIFY(stuckCheck.waitForStarted(5000)); QTest::qWait(300); QCOMPARE(stuckCheck.state(),QProcess::Running);
+        const auto whileHung=request("POST",QStringLiteral("/api/v1/qso"),
+                    "<CALL:5>K1HAR<QSO_DATE:8>20260917<TIME_ON:4>0912<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(whileHung.first,201); QCOMPARE(countCall(QStringLiteral("K1HAR")),1);
+        QVERIFY(stuckCheck.waitForFinished(5000)); QCOMPARE(stuckCheck.exitCode(),1);
+        QCOMPARE(countCall(QStringLiteral("K1HAR")),1);
         } else {
             qWarning("Python unavailable; real-app extension subprocess was not exercised");
         }

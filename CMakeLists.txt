@@ -719,6 +719,8 @@ if(DECODXLOG_BUILD_TESTS)
     set_target_properties(clublog_oqrs_probe PROPERTIES WIN32_EXECUTABLE OFF)
     find_package(Python3 QUIET COMPONENTS Interpreter)
     if(Python3_Interpreter_FOUND)
+        add_test(NAME extension_harness COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/python/test_extension_harness.py)
         add_test(NAME recent_activity_extension COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/python/test_recent_activity.py)
         add_test(NAME clublog_live50_simulation COMMAND ${Python3_EXECUTABLE}
