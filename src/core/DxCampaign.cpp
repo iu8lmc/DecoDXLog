@@ -49,7 +49,7 @@ QJsonObject encode(const Campaign& c)
         {"start",c.start.toString(Qt::ISODate)},{"end",c.end.toString(Qt::ISODate)},{"source",c.source},
         {"verifiedAt",c.verifiedAt.toUTC().toString(Qt::ISODateWithMs)},{"bands",QJsonArray::fromStringList(c.bands)},
         {"modes",QJsonArray::fromStringList(c.modes)},{"stationProfileId",QString::number(c.stationProfileId)},
-        {"archived",c.archived},{"revision",c.revision}};
+        {"archived",c.archived},{"watched",c.watched},{"revision",c.revision}};
 }
 QStringList strings(const QJsonValue& v)
 {
@@ -65,7 +65,7 @@ std::optional<Campaign> decode(const QString& raw)
     c.source=o.value("source").toString(); c.verifiedAt=QDateTime::fromString(o.value("verifiedAt").toString(),Qt::ISODate);
     c.bands=strings(o.value("bands")); c.modes=strings(o.value("modes"));
     bool ok=false; c.stationProfileId=o.value("stationProfileId").toString().toLongLong(&ok);
-    c.archived=o.value("archived").toBool(); c.revision=o.value("revision").toInt();
+    c.archived=o.value("archived").toBool(); c.watched=o.value("watched").toBool(false); c.revision=o.value("revision").toInt();
     if(!ok || c.id.isEmpty() || c.revision<1 || !valid(c,nullptr)) return {}; return c;
 }
 }
@@ -149,5 +149,12 @@ QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visi
         if (modeMatches) out << e;
     }
     return out;
+}
+bool watchMatches(const Campaign& c,const EnrichedSpot& spot,const QDateTime& now,qint64 activeProfileId)
+{
+    if (!c.watched || c.archived || !now.isValid() || now.timeSpec()==Qt::LocalTime ||
+        now.toUTC().date()<c.start || now.toUTC().date()>c.end ||
+        (c.stationProfileId>0 && c.stationProfileId!=activeProfileId)) return false;
+    return !freshSpots(c,{spot},now,30).isEmpty();
 }
 }

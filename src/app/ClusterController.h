@@ -238,6 +238,8 @@ signals:
     // L'operatore ha scelto uno spot (clic o doppio clic): in gara il
     // nominativo, la banda e il modo vanno nell'inserimento veloce.
     void spotPicked(const QString& call, const QString& band, const QString& mode, double freqKhz);
+    // Emitted only for newly received reports passing the effective cluster filter.
+    void filteredSpotObserved(const core::EnrichedSpot& spot);
     // Lo stesso spot, con dove sta: il rotore ne prende la rotta.
     void spotAimed(const QString& call, bool hasPosition, double lat, double lon, int azimuth);
 

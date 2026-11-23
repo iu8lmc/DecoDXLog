@@ -16,6 +16,7 @@ struct Campaign {
     QStringList bands, modes;
     qint64 stationProfileId{0}; // zero = all profiles, not an award account
     bool archived{false};
+    bool watched{false};
     int revision{0};
 };
 struct Cell { QString band, mode; int worked{0}, confirmed{0}; };
@@ -27,5 +28,6 @@ QList<Cell> matrix(const LogDatabase& db, const Campaign& campaign, QString* err
 // or times are inferred; future, undated and out-of-period spots are excluded.
 QList<EnrichedSpot> freshSpots(const Campaign& campaign, const QList<EnrichedSpot>& visible,
                                const QDateTime& now, int maxAgeMinutes);
+bool watchMatches(const Campaign& campaign, const EnrichedSpot& spot, const QDateTime& now, qint64 activeProfileId);
 }
 }

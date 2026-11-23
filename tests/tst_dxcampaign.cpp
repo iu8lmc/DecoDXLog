@@ -2,12 +2,32 @@
 #include "core/LogDatabase.h"
 #include "core/Spots.h"
 #include <QTimeZone>
+#include <QSqlQuery>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTemporaryDir>
 #include <QTest>
 using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void watchRequiresOptInActivePeriodAndProfile()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); const auto now=QDateTime::currentDateTimeUtc();
+        dxcampaign::Campaign c; c.title="Watch fixture"; c.calls={"3Y0J"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+        c.source="fixture"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; c.stationProfileId=4;
+        EnrichedSpot e; e.spot.dxCall="3Y0J"; e.spot.band="20m"; e.spot.mode="CW"; e.spot.time=now.addSecs(-60);
+        QVERIFY(!dxcampaign::watchMatches(c,e,now,4)); c.watched=true;
+        QVERIFY(dxcampaign::watchMatches(c,e,now,4)); QVERIFY(!dxcampaign::watchMatches(c,e,now,5));
+        c.archived=true; QVERIFY(!dxcampaign::watchMatches(c,e,now,4)); c.archived=false;
+        c.end=now.date().addDays(-1); e.spot.time=now.addDays(-1); QVERIFY(!dxcampaign::watchMatches(c,e,now,4));
+        c.end=now.date().addDays(1); e.spot.time=now.addSecs(-60);
+        QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); const auto saved=dxcampaign::load(db,c.id); QVERIFY(saved); QVERIFY(saved->watched);
+        QSqlQuery q(db.connection()); q.prepare("SELECT value FROM app_setting WHERE key=?"); q.addBindValue("dx_campaign."+c.id); QVERIFY(q.exec()); QVERIFY(q.next());
+        auto json=QJsonDocument::fromJson(q.value(0).toString().toUtf8()).object(); json.remove("watched");
+        QSqlQuery update(db.connection()); update.prepare("UPDATE app_setting SET value=? WHERE key=?"); update.addBindValue(QString::fromUtf8(QJsonDocument(json).toJson(QJsonDocument::Compact))); update.addBindValue("dx_campaign."+c.id); QVERIFY(update.exec());
+        const auto old=dxcampaign::load(db,c.id); QVERIFY(old); QVERIFY(!old->watched);
+    }
     void spotsRequireExactCallCampaignPeriodAndFreshness()
     {
         dxcampaign::Campaign c; c.title="Trip"; c.calls={"ZZ1AAA","ZZ1BBB"}; c.start=QDate(2026,1,2); c.end=QDate(2026,1,3);

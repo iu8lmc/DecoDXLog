@@ -1004,6 +1004,8 @@ private:
     // conferme scelte): quello che vede Decodium e che decide "nuovo confermato".
     const QList<core::AwardResult>& globalAwardResults() const;
     void awardFilterChanged();
+    void reloadDxCampaignWatches();
+    void noteDxCampaignSpot(const core::EnrichedSpot& spot);
     QJsonObject decoLinkAward() const;
     QJsonArray decoLinkQuery(const QJsonObject& query) const;
     void decoLinkQso(const core::AdifRecord& record, const QString& status, qint64 id,
@@ -1024,6 +1026,9 @@ private:
     bool m_dxCampaignBusy{false};
     quint64 m_dxCampaignGeneration{0};
     QThreadPool m_dxCampaignPool;
+    QList<core::dxcampaign::Campaign> m_dxWatchedCampaigns;
+    QString m_dxWatchPath;
+    QHash<QString,QDateTime> m_dxWatchRecent;
     QVariantMap m_qslPlan;
     std::shared_ptr<const core::qslplanner::Plan> m_qslPlanSnapshot;
     bool m_qslPlanBusy{false};

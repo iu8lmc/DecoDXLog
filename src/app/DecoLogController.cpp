@@ -221,6 +221,7 @@ DecoLogController::DecoLogController(QObject* parent)
     m_qslPlanPool.setMaxThreadCount(1);
     m_dxCampaignPool.setMaxThreadCount(1);
     connect(this, &DecoLogController::logChanged, this, [this] {
+        if (!m_shuttingDown && m_dxWatchPath!=m_db.path()) reloadDxCampaignWatches();
         if (!m_shuttingDown && !m_dxCampaign.isEmpty()) refreshDxCampaign();
         else if (!m_shuttingDown) emit dxCampaignChanged();
     });
@@ -937,6 +938,8 @@ bool DecoLogController::openDatabase(const QString& path)
         return true;
     };
     m_cluster = new ClusterController(std::move(ctx), this);
+    reloadDxCampaignWatches();
+    connect(m_cluster, &ClusterController::filteredSpotObserved, this, &DecoLogController::noteDxCampaignSpot);
 
     // Full Spectrum e Signal RX di Decodium, ricostruiti dal protocollo UDP e
     // colorati con quello che solo il log sa.
@@ -2272,7 +2275,7 @@ QVariantMap campaignMap(const dxcampaign::Campaign& c)
         {QStringLiteral("start"),c.start.toString(Qt::ISODate)},{QStringLiteral("end"),c.end.toString(Qt::ISODate)},
         {QStringLiteral("source"),c.source},{QStringLiteral("observedAt"),c.verifiedAt.toUTC().toString(Qt::ISODate)},
         {QStringLiteral("bands"),c.bands},{QStringLiteral("modes"),c.modes},{QStringLiteral("profileId"),c.stationProfileId},
-        {QStringLiteral("archived"),c.archived},{QStringLiteral("revision"),c.revision}};
+        {QStringLiteral("archived"),c.archived},{QStringLiteral("watched"),c.watched},{QStringLiteral("revision"),c.revision}};
 }
 }
 
@@ -2281,6 +2284,43 @@ QVariantList DecoLogController::dxCampaigns() const
     QVariantList out; QString error;
     for (const auto& c : dxcampaign::list(m_db,&error)) out << campaignMap(c);
     return out;
+}
+
+void DecoLogController::reloadDxCampaignWatches()
+{
+    if (m_dxWatchPath!=m_db.path()) m_dxWatchRecent.clear();
+    m_dxWatchPath=m_db.path(); m_dxWatchedCampaigns.clear();
+    if (!m_db.isOpen()) return;
+    QString error;
+    for (const auto& c : dxcampaign::list(m_db,&error)) if (c.watched && !c.archived) m_dxWatchedCampaigns << c;
+    if (!error.isEmpty()) addActivity(QStringLiteral("DXCAMPAIGN"),tr("Cannot load campaign watchlist: %1").arg(error),QStringLiteral("warning"));
+}
+
+void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
+{
+    if (m_shuttingDown || m_dxWatchPath!=m_db.path() || m_dxWatchedCampaigns.isEmpty()) return;
+    const QDateTime now=QDateTime::currentDateTimeUtc();
+    const qint64 profile=m_profiles ? m_profiles->activeProfileId() : 0;
+    for (const auto& campaign : std::as_const(m_dxWatchedCampaigns)) {
+        if (!dxcampaign::watchMatches(campaign,spot,now,profile)) continue;
+        // Another process may have edited or disabled this campaign. Never
+        // emit using a stale cached revision; refresh and wait for a new spot.
+        const auto current=dxcampaign::load(m_db,campaign.id);
+        if (!current || current->revision!=campaign.revision) { reloadDxCampaignWatches(); return; }
+        const QString key=campaign.id+QLatin1Char('|')+spot.key();
+        const QDateTime last=m_dxWatchRecent.value(key);
+        if (last.isValid() && last.secsTo(now)<600) continue;
+        if (m_dxWatchRecent.size()>=4096) {
+            for (auto it=m_dxWatchRecent.begin();it!=m_dxWatchRecent.end();) {
+                if (!it.value().isValid() || it.value().secsTo(now)>=600) it=m_dxWatchRecent.erase(it); else ++it;
+            }
+            if (m_dxWatchRecent.size()>=4096) continue;
+        }
+        m_dxWatchRecent.insert(key,now);
+        addActivity(QStringLiteral("DXCAMPAIGN"),tr("Watched %1: %2 · %3 · %4 (%5 kHz)")
+            .arg(campaign.title,spot.spot.dxCall,spot.spot.band,spot.spot.mode,QString::number(spot.spot.freqKhz,'f',1)),
+            QStringLiteral("highlight"));
+    }
 }
 
 bool DecoLogController::saveDxCampaign(const QVariantMap& values)
@@ -2296,8 +2336,14 @@ bool DecoLogController::saveDxCampaign(const QVariantMap& values)
     c.bands=values.value(QStringLiteral("bands")).toStringList(); for (QString& band : c.bands) band=band.trimmed().toLower();
     c.modes=values.value(QStringLiteral("modes")).toStringList(); for (QString& mode : c.modes) mode=mode.trimmed().toUpper();
     c.stationProfileId=values.value(QStringLiteral("profileId")).toLongLong(); c.archived=values.value(QStringLiteral("archived")).toBool();
+    if (values.contains(QStringLiteral("watched"))) c.watched=values.value(QStringLiteral("watched")).toBool();
+    else if (!c.id.isEmpty()) {
+        const auto existing=dxcampaign::load(m_db,c.id);
+        if (existing) c.watched=existing->watched;
+    }
     c.revision=values.value(QStringLiteral("revision")).toInt();
     if (!dxcampaign::save(m_db,c,&m_dxCampaignError)) { emit dxCampaignChanged(); return false; }
+    reloadDxCampaignWatches();
     m_dxCampaign=campaignMap(c); m_dxCampaignPath=m_db.path(); m_dxCampaignError.clear(); emit dxCampaignChanged(); refreshDxCampaign(); return true;
 }
 

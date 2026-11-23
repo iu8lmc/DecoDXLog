@@ -692,6 +692,8 @@ void ClusterController::onSpot(const Spot& spot)
     t[1] += clock.nsecsElapsed(); clock.restart();
     if (m_ctx.spotSeen)
         m_ctx.spotSeen(e);
+    if (m_model.filter().matches(e,QDateTime::currentDateTimeUtc()))
+        emit filteredSpotObserved(e);
     t[2] += clock.nsecsElapsed(); clock.restart();
     ++m_spotRevision;
     emit spotsUpdated();

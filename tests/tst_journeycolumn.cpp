@@ -38,13 +38,14 @@ private:
             s.setValue(QStringLiteral("layout/journeyColumnMigrated"), true);
         s.sync();
     }
-    static bool launch(const QTemporaryDir& dir, const QString& probe, QByteArray& output, int grabMs = 2800)
+    static bool launch(const QTemporaryDir& dir, const QString& probe, QByteArray& output, int grabMs = 2800, bool traceActivity = false)
     {
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
         env.insert(QStringLiteral("QT_QUICK_BACKEND"), QStringLiteral("software"));
         env.insert(QStringLiteral("DECODXLOG_DATA_ROOT"), dir.filePath(QStringLiteral("data")));
         env.insert(QStringLiteral("DECODXLOG_GRAB_MS"), QString::number(grabMs));
+        if (traceActivity) env.insert(QStringLiteral("DECODXLOG_TRACE_ACTIVITY"),QStringLiteral("1"));
         QProcess app;
         app.setProcessEnvironment(env);
         app.setProcessChannelMode(QProcess::MergedChannels);
@@ -61,6 +62,25 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void watchedCampaignAlertsRespectFiltersProfileAndRestart()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile a; a.name="A"; a.stationCallsign="9H1AA"; a.isDefault=true;
+          StationProfile b; b.name="B"; b.stationCallsign="9H1BB"; const qint64 first=db.saveStationProfile(a),second=db.saveStationProfile(b); QCOMPARE(first,qint64(1)); QCOMPARE(second,qint64(2));
+          const auto now=QDateTime::currentDateTimeUtc(); dxcampaign::Campaign c; c.title="Tracked"; c.calls={"3Y0J","3Y0K"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="synthetic"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; c.watched=true; c.stationProfileId=first;
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+          c.id.clear(); c.revision=0; c.title="Other profile"; c.calls={"3Y0P"}; c.stationProfileId=second; QVERIFY(dxcampaign::save(db,c,&error));
+          c.id.clear(); c.revision=0; c.title="Not watched"; c.calls={"3Y0J"}; c.watched=false; c.stationProfileId=first; QVERIFY(dxcampaign::save(db,c,&error));
+          c.id.clear(); c.revision=0; c.title="Archived"; c.watched=true; c.archived=true; QVERIFY(dxcampaign::save(db,c,&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignwatchprobe",output,5000,true),output.constData());
+        QCOMPARE(output.count("[activity] DXCAMPAIGN|highlight|"),2);
+        QVERIFY2(output.contains("Tracked: 3Y0J") && output.contains("Other profile: 3Y0P"),output.constData());
+        QVERIFY2(!output.contains("Not watched:") && !output.contains("Archived:") && !output.contains("Tracked: 3Y0K"),output.constData());
+        QByteArray reopened; QVERIFY2(launch(dir,"dxcampaignwatchprobe",reopened,5000,true),reopened.constData());
+        QCOMPARE(reopened.count("[activity] DXCAMPAIGN|highlight|"),2);
+    }
     void dxCampaignShowsOnlyMatchingFilteredRankedSpots()
     {
         using namespace decolog::core;
@@ -79,9 +99,9 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString firstId, secondId;
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           dxcampaign::Campaign c; c.title="Spring"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7);
-          c.source="original source"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"};
+          c.source="original source"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.watched=true;
           QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); firstId=c.id;
-          c.id.clear(); c.revision=0; c.title="Autumn"; c.start=QDate(2026,10,1); c.end=QDate(2026,10,7);
+          c.id.clear(); c.revision=0; c.title="Autumn"; c.start=QDate(2026,10,1); c.end=QDate(2026,10,7); c.watched=false;
           QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); secondId=c.id;
           QVERIFY(db.insertQso(AdifRecord{{"CALL","ZZ1AAA"},{"QSO_DATE","20260108"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import").id>0); }
         QByteArray output; QVERIFY2(launch(dir,"dxdatesprobe",output,7000),output.constData());
@@ -91,7 +111,7 @@ private slots:
         QVERIFY2(!output.contains("TypeError"),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
         const auto first=dxcampaign::load(db,firstId), second=dxcampaign::load(db,secondId); QVERIFY(first && second);
-        QCOMPARE(first->end,QDate(2026,1,10)); QCOMPARE(first->revision,3); QCOMPARE(first->calls,QStringList({"ZZ1AAA"}));
+        QCOMPARE(first->end,QDate(2026,1,10)); QCOMPARE(first->revision,3); QCOMPARE(first->calls,QStringList({"ZZ1AAA"})); QVERIFY(first->watched);
         QCOMPARE(first->source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(first->verifiedAt.toString(Qt::ISODate),QString("2026-01-09T10:00:00Z"));
         QCOMPARE(second->end,QDate(2026,10,7)); QCOMPARE(second->revision,1); QCOMPARE(second->source,QString("original source")); QCOMPARE(db.qsoCount(),1);
     }
@@ -113,7 +133,7 @@ private slots:
         QVERIFY2(restored.contains("PROBE dxcampaign restored matrix") && restored.contains("PROBE dxcampaign rendered 20m · CW · confirmed (1/1)"),restored.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QString error; const auto campaigns=dxcampaign::list(db,&error);
         QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(campaigns.size(),1); QCOMPARE(campaigns.first().calls.size(),2);
-        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,3); QVERIFY(!campaigns.first().archived);
+        QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,3); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched);
     }
     void qslAlternativesDesktopPagesAndInvalidates()
     {

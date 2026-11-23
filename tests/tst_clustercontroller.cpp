@@ -66,6 +66,15 @@ class TestClusterController : public QObject {
     Q_OBJECT
 
 private slots:
+    void filteredSpotNotificationHonoursClusterFilter()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ClusterController::Context ctx; ctx.db=&db;
+        ClusterController cluster(std::move(ctx)); cluster.setFilter({{"bands",QStringList{"40m"}}});
+        QStringList seen; connect(&cluster,&ClusterController::filteredSpotObserved,this,[&](const EnrichedSpot& e) { seen << e.spot.dxCall; });
+        cluster.injectLine("DX de IK1AAA: 14025.0 3Y0J CW 1200Z"); QVERIFY(seen.isEmpty());
+        cluster.injectLine("DX de IK1AAA: 7025.0 3Y0K CW 1200Z"); QCOMPARE(seen,QStringList({"3Y0K"}));
+        cluster.setFilter({});
+    }
     void campaignRankingUsesVisibleFreshSpots()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); ClusterController::Context ctx; ctx.db=&db;

@@ -185,6 +185,7 @@ GlassPanel {
             cancelDates.clicked(); console.warn("PROBE dxdates cancel " + !dateReview.visible)
             row.probeReviewDates(); dateReview.choose(index)
             const changed=Object.assign({},dateReview.selected)
+            delete changed.watched
             root.campaignBackend.saveDxCampaign(changed)
             applyDates.clicked(); console.warn("PROBE dxdates stale " + dateReview.visible + " " + dateReview.reviewError)
             dateReview.choose(root.campaignBackend.dxCampaigns.findIndex(c => c.title === "Spring"))
@@ -205,7 +206,7 @@ GlassPanel {
         Qt.callLater(function() {
             const row=list.itemAtIndex(0)
             if (!row) { console.warn("PROBE dxcampaign missing calendar row"); return }
-            row.probePlan(); callsField.text="ZZ1AAA, ZZ1BBB"; bandsField.text="20m, 40m"; modesField.text="CW, FT8"
+            row.probePlan(); callsField.text="ZZ1AAA, ZZ1BBB"; bandsField.text="20m, 40m"; modesField.text="CW, FT8"; watchedField.checked=true
             saveCampaign.clicked(); campaignProbeResult.start()
         })
     }
@@ -339,6 +340,7 @@ GlassPanel {
             startField.text=draft.start || ""; endField.text=draft.end || ""; sourceField.text=draft.source || ""
             observedField.text=draft.observedAt || ""; bandsField.text=(draft.bands || []).join(", "); modesField.text=(draft.modes || []).join(", ")
             profileField.currentIndex=Math.max(0,profileField.ids.indexOf(draft.profileId || 0)); archivedField.checked=!!draft.archived
+            watchedField.checked=!!draft.watched
             editorError=""; open()
         }
         function splitValues(text) { return text.split(",").map(s => s.trim()).filter(s => s.length) }
@@ -347,7 +349,7 @@ GlassPanel {
             const data={id:draft.id || "", revision:draft.revision || 0, title:titleField.text, calls:splitValues(callsField.text),
                 start:startField.text, end:endField.text, source:sourceField.text, observedAt:observedField.text,
                 bands:splitValues(bandsField.text), modes:splitValues(modesField.text), profileId:profileField.ids[profileField.currentIndex] || 0,
-                archived:archivedField.checked}
+                archived:archivedField.checked, watched:watchedField.checked}
             if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; editorError="" }
             else editorError=root.campaignBackend.dxCampaignError
         }
@@ -363,7 +365,7 @@ GlassPanel {
                         required property var modelData
                         width: ListView.view.width; height: 46; color: Qt.rgba(1,1,1,0.05)
                         Text { anchors.fill: parent; anchors.margins: 4; color: root.textColor; elide: Text.ElideRight
-                            text: modelData.title + (modelData.archived ? " · " + qsTr("archived") : "") + "\n" + modelData.start }
+                            text: modelData.title + (modelData.watched ? " ★" : "") + (modelData.archived ? " · " + qsTr("archived") : "") + "\n" + modelData.start }
                         MouseArea { anchors.fill: parent; onClicked: { if (root.campaignBackend.selectDxCampaign(modelData.id)) campaignDialog.edit(root.campaignBackend.dxCampaign) } }
                     }
                 }
@@ -391,9 +393,12 @@ GlassPanel {
                         model: ids.map(id => id===0 ? qsTr("All station profiles") : root.campaignBackend.stationProfiles.byId(id).name)
                     }
                     CheckBox { id:archivedField; text:qsTr("Archived") }
+                    CheckBox { id:watchedField; objectName:"dxCampaignWatched"; text:qsTr("Watch spots") }
                     CalendarButton { id:saveCampaign; objectName:"saveDxCampaign"; text:qsTr("Save"); onClicked:campaignDialog.save() }
                     CalendarButton { text:qsTr("Refresh matrix"); enabled:!!campaignDialog.draft.id && !root.campaignBackend.dxCampaignBusy; onClicked:root.campaignBackend.refreshDxCampaign() }
                 }
+                Text { Layout.fillWidth:true; color:root.mutedColor; wrapMode:Text.Wrap
+                    text:qsTr("Watched active campaigns add matching fresh spots to the activity log, respecting the cluster filter and active station profile. Repeated alerts are limited.") }
                 Text { id:errorText; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:campaignDialog.editorError || (root.campaignBackend ? root.campaignBackend.dxCampaignError : "") }
                 Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor; text:qsTr("Matrix: exact calls and inclusive UTC dates; local LoTW/card states only. This is not an award eligibility decision.") }
                 ListView {
