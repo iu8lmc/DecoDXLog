@@ -2,10 +2,27 @@
 
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QCryptographicHash>
+#include <QDataStream>
+#include <QIODevice>
+#include <algorithm>
 
 namespace decolog::core {
 
 ContestNetInventory::~ContestNetInventory() { close(); }
+
+QByteArray ContestNetInventory::fingerprint(const AdifRecord& record)
+{
+    auto fields=record.fields();
+    std::sort(fields.begin(),fields.end(),[](const AdifField& a,const AdifField& b) { return a.name<b.name; });
+    QByteArray canonical;
+    QDataStream stream(&canonical,QIODevice::WriteOnly);
+    stream.setVersion(QDataStream::Qt_6_0);
+    stream.setByteOrder(QDataStream::BigEndian);
+    stream << QByteArrayLiteral("DecoDXLog-ContestNet-ADIF-v1") << quint32(fields.size());
+    for (const auto& field : fields) stream << field.name << field.value;
+    return QCryptographicHash::hash(canonical,QCryptographicHash::Sha256);
+}
 
 bool ContestNetInventory::begin(const QString& path)
 {
@@ -51,12 +68,18 @@ ContestNetInventoryPage ContestNetInventory::next(int limit)
         else {
             while (q.next()) {
                 if (page.rows.size()==limit) { page.hasMore=true; break; }
-                page.rows.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toInt(),q.value(3).toBool()});
+                page.rows.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toInt(),q.value(3).toBool(),{}});
             }
             if (q.lastError().isValid()) page.error=q.lastError().text();
         }
     }
     if (!page.error.isEmpty()) { page.rows.clear(); close(); return page; }
+    for (auto& row : page.rows) {
+        QString error;
+        const auto record=m_db.recordChecked(row.id,&error);
+        if (!record) { page.rows.clear(); page.error=error.isEmpty()?QStringLiteral("Cannot read QSO for inventory"):error; close(); return page; }
+        row.contentHash=fingerprint(*record);
+    }
     if (!m_db.fileIdentityMatchesOpen()) { page.rows.clear(); page.error=QStringLiteral("Log file changed during inventory"); close(); return page; }
     if (!page.rows.isEmpty()) m_afterId=page.rows.last().id;
     m_started=true; m_done=!page.hasMore; page.ok=true; return page;

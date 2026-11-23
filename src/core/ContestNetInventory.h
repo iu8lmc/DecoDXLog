@@ -10,6 +10,7 @@ struct ContestNetInventoryRow {
     QString uuid;
     int revision{0};
     bool deleted{false};
+    QByteArray contentHash;
 };
 
 struct ContestNetInventoryPage {
@@ -31,6 +32,9 @@ public:
     QString logIdentity() const { return m_identity; }
     QByteArray fileIdentity() const { return m_fileIdentity; }
     qint64 journalWatermark() const { return m_watermark; }
+    // SHA-256 of versioned, sorted ADIF names and exact values; excludes UUID,
+    // revision, attachments and metadata that recordChecked() does not export.
+    static QByteArray fingerprint(const AdifRecord& record);
 
 private:
     LogDatabase m_db;

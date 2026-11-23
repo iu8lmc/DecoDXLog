@@ -402,6 +402,9 @@ public:
 
     // Il record ADIF completo di un QSO: colonne, stati QSL e adif_extra.
     std::optional<AdifRecord> record(qint64 id) const;
+    // Like record(), but reports QSO or QSL query failures instead of treating
+    // an unreadable QSL table as an empty set.
+    std::optional<AdifRecord> recordChecked(qint64 id, QString* error) const;
     std::optional<QsoMeta> meta(qint64 id) const;
     QList<QslState> qslStatus(qint64 id) const;
     QList<HistoryEntry> history(qint64 id) const;

@@ -63,13 +63,63 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestNetInventoryFingerprintBatchCost()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("fingerprint-bench.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("BEGIN IMMEDIATE"));
+        for (int i=0;i<1000;++i) {
+            AdifRecord record{{"CALL",QString("K%1TEST").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+            QVERIFY(db.insertQso(record,"fixture",{},true,0,false).status==InsertResult::Status::Inserted);
+        }
+        QVERIFY(q.exec("COMMIT")); QElapsedTimer timer; timer.start(); QVERIFY(q.exec("SELECT id,uuid,revision,deleted FROM qso ORDER BY id")); int baselineCount=0; while(q.next()) ++baselineCount; const auto baselineMs=timer.elapsed(); q.finish();
+        ContestNetInventory inventory; timer.restart(); QVERIFY(inventory.begin(path)); int count=0; bool more=true;
+        while (more) { const auto page=inventory.next(500); QVERIFY2(page.ok,qPrintable(page.error)); for (const auto& row:page.rows) { QCOMPARE(row.contentHash.size(),32); ++count; } more=page.hasMore; }
+        const auto hashedMs=timer.elapsed(); QCOMPARE(baselineCount,1000); QCOMPARE(count,1000);
+        qInfo("Inventory A/B 1000 synthetic QSO: metadata SQL=%lld ms snapshot with ADIF SHA-256=%lld ms",baselineMs,hashedMs);
+    }
+    void contestNetInventoryFingerprintsContentNotFieldOrder()
+    {
+        const AdifRecord first{{"CALL","K1AAA"},{"COMMENT",QString::fromUtf8("Città ✨")},{"MODE","CW"}};
+        const AdifRecord reordered{{"MODE","CW"},{"COMMENT",QString::fromUtf8("Città ✨")},{"CALL","K1AAA"}};
+        auto changed=reordered; changed.set("COMMENT",QString::fromUtf8("Città diversa"));
+        QCOMPARE(ContestNetInventory::fingerprint(first),ContestNetInventory::fingerprint(reordered));
+        QCOMPARE(ContestNetInventory::fingerprint(first).toHex(),QByteArray("2a0d25b65dd247db2ab9297896c4c4127683249fd837fdcf406eb6feba6f4c64"));
+        QVERIFY(ContestNetInventory::fingerprint(first)!=ContestNetInventory::fingerprint(changed)); QCOMPARE(ContestNetInventory::fingerprint(first).size(),32);
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("hash.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        const auto result=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME","Alice"}},"fixture"); QVERIFY(result.id>0);
+        ContestNetInventory firstSnapshot; QVERIFY(firstSnapshot.begin(path)); const auto firstPage=firstSnapshot.next(10); QVERIFY(firstPage.ok); QCOMPARE(firstPage.rows.size(),1);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET name='Bob' WHERE id="+QString::number(result.id)));
+        ContestNetInventory secondSnapshot; QVERIFY(secondSnapshot.begin(path)); const auto secondPage=secondSnapshot.next(10); QVERIFY(secondPage.ok); QCOMPARE(secondPage.rows.size(),1);
+        QCOMPARE(firstPage.rows.first().uuid,secondPage.rows.first().uuid); QCOMPARE(firstPage.rows.first().revision,secondPage.rows.first().revision);
+        QVERIFY(firstPage.rows.first().contentHash!=secondPage.rows.first().contentHash);
+        QslState qsl; qsl.service="lotw"; qsl.sent="Y"; QVERIFY(db.setQslState(result.id,qsl));
+        ContestNetInventory thirdSnapshot; QVERIFY(thirdSnapshot.begin(path)); const auto thirdPage=thirdSnapshot.next(10); QVERIFY(thirdPage.ok); QCOMPARE(thirdPage.rows.size(),1);
+        QCOMPARE(secondPage.rows.first().revision,thirdPage.rows.first().revision); QVERIFY(secondPage.rows.first().contentHash!=thirdPage.rows.first().contentHash);
+        QCOMPARE(secondSnapshot.journalWatermark(),thirdSnapshot.journalWatermark());
+    }
+    void contestNetInventoryRejectsUnreadableQslData()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("broken.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA foreign_keys=OFF")); QVERIFY(q.exec("DROP TABLE qsl_status")); }
+        ContestNetInventory inventory; QVERIFY(inventory.begin(path)); const auto page=inventory.next(10); QVERIFY(!page.ok); QVERIFY(page.rows.isEmpty()); QVERIFY(!page.error.isEmpty());
+    }
+    void contestNetInventoryRejectsMalformedAdifExtra()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("bad-extra.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET adif_extra='{bad json' WHERE id="+QString::number(qso.id))); }
+        ContestNetInventory inventory; QVERIFY(inventory.begin(path)); const auto page=inventory.next(10); QVERIFY(!page.ok); QVERIFY(page.rows.isEmpty()); QVERIFY(page.error.contains("ADIF"));
+        { LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET adif_extra='{\"APP_VALUE\":42}'")); }
+        QVERIFY(inventory.begin(path)); const auto nonString=inventory.next(10); QVERIFY(!nonString.ok); QVERIFY(nonString.rows.isEmpty()); QVERIFY(nonString.error.contains("ADIF"));
+    }
     void contestNetInventoryPinsSnapshotAndJournalCursor()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("inventory.sqlite");
         LogDatabase writer; QVERIFY(writer.open(path));
         auto make=[&](const QString& call) { return AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}}; };
         const auto a=writer.insertQso(make("K1AAA"),"fixture"), b=writer.insertQso(make("K1BBB"),"fixture"), c=writer.insertQso(make("K1CCC"),"fixture"); QVERIFY(a.id>0 && b.id>0 && c.id>0); QVERIFY(writer.softDeleteQso(c.id));
-        const auto bUuid=writer.meta(b.id)->uuid; ContestNetInventory inventory; QVERIFY2(inventory.begin(path),qPrintable(inventory.error()));
+        const auto bUuid=writer.meta(b.id)->uuid; const auto bHash=ContestNetInventory::fingerprint(*writer.record(b.id)); ContestNetInventory inventory; QVERIFY2(inventory.begin(path),qPrintable(inventory.error()));
         const auto watermark=inventory.journalWatermark(); QVERIFY(watermark>0); QCOMPARE(inventory.logIdentity(),writer.identity());
         QVERIFY(!inventory.fileIdentity().isEmpty()); QVERIFY(!inventory.next(0).ok); QVERIFY(!inventory.next(501).ok);
         auto first=inventory.next(1); QVERIFY(first.ok); QCOMPARE(first.rows.size(),1); QVERIFY(first.hasMore); QCOMPARE(first.rows.first().id,a.id);
@@ -78,6 +128,7 @@ private slots:
         QVERIFY(writer.adoptUuid(b.id,"cloud-adopted-uuid"));
         auto second=inventory.next(10); QVERIFY(second.ok); QCOMPARE(second.rows.size(),2); QVERIFY(!second.hasMore);
         QCOMPARE(second.rows.at(0).id,b.id); QCOMPARE(second.rows.at(0).uuid,bUuid); QCOMPARE(second.rows.at(0).revision,1); QVERIFY(!second.rows.at(0).deleted);
+        QCOMPARE(second.rows.at(0).contentHash,bHash); QVERIFY(second.rows.at(0).contentHash!=ContestNetInventory::fingerprint(*writer.record(b.id)));
         QCOMPARE(second.rows.at(1).id,c.id); QVERIFY(second.rows.at(1).deleted);
         const auto later=writer.contestNetChangesAfter(watermark,10); QVERIFY(later.ok); QCOMPARE(later.changes.size(),4);
         QCOMPARE(later.changes.last().previousQsoUuid,bUuid); QCOMPARE(later.changes.last().qsoUuid,QString("cloud-adopted-uuid"));

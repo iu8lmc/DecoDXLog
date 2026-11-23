@@ -2288,6 +2288,33 @@ std::optional<AdifRecord> LogDatabase::record(qint64 id) const
     return adifFromRow(q, RowLayout::of(q.record()), qslStatus(id));
 }
 
+std::optional<AdifRecord> LogDatabase::recordChecked(qint64 id, QString* error) const
+{
+    if (error) error->clear();
+    if (!isOpen()) { if (error) *error=QStringLiteral("database not open"); return std::nullopt; }
+    QSqlQuery q(connection()); q.prepare(QStringLiteral("SELECT * FROM qso WHERE id = ?")); q.addBindValue(id);
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return std::nullopt; }
+    if (!q.next()) { if (error) *error=QStringLiteral("QSO not found"); return std::nullopt; }
+    const int extraColumn=q.record().indexOf(QStringLiteral("adif_extra"));
+    if (extraColumn>=0 && !q.value(extraColumn).toString().isEmpty()) {
+        QJsonParseError parseError;
+        const auto extra=QJsonDocument::fromJson(q.value(extraColumn).toString().toUtf8(),&parseError);
+        if (parseError.error!=QJsonParseError::NoError || !extra.isObject()) {
+            if (error) *error=QStringLiteral("Invalid ADIF extra fields"); return std::nullopt;
+        }
+        const QJsonObject values=extra.object();
+        for (auto it=values.constBegin();it!=values.constEnd();++it) {
+            if (!it.value().isString()) { if (error) *error=QStringLiteral("Invalid ADIF extra field value"); return std::nullopt; }
+        }
+    }
+    QSqlQuery s(connection()); s.prepare(QStringLiteral("SELECT %1 FROM qsl_status WHERE qso_id = ?").arg(QLatin1String(kQslColumns))); s.addBindValue(id);
+    if (!s.exec()) { if (error) *error=s.lastError().text(); return std::nullopt; }
+    QList<QslState> states;
+    while (s.next()) states.append(qslFromQuery(s,0));
+    if (s.lastError().isValid()) { if (error) *error=s.lastError().text(); return std::nullopt; }
+    return adifFromRow(q,RowLayout::of(q.record()),states);
+}
+
 std::optional<QsoMeta> LogDatabase::meta(qint64 id) const
 {
     QSqlQuery q(connection());
