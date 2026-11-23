@@ -167,6 +167,28 @@ private slots:
         const auto status=db.qslStatus(added.id); QVERIFY(status.isEmpty() || status.first().sent!=QString("Q"));
         QVERIFY(cards.status().contains("identity",Qt::CaseInsensitive));
     }
+    void plannerQueueRejectsReplacedCloneWhileWorkerWaiting()
+    {
+        core::LogDatabase db; const QString path=m_dir.filePath("paper-file-origin.sqlite"), clone=m_dir.filePath("paper-file-clone.sqlite");
+        QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+        const auto a=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        const auto b=db.insertQso({{"CALL","K2BBB"},{"QSO_DATE","20261118"},{"TIME_ON","101500"},{"BAND","20m"},{"MODE","CW"}},"test");
+        core::QslState state; state.service="card"; state.sent="Q"; state.via="E"; QVERIFY(db.setCardState(a.id,state));
+        const auto meta=db.meta(b.id); QVERIFY(meta.has_value()); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text()));
+        QTcpServer cloud; QVERIFY(cloud.listen(QHostAddress::LocalHost)); QslCardController::Context ctx; ctx.db=&db;
+        ctx.cloudAccess=[&] { return QPair<QString,QString>{QStringLiteral("http://127.0.0.1:%1").arg(cloud.serverPort()),"fake"}; };
+        ctx.emailFor=[](const QString&,auto done) { done(QStringLiteral("test@example.invalid"),{}); };
+        QslCardController cards(ctx); cards.addStandardCardFields(); cards.sendCardsByEmail({QVariant(a.id)});
+        QTRY_VERIFY_WITH_TIMEOUT(cloud.hasPendingConnections(),15000); QTcpSocket* socket=cloud.nextPendingConnection(); QVERIFY(socket);
+        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable()>0,5000); QVERIFY(q.exec("BEGIN EXCLUSIVE"));
+        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}"); socket->flush(); QTest::qWait(200);
+        QVERIFY(cards.enqueueIfUnsent(b.id,meta->uuid,meta->revision,"B",path));
+        if (!QFile::rename(path,path+".original")) { q.exec("ROLLBACK"); QSKIP("Platform does not allow replacing an open SQLite file"); }
+        QVERIFY(QFile::rename(clone,path)); QVERIFY(q.exec("COMMIT"));
+        QTRY_VERIFY_WITH_TIMEOUT(!cards.operationBusy(),15000);
+        core::LogDatabase replacement; QVERIFY(replacement.open(path)); const auto status=replacement.qslStatus(b.id);
+        QVERIFY(status.isEmpty() || status.first().sent!=QString("Q")); QVERIFY(cards.status().contains("file",Qt::CaseInsensitive));
+    }
     void initTestCase()
     {
         // Le impostazioni vanno in un temporaneo: una prova non tocca quelle di

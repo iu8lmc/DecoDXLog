@@ -104,7 +104,7 @@ struct CardBatchResult {
 CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QString& sent,
                                 const QString& via, bool unanswered, const QString& received,
                                 const QString& expectedUuid = {}, bool onlyUnsent = false, int expectedRevision = -1,
-                                const QString& expectedIdentity = {})
+                                const QString& expectedIdentity = {}, const QByteArray& expectedFileToken = {})
 {
     CardBatchResult result;
     if (unanswered) {
@@ -119,12 +119,18 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
     if (!connection.transaction()) {
         result.failed = int(ids.size()); result.error = connection.lastError().text(); return result;
     }
+    if (!expectedFileToken.isEmpty() && fileIdentity(db.path())!=expectedFileToken) {
+        connection.rollback(); result.failed=int(ids.size()); result.error=QObject::tr("Log file changed before the paper QSL operation"); return result;
+    }
     if (!expectedIdentity.isEmpty() && db.identity()!=expectedIdentity) {
         connection.rollback(); result.failed=int(ids.size()); result.error=QObject::tr("Log identity changed before the paper QSL operation"); return result;
     }
     QElapsedTimer held; held.start();
     int inBlock = 0;
     auto commit = [&] {
+        if (!expectedFileToken.isEmpty() && fileIdentity(db.path())!=expectedFileToken) {
+            connection.rollback(); result.failed += inBlock; result.error=QObject::tr("Log file changed during the paper QSL operation"); inBlock=0; return false;
+        }
         if (connection.commit()) result.changed += inBlock;
         else {
             result.failed += inBlock;
@@ -132,6 +138,7 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
             connection.rollback();
         }
         inBlock = 0;
+        return true;
     };
     int done = 0;
     for (const qint64 id : std::as_const(ids)) {
@@ -200,7 +207,7 @@ CardBatchResult changeCardBatch(LogDatabase& db, QList<qint64> ids, const QStrin
             return result;
         }
         if (done % 200 == 0 || held.elapsed() >= 250 || done == ids.size()) {
-            commit();
+            if (!commit()) { result.failed += int(ids.size()) - done; break; }
             if (done < ids.size() && !connection.transaction()) {
                 result.failed += int(ids.size()) - done;
                 if (result.error.isEmpty()) result.error = connection.lastError().text();
@@ -420,8 +427,9 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
     }
     const QString path = m_ctx.db->path();
     const QString identity = (path.isEmpty() || path==QLatin1String(":memory:")) ? QString() : m_ctx.db->identity();
-    if (!path.isEmpty() && path!=QLatin1String(":memory:") && identity.isEmpty()) {
-        m_status=tr("Cannot verify log identity"); note(m_status,QStringLiteral("warning")); emit changed(); return 0;
+    const QByteArray fileToken=(path.isEmpty() || path==QLatin1String(":memory:")) ? QByteArray() : fileIdentity(path);
+    if (!path.isEmpty() && path!=QLatin1String(":memory:") && (identity.isEmpty() || fileToken.isEmpty())) {
+        m_status=tr("Cannot verify log or file identity"); note(m_status,QStringLiteral("warning")); emit changed(); return 0;
     }
     auto done = [this, sent, unanswered, received](const CardBatchResult& result) {
         m_operationBusy = false;
@@ -447,10 +455,11 @@ int QslCardController::changeCards(const QList<qint64>& ids, const QString& sent
     m_operationBusy = true;
     emit operationChanged();
     QPointer<QslCardController> self(this);
-    m_cardPool.start([self, path, identity, ids, sent, via, unanswered, received, expectedUuid, onlyUnsent, expectedRevision] {
+    m_cardPool.start([self, path, identity, fileToken, ids, sent, via, unanswered, received, expectedUuid, onlyUnsent, expectedRevision] {
         LogDatabase db;
         CardBatchResult result;
-        if (db.openExistingReadWrite(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received,expectedUuid,onlyUnsent,expectedRevision,identity);
+        if (fileIdentity(path)!=fileToken) { result.failed=qMax(1,int(ids.size())); result.error=QObject::tr("Log file changed before the paper QSL operation"); }
+        else if (db.openExistingReadWrite(path)) result = changeCardBatch(db, ids, sent, via, unanswered, received,expectedUuid,onlyUnsent,expectedRevision,identity,fileToken);
         else { result.failed = qMax(1, int(ids.size())); result.error = db.lastError(); }
         QMetaObject::invokeMethod(self.data(), [self, path, sent, unanswered, received, result] {
             if (!self) return;
@@ -1099,7 +1108,7 @@ void QslCardController::recordConfirmedMail(const QString& path, const QString& 
         } else if (fileIdentity(path)!=fileToken) {
             result.failed=1; result.error=QObject::tr("The original log file changed.");
         } else {
-            result = changeCardBatch(db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid, false, -1, identity);
+            result = changeCardBatch(db, {id}, QStringLiteral("Y"), QStringLiteral("E"), false, {}, uuid, false, -1, identity, fileToken);
         }
         if (self) QMetaObject::invokeMethod(self.data(), [self, complete, result] {
             if (self) complete(result);
