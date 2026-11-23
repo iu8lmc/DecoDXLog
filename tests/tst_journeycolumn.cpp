@@ -69,6 +69,33 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonPriorReviewRestoresWithFrequencyRecheck()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","5"),qMakePair("K2BBB","3"),qMakePair("K3CCC","5")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"FREQ","7.074"},{"MODE","CW"},{"DXCC","291"},{"CQZ",item.second}},"fixture",{},true,profile,false).id>0); }
+        const QString path=dir.filePath("review.json"); QByteArray output;
+        QVERIFY2(launch(dir,"marathonroundtripprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); auto base=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1,profile}).toJson().object();
+          for (const QString& key : {QStringLiteral("selected"),QStringLiteral("zoneCandidates"),QStringLiteral("entityAlternatives"),QStringLiteral("zoneAlternatives")}) {
+              QJsonArray rows; for (const auto& value : base.value(key).toArray()) { auto row=value.toObject(); row.remove("frequencyMhz"); row.remove("invalidFrequency"); rows.append(row); } base.insert(key,rows); }
+          QJsonArray warnings; for (const auto& w : base.value("warnings").toArray()) if (!w.toString().contains(": recorded frequency ")) warnings.append(w); base.insert("warnings",warnings);
+          const auto identity=db.identity().toUtf8(); const auto raw=QByteArray::number(identity.size())+':'+identity+QJsonDocument(base).toJson(QJsonDocument::Compact);
+          QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); auto review=QJsonDocument::fromJson(file.readAll()).object(); file.close();
+          review.insert("previewSnapshot",QString::fromLatin1(QCryptographicHash::hash(raw,QCryptographicHash::Sha256).toHex()));
+          QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate)); QVERIFY(file.write(QJsonDocument(review).toJson())>0); }
+        QVERIFY2(launch(dir,"marathonimportprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("error= before=1,1 after=2,3 notice=Restored an older review; recheck current location, propagation and frequency evidence"),output.constData());
+    }
+    void marathonReviewShowsFrequencyBandConflict()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"FREQ","7.074"},{"MODE","CW"},{"DXCC","291"},{"CQZ","5"}},"fixture",{},true,profile,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"marathonreviewprobe:"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("recorded frequency 7.074 MHz outside recorded band 20m") && output.contains("entity=QSO 1") && output.contains("7.074 MHz") && !output.contains("TypeError"),output.constData());
+    }
     void marathonOldReviewRestoresOnlyIfPropagationStillEligible()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

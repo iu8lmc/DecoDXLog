@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QList>
 #include <QString>
+#include <optional>
 #include "core/LogDatabase.h"
 
 namespace decolog::core::cqmarathon {
@@ -24,6 +25,8 @@ struct Entry {
     bool invalidExtra{false};
     QString propMode;
     QString satName;
+    std::optional<double> frequencyMhz;
+    bool invalidFrequency{false};
 };
 
 struct Rules {

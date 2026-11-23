@@ -588,7 +588,7 @@ DialogFrame {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
         const before=marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId
         const error=loadMarathonReviewed("file://"+path)
-        console.warn("PROBE marathonReviewedImport error="+error+" before="+before+" after="+marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId)
+        console.warn("PROBE marathonReviewedImport error="+error+" before="+before+" after="+marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId+" notice="+marathonImportNotice)
     }
     function probeMarathonReviewedExport(path,profile,dbPath) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
@@ -673,7 +673,7 @@ DialogFrame {
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
             ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonWorkingEntities; ScrollBar.vertical:PanelScrollBar {}
                 delegate:RowLayout { required property var modelData; required property int index; width:marathonEntityRows.width
-                    readonly property string text: qsTr("QSO %1 · %2 · Marathon entity %3 · DXCC %4 · REGION %5 · %6 · CQ zone %7 · %8 %9 · %10").arg(modelData.qsoId).arg(modelData.call).arg(modelData.entityCode).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.region || qsTr("not recorded")).arg(modelData.entityBasis).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp)
+                    readonly property string text: qsTr("QSO %1 · %2 · Marathon entity %3 · DXCC %4 · REGION %5 · %6 · CQ zone %7 · %8 %9 · %10").arg(modelData.qsoId).arg(modelData.call).arg(modelData.entityCode).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.region || qsTr("not recorded")).arg(modelData.entityBasis).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) + (modelData.frequencyMhz ? qsTr(" · %1 MHz").arg(modelData.frequencyMhz) : "")
                     Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:parent.text }
                     GlassButton { text:qsTr("Next alternative"); onClicked:root.cycleMarathonCandidate("entity",index) } } }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Independent zone candidates") }

@@ -11,6 +11,27 @@ using namespace decolog::core;
 class TestCqMarathonDb : public QObject {
     Q_OBJECT
 private slots:
+    void recordedFrequencyConflictsAreVisible()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto& item : {qMakePair("K1AAA","7.074"),qMakePair("K2BBB","14.074"),qMakePair("K3CCC","")}) {
+            AdifRecord rec{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},
+                           {"DXCC","291"},{"CQZ",QString::number(1+db.qsoCount())},{"FREQ",item.second}};
+            QCOMPARE(db.insertQso(rec,"test").status,InsertResult::Status::Inserted);
+        }
+        const auto result=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1});
+        QCOMPARE(result.zoneCandidates.size(),3);
+        const auto warnings=result.warnings.join('\n');
+        QVERIFY(warnings.contains("QSO 1: recorded frequency 7.074 MHz outside recorded band 20m"));
+        QVERIFY(!warnings.contains("QSO 2: recorded frequency")); QVERIFY(!warnings.contains("QSO 3: recorded frequency"));
+        QSqlQuery update(db.connection()); QVERIFY(update.exec("UPDATE qso SET freq=14.35 WHERE call='K1AAA'"));
+        QVERIFY(update.exec("UPDATE qso SET freq='invalid' WHERE call='K3CCC'"));
+        const auto updated=cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1});
+        QVERIFY(!updated.warnings.join('\n').contains("QSO 1: recorded frequency"));
+        QVERIFY(updated.warnings.join('\n').contains("QSO 3: invalid recorded frequency"));
+        QVERIFY(update.exec("UPDATE qso SET freq=14.350001 WHERE call='K1AAA'"));
+        QVERIFY(cqmarathon::select(cqmarathon::loadEntries(db),{2026,"mixed",1}).warnings.join('\n').contains("QSO 1: recorded frequency"));
+    }
     void excludesRecordedRelayPropagationFor2026()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

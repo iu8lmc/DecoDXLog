@@ -1,5 +1,6 @@
 #include "core/CqMarathon.h"
 #include "core/CqMarathonEntityCodes.h"
+#include "core/Bands.h"
 #include "core/Maidenhead.h"
 #include "core/Modes.h"
 
@@ -164,6 +165,14 @@ Result select(const QList<Entry>& entries, const Rules& rules)
                 result.exclusions << QStringLiteral("QSO %1: maritime mobile designation; location requires review").arg(entry.qsoId); continue;
             }
         }
+        if (entry.invalidFrequency) {
+            result.warnings << QStringLiteral("QSO %1: invalid recorded frequency; review band").arg(entry.qsoId);
+        } else if (entry.frequencyMhz) {
+            double low=0,high=0;
+            if (bands::edges(entry.band,&low,&high) && (*entry.frequencyMhz<low || *entry.frequencyMhz>high))
+                result.warnings << QStringLiteral("QSO %1: recorded frequency %2 MHz outside recorded band %3; review both fields")
+                                       .arg(entry.qsoId).arg(QString::number(*entry.frequencyMhz,'g',12)).arg(entry.band);
+        }
         const QString ownGrid=entry.myGrid.trimmed().toUpper();
         if (entry.invalidExtra) ++result.locationInvalid;
         else if (ownGrid.isEmpty()) ++result.locationMissing;
@@ -289,7 +298,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
     QSqlQuery query(db.connection());
     query.setForwardOnly(true);
     if (!query.exec(QStringLiteral(
-            "SELECT id, call, dxcc, cqz, band, mode, qso_datetime_on, station_profile_id, adif_extra, prop_mode, sat_name "
+            "SELECT id, call, dxcc, cqz, band, mode, qso_datetime_on, station_profile_id, adif_extra, prop_mode, sat_name, freq "
             "FROM qso WHERE deleted = 0 ORDER BY qso_datetime_on, id"))) {
         if (error) *error = query.lastError().text();
         return {};
@@ -306,6 +315,11 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         if (timestamp.isValid() && timestamp.timeSpec()!=Qt::LocalTime) entry.timestamp=timestamp.toUTC();
         entry.stationProfileId = query.value(7).toLongLong();
         entry.propMode=query.value(9).toString(); entry.satName=query.value(10).toString();
+        if (!query.value(11).isNull()) {
+            bool ok=false; const double mhz=query.value(11).toDouble(&ok);
+            if (!ok || !std::isfinite(mhz) || mhz<=0) entry.invalidFrequency=true;
+            else entry.frequencyMhz=mhz;
+        }
         const QByteArray extra=query.value(8).toByteArray();
         if (!extra.isEmpty()) {
             QJsonParseError parseError; const auto doc=QJsonDocument::fromJson(extra,&parseError);
@@ -339,6 +353,8 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("timestamp"), entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
         if (!entry.propMode.isEmpty()) object.insert(QStringLiteral("propMode"),entry.propMode);
         if (!entry.satName.isEmpty()) object.insert(QStringLiteral("satName"),entry.satName);
+        if (entry.frequencyMhz) object.insert(QStringLiteral("frequencyMhz"),*entry.frequencyMhz);
+        if (entry.invalidFrequency) object.insert(QStringLiteral("invalidFrequency"),true);
         return object;
     };
     for (const Entry& entry : selected) qsos.append(row(entry));
