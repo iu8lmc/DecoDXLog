@@ -68,6 +68,25 @@ class TestContestAudio : public QObject {
         QFile altered(path); QVERIFY(altered.open(QIODevice::ReadWrite)); QVERIFY(altered.seek(40)); altered.write("bad!"); altered.close();
         QVERIFY(!ContestAudioFile::locate(path,start).error.isEmpty());
     }
+    void findsBoundedRecordingsCoveringQsoTime()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const auto qso=QDateTime::fromString("2026-11-23T12:00:01Z",Qt::ISODate);
+        auto make=[&](const QDateTime &start) {
+            ContestAudioFile writer; if (!writer.start(dir.path(),64000,start)) return QString();
+            if (writer.append(QByteArray(64000,'x')).written!=64000) return QString();
+            QString path; return writer.finish(&path) ? path : QString();
+        };
+        const auto first=make(qso.addSecs(-1)), second=make(qso.addMSecs(-500)), outside=make(qso.addSecs(-9));
+        QVERIFY(!first.isEmpty() && !second.isEmpty() && !outside.isEmpty());
+        QFile noise(dir.filePath("other.wav")); QVERIFY(noise.open(QIODevice::WriteOnly)); noise.write("unrelated"); noise.close();
+        const auto found=ContestAudioFile::findMatching(dir.path(),qso,1000,50);
+        QVERIFY2(found.error.isEmpty(),qPrintable(found.error)); QCOMPARE(found.matches.size(),2); QVERIFY(!found.truncated);
+        QCOMPARE(found.matches[0].path,first); QCOMPARE(found.matches[1].path,second);
+        const auto limited=ContestAudioFile::findMatching(dir.path(),qso,1,50); QVERIFY(limited.truncated); QCOMPARE(limited.inspected,1);
+        const auto few=ContestAudioFile::findMatching(dir.path(),qso,1000,1); QVERIFY(few.truncated); QCOMPARE(few.matches.size(),1);
+        QVERIFY(!ContestAudioFile::findMatching(dir.filePath("missing"),qso,1000,50).error.isEmpty());
+    }
     void decodesPcmThroughExternalPlayer()
     {
         const QString ffmpeg=QStandardPaths::findExecutable("ffmpeg");

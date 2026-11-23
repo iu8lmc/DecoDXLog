@@ -14,10 +14,11 @@ ContestAudioController::ContestAudioController(QObject *parent) : QObject(parent
 {
     connect(m_devices,&QMediaDevices::audioInputsChanged,this,&ContestAudioController::devicesChanged);
     connect(m_devices,&QMediaDevices::audioOutputsChanged,this,&ContestAudioController::devicesChanged);
+    m_searchPool.setMaxThreadCount(1);
     m_checkpoint.setInterval(5000);
     connect(&m_checkpoint,&QTimer::timeout,this,[this] { if (m_recording && !m_file.checkpoint()) finish(false,m_file.error()); });
 }
-ContestAudioController::~ContestAudioController() { if (m_recording) stop(); stopPlayback(); }
+ContestAudioController::~ContestAudioController() { m_searchPool.waitForDone(); if (m_recording) stop(); stopPlayback(); }
 QStringList ContestAudioController::inputs() const
 {
     QStringList result{tr("System default")};
@@ -91,6 +92,29 @@ void ContestAudioController::stopPlayback()
     if (m_sink) { auto *sink=m_sink; m_sink=nullptr; sink->stop(); sink->deleteLater(); }
     if (m_playbackFile) { m_playbackFile->close(); m_playbackFile->deleteLater(); m_playbackFile=nullptr; }
     emit changed();
+}
+bool ContestAudioController::findRecordings(const QUrl &folder, const QString &qsoUtc)
+{
+    const QDateTime when=QDateTime::fromString(qsoUtc,Qt::ISODateWithMs);
+    if (m_searchBusy || !folder.isLocalFile() || !qsoUtc.endsWith(QLatin1Char('Z'),Qt::CaseInsensitive) || !when.isValid()) return false;
+    m_searchBusy=true; emit changed(); QPointer<ContestAudioController> self(this);
+    m_searchPool.start([self,folder,qsoUtc,when] {
+        const auto found=core::ContestAudioFile::findMatching(folder.toLocalFile(),when);
+        QVariantList matches;
+        for (const auto &item:found.matches)
+            matches << QVariantMap{{QStringLiteral("url"),QUrl::fromLocalFile(item.path)},
+                {QStringLiteral("startUtc"),item.location.startUtc.toString(Qt::ISODateWithMs)},
+                {QStringLiteral("durationMs"),item.location.durationMs}, {QStringLiteral("offsetMs"),item.location.offsetMs}};
+        const QVariantMap result{{QStringLiteral("folder"),folder},{QStringLiteral("qsoUtc"),qsoUtc},
+            {QStringLiteral("matches"),matches},{QStringLiteral("inspected"),found.inspected},
+            {QStringLiteral("truncated"),found.truncated},{QStringLiteral("error"),found.error}};
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,result] {
+            if (!self) return;
+            self->m_searchBusy=false; emit self->changed(); emit self->recordingsFound(result);
+        },Qt::QueuedConnection);
+    });
+    return true;
 }
 bool ContestAudioController::recoverFile(const QUrl &partial)
 {

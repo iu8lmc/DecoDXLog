@@ -102,6 +102,16 @@ private slots:
         QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("01020304"));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
+    void contestAudioFindsRecordingThroughApp()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000));
+        QString path; QVERIFY(writer.finish(&path)); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("contestaudiofindprobe:")+dir.path(),output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE contestFind count=1 selected=true") && !output.contains("TypeError"),output.constData());
+        QVERIFY(QFile::exists(path)); decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestReportFindsCandidateInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

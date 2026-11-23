@@ -83,6 +83,21 @@ class TestContestAudioController : public QObject {
         QCOMPARE(qFromLittleEndian<qint16>(bytes.constData()+44),qint16(16384));
         QCOMPARE(qFromLittleEndian<qint16>(bytes.constData()+46),qint16(-16384));
     }
+    void asynchronouslyFindsRecordingsWithoutChangingFiles()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::core::ContestAudioFile writer;
+        const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000));
+        QString path; QVERIFY(writer.finish(&path)); decolog::app::ContestAudioController controller;
+        QSignalSpy done(&controller,&decolog::app::ContestAudioController::recordingsFound);
+        QVERIFY(!controller.findRecordings(QUrl::fromLocalFile(dir.path()),"invalid"));
+        QVERIFY(controller.findRecordings(QUrl::fromLocalFile(dir.path()),"2026-11-23T12:00:01Z"));
+        QVERIFY(!controller.findRecordings(QUrl::fromLocalFile(dir.path()),"2026-11-23T12:00:01Z"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000); const auto result=done.first().at(0).toMap();
+        QVERIFY(result.value("error").toString().isEmpty()); QCOMPARE(result.value("matches").toList().size(),1);
+        QCOMPARE(result.value("matches").toList().first().toMap().value("url").toUrl(),QUrl::fromLocalFile(path));
+        QCOMPARE(result.value("qsoUtc").toString(),QString("2026-11-23T12:00:01Z")); QVERIFY(QFile::exists(path));
+    }
     void capturesStreamAndStopsAtLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); Feed feed;

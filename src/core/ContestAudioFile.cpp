@@ -1,5 +1,7 @@
 #include "core/ContestAudioFile.h"
 #include <QDir>
+#include <QDirIterator>
+#include <algorithm>
 #include <QFileInfo>
 #include <QRegularExpression>
 #include <QUuid>
@@ -139,6 +141,28 @@ ContestAudioFile::Location ContestAudioFile::locate(const QString &path, const Q
     result.offsetMs=result.startUtc.msecsTo(qsoUtc.toUTC());
     if (result.offsetMs<0 || result.offsetMs>=result.durationMs)
         result.error=QStringLiteral("QSO time is outside this recording");
+    return result;
+}
+
+ContestAudioFile::SearchResult ContestAudioFile::findMatching(const QString &directory, const QDateTime &qsoUtc, int maxFiles, int maxResults)
+{
+    SearchResult result;
+    const QFileInfo folder(directory);
+    if (!qsoUtc.isValid() || !folder.isDir() || !folder.isReadable() || maxFiles<1 || maxFiles>1000 || maxResults<1 || maxResults>50) {
+        result.error=QStringLiteral("Invalid directory, QSO time or search limit"); return result;
+    }
+    QDirIterator it(directory, {QStringLiteral("contest-audio-*.wav")}, QDir::Files | QDir::NoSymLinks | QDir::Readable);
+    while (it.hasNext()) {
+        if (result.inspected==maxFiles) { result.truncated=true; break; }
+        const QString path=it.next(); ++result.inspected;
+        const Location location=locate(path,qsoUtc);
+        if (!location.error.isEmpty()) continue;
+        if (result.matches.size()==maxResults) { result.truncated=true; continue; }
+        result.matches.append({path,location});
+    }
+    std::sort(result.matches.begin(),result.matches.end(),[](const Match &a,const Match &b) {
+        return a.location.startUtc==b.location.startUtc ? a.path<b.path : a.location.startUtc<b.location.startUtc;
+    });
     return result;
 }
 

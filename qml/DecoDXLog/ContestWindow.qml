@@ -43,6 +43,12 @@ RoundedWindow {
         contestAudioDialog.recoverPartial(path)
         console.warn("PROBE contestRecover success=" + (decolog.contestAudio.lastPath.length > 0) + " path=" + decolog.contestAudio.lastPath)
     }
+    function probeContestAudioFind(folder) {
+        openAudioForQso({utc:"2026-11-23T12:00:01Z", call:"K1ABC"})
+        contestAudioDialog.folder=folder
+        contestAudioDialog.probingFind=true
+        contestAudioFind.clicked()
+    }
     function probeContestAudioPlayback(path) {
         openAudioForQso({utc:"2026-11-23T12:00:01Z", call:"K1ABC"})
         contestAudioDialog.playbackFile=path
@@ -1030,11 +1036,29 @@ RoundedWindow {
 
     DialogFrame {
         id:contestAudioDialog
-        dialogKey:"contestAudio"; width:700; height:500; title:qsTr("Contest session audio"); dotColor:Theme.primaryColor
+        dialogKey:"contestAudio"; width:700; height:620; title:qsTr("Contest session audio"); dotColor:Theme.primaryColor
         property url folder: ""
         property url playbackFile: ""
         property string qsoUtc: ""
         property string qsoCall: ""
+        property var foundRecordings: []
+        property string findMessage: ""
+        property bool probingFind: false
+        onFolderChanged: { foundRecordings=[]; findMessage="" }
+        onQsoUtcChanged: { foundRecordings=[]; findMessage="" }
+        Connections {
+            target:decolog.contestAudio
+            function onRecordingsFound(result) {
+                if (String(result.folder)!==String(contestAudioDialog.folder) || result.qsoUtc!==contestAudioDialog.qsoUtc) return
+                contestAudioDialog.foundRecordings=result.matches || []
+                contestAudioDialog.findMessage=result.error ? result.error : qsTr("%1 possible recordings · %2 files checked%3").arg(contestAudioDialog.foundRecordings.length).arg(result.inspected).arg(result.truncated ? qsTr(" · search limited") : "")
+                if (contestAudioDialog.probingFind) {
+                    if (contestAudioDialog.foundRecordings.length && audioMatches.itemAt(0)) audioMatches.itemAt(0).selectRecording()
+                    console.warn("PROBE contestFind count=" + contestAudioDialog.foundRecordings.length + " selected=" + (String(contestAudioDialog.playbackFile).length>0))
+                    contestAudioDialog.probingFind=false
+                }
+            }
+        }
         function recoverPartial(path) { decolog.contestAudio.recoverFile(path) }
         ColumnLayout {
             anchors.fill:parent; spacing:10
@@ -1067,6 +1091,28 @@ RoundedWindow {
             }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
                 text:qsTr("Review QSO %1 at %2. Choose the recording covering its UTC time; playback starts up to 10 seconds earlier. Timing is approximate and does not prove an association.").arg(contestAudioDialog.qsoCall || "—").arg(contestAudioDialog.qsoUtc || "—") }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { id:contestAudioFind; text:qsTr("Find recordings in folder"); enabled:!decolog.contestAudio.searchBusy && contestAudioDialog.qsoUtc.length>0 && String(contestAudioDialog.folder).length>0
+                    onClicked: { contestAudioDialog.foundRecordings=[]; contestAudioDialog.findMessage=qsTr("Searching…"); if (!decolog.contestAudio.findRecordings(contestAudioDialog.folder,contestAudioDialog.qsoUtc)) contestAudioDialog.findMessage=qsTr("Choose a folder and a valid UTC QSO time.") } }
+                Text { Layout.fillWidth:true; color:Theme.textSecondary; text:contestAudioDialog.findMessage; wrapMode:Text.Wrap }
+            }
+            ScrollView {
+                Layout.fillWidth:true; Layout.preferredHeight:90; visible:contestAudioDialog.foundRecordings.length>0; clip:true
+                ColumnLayout {
+                    width:parent.availableWidth
+                    Repeater {
+                        id:audioMatches
+                        model:contestAudioDialog.foundRecordings
+                        RowLayout { required property var modelData; Layout.fillWidth:true
+                            function selectRecording() { audioSelect.clicked() }
+                            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                                text:qsTr("Start %1 · duration %2 s · QSO offset %3 s").arg(modelData.startUtc).arg((modelData.durationMs/1000).toFixed(1)).arg((modelData.offsetMs/1000).toFixed(1)) }
+                            GlassButton { id:audioSelect; text:qsTr("Select"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing; onClicked:contestAudioDialog.playbackFile=modelData.url }
+                        }
+                    }
+                }
+            }
             RowLayout {
                 Layout.fillWidth:true
                 GlassButton { text:qsTr("Choose recording…"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing; onClicked:contestAudioPlaybackFile.open() }

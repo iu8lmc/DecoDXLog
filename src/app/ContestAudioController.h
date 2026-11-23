@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QTimer>
+#include <QThreadPool>
 #include <QUrl>
 class QAudioSource;
 class QAudioSink;
@@ -24,6 +25,7 @@ class ContestAudioController : public QObject {
     Q_PROPERTY(QStringList outputs READ outputs NOTIFY devicesChanged)
     Q_PROPERTY(int outputIndex READ outputIndex NOTIFY devicesChanged)
     Q_PROPERTY(bool playing READ playing NOTIFY changed)
+    Q_PROPERTY(bool searchBusy READ searchBusy NOTIFY changed)
   public:
     explicit ContestAudioController(QObject *parent=nullptr);
     ~ContestAudioController() override;
@@ -31,6 +33,7 @@ class ContestAudioController : public QObject {
     QStringList outputs() const;
     int outputIndex() const;
     bool playing() const;
+    bool searchBusy() const { return m_searchBusy; }
     int inputIndex() const;
     bool recording() const { return m_recording; }
     qint64 bytesWritten() const { return m_file.bytesWritten(); }
@@ -41,6 +44,7 @@ class ContestAudioController : public QObject {
     Q_INVOKABLE bool playForQso(const QUrl &wav, const QString &qsoUtc);
     Q_INVOKABLE void stopPlayback();
     Q_INVOKABLE bool recoverFile(const QUrl &partial);
+    Q_INVOKABLE bool findRecordings(const QUrl &folder, const QString &qsoUtc);
     Q_INVOKABLE bool start(const QUrl &directory, int limitMiB);
     Q_INVOKABLE void stop();
     // Locally supplied PCM stream; an invalid format means 16 kHz mono Int16.
@@ -50,6 +54,7 @@ class ContestAudioController : public QObject {
     void changed();
     void devicesChanged();
     void finished(bool success, const QString &path, const QString &message);
+    void recordingsFound(const QVariantMap &result);
   private:
     void drain();
     void finish(bool success, const QString &reason);
@@ -60,6 +65,8 @@ class ContestAudioController : public QObject {
     QFile *m_playbackFile{nullptr};
     QMediaDevices *m_devices{nullptr};
     QTimer m_checkpoint;
+    QThreadPool m_searchPool;
+    bool m_searchBusy{false};
     QByteArray m_inputId, m_outputId, m_inputPending;
     QAudioFormat m_inputFormat;
     bool m_defaultOutput{true};
