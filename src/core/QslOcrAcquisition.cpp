@@ -27,6 +27,22 @@ bool writeOriginMatches(QSqlDatabase &db, const QString &path, const QString &id
 QslOcrAcquisition::QslOcrAcquisition(LogDatabase *db, TesseractOcr *ocr, QObject *parent)
     : QObject(parent), m_db(db), m_ocr(ocr) {}
 QslOcrAcquisition::~QslOcrAcquisition() { if (m_cancel) m_cancel->store(true); m_pool.waitForDone(); }
+void QslOcrAcquisition::finishWrite(const QString &path, const QString &identity, const QByteArray &fileToken, quint64 generation, const QVariantMap &result)
+{
+    m_busy=false; m_cancel.reset(); m_result=result;
+    const bool same=m_db && m_db->isOpen() && m_db->path()==path && m_db->identity()==identity &&
+                    m_db->openGeneration()==generation && m_db->openFileIdentity()==fileToken && m_db->fileIdentityMatchesOpen();
+    const bool committed=result.value(QStringLiteral("ok")).toBool();
+    if (!same) {
+        m_result.insert(QStringLiteral("originChanged"),true);
+        m_result.insert(QStringLiteral("committed"),committed);
+        m_result.insert(QStringLiteral("ok"),false);
+        m_error=committed ? tr("The operation was saved in the original log; the open log has changed. Review the original log before repeating it.")
+                          : tr("The operation failed in the original log; the open log has changed. %1").arg(result.value(QStringLiteral("error")).toString());
+        m_result.insert(QStringLiteral("error"),m_error);
+    } else m_error=result.value(QStringLiteral("error")).toString();
+    emit changed(); emit finished(same && committed);
+}
 bool QslOcrAcquisition::start(const QVariantList &selected, const QUrl &original)
 {
     if (m_busy) return false;
@@ -41,17 +57,15 @@ bool QslOcrAcquisition::start(const QVariantList &selected, const QUrl &original
     const QString filename = QFileInfo(original.toLocalFile()).fileName(), ocrText = m_ocr->text();
     const QString identity=m_db->identity(); const QByteArray fileToken=m_db->openFileIdentity();
     if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) { m_error=tr("The open log changed"); emit changed(); return false; }
+    const quint64 generation=m_db->openGeneration();
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrAcquisition> self(this);
-    m_pool.start([self, dbPath, identity, fileToken, snapshot, hash, filename, ocrText, selected, cancelled] {
+    m_pool.start([self, dbPath, identity, fileToken, generation, snapshot, hash, filename, ocrText, selected, cancelled] {
         const QVariantMap result = execute(dbPath, snapshot, hash, filename, ocrText, selected, cancelled.get(), identity, fileToken);
-        QMetaObject::invokeMethod(self.data(), [self, result] {
-            if (!self) return;
-            self->m_busy = false; self->m_cancel.reset(); self->m_result = result;
-            self->m_error = result.value(QStringLiteral("error")).toString();
-            emit self->changed(); emit self->finished(result.value(QStringLiteral("ok")).toBool());
+        QMetaObject::invokeMethod(self.data(), [self, dbPath, identity, fileToken, generation, result] {
+            if (self) self->finishWrite(dbPath, identity, fileToken, generation, result);
         }, Qt::QueuedConnection);
     });
     return true;
@@ -213,14 +227,14 @@ bool QslOcrAcquisition::saveReview(qint64 acquisitionId,const QString &uuid,qint
     }
     const QString path=m_db->path(), identity=m_db->identity(); const QByteArray fileToken=m_db->openFileIdentity();
     if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) { m_error=tr("The open log changed"); emit changed(); return false; }
+    const quint64 generation=m_db->openGeneration();
     m_cancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_cancel;
     m_busy=true; emit changed(); QPointer<QslOcrAcquisition> self(this);
-    m_pool.start([self,path,identity,fileToken,acquisitionId,uuid,expectedReviewId,text,cancelled] {
+    m_pool.start([self,path,identity,fileToken,generation,acquisitionId,uuid,expectedReviewId,text,cancelled] {
         const QVariantMap result=saveReviewExecute(path,acquisitionId,uuid,expectedReviewId,text,cancelled.get(),identity,fileToken);
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(),[self,result] {
-            if (!self) return; self->m_busy=false; self->m_cancel.reset(); self->m_result=result;
-            self->m_error=result.value(QStringLiteral("error")).toString(); emit self->changed(); emit self->finished(result.value(QStringLiteral("ok")).toBool());
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,fileToken,generation,result] {
+            if (self) self->finishWrite(path,identity,fileToken,generation,result);
         },Qt::QueuedConnection);
     });
     return true;
@@ -272,17 +286,15 @@ bool QslOcrAcquisition::undo(qint64 acquisitionId, const QString &uuid)
     }
     const QString path = m_db->path(), identity=m_db->identity(); const QByteArray fileToken=m_db->openFileIdentity();
     if (identity.isEmpty() || fileToken.isEmpty() || !m_db->fileIdentityMatchesOpen()) { m_error=tr("The open log changed"); emit changed(); return false; }
+    const quint64 generation=m_db->openGeneration();
     m_cancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrAcquisition> self(this);
-    m_pool.start([self, path, identity, fileToken, acquisitionId, uuid, cancelled] {
+    m_pool.start([self, path, identity, fileToken, generation, acquisitionId, uuid, cancelled] {
         const QVariantMap result = undoExecute(path, acquisitionId, uuid, cancelled.get(), identity, fileToken);
-        QMetaObject::invokeMethod(self.data(), [self, result] {
-            if (!self) return;
-            self->m_busy = false; self->m_cancel.reset(); self->m_result = result;
-            self->m_error = result.value(QStringLiteral("error")).toString();
-            emit self->changed(); emit self->finished(result.value(QStringLiteral("ok")).toBool());
+        QMetaObject::invokeMethod(self.data(), [self, path, identity, fileToken, generation, result] {
+            if (self) self->finishWrite(path, identity, fileToken, generation, result);
         }, Qt::QueuedConnection);
     });
     return true;

@@ -10,6 +10,8 @@
 #include <QSqlQuery>
 #include <QCryptographicHash>
 #include <QTest>
+#include <QElapsedTimer>
+#include <QThread>
 using namespace decolog::core;
 class TestTesseractOcr : public QObject {
     Q_OBJECT
@@ -156,6 +158,28 @@ class TestTesseractOcr : public QObject {
         QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished); QVERIFY(search.start("K1ABC"));
         QVERIFY(QFile::rename(path,dir.filePath("original.sqlite"))); QVERIFY(QFile::rename(other,path));
         QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.at(0).first().toBool()); QVERIFY(search.matches().isEmpty());
+    }
+    void completedReviewIsAttributedToOriginalLogSession()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("origin.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        const auto inserted=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false); QVERIFY(inserted.id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT uuid,revision FROM qso")); QVERIFY(q.next()); const QVariantList selected{QVariantMap{{"id",inserted.id},{"uuid",q.value(0)},{"revision",q.value(1)}}}; q.finish();
+        const QString image=makeImage(dir,"card.png",false); QFile file(image); QVERIFY(file.open(QIODevice::ReadOnly)); const auto bytes=file.readAll(); file.close();
+        const auto hash=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex()); std::atomic_bool cancelled{false};
+        const auto saved=QslOcrAcquisition::execute(path,image,hash,"card.png","ocr",selected,&cancelled,db.identity(),db.openFileIdentity()); QVERIFY(saved.value("ok").toBool());
+        QVERIFY(q.exec("SELECT uuid FROM qsl_ocr_acquisition")); QVERIFY(q.next()); const QString acquisitionUuid=q.value(0).toString(); q.finish();
+        QslOcrAcquisition acquisition(&db,nullptr); QSignalSpy done(&acquisition,&QslOcrAcquisition::finished);
+        QVERIFY(acquisition.saveReview(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0,"reviewed"));
+        QElapsedTimer timer; timer.start(); bool committed=false;
+        while (timer.elapsed()<5000 && !committed) { QSqlQuery check(db.connection()); QVERIFY(check.exec("SELECT count(*) FROM qsl_ocr_review")); QVERIFY(check.next()); committed=check.value(0).toInt()==1; if (!committed) QThread::msleep(10); }
+        QVERIFY(committed); db.close(); QVERIFY(db.open(path));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.first().first().toBool());
+        QVERIFY(acquisition.result().value("committed").toBool()); QVERIFY(acquisition.result().value("originChanged").toBool());
+        QVERIFY(acquisition.error().contains("original log",Qt::CaseInsensitive));
+        QSqlQuery verify(db.connection()); QVERIFY(verify.exec("SELECT reviewed_text FROM qsl_ocr_review")); QVERIFY(verify.next()); QCOMPARE(verify.value(0).toString(),QString("reviewed"));
+        verify.finish(); QVERIFY(acquisition.saveReview(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0,"stale")); db.close(); QVERIFY(db.open(path));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QVERIFY(!done.last().first().toBool()); QVERIFY(acquisition.result().value("originChanged").toBool());
+        QVERIFY(!acquisition.result().value("committed").toBool()); QVERIFY(acquisition.error().contains("failed",Qt::CaseInsensitive));
     }
     void searchesDateAndTimeBeforeApplyingResultLimit()
     {

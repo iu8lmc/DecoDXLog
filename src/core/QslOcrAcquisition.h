@@ -43,6 +43,7 @@ class QslOcrAcquisition : public QObject {
     void changed();
     void finished(bool success);
   private:
+    void finishWrite(const QString &path, const QString &identity, const QByteArray &fileToken, quint64 generation, const QVariantMap &result);
     LogDatabase *m_db;
     TesseractOcr *m_ocr;
     QThreadPool m_pool;

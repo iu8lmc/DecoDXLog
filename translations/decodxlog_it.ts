@@ -15916,6 +15916,14 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
         <source>Cannot undo the OCR acquisition</source>
         <translation>Impossibile annullare l’acquisizione OCR</translation>
     </message>
+    <message>
+        <source>The operation was saved in the original log; the open log has changed. Review the original log before repeating it.</source>
+        <translation>L’operazione è stata salvata nel log originale; il log aperto è cambiato. Controlla il log originale prima di ripeterla.</translation>
+    </message>
+    <message>
+        <source>The operation failed in the original log; the open log has changed. %1</source>
+        <translation>L’operazione è fallita nel log originale; il log aperto è cambiato. %1</translation>
+    </message>
 </context>
 <context>
     <name>QslOcrHistoryDialog</name>
