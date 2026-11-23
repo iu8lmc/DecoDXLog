@@ -82,9 +82,22 @@ private slots:
         contestreport::Entry row; row.call="W1ABC"; row.date="2025-01-01"; row.time="0000"; row.frequencyKhz="14020"; row.mode="CW";
         auto exact=contestreport::findCandidates(db,row,0); QVERIFY(exact.error.isEmpty()); QCOMPARE(exact.candidates.size(),1); QCOMPARE(exact.candidates.first().id,same);
         auto widened=contestreport::findCandidates(db,row,1); QVERIFY(widened.error.isEmpty()); QCOMPARE(widened.candidates.size(),3);
-        QCOMPARE(widened.candidates[0].id,before); QCOMPARE(widened.candidates[1].id,same); QCOMPARE(widened.candidates[2].id,after);
+        QCOMPARE(widened.candidates[0].id,same); QCOMPARE(widened.candidates[1].id,after); QCOMPARE(widened.candidates[2].id,before);
         QVERIFY(!contestreport::findCandidates(db,row,-1).error.isEmpty()); QVERIFY(!contestreport::findCandidates(db,row,6).error.isEmpty());
         QCOMPARE(db.qsoCount(),qint64(3));
+    }
+    void closestMinuteWinsWhenCandidateListIsTruncated()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const QString &time) {
+            return db.insertQso(AdifRecord{{"CALL","W1ABC"},{"QSO_DATE","20241123"},{"TIME_ON",time},
+                {"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id;
+        };
+        for (int i=0;i<6;++i) QVERIFY(add(QString("1157%1").arg(i,2,10,QLatin1Char('0')))>0);
+        const auto exact=add("120030"); QVERIFY(exact>0);
+        contestreport::Entry row; row.call="W1ABC"; row.date="2024-11-23"; row.time="1200"; row.frequencyKhz="14020"; row.mode="CW";
+        const auto found=contestreport::findCandidates(db,row,5); QVERIFY(found.error.isEmpty());
+        QCOMPARE(found.candidates.size(),5); QVERIFY(found.truncated); QCOMPARE(found.candidates.first().id,exact);
     }
     void candidateStationDistinguishesCurrentProfileFromQso()
     {

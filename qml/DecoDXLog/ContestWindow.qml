@@ -56,7 +56,10 @@ RoundedWindow {
                 Qt.callLater(() => retryCandidateSearch.clicked())
                 return
             }
-            if (root.reportProbeWindow) console.warn("PROBE lcr window " + result.toleranceMinutes + " count " + (result.candidates || []).length)
+            if (root.reportProbeWindow) {
+                console.warn("PROBE lcr window " + result.toleranceMinutes + " count " + (result.candidates || []).length)
+                if ((result.candidates || []).length) console.warn("PROBE lcr closest " + result.candidates[0].utc + " truncated " + result.truncated)
+            }
             if ((root.reportProbeOpen || root.reportProbeWindow) && (result.candidates || []).length) {
                 const id=result.candidates[0].id
                 reportCandidates.openCandidate(result.candidates[0])
@@ -1003,7 +1006,7 @@ RoundedWindow {
         ColumnLayout {
             anchors.fill:parent; spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
-                text:qsTr("Suggestions share the reported or suggested corrected call, band and mode family within the selected UTC minute window. Check time, station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
+                text:qsTr("Suggestions share the reported or suggested corrected call, band and mode family within the selected UTC minute window. Ordered by time proximity, then call basis. Check time, station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
             RowLayout {
                 Text { text:qsTr("Additional minutes before and after"); color:Theme.textSecondary }
                 SpinBox { id:candidateTolerance; from:0; to:5; value:0; enabled:!decolog.activation.contestReportBusy; Accessible.name:qsTr("Additional minutes before and after") }

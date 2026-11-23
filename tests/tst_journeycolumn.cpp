@@ -105,6 +105,22 @@ private slots:
                  output.contains("PROBE lcr opened true") && !output.contains("TypeError"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(1));
     }
+    void contestReportShowsExactMinuteBeforeTruncatedEarlierCandidates()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log));
+          for (int i=0;i<6;++i) QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","DL1ABC"},{"QSO_DATE","20241123"},
+            {"TIME_ON",QString("1200%1").arg(i,2,10,QLatin1Char('0'))},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","DL1ABC"},{"QSO_DATE","20241123"},{"TIME_ON","120130"},
+            {"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0); }
+        const QString path=dir.filePath("report.rpt"); QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1ABC 14\n"); file.close();
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("cqwwwindowprobe:")+path,output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE lcr exact 1") && output.contains("PROBE lcr window 1 count 5") &&
+                 output.contains("PROBE lcr closest 2024-11-23T12:01:30Z truncated true") && output.contains("PROBE lcr opened true") &&
+                 !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(7));
+    }
     void contestReportHistoryExportsOriginalBytes()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

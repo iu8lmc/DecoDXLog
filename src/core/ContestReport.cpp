@@ -50,10 +50,17 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry, int to
         "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(json_extract(q.adif_extra,'$.CONTEST_ID'),'') ELSE '' END, q.call "
         "FROM qso q LEFT JOIN station_profile p ON p.id=q.station_profile_id "
         "WHERE q.deleted=0 AND q.call IN (?,?) AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
-        + modeClause + QStringLiteral(" ORDER BY CASE WHEN q.call=? THEN 0 ELSE 1 END,q.qso_datetime_on,q.id LIMIT 6"));
+        + modeClause + QStringLiteral(" ORDER BY CASE WHEN q.qso_datetime_on>=? AND q.qso_datetime_on<? THEN 0 ELSE 1 END, "
+          "COALESCE(CASE WHEN q.qso_datetime_on<? THEN julianday(?)-julianday(q.qso_datetime_on) "
+          "WHEN q.qso_datetime_on>=? THEN julianday(q.qso_datetime_on)-julianday(?) ELSE 0 END, 999999), "
+          "CASE WHEN q.call=? THEN 0 ELSE 1 END,q.qso_datetime_on,q.id LIMIT 6"));
+    const QString minuteStart=start.toString(Qt::ISODate), minuteEnd=start.addSecs(60).toString(Qt::ISODate);
     q.addBindValue(reportedCall); q.addBindValue(correctedCall); q.addBindValue(band);
     q.addBindValue(start.addSecs(-60*toleranceMinutes).toString(Qt::ISODate));
-    q.addBindValue(start.addSecs(60*(toleranceMinutes+1)).toString(Qt::ISODate)); q.addBindValue(reportedCall);
+    q.addBindValue(start.addSecs(60*(toleranceMinutes+1)).toString(Qt::ISODate));
+    q.addBindValue(minuteStart); q.addBindValue(minuteEnd);
+    q.addBindValue(minuteStart); q.addBindValue(minuteStart); q.addBindValue(minuteEnd); q.addBindValue(minuteEnd);
+    q.addBindValue(reportedCall);
     if (!q.exec()) { result.error=q.lastError().text(); return result; }
     while (q.next()) {
         if (result.candidates.size()==5) { result.truncated=true; break; }
