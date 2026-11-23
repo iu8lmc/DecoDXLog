@@ -2289,9 +2289,10 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
 }
 
 ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& source, qint64 stationProfileId,
-                                     const ImportProgress& progress, int batchSize)
+                                     const ImportProgress& progress, int batchSize, const std::function<bool()>& cancelled)
 {
     ImportResult result;
+    if (cancelled && cancelled()) { result.cancelled=true; return result; }
     const AdifDocument doc = adif::parse(data);
     const QString programId = doc.header.value(QStringLiteral("PROGRAMID"));
     const int total = static_cast<int>(doc.records.size());
@@ -2323,6 +2324,10 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
         const int duplicatesBeforeBatch = result.duplicates;
         const qsizetype idsBeforeBatch = result.insertedIds.size();
         for (; done < end; ++done) {
+            if (cancelled && cancelled()) {
+                db.rollback(); result.inserted=insertedBeforeBatch; result.duplicates=duplicatesBeforeBatch;
+                result.insertedIds.resize(idsBeforeBatch); result.cancelled=true; return result;
+            }
             AdifRecord record = doc.records.at(done);
             ++result.read;
             if (!record.contains(QStringLiteral("QSO_DATE")) || !record.contains(QStringLiteral("TIME_ON")))

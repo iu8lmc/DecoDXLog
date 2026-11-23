@@ -21,6 +21,24 @@ class TestMigration : public QObject
     Q_OBJECT
 
 private slots:
+    void cancellingPreviewLeavesSourceUntouched()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (int i=0;i<300;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL",QString("K%1AAA").arg(i)},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        const QByteArray incoming="<CALL:5>K1NEW<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>";
+        ImportResult result; QString error; int checks=0;
+        QVERIFY(!migration::estimateImport(db,incoming,&result,&error,[&] { return ++checks>130; }));
+        QVERIFY(error.contains("cancel",Qt::CaseInsensitive)); QVERIFY(checks>130); QCOMPARE(db.qsoCount(),qint64(300));
+        QVERIFY2(migration::estimateImport(db,incoming,&result,&error),qPrintable(error)); QCOMPARE(result.inserted,1); QCOMPARE(db.qsoCount(),qint64(300));
+        LogDatabase empty; QVERIFY(empty.open(":memory:")); AdifDocument document;
+        for (int i=0;i<300;++i) document.records.append(AdifRecord{{"CALL",QString("W%1XYZ").arg(i)},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}});
+        checks=0; const QByteArray large=adif::writeDocument(document);
+        QVERIFY(!migration::estimateImport(empty,large,&result,&error,[&] { return ++checks>40; }));
+        QVERIFY(result.cancelled); QCOMPARE(empty.qsoCount(),qint64(0));
+        QVERIFY2(migration::estimateImport(empty,large,&result,&error),qPrintable(error)); QCOMPARE(result.inserted,300); QCOMPARE(empty.qsoCount(),qint64(0));
+        checks=0; const auto interrupted=empty.importAdif(large,"fixture",0,{},50,[&] { return ++checks>80; });
+        QVERIFY(interrupted.cancelled); QCOMPARE(interrupted.inserted,50); QCOMPARE(empty.qsoCount(),qint64(50));
+    }
     void estimatePreservesExistingDuplicatesForTimeWindow()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); db.setDedupWindows(60,60);

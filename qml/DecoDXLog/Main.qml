@@ -1612,7 +1612,7 @@ RoundedWindow {
         }
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
         else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
-        else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe") importSnapshotProbe.start()
+        else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe" || what[0] === "importcancelbusyprobe") importSnapshotProbe.start()
         else if (what[0] === "confirmationreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "clubreportprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "customreportprobe") { openStats(); activityReportProbe.start() }
@@ -2037,14 +2037,16 @@ RoundedWindow {
     }
     Connections {
         target: decolog
+        function onImportChanged() { if (decolog.importPreviewBusy) importPreviewWorking.open(); else importPreviewWorking.close() }
         function onImportPreviewReady(file, result) {
             window.pendingImport = file
             window.importPreview = result
             importPreviewDialog.open()
-            if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready " + JSON.stringify(result)); importSnapshotAccept.start() }
+            if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0 || startupShow.indexOf("importcancelbusyprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready " + JSON.stringify(result)); importSnapshotAccept.start() }
         }
     }
-    Timer { id:importSnapshotProbe; interval:1000; onTriggered:decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false) }
+    Timer { id:importSnapshotProbe; interval:1000; onTriggered: { decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false); if (startupShow.indexOf("importcancelbusyprobe:") === 0) { const wasBusy=decolog.importPreviewBusy; importPreviewWorking.reject(); console.warn("PROBE importcancel busy="+wasBusy+" cleared="+!decolog.importPreviewBusy); importSnapshotRestart.start() } } }
+    Timer { id:importSnapshotRestart; interval:500; onTriggered:decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false) }
     Timer { id:importSnapshotAccept; interval:2000; onTriggered: { if (startupShow.indexOf("importcancelprobe:") === 0) importPreviewDialog.reject(); else importPreviewDialog.accept() } }
     Connections {
         target: decolog.qsl
@@ -2052,6 +2054,15 @@ RoundedWindow {
     }
     property url pendingImport
     property var importPreview: ({})
+    DialogFrame {
+        id:importPreviewWorking; title:qsTr("Preparing import preview"); dialogKey:"import-preview-working"; dotColor:Theme.primaryColor; width:480; height:200
+        onRejected: { if (decolog.importPreviewBusy) decolog.cancelImportPreview() }
+        body:ColumnLayout { anchors.margins:16; spacing:10
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary; text:qsTr("Checking the log and source file. Cancelling may wait for the current file or database operation to finish.") }
+            Item { Layout.fillHeight:true }
+            RowLayout { Item { Layout.fillWidth:true } GlassButton { text:qsTr("Cancel preview"); onClicked:importPreviewWorking.reject() } }
+        }
+    }
     property var importUndoSummary: ({})
     property var importUndoPreview: ({})
     Connections {

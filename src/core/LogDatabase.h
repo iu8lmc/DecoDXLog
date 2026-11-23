@@ -47,6 +47,7 @@ struct ContestSerialReservation {
 };
 
 struct ImportResult {
+    bool cancelled{false};
     int read{0};
     int inserted{0};
     int duplicates{0};
@@ -384,10 +385,11 @@ public:
     // Lo stesso, a blocchi di `batchSize` QSO, ognuno nella sua transazione, e
     // dopo ogni blocco `progress(fatti, totale)`. Fra un blocco e l'altro chi
     // scrive un QSO dalla radio passa: un'importazione da un milione di QSO
-    // non tiene il log chiuso per minuti.
+    // non tiene il log chiuso per minuti. Optional cancellation rolls back the
+    // current batch; previously committed batches remain and are reported.
     using ImportProgress = std::function<void(int done, int total)>;
     ImportResult importAdif(const QByteArray& data, const QString& source, qint64 stationProfileId,
-                            const ImportProgress& progress, int batchSize);
+                            const ImportProgress& progress, int batchSize, const std::function<bool()>& cancelled = {});
     // Called initially with total=-1, before each item and at completion. False cancels.
     ImportUndoResult undoLatestImport(const std::function<bool(int done, int total)>& progress = {},
                                       bool preview = false, qint64 expectedBatchId = 0,

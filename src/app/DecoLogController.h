@@ -297,6 +297,7 @@ class DecoLogController : public QObject {
 
     // L'importazione ADIF gira su un altro filo: da 0 a 1 mentre va, -1 ferma.
     Q_PROPERTY(double importProgress READ importProgress NOTIFY importChanged)
+    Q_PROPERTY(bool importPreviewBusy READ importPreviewBusy NOTIFY importChanged)
     Q_PROPERTY(bool importUndoRunning READ importUndoRunning NOTIFY importChanged)
     Q_PROPERTY(bool importUndoPreviewing READ importUndoPreviewing NOTIFY importChanged)
     // Anche una modifica in blocco: da 0 a 1 mentre va, -1 ferma.
@@ -717,6 +718,7 @@ public:
     Q_INVOKABLE void cancelLotw() { m_lotw.cancel(); }
 
     double importProgress() const { return m_importProgress; }
+    bool importPreviewBusy() const { return m_importPreviewBusy; }
     bool importUndoRunning() const { return m_importUndoRunning; }
     bool importUndoPreviewing() const { return m_importUndoPreviewing; }
     double bulkProgress() const { return m_bulkProgress; }
@@ -1266,6 +1268,8 @@ private:
     qint64 m_importPreviewProfile{0};
     quint64 m_importPreviewLogVersion{0};
     qint64 m_importPreviewDataVersion{-1};
+    bool m_importPreviewBusy{false};
+    std::shared_ptr<std::atomic_bool> m_importPreviewCancel;
     QThreadPool m_statsViewPool;
     QThreadPool m_activityReportPool;
     quint64 m_activityReportGeneration{0};

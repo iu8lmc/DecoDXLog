@@ -723,6 +723,7 @@ void DecoLogController::shutdown()
     ++m_qslPlanGeneration;
     ++m_dxCampaignGeneration;
     ++m_activityReportGeneration;
+    if (m_importPreviewCancel) m_importPreviewCancel->store(true);
     for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool, &m_qslPlanPool, &m_dxCampaignPool, &m_dxWatchPool, &m_activityReportPool,
                               &m_countsPool, &m_backupPool, &m_linkPool,
                               &m_statsViewPool, &m_callInfoPool})
@@ -5621,7 +5622,7 @@ void DecoLogController::importAdif(const QUrl& url)
     });
 }
 
-static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QByteArray* snapshot)
+static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QByteArray* snapshot, const std::shared_ptr<std::atomic_bool>& cancel)
 {
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
     QFile file(path);
@@ -5672,7 +5673,7 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
     // Dry-run against a private in-memory copy of the current log.  This gives
     // the operator a before/after comparison without writing the real log.
     ImportResult estimate;
-    if (!migration::estimateImport(sourceDb,adif,&estimate,&error)) {
+    if (!migration::estimateImport(sourceDb,adif,&estimate,&error,[cancel] { return cancel->load(); })) {
         out.insert(QStringLiteral("ok"),false); out.insert(QStringLiteral("error"),QObject::tr("Cannot estimate this import: %1").arg(error)); return out;
     }
     out.insert(QStringLiteral("estimatedInserted"), estimate.inserted);
@@ -5684,11 +5685,16 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
 
 void DecoLogController::cancelImportPreview()
 {
+    if (m_importPreviewCancel) m_importPreviewCancel->store(true);
+    m_importPreviewCancel.reset();
     ++m_importPreviewGeneration; m_importPreviewFile=QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear(); m_importPreviewDataVersion=-1;
+    if (m_importPreviewBusy) { m_importPreviewBusy=false; emit importChanged(); }
 }
 
 void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const QString& stationCall)
 {
+    if (m_importPreviewCancel) m_importPreviewCancel->store(true);
+    const auto cancel=std::make_shared<std::atomic_bool>(false); m_importPreviewCancel=cancel;
     const QString dbPath = m_db.path(), dbIdentity=m_db.identity(); const quint64 dbGeneration=m_db.openGeneration(); const qint64 dataVersion=m_db.dataVersion();
     const int digital = m_db.dedupWindowSeconds(false);
     const int manual = m_db.dedupWindowSeconds(true);
@@ -5696,10 +5702,12 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
     const quint64 logVersion = m_logVersion;
     const qint64 profile = m_profiles ? m_profiles->activeProfileId() : 0;
     m_importPreviewFile = QUrl(); m_importPreviewAdif.clear(); m_importPreviewIdentity.clear(); m_importPreviewDataVersion=-1;
+    m_importPreviewBusy=true; emit importChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, url, dbPath, dbIdentity, dbGeneration, dataVersion, digital, manual, generation, logVersion, profile, fromClubLog, stationCall] {
+    m_importPool.start([self, url, dbPath, dbIdentity, dbGeneration, dataVersion, digital, manual, generation, logVersion, profile, fromClubLog, stationCall, cancel] {
         QVariantMap result;
         QByteArray snapshot;
+        if (cancel->load()) return;
         LogDatabase db;
         if (dbPath.isEmpty() || dbIdentity.isEmpty() || dataVersion<0 || dbPath == QLatin1String(":memory:") || !db.open(dbPath) || db.identity()!=dbIdentity) {
             result = {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Cannot open logbook for preview")}};
@@ -5708,6 +5716,7 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
             bool valid = true;
             QString error;
             if (fromClubLog) {
+                if (cancel->load()) return;
                 QFile input(url.toLocalFile());
                 if (!input.open(QIODevice::ReadOnly)) valid = false;
                 const auto prepared = valid ? prepareClubLogDownload(input.readAll(), stationCall) : ClubLogDownloadResult{};
@@ -5724,17 +5733,19 @@ void DecoLogController::previewImport(const QUrl& url, bool fromClubLog, const Q
                         error = QObject::tr("Club Log returned an empty or unrecognised ADIF download; nothing was imported");
                 }
                 if (valid) {
+                    if (cancel->load()) return;
                     QSaveFile output(url.toLocalFile());
                     valid = output.open(QIODevice::WriteOnly) && output.write(converted) == converted.size() && output.commit();
                     if (!valid) error = QObject::tr("Cannot prepare the temporary Club Log download for preview");
                 }
             }
-            result = valid ? makeImportPreview(url, db, &snapshot)
+            result = valid ? makeImportPreview(url, db, &snapshot, cancel)
                            : QVariantMap{{QStringLiteral("ok"), false}, {QStringLiteral("error"), error}};
         }
-        if (!self) return;
+        if (!self || cancel->load()) return;
         QMetaObject::invokeMethod(self.data(), [self, url, dbPath, dbIdentity, dbGeneration, dataVersion, generation, logVersion, profile, result, snapshot] {
             if (!self || generation != self->m_importPreviewGeneration) return;
+            self->m_importPreviewCancel.reset(); self->m_importPreviewBusy=false; emit self->importChanged();
             if (self->m_db.path() != dbPath || self->m_db.identity()!=dbIdentity || self->m_db.openGeneration()!=dbGeneration || self->m_db.dataVersion()!=dataVersion || self->m_logVersion != logVersion
                 || (self->m_profiles ? self->m_profiles->activeProfileId() : 0) != profile) {
                 emit self->importPreviewReady(url, {{QStringLiteral("ok"), false}, {QStringLiteral("error"), QObject::tr("Logbook changed; preview again")}});

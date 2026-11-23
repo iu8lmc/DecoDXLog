@@ -17,6 +17,7 @@
 #include <QByteArray>
 #include <QList>
 #include <QString>
+#include <functional>
 namespace decolog::core { class LogDatabase; struct ImportResult; }
 
 namespace decolog::core::migration {
@@ -26,7 +27,8 @@ namespace decolog::core::migration {
 QByteArray asAdif(const QString& path, QString* error = nullptr, QString* kind = nullptr);
 // Advisory dry run using the exact stored duplicate keys from a consistent
 // source snapshot. The source log is never modified.
-bool estimateImport(const LogDatabase& source, const QByteArray& adif, ImportResult* result, QString* error = nullptr);
+bool estimateImport(const LogDatabase& source, const QByteArray& adif, ImportResult* result, QString* error = nullptr,
+                    const std::function<bool()>& cancelled = {});
 
 QList<AdifRecord> readCsv(const QByteArray& data, QString* error = nullptr);
 QList<AdifRecord> readN1mmDatabase(const QString& path, QString* error = nullptr);

@@ -68,6 +68,14 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void importPreviewCanCancelAndRestart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto path=dir.filePath("source.adi"); QFile input(path);
+        QVERIFY(input.open(QIODevice::WriteOnly)); input.write("<CALL:5>K1OLD<QSO_DATE:8>20261101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>\n"); input.close();
+        QByteArray output; QVERIFY2(launch(dir,"importcancelbusyprobe:"+path,output,7000),output.constData());
+        QVERIFY2(output.contains("PROBE importcancel busy=true cleared=true") && output.count("PROBE importsnapshot ready")==1 && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(1));
+    }
     void importPreviewRejectsExternalLogChange()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
