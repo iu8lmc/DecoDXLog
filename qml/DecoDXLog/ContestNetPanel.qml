@@ -167,7 +167,7 @@ GlassPanel {
         transientParent: root.Window.window
         title: qsTr("Experimental serial authority")
         info: qsTr("Test only · configured for this session")
-        width: 620; height: 410
+        width: 620; height: 510
         property string result: ""
         body: ColumnLayout {
             spacing: 10
@@ -187,12 +187,21 @@ GlassPanel {
                 label: qsTr("Authority station ID")
                 StyledTextField { id: serialAuthority; Layout.fillWidth: true; placeholderText: qsTr("Explicit authority ID") }
             }
+            LabeledField {
+                label: qsTr("Minimum serial")
+                StyledTextField { id: serialMinimum; Layout.fillWidth: true; text: "1"; validator: IntValidator { bottom: 1 } }
+            }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary; text: root.net.durableSerialStatus }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; text: serialAuthorityDialog.result }
             Item { Layout.fillHeight: true }
             RowLayout {
                 GlassButton { text: qsTr("Apply"); onClicked: {
                     const error = root.net.configureDurableSerialAuthority(serialScope.text, serialAuthority.text)
                     serialAuthorityDialog.result = error || qsTr("Applied for this session.")
+                } }
+                GlassButton { text: qsTr("Request / retry"); onClicked: {
+                    const error = root.net.requestDurableSerial(parseInt(serialMinimum.text) || 0)
+                    serialAuthorityDialog.result = error || qsTr("Checking the saved request…")
                 } }
                 GlassButton { text: qsTr("Close"); onClicked: serialAuthorityDialog.close() }
             }

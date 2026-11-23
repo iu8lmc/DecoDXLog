@@ -77,6 +77,57 @@ QString NetController::configureDurableSerialAuthority(const QString& scope, con
     m_durableBusy = false;
     m_durableScope = s;
     m_durableAuthority = a;
+    m_durableStatus = s.isEmpty() ? tr("Experimental serials disabled.") : tr("Configured; no request checked yet.");
+    emit durableSerialStatusChanged();
+    return {};
+}
+
+QString NetController::requestDurableSerial(int minimum)
+{
+    if (minimum < 1) return tr("Enter a positive minimum serial.");
+    if (!m_net.running() || m_durableScope.isEmpty() || m_durableAuthority.isEmpty())
+        return tr("Enable the network and configure the contest scope and authority first.");
+    if (m_durableBusy) return tr("Serial operation in progress; retry shortly.");
+    if (!m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen())
+        return tr("Open the original file-backed log before requesting a serial.");
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity();
+    const QByteArray fileIdentity=m_ctx.db->openFileIdentity();
+    if (fileIdentity.isEmpty()) return tr("A file-backed log is required.");
+    const quint64 dbGeneration=m_ctx.db->openGeneration(), configGeneration=m_durableGeneration;
+    const QString scope=m_durableScope, authority=m_durableAuthority, requester=m_id;
+    const QString requestId=QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_durableBusy=true;
+    QPointer<NetController> self(this);
+    m_durablePool.start([self,path,identity,fileIdentity,dbGeneration,configGeneration,scope,authority,requester,requestId,minimum] {
+        ContestSerialRequest request;
+        LogDatabase db;
+        if (db.openExistingReadWrite(path) && db.openFileIdentity()==fileIdentity && db.fileIdentityMatchesOpen() && db.identity()==identity) {
+            request=db.activeContestSerialRequest(scope,requester);
+            if (!request.ok && request.error==QLatin1String("No active serial request"))
+                request=db.beginContestSerialRequest(scope,requester,requestId,authority,minimum);
+            else if (request.ok && (request.authority!=authority || request.minimum!=minimum)) {
+                request.ok=false; request.error=QStringLiteral("An active request has different authority or minimum");
+            }
+        } else request.error=QStringLiteral("Cannot open the original log");
+        if (!self) return;
+        QMetaObject::invokeMethod(self,[self,request,identity,fileIdentity,dbGeneration,configGeneration] {
+            if (!self || self->m_durableGeneration!=configGeneration) return;
+            self->m_durableBusy=false;
+            if (!self->m_ctx.db || self->m_ctx.db->openGeneration()!=dbGeneration || self->m_ctx.db->identity()!=identity ||
+                self->m_ctx.db->openFileIdentity()!=fileIdentity || !self->m_ctx.db->fileIdentityMatchesOpen()) return;
+            if (!request.ok) self->m_durableStatus=tr("Request failed: %1").arg(request.error);
+            else if (request.state==QLatin1String("granted")) self->m_durableStatus=tr("Experimental grant: %1; not connected to QSO entry.").arg(request.serial);
+            else if (self->m_net.running()) {
+                const QJsonObject body=contestserial::requestFrame(request);
+                if (!body.isEmpty()) {
+                    self->send(QStringLiteral("serial_request_v3"),body);
+                    self->m_durableStatus=tr("Pending; no serial granted. Retry if the authority does not respond.");
+                    emit self->durableSerialRequestSent(body);
+                }
+            }
+            emit self->durableSerialStatusChanged();
+        },Qt::QueuedConnection);
+    });
     return {};
 }
 
@@ -140,6 +191,8 @@ void NetController::acceptDurableSerialGrant(const QString& from, const QJsonObj
             if (!grant.ok || !self->m_ctx.db || self->m_ctx.db->openGeneration() != dbGeneration ||
                 self->m_ctx.db->identity() != identity || self->m_ctx.db->openFileIdentity() != fileIdentity ||
                 !self->m_ctx.db->fileIdentityMatchesOpen()) return;
+            self->m_durableStatus = tr("Experimental grant: %1; not connected to QSO entry.").arg(grant.serial);
+            emit self->durableSerialStatusChanged();
             emit self->durableSerialGrantAccepted(body);
         }, Qt::QueuedConnection);
     });

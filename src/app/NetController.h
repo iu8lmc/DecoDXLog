@@ -37,6 +37,7 @@ class NetController : public QObject {
     Q_PROPERTY(int sent READ sent NOTIFY stateChanged)
     Q_PROPERTY(QStringList queuedCalls READ queuedCalls NOTIFY queuedCallsChanged)
     Q_PROPERTY(QString nodeId READ id CONSTANT)
+    Q_PROPERTY(QString durableSerialStatus READ durableSerialStatus NOTIFY durableSerialStatusChanged)
 
 public:
     struct Context {
@@ -88,6 +89,8 @@ public:
     bool isSerialServer() const;
     QString id() const { return m_id; }
     Q_INVOKABLE QString configureDurableSerialAuthority(const QString& scope, const QString& authority);
+    Q_INVOKABLE QString requestDurableSerial(int minimum);
+    QString durableSerialStatus() const { return m_durableStatus; }
 
     // Chiave wire-level usata per deduplicare un datagramma. La sessione fa
     // parte della chiave: dopo un riavvio il contatore puo' ricominciare da 1.
@@ -110,6 +113,8 @@ signals:
     void gabReceived(const QString& from, const QString& text);
     void durableSerialGrantReady(const QJsonObject& grant);
     void durableSerialGrantAccepted(const QJsonObject& grant);
+    void durableSerialRequestSent(const QJsonObject& request);
+    void durableSerialStatusChanged();
 
 private:
     void restart();
@@ -159,6 +164,7 @@ private:
     QThreadPool m_durablePool;
     QString m_durableScope;
     QString m_durableAuthority;
+    QString m_durableStatus;
     quint64 m_durableGeneration{0};
     bool m_durableBusy{false};
     void requestSerial();
