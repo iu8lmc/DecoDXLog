@@ -21,6 +21,25 @@ class TestMigration : public QObject
     Q_OBJECT
 
 private slots:
+    void estimatePreservesExistingDuplicatesForTimeWindow()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); db.setDedupWindows(60,60);
+        auto add=[&](const char* time) { return db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON",time},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id; };
+        QVERIFY(add("120000")>0); QVERIFY(add("120100")>0);
+        const QByteArray incoming="<CALL:5>K1ABC<QSO_DATE:8>20261101<TIME_ON:6>120200<BAND:3>20m<MODE:2>CW<EOR>";
+        LogDatabase oldProbe; QVERIFY(oldProbe.open(":memory:")); oldProbe.setDedupWindows(60,60);
+        QCOMPARE(oldProbe.importAdif(db.exportAdif(),"preview").inserted,1);
+        QCOMPARE(oldProbe.importAdif(incoming,"preview").inserted,1); // old preview gave the wrong answer
+        QString error; ImportResult estimate; QVERIFY2(migration::estimateImport(db,incoming,&estimate,&error),qPrintable(error));
+        QCOMPARE(estimate.inserted,0); QCOMPARE(estimate.duplicates,1); QCOMPARE(db.qsoCount(),qint64(2));
+        const auto actual=db.importAdif(incoming,"fixture"); QCOMPARE(actual.inserted,estimate.inserted); QCOMPARE(actual.duplicates,estimate.duplicates);
+        const QByteArray batch="<CALL:5>K2ABC<QSO_DATE:8>20261102<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K2ABC<QSO_DATE:8>20261102<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>"
+            "<CALL:5>K3ABC<QSO_DATE:8>20261302<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>";
+        QVERIFY2(migration::estimateImport(db,batch,&estimate,&error),qPrintable(error)); QCOMPARE(db.qsoCount(),qint64(2));
+        const auto batchActual=db.importAdif(batch,"fixture"); QCOMPARE(estimate.inserted,batchActual.inserted); QCOMPARE(estimate.duplicates,batchActual.duplicates); QCOMPARE(estimate.invalid,batchActual.invalid);
+        QCOMPARE(estimate.inserted,1); QCOMPARE(estimate.duplicates,1); QCOMPARE(estimate.invalid,1);
+    }
     void anonymizedVendorMatrixPreservesSemanticAndExtraFields()
     {
         const QString path = QFINDTESTDATA("fixtures/migration_matrix.json");

@@ -68,6 +68,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void importPreviewUsesAllExistingDuplicateKeys()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const QString &time:QStringList{"120000","120200"}) QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON",time},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0); }
+        const QString path=dir.filePath("duplicate.adi"); QFile input(path); QVERIFY(input.open(QIODevice::WriteOnly));
+        input.write("<CALL:5>K1ABC<QSO_DATE:8>20261101<TIME_ON:6>120400<BAND:3>20m<MODE:2>CW<EOR>\n"); input.close();
+        QByteArray output; QVERIFY2(launch(dir,"importsnapshotprobe:"+path,output,7000),output.constData());
+        QVERIFY2(output.contains("\"estimatedDuplicates\":1") && output.contains("\"estimatedInserted\":0") && !output.contains("TypeError"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void importUsesReviewedSnapshotWhenSourceChanges_data()
     {
         QTest::addColumn<bool>("removeSource"); QTest::addColumn<bool>("cancel"); QTest::newRow("modified") << false << false; QTest::newRow("removed") << true << false; QTest::newRow("cancelled") << false << true;

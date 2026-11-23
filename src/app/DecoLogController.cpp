@@ -5670,16 +5670,13 @@ static QVariantMap makeImportPreview(const QUrl& url, LogDatabase& sourceDb, QBy
 
     // Dry-run against a private in-memory copy of the current log.  This gives
     // the operator a before/after comparison without writing the real log.
-    LogDatabase probe;
-    if (probe.open(QStringLiteral(":memory:"))) {
-        probe.setDedupWindows(sourceDb.dedupWindowSeconds(false), sourceDb.dedupWindowSeconds(true));
-        const ImportResult existing = probe.importAdif(sourceDb.exportAdif(), QStringLiteral("preview"));
-        Q_UNUSED(existing);
-        const ImportResult estimate = probe.importAdif(adif, QStringLiteral("preview"), 0);
-        out.insert(QStringLiteral("estimatedInserted"), estimate.inserted);
-        out.insert(QStringLiteral("estimatedDuplicates"), estimate.duplicates);
-        out.insert(QStringLiteral("estimatedInvalid"), estimate.invalid);
+    ImportResult estimate;
+    if (!migration::estimateImport(sourceDb,adif,&estimate,&error)) {
+        out.insert(QStringLiteral("ok"),false); out.insert(QStringLiteral("error"),QObject::tr("Cannot estimate this import: %1").arg(error)); return out;
     }
+    out.insert(QStringLiteral("estimatedInserted"), estimate.inserted);
+    out.insert(QStringLiteral("estimatedDuplicates"), estimate.duplicates);
+    out.insert(QStringLiteral("estimatedInvalid"), estimate.invalid);
     if (snapshot) *snapshot=adif;
     return out;
 }

@@ -1,6 +1,7 @@
 #include "core/LogMigration.h"
 
 #include "core/Bands.h"
+#include "core/LogDatabase.h"
 
 #include <QDate>
 #include <QDateTime>
@@ -16,6 +17,37 @@
 #include <QUuid>
 
 namespace decolog::core::migration {
+
+bool estimateImport(const LogDatabase& source,const QByteArray& adif,ImportResult* result,QString* error)
+{
+    if (error) error->clear();
+    auto fail=[&](const QString& message) { if (error) *error=message; return false; };
+    if (!source.isOpen() || !result || adif.isEmpty()) return fail(QStringLiteral("Invalid import preview request"));
+    LogDatabase probe; if (!probe.open(QStringLiteral(":memory:"))) return fail(probe.lastError());
+    probe.setDedupWindows(source.dedupWindowSeconds(false),source.dedupWindowSeconds(true));
+    QSqlDatabase src=source.connection(), dst=probe.connection();
+    if (!src.transaction()) return fail(src.lastError().text());
+    if (!dst.transaction()) { src.rollback(); return fail(dst.lastError().text()); }
+    QSqlQuery read(src), write(dst); read.setForwardOnly(true);
+    if (!read.exec(QStringLiteral("SELECT id,call,band,mode,submode,qso_datetime_on FROM qso WHERE deleted=0")) ||
+        !write.prepare(QStringLiteral("INSERT INTO qso(uuid,call,band,mode,submode,qso_datetime_on,source,created_at,updated_at) VALUES(?,?,?,?,?,?,'preview','preview','preview')"))) {
+        const QString message=read.lastError().isValid()?read.lastError().text():write.lastError().text(); dst.rollback(); src.rollback(); return fail(message);
+    }
+    while (read.next()) {
+        write.bindValue(0,QStringLiteral("preview-%1").arg(read.value(0).toLongLong()));
+        for (int i=1;i<6;++i) write.bindValue(i,read.value(i));
+        if (!write.exec()) { const QString message=write.lastError().text(); dst.rollback(); src.rollback(); return fail(message); }
+    }
+    if (read.lastError().isValid()) { const QString message=read.lastError().text(); dst.rollback(); src.rollback(); return fail(message); }
+    read.finish(); write.finish();
+    if (!src.rollback()) { const QString message=src.lastError().text(); dst.rollback(); return fail(message); }
+    if (!dst.commit()) { const QString message=dst.lastError().text(); dst.rollback(); return fail(message); }
+    *result=probe.importAdif(adif,QStringLiteral("preview"),0);
+    const int expected=adif::parse(adif).records.size();
+    if (result->read!=expected || result->inserted+result->duplicates+result->invalid!=expected || result->errors.size()>qMin(result->invalid,20))
+        return fail(result->errors.isEmpty() ? QStringLiteral("Incomplete import preview") : result->errors.join(QStringLiteral("; ")));
+    return true;
+}
 
 namespace {
 

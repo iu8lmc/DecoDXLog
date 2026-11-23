@@ -17,12 +17,16 @@
 #include <QByteArray>
 #include <QList>
 #include <QString>
+namespace decolog::core { class LogDatabase; struct ImportResult; }
 
 namespace decolog::core::migration {
 
 // Il file come ADIF: un ADIF resta com'e', un CSV o un database N1MM si
 // convertono. `kind` dice cos'era ("adif", "csv", "n1mm").
 QByteArray asAdif(const QString& path, QString* error = nullptr, QString* kind = nullptr);
+// Advisory dry run using the exact stored duplicate keys from a consistent
+// source snapshot. The source log is never modified.
+bool estimateImport(const LogDatabase& source, const QByteArray& adif, ImportResult* result, QString* error = nullptr);
 
 QList<AdifRecord> readCsv(const QByteArray& data, QString* error = nullptr);
 QList<AdifRecord> readN1mmDatabase(const QString& path, QString* error = nullptr);

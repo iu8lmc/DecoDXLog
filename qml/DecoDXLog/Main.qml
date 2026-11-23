@@ -2041,7 +2041,7 @@ RoundedWindow {
             window.pendingImport = file
             window.importPreview = result
             importPreviewDialog.open()
-            if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready"); importSnapshotAccept.start() }
+            if ((startupShow.indexOf("importsnapshotprobe:") === 0 || startupShow.indexOf("importcancelprobe:") === 0) && result.ok) { console.warn("PROBE importsnapshot ready " + JSON.stringify(result)); importSnapshotAccept.start() }
         }
     }
     Timer { id:importSnapshotProbe; interval:1000; onTriggered:decolog.previewImport("file://"+startupShow.split(":").slice(1).join(":"),false) }
