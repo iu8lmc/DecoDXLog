@@ -13201,6 +13201,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::QslController</name>
+    <message><source>Club Log: cannot read local QSL status; the batch remains awaiting review</source><translation>Club Log: impossibile leggere lo stato QSL locale; il lotto rimane in attesa di verifica</translation></message>
     <message>
         <source>Download received; see the import preview</source>
         <translation>Download ricevuto; consulta l’anteprima di importazione</translation>

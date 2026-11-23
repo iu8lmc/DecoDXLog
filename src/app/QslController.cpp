@@ -234,10 +234,15 @@ QslController::QslController(Context context, QObject* parent)
                 && !result.clubLogBatchRecords.isEmpty()) {
                 QHash<qint64, QString> identities;
                 for (qint64 id : std::as_const(m_batch)) {
+                    QList<QslState> states;
+                    if (!m_ctx.db->readQslStatus(id,&states)) {
+                        QslUploadResult unresolved=result; unresolved.ok=false; unresolved.requiresReconciliation=true;
+                        unresolved.message=tr("Club Log: cannot read local QSL status; the batch remains awaiting review"); finishBatch(unresolved); return;
+                    }
                     const auto record = m_ctx.db->record(id);
                     if (!record) { identities.clear(); break; }
                     QString remote = record->value(QStringLiteral("APP_CLUBLOG_QSOID")).trimmed();
-                    for (const QslState& state : m_ctx.db->qslStatus(id)) {
+                    for (const QslState& state : std::as_const(states)) {
                         if (state.service != QLatin1String("clublog") || state.remoteId.isEmpty()) continue;
                         if (!remote.isEmpty() && remote != state.remoteId) { remote.clear(); break; }
                         remote = state.remoteId;
@@ -1335,12 +1340,15 @@ void QslController::reconcileClubLogPresence(const QslUploadResult& pending)
                 QHash<qint64, QString> identities;
                 QVariantList rows;
                 QList<qint64> remaining;
+                bool statusUnreadable=false;
                 for (qsizetype i = 0; i < ids.size(); ++i) {
                     if (ids.at(i).isEmpty()) { remaining.append(m_batch.at(i)); continue; }
+                    QList<QslState> states;
+                    if (!m_ctx.db->readQslStatus(m_batch.at(i),&states)) { identities.clear(); statusUnreadable=true; break; }
                     const auto record = m_ctx.db->record(m_batch.at(i));
                     if (!record) { identities.clear(); break; }
                     QString known = record->value(QStringLiteral("APP_CLUBLOG_QSOID")).trimmed();
-                    for (const QslState& state : m_ctx.db->qslStatus(m_batch.at(i))) {
+                    for (const QslState& state : std::as_const(states)) {
                         if (state.service != QLatin1String("clublog") || state.remoteId.isEmpty()) continue;
                         if (!known.isEmpty() && known.toLongLong() != state.remoteId.toLongLong()) { known = QStringLiteral("invalid"); break; }
                         known = state.remoteId;
@@ -1349,6 +1357,10 @@ void QslController::reconcileClubLogPresence(const QslUploadResult& pending)
                     identities.insert(m_batch.at(i), ids.at(i));
                     rows.append(QVariantMap{{QStringLiteral("status"), QStringLiteral("duplicate")},
                                             {QStringLiteral("qsoid"), ids.at(i)}});
+                }
+                if (statusUnreadable) {
+                    QslUploadResult unresolved=pending; unresolved.ok=false; unresolved.requiresReconciliation=true;
+                    unresolved.message=tr("Club Log: cannot read local QSL status; the batch remains awaiting review"); finishBatch(unresolved); return;
                 }
                 if (identities.size() == m_batch.size() && reconcileClubLogBatch(identities, rows)) {
                     note(tr("Club Log: every contact was found in the log; upload processing details are unavailable"), QStringLiteral("info"));
@@ -1370,6 +1382,12 @@ void QslController::reconcileClubLogPresence(const QslUploadResult& pending)
                         if (!db.transaction()) return false;
                         bool ok = true;
                         for (auto it = identities.cbegin(); it != identities.cend(); ++it) {
+                            QList<QslState> current;
+                            if (!m_ctx.db->readQslStatus(it.key(),&current)) { ok=false; break; }
+                            for (const QslState& state : std::as_const(current)) {
+                                if (state.service==QLatin1String("clublog") && !state.remoteId.isEmpty() && state.remoteId!=it.value()) { ok=false; break; }
+                            }
+                            if (!ok) break;
                             QslUploadResult found; found.ok = true; found.duplicates = 1; found.remoteId = it.value();
                             if (!markSent(it.key(), QStringLiteral("clublog"), found)) { ok = false; break; }
                         }
@@ -1404,11 +1422,17 @@ bool QslController::reconcileClubLogBatch(const QHash<qint64, QString>& identiti
     const int oldAccepted = m_accepted, oldDuplicates = m_duplicates, oldRejected = m_rejected;
     QSettings settings;
     ClubLogUploadJournal journal(settings);
-    const bool saved = journal.reconcileAndClear(m_clubLogJournalNonce, [this, &matched] {
+    const bool saved = journal.reconcileAndClear(m_clubLogJournalNonce, [this, &matched, &identities] {
         QSqlDatabase db = m_ctx.db->connection();
         if (!db.transaction()) return false;
         bool committed = true;
         for (qint64 id : std::as_const(m_batch)) {
+            QList<QslState> current;
+            if (!m_ctx.db->readQslStatus(id,&current)) { committed=false; break; }
+            for (const QslState& state : std::as_const(current)) {
+                if (state.service==QLatin1String("clublog") && !state.remoteId.isEmpty() && state.remoteId!=identities.value(id)) { committed=false; break; }
+            }
+            if (!committed) break;
             const QVariantMap row = matched.value(id);
             QslUploadResult individual;
             individual.remoteId = row.value(QStringLiteral("qsoid")).toString();

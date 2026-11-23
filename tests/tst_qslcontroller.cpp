@@ -23,6 +23,9 @@
 #include <QTest>
 #include <QElapsedTimer>
 #include <QSignalSpy>
+#include <QLibrary>
+#include <QSqlDriver>
+#include <cstring>
 #include <cstdio>
 #include <algorithm>
 
@@ -827,6 +830,50 @@ private slots:
         QVERIFY(db.qslStatus(id).isEmpty());
     }
 
+    void clubLogFinalResultsRetainCheckpointOnStatusReadFailure()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("System SQLite authorizer test is opt-in");
+        LogDatabase db; QVERIFY(db.open(m_dir.filePath("clublog-status-failure.sqlite")));
+        const QByteArray adi="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<APP_CLUBLOG_QSOID:3>101<EOR>"
+                             "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1100<BAND:3>20m<MODE:2>CW<APP_CLUBLOG_QSOID:3>102<EOR>";
+        QCOMPARE(db.importAdif(adi).inserted,2); const auto a=db.latestIds("K1AAA",1).first(), b=db.latestIds("K1BBB",1).first();
+        QslState state; state.service="clublog"; state.sent="N"; state.remoteId="101"; QVERIFY(db.setQslState(a,state)); state.remoteId="102"; QVERIFY(db.setQslState(b,state));
+        QSettings settings; ClubLogUploadJournal journal(settings); QVERIFY(journal.begin(db.path(),"K1TEST",{QString::number(a),QString::number(b)},ClubLogUploadJournal::recordsFingerprint(db.exportAdif(QList<qint64>{a,b}),2))); QVERIFY(journal.queued("123",journal.nonce()));
+        QslController controller({&db}); controller.m_web.setClubLogRestBatchBaseUrl(QUrl("http://127.0.0.1:9/api/")); controller.m_batch={a,b}; controller.m_batchMode=true; controller.m_busyService="clublog";
+        controller.m_clubLogRestStage="polling"; controller.m_clubLogRestJournalThisRun=true; controller.m_clubLogJournalNonce=journal.nonce();
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int(*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int(*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); QVariant handle=db.connection().driver()->handle();
+        if (!setAuthorizer || QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native authorizer unavailable"); void* nativeDb=*static_cast<void**>(handle.data()); QVERIFY(nativeDb);
+        const auto deny=+[](void*,int action,const char* table,const char* column,const char*,const char*) { return action==20 && table && column && std::strcmp(table,"qsl_status")==0 && std::strcmp(column,"last_error")==0 ? 1 : 0; };
+        QslUploadResult result; result.requiresReconciliation=true; result.clubLogBatchRecords={QVariantMap{{"qsoid",102},{"status","duplicate"}},QVariantMap{{"qsoid",101},{"status","created"}}};
+        QCOMPARE(setAuthorizer(nativeDb,deny,nullptr),0); controller.m_web.finished(result); QCOMPARE(setAuthorizer(nativeDb,nullptr,nullptr),0);
+        QVERIFY(!controller.busy()); QSettings after; QVERIFY(ClubLogUploadJournal(after).pending());
+        QCOMPARE(db.qslStatus(a).first().sent,QString("N")); QCOMPARE(db.qslStatus(b).first().sent,QString("N")); QCOMPARE(db.qslStatus(a).first().remoteId,QString("101")); QCOMPARE(db.qslStatus(b).first().remoteId,QString("102"));
+    }
+    void clubLogTransactionRechecksLocalRemoteIds()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("System SQLite authorizer test is opt-in");
+        LogDatabase db; QVERIFY(db.open(m_dir.filePath("clublog-status-transaction.sqlite")));
+        const QByteArray adi="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>";
+        QCOMPARE(db.importAdif(adi).inserted,1); const auto id=db.latestIds("K1AAA",1).first(); QslState state; state.service="clublog"; state.sent="N"; state.remoteId="101"; QVERIFY(db.setQslState(id,state));
+        QSettings settings; ClubLogUploadJournal journal(settings); QVERIFY(journal.begin(db.path(),"K1TEST",{QString::number(id)},ClubLogUploadJournal::recordsFingerprint(db.exportAdif(QList<qint64>{id}),1))); QVERIFY(journal.queued("123",journal.nonce()));
+        QslController controller({&db}); controller.m_batch={id}; controller.m_batchMode=true; controller.m_busyService="clublog"; controller.m_clubLogJournalNonce=journal.nonce();
+        const QHash<qint64,QString> identities{{id,"101"}}; const QVariantList rows{QVariantMap{{"qsoid",101},{"status","duplicate"}}};
+        state.remoteId="999"; QVERIFY(db.setQslState(id,state)); QVERIFY(!controller.reconcileClubLogBatch(identities,rows)); QCOMPARE(db.qslStatus(id).first().remoteId,QString("999")); QVERIFY(ClubLogUploadJournal(settings).pending());
+        state.remoteId="101"; QVERIFY(db.setQslState(id,state)); QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int(*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int(*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); QVariant handle=db.connection().driver()->handle();
+        if (!setAuthorizer || QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native authorizer unavailable"); void* nativeDb=*static_cast<void**>(handle.data()); QVERIFY(nativeDb);
+        const auto deny=+[](void*,int action,const char* table,const char* column,const char*,const char*) { return action==20 && table && column && std::strcmp(table,"qsl_status")==0 && std::strcmp(column,"last_error")==0 ? 1 : 0; };
+        QCOMPARE(setAuthorizer(nativeDb,deny,nullptr),0); const bool saved=controller.reconcileClubLogBatch(identities,rows); QCOMPARE(setAuthorizer(nativeDb,nullptr,nullptr),0);
+        QVERIFY(!saved); QVERIFY(ClubLogUploadJournal(settings).pending()); QCOMPARE(db.qslStatus(id).first().sent,QString("N"));
+        QVERIFY(controller.reconcileClubLogBatch(identities,rows)); QVERIFY(!ClubLogUploadJournal(settings).pending()); QCOMPARE(db.qslStatus(id).first().sent,QString("Y"));
+    }
     void finishedResultsUpdateOnlyTheirOwnContacts_data() {
         QTest::addColumn<int>("scenario");
         QTest::newRow("identified, reverse order") << 0;
