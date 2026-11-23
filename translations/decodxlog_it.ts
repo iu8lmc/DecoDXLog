@@ -447,6 +447,7 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message><source>The reviewed log or plan changed; reopen the cost editor.</source><translation>Il log o il piano verificato è cambiato; riapri l'editor dei costi.</translation></message>
     <message>
         <source>Select recorded award account</source>
         <translation>Seleziona account diploma registrato</translation>
@@ -11595,6 +11596,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>The reviewed log or plan changed; reopen the cost editor.</source><translation>Il log o il piano verificato è cambiato; riapri l'editor dei costi.</translation></message>
     <message>
         <source>General QSL settings</source>
         <translation>Impostazioni QSL generali</translation>

@@ -515,14 +515,16 @@ DialogFrame {
         width: 600; height: 370
         property var route: ({})
         property string logPath: ""
+        property string reviewToken: ""
         function edit(selected) {
             route = selected
             logPath = decolog.currentLogInfo().path || ""
+            reviewToken = decolog.beginQslRouteCostReview()
             const c = selected.cost || ({})
             amountField.text = c.amount || ""; currencyField.text = c.currency || "EUR"
             basisField.currentIndex = c.basis === "sourced" ? 1 : 0
             sourceField.text = c.source || ""; observedField.text = c.observedDate || ""
-            costError.text = ""; open()
+            costError.text = reviewToken ? "" : qsTr("The reviewed log or plan changed; reopen the cost editor."); open()
         }
         body: ColumnLayout {
             spacing: 8
@@ -544,14 +546,14 @@ DialogFrame {
                     text: qsTr("Save cost")
                     onClicked: {
                         if (!costEditor.logPath || costEditor.logPath !== decolog.currentLogInfo().path) { costError.text=qsTr("The open log changed. Reopen this editor."); return }
-                        const error=decolog.saveQslRouteCost(costEditor.route.manager,costEditor.route.channel,
-                            {amount: amountField.text, currency: currencyField.text, basis: basisField.currentIndex === 0 ? "estimate" : "sourced", source: sourceField.text, observedDate: observedField.text})
+                        const error=decolog.changeReviewedQslRouteCost(costEditor.reviewToken,costEditor.route.manager,costEditor.route.channel,
+                            {amount: amountField.text, currency: currencyField.text, basis: basisField.currentIndex === 0 ? "estimate" : "sourced", source: sourceField.text, observedDate: observedField.text},false)
                         if (error.length) costError.text=error; else costEditor.close()
                     }
                 }
                 GlassButton {
                     text: qsTr("Clear cost")
-                    onClicked: { if (!costEditor.logPath || costEditor.logPath !== decolog.currentLogInfo().path) { costError.text=qsTr("The open log changed. Reopen this editor."); return }; const error=decolog.clearQslRouteCost(costEditor.route.manager,costEditor.route.channel); if (error.length) costError.text=error; else costEditor.close() }
+                    onClicked: { if (!costEditor.logPath || costEditor.logPath !== decolog.currentLogInfo().path) { costError.text=qsTr("The open log changed. Reopen this editor."); return }; const error=decolog.changeReviewedQslRouteCost(costEditor.reviewToken,costEditor.route.manager,costEditor.route.channel,{},true); if (error.length) costError.text=error; else costEditor.close() }
                 }
                 GlassButton { text: qsTr("Cancel"); onClicked: costEditor.close() }
             }

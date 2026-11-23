@@ -23,6 +23,10 @@ std::optional<RouteCost> routeCost(const LogDatabase& db, const QString& manager
 bool saveRouteCost(LogDatabase& db, const QString& manager, const QString& channel,
                    const RouteCost& cost, QString* error = nullptr);
 bool clearRouteCost(LogDatabase& db, const QString& manager, const QString& channel, QString* error = nullptr);
+struct RouteCostOrigin { QString path, identity; QByteArray fileIdentity; quint64 generation{0}; qint64 dataVersion{-1}; };
+RouteCostOrigin routeCostOrigin(const LogDatabase& db);
+bool changeRouteCostGuarded(LogDatabase& db, const RouteCostOrigin& origin, const QString& manager, const QString& channel,
+                            const std::optional<RouteCost>& cost, QString* error = nullptr);
 struct AlternativeGroup {
     QList<qint64> ids;
     QList<qint64> pendingIds;

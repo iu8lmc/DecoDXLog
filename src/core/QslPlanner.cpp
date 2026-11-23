@@ -173,6 +173,30 @@ bool clearRouteCost(LogDatabase& db, const QString& manager, const QString& chan
     if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
     if (error) error->clear(); return true;
 }
+RouteCostOrigin routeCostOrigin(const LogDatabase& db)
+{
+    if (!db.isOpen() || !db.fileIdentityMatchesOpen()) return {};
+    return {db.path(),db.identity(),db.openFileIdentity(),db.openGeneration(),db.dataVersion()};
+}
+bool changeRouteCostGuarded(LogDatabase& db, const RouteCostOrigin& origin, const QString& manager, const QString& channel,
+                            const std::optional<RouteCost>& cost, QString* error)
+{
+    const auto fail=[&](const QString& text) { if (error) *error=text; return false; };
+    if (!db.isOpen() || origin.path.isEmpty() || origin.identity.isEmpty() || origin.fileIdentity.isEmpty() || origin.dataVersion<0)
+        return fail(QStringLiteral("The reviewed log or plan changed; reopen the cost editor."));
+    QSqlDatabase sql=db.connection(); QSqlQuery begin(sql);
+    if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) return fail(begin.lastError().text());
+    if (db.path()!=origin.path || db.identity()!=origin.identity || db.openGeneration()!=origin.generation ||
+        db.openFileIdentity()!=origin.fileIdentity || !db.fileIdentityMatchesOpen() || db.dataVersion()!=origin.dataVersion) {
+        sql.rollback(); return fail(QStringLiteral("The reviewed log or plan changed; reopen the cost editor."));
+    }
+    QString detail;
+    if (!(cost ? saveRouteCost(db,manager,channel,*cost,&detail) : clearRouteCost(db,manager,channel,&detail))) {
+        sql.rollback(); return fail(detail);
+    }
+    if (!sql.commit()) { const QString detail=sql.lastError().text(); sql.rollback(); return fail(detail); }
+    if (error) error->clear(); return true;
+}
 Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>& goals,
            const AwardCalculator& calculator)
 {

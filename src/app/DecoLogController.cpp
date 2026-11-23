@@ -2763,6 +2763,31 @@ QString DecoLogController::clearQslRouteCost(const QString& manager, const QStri
     emit qslPlanChanged(); return {};
 }
 
+QString DecoLogController::beginQslRouteCostReview()
+{
+    m_qslCostReviewToken.clear();
+    if (!qslPlanCurrent()) return {};
+    m_qslCostReviewOrigin=qslplanner::routeCostOrigin(m_db);
+    if (m_qslCostReviewOrigin.identity.isEmpty() || m_qslCostReviewOrigin.fileIdentity.isEmpty() || m_qslCostReviewOrigin.dataVersion<0) return {};
+    m_qslCostReviewPlanGeneration=m_qslPlanGeneration;
+    m_qslCostReviewToken=QUuid::createUuid().toString(QUuid::WithoutBraces);
+    return m_qslCostReviewToken;
+}
+
+QString DecoLogController::changeReviewedQslRouteCost(const QString& token, const QString& manager, const QString& channel, const QVariantMap& values, bool clear)
+{
+    if (token.isEmpty() || token!=m_qslCostReviewToken || m_qslCostReviewPlanGeneration!=m_qslPlanGeneration || !qslPlanCurrent())
+        return tr("The reviewed log or plan changed; reopen the cost editor.");
+    const qslplanner::RouteCost cost{values.value(QStringLiteral("amount")).toString().trimmed(),
+        values.value(QStringLiteral("currency")).toString().trimmed().toUpper(), values.value(QStringLiteral("basis")).toString(),
+        values.value(QStringLiteral("source")).toString().trimmed(), values.value(QStringLiteral("observedDate")).toString().trimmed()};
+    QString error;
+    if (!qslplanner::changeRouteCostGuarded(m_db,m_qslCostReviewOrigin,manager,channel,clear ? std::optional<qslplanner::RouteCost>{} : std::optional<qslplanner::RouteCost>{cost},&error)) return error;
+    m_qslCostReviewToken.clear();
+    ++m_qslPlanGeneration; m_qslPlanPool.clear(); m_qslPlanSnapshot.reset(); m_qslPlanBusy=false; m_qslPlan.insert(QStringLiteral("stale"),true);
+    emit qslPlanChanged(); return {};
+}
+
 void DecoLogController::loadClubLogCty()
 {
     const QString path = clublogCtyPath();

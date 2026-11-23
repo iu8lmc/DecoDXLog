@@ -1,11 +1,34 @@
 #include "core/QslPlanner.h"
 #include <QTemporaryDir>
+#include <QFile>
 #include <QSqlQuery>
 #include <QTest>
 using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void legacyRouteCostWritesAfterLogReplacement()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"), clone=dir.filePath("clone.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish(); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY(q.exec());
+        db.close(); QVERIFY(QFile::rename(path,path+".old")); QVERIFY(QFile::rename(clone,path)); QVERIFY(db.open(path));
+        QString error; QVERIFY(qslplanner::saveRouteCost(db,"M0ABC","B",{"12.50","EUR","estimate","",""},&error));
+        QVERIFY(qslplanner::routeCost(db,"M0ABC","B"));
+    }
+    void guardedRouteCostRejectsReplacedLogAndExternalChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"), clone=dir.filePath("clone.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish(); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY(q.exec());
+        const auto old=qslplanner::routeCostOrigin(db); QVERIFY(!old.identity.isEmpty()); QVERIFY(!old.fileIdentity.isEmpty());
+        db.close(); QVERIFY(QFile::rename(path,path+".old")); QVERIFY(QFile::rename(clone,path)); QVERIFY(db.open(path));
+        QString error; const qslplanner::RouteCost cost{"12.50","EUR","estimate","",""};
+        QVERIFY(!qslplanner::changeRouteCostGuarded(db,old,"M0ABC","B",cost,&error)); QVERIFY(!qslplanner::routeCost(db,"M0ABC","B"));
+        QVERIFY(!qslplanner::changeRouteCostGuarded(db,old,"M0ABC","B",std::nullopt,&error));
+        auto fresh=qslplanner::routeCostOrigin(db); QVERIFY2(qslplanner::changeRouteCostGuarded(db,fresh,"M0ABC","B",cost,&error),qPrintable(error));
+        fresh=qslplanner::routeCostOrigin(db); { LogDatabase other; QVERIFY(other.open(path)); QSqlQuery update(other.connection()); QVERIFY(update.exec("INSERT INTO app_setting(key,value) VALUES('concurrent','yes')")); }
+        QVERIFY(!qslplanner::changeRouteCostGuarded(db,fresh,"M0ABC","B",std::nullopt,&error)); QCOMPARE(qslplanner::routeCost(db,"M0ABC","B")->amount,QString("12.50"));
+        fresh=qslplanner::routeCostOrigin(db); QVERIFY2(qslplanner::changeRouteCostGuarded(db,fresh,"M0ABC","B",std::nullopt,&error),qPrintable(error)); QVERIFY(!qslplanner::routeCost(db,"M0ABC","B"));
+    }
     void selectionsAlsoRespectTheExactAwardAccount()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("accounts.sqlite"))); QString error;

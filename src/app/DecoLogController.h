@@ -559,6 +559,8 @@ public:
     Q_INVOKABLE QVariantMap qslPlanAlternativePage(qint64 id, const QString& award, const QString& key, int offset) const;
     Q_INVOKABLE QString saveQslRouteCost(const QString& manager, const QString& channel, const QVariantMap& cost);
     Q_INVOKABLE QString clearQslRouteCost(const QString& manager, const QString& channel);
+    Q_INVOKABLE QString beginQslRouteCostReview();
+    Q_INVOKABLE QString changeReviewedQslRouteCost(const QString& token, const QString& manager, const QString& channel, const QVariantMap& cost, bool clear);
     // Gli elementi di un award per la tabella. `view`: "all", "unconfirmed" o
     // "missing" (quelli mai lavorati, per gli award con un elenco chiuso).
     Q_INVOKABLE QVariantList awardItems(const QString& awardId, const QString& search, const QString& view) const;
@@ -1090,6 +1092,9 @@ private:
     std::shared_ptr<const core::qslplanner::Plan> m_qslPlanSnapshot;
     bool m_qslPlanBusy{false};
     quint64 m_qslPlanGeneration{0};
+    QString m_qslCostReviewToken;
+    quint64 m_qslCostReviewPlanGeneration{0};
+    core::qslplanner::RouteCostOrigin m_qslCostReviewOrigin;
     qint64 m_qslPlanDataVersion{-1};
     quint64 m_qslPlanOpenGeneration{0};
     QString m_qslPlanIdentity;
