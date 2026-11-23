@@ -2416,6 +2416,18 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
         <source>Close</source>
         <translation>Chiudi</translation>
     </message>
+    <message>
+        <source>%1: current %2 · selected %3</source>
+        <translation>%1: attuale %2 · selezionato %3</translation>
+    </message>
+    <message>
+        <source>not present</source>
+        <translation>non presente</translation>
+    </message>
+    <message>
+        <source>%1 additional fields omitted</source>
+        <translation>%1 ulteriori campi omessi</translation>
+    </message>
 </context>
 <context>
     <name>ContestRatePanel</name>

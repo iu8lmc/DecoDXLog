@@ -10,10 +10,16 @@ struct ContestNetDifference {
         bool present{false}; int revision{0}; bool deleted{false}; QByteArray contentHash;
         QString call, band, mode, date, time;
     };
+    struct Field {
+        QString name, localValue, remoteValue;
+        bool localPresent{false}, remotePresent{false}, nameTruncated{false}, localTruncated{false}, remoteTruncated{false};
+    };
     QString uuid;
     Kind kind{Kind::MatchingFingerprint};
     Side local;
     Side remote;
+    QList<Field> fields;
+    int fieldsOmitted{0};
 };
 
 struct ContestNetDifferencePage {

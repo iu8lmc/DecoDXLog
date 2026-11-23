@@ -31,7 +31,13 @@ private slots:
         NetController::Context ctx; ctx.db=&local; NetController net(ctx); QSignalSpy changes(&net,&NetController::qsoComparisonChanged);
         QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
         const auto summary=net.qsoComparisonSummary(); QCOMPARE(summary.value("contentConflict").toInt(),1); QCOMPARE(summary.value("localOnly").toInt(),1); QCOMPARE(summary.value("remoteOnly").toInt(),1);
-        const auto rows=net.qsoComparisonRows(); QCOMPARE(rows.size(),3); bool hasCall=false; for (const auto& item:rows) if (item.toMap().value("localCall").toString()=="K1AAA") hasCall=true; QVERIFY(hasCall);
+        const auto rows=net.qsoComparisonRows(); QCOMPARE(rows.size(),3); bool hasCall=false, hasNameDiff=false;
+        for (const auto& item:rows) if (item.toMap().value("localCall").toString()=="K1AAA") {
+            hasCall=true; for (const auto& field:item.toMap().value("fields").toList()) {
+                const auto values=field.toMap(); if (values.value("name").toString()=="NAME" && values.value("local").toString()=="Local" && values.value("remote").toString()=="Remote") hasNameDiff=true;
+            }
+        }
+        QVERIFY(hasCall); QVERIFY(hasNameDiff);
         QCOMPARE(local.record(localId)->value("NAME"),QString("Local")); QCOMPARE(remote.record(remoteId)->value("NAME"),QString("Remote"));
         auto changed=*local.record(localId); changed.set("NAME","After comparison"); QVERIFY(local.updateQso(localId,changed).status==InsertResult::Status::Inserted);
         QTRY_VERIFY_WITH_TIMEOUT(net.qsoComparisonSummary().value("stale").toBool(),4000); QVERIFY(changes.size()>0);

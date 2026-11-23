@@ -53,6 +53,31 @@ ContestNetDifferencePage ContestNetReconcile::next(int limit)
             else if (a.contentHash!=b.contentHash) row.kind=ContestNetDifference::Kind::ContentConflict;
             else if (a.revision!=b.revision) row.kind=ContestNetDifference::Kind::RevisionDifference;
             else row.kind=ContestNetDifference::Kind::MatchingFingerprint;
+            if (a.contentHash!=b.contentHash) {
+                const auto localDoc=adif::parse(a.adifPayload), remoteDoc=adif::parse(b.adifPayload);
+                if (localDoc.records.size()!=1 || remoteDoc.records.size()!=1) { m_error=QStringLiteral("Cannot inspect comparison payload"); return fail(); }
+                QMap<QString,QString> localFields,remoteFields;
+                for (const auto& field:localDoc.records.first().fields()) localFields.insert(field.name,field.value);
+                for (const auto& field:remoteDoc.records.first().fields()) remoteFields.insert(field.name,field.value);
+                QSet<QString> names(localFields.keyBegin(),localFields.keyEnd());
+                for (auto it=remoteFields.cbegin();it!=remoteFields.cend();++it) names.insert(it.key());
+                QStringList ordered=names.values(); ordered.sort(Qt::CaseSensitive);
+                auto preview=[](const QString& value,bool& truncated) {
+                    truncated=value.size()>256;
+                    QString out=truncated?value.left(256):value;
+                    if (truncated && !out.isEmpty() && out.at(out.size()-1).isHighSurrogate()) out.chop(1);
+                    return out;
+                };
+                for (const auto& name:ordered) {
+                    const bool localPresent=localFields.contains(name),remotePresent=remoteFields.contains(name);
+                    if (localPresent==remotePresent && localFields.value(name)==remoteFields.value(name)) continue;
+                    if (row.fields.size()>=32) { ++row.fieldsOmitted; continue; }
+                    ContestNetDifference::Field field; field.name=preview(name,field.nameTruncated); field.localPresent=localPresent; field.remotePresent=remotePresent;
+                    field.localValue=preview(localFields.value(name),field.localTruncated);
+                    field.remoteValue=preview(remoteFields.value(name),field.remoteTruncated);
+                    row.fields.append(field);
+                }
+            }
         }
         page.rows.append(row);
     }

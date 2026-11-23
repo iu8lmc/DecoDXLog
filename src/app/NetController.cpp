@@ -128,14 +128,21 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
                     case ContestNetDifference::Kind::DeletionConflict: kind=QStringLiteral("deletionConflict"); break;
                     }
                     counts[kind]=counts.value(kind).toLongLong()+1;
-                    if (kind!=QLatin1String("matching") && rows.size()<200)
+                    if (kind!=QLatin1String("matching") && rows.size()<200) {
+                        QVariantList fields;
+                        for (const auto& field:difference.fields)
+                            fields.append(QVariantMap{{QStringLiteral("name"),field.name},{QStringLiteral("local"),field.localValue},{QStringLiteral("remote"),field.remoteValue},
+                                {QStringLiteral("localPresent"),field.localPresent},{QStringLiteral("remotePresent"),field.remotePresent},{QStringLiteral("nameTruncated"),field.nameTruncated},
+                                {QStringLiteral("localTruncated"),field.localTruncated},{QStringLiteral("remoteTruncated"),field.remoteTruncated}});
                         rows.append(QVariantMap{{QStringLiteral("uuid"),difference.uuid},{QStringLiteral("kind"),kind},
                             {QStringLiteral("localCall"),difference.local.call},{QStringLiteral("localBand"),difference.local.band},
                             {QStringLiteral("localMode"),difference.local.mode},{QStringLiteral("localDate"),difference.local.date},
                             {QStringLiteral("localRevision"),difference.local.present?QVariant(difference.local.revision):QVariant()},
                             {QStringLiteral("remoteCall"),difference.remote.call},{QStringLiteral("remoteBand"),difference.remote.band},
                             {QStringLiteral("remoteMode"),difference.remote.mode},{QStringLiteral("remoteDate"),difference.remote.date},
-                            {QStringLiteral("remoteRevision"),difference.remote.present?QVariant(difference.remote.revision):QVariant()}});
+                            {QStringLiteral("remoteRevision"),difference.remote.present?QVariant(difference.remote.revision):QVariant()},
+                            {QStringLiteral("fields"),fields},{QStringLiteral("fieldsOmitted"),difference.fieldsOmitted}});
+                    }
                 }
                 more=page.hasMore;
             }

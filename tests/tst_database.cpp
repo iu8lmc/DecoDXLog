@@ -119,6 +119,19 @@ private slots:
         QVERIFY(!page.ok); QVERIFY(page.rows.isEmpty()); QVERIFY(page.error.contains("budget")); QVERIFY(!comparison.next(10).ok);
         QCOMPARE(left.qsoCount(),1); QCOMPARE(right.qsoCount(),0);
     }
+    void contestNetReconcileBoundsFieldPreviewsWithoutSplittingUnicode()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto l=dir.filePath("left.sqlite"),r=dir.filePath("right.sqlite"); LogDatabase left,right; QVERIFY(left.open(l)); QVERIFY(right.open(r));
+        AdifRecord a{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}}, b=a;
+        const QString longValue=QString(255,'x')+QString::fromUtf8("😀tail");
+        for (int i=0;i<40;++i) a.set(QString("APP_TEST_%1").arg(i,2,10,QChar('0')),longValue);
+        a.set(QString("APP_A")+QString(300,'Z'),longValue);
+        const auto qa=left.insertQso(a,"fixture"),qb=right.insertQso(b,"fixture"); QVERIFY(qa.id>0 && qb.id>0); QVERIFY(left.adoptUuid(qa.id,"same")); QVERIFY(right.adoptUuid(qb.id,"same"));
+        ContestNetReconcile comparison; QVERIFY(comparison.begin(l,r)); const auto page=comparison.next(10); QVERIFY(page.ok); QCOMPARE(page.rows.size(),1);
+        const auto row=page.rows.first(); QCOMPARE(row.kind,ContestNetDifference::Kind::ContentConflict); QCOMPARE(row.fields.size(),32); QCOMPARE(row.fieldsOmitted,9); QVERIFY(row.fields.first().nameTruncated); QCOMPARE(row.fields.first().name.size(),256);
+        for (const auto& field:row.fields) { QVERIFY(field.localPresent); QVERIFY(!field.remotePresent); QVERIFY(field.localTruncated); QVERIFY(!field.remoteTruncated); QCOMPARE(field.localValue.size(),255); QVERIFY(!field.localValue.at(field.localValue.size()-1).isHighSurrogate()); }
+        QCOMPARE(left.record(qa.id)->value("APP_TEST_00"),longValue);
+    }
     void contestNetReconcileThousandRowTiming()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("source.sqlite"), copy=dir.filePath("copy.sqlite"); LogDatabase db; QVERIFY(db.open(path));
@@ -130,7 +143,11 @@ private slots:
         QVERIFY(q.exec("COMMIT")); q.prepare("VACUUM INTO ?"); q.addBindValue(copy); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
         ContestNetReconcile comparison; QElapsedTimer timer; timer.start(); QVERIFY(comparison.begin(path,copy)); int count=0; bool more=true;
         while (more) { const auto page=comparison.next(100); QVERIFY2(page.ok,qPrintable(page.error)); for (const auto& row:page.rows) { QCOMPARE(row.kind,ContestNetDifference::Kind::MatchingFingerprint); ++count; } more=page.hasMore; }
-        const auto elapsed=timer.elapsed(); QCOMPARE(count,1000); qInfo("Compare 1000 synthetic matching QSO in two SQLite snapshots: %lld ms",elapsed);
+        const auto elapsed=timer.elapsed(); QCOMPARE(count,1000); comparison.close();
+        { LogDatabase other; QVERIFY(other.open(copy)); QSqlQuery changed(other.connection()); QVERIFY(changed.exec("UPDATE qso SET name='Changed'")); }
+        timer.restart(); QVERIFY(comparison.begin(path,copy)); count=0; more=true;
+        while (more) { const auto page=comparison.next(100); QVERIFY2(page.ok,qPrintable(page.error)); for (const auto& row:page.rows) { QCOMPARE(row.kind,ContestNetDifference::Kind::ContentConflict); QVERIFY(!row.fields.isEmpty()); ++count; } more=page.hasMore; }
+        const auto conflictMs=timer.elapsed(); QCOMPARE(count,1000); qInfo("Compare 1000 synthetic QSO: matching=%lld ms content conflicts=%lld ms",elapsed,conflictMs);
     }
     void contestNetInventoryReturnsBoundedRoundTripPayloads()
     {

@@ -71,19 +71,20 @@ private:
 private slots:
     void stationNetworkComparisonDialogShowsOfflineResult_data()
     {
-        QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("expectedTitle");
-        QTest::newRow("English") << QStringLiteral("en") << QByteArray("Compare station logs");
-        QTest::newRow("Italian") << QStringLiteral("it") << QByteArray("Confronta i log di stazione");
+        QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("expectedTitle"); QTest::addColumn<QByteArray>("expectedField");
+        QTest::newRow("English") << QStringLiteral("en") << QByteArray("Compare station logs") << QByteArray("NAME: current Local");
+        QTest::newRow("Italian") << QStringLiteral("it") << QByteArray("Confronta i log di stazione") << QByteArray("NAME: attuale Local");
     }
     void stationNetworkComparisonDialogShowsOfflineResult()
     {
-        using namespace decolog::core; QFETCH(QString,language); QFETCH(QByteArray,expectedTitle); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        using namespace decolog::core; QFETCH(QString,language); QFETCH(QByteArray,expectedTitle); QFETCH(QByteArray,expectedField); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
         const auto localPath=dir.filePath("test.sqlite"),remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
         const auto add=[](LogDatabase& db,const QString& name) { auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"NAME",name}},"fixture"); return qso.id>0 && db.adoptUuid(qso.id,"shared"); };
         QVERIFY(add(local,"Local")); QVERIFY(add(remote,"Remote")); local.close(); remote.close();
         QByteArray output; QVERIFY2(launch(dir,"netcompareprobe:"+remotePath,output,4500),output.constData());
-        QVERIFY2(output.contains("PROBE netcompare") && output.contains("\"visible\":true") && output.contains(expectedTitle) && output.contains("\"contentConflict\":1") && output.contains("\"rows\":1"),output.constData());
+        QVERIFY2(output.contains("PROBE netcompare") && output.contains("\"visible\":true") && output.contains(expectedTitle) && output.contains("\"contentConflict\":1") && output.contains("\"rows\":1") && output.contains("\"firstFields\":1"),output.constData());
+        QVERIFY2(output.contains(expectedField),output.constData());
     }
     void contestSerialEntryUsesSelectedGrant_data()
     {

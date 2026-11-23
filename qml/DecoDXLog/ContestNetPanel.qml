@@ -12,7 +12,7 @@ GlassPanel {
 
     readonly property var net: decolog.net
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
-    function probeComparisonState() { return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:root.net.qsoComparisonRows.length} }
+    function probeComparisonState() { const rows=root.net.qsoComparisonRows, first=qsoComparisonList.itemAtIndex(0); return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:rows.length,firstFields:rows.length ? (rows[0].fields || []).length : 0,fieldShown:first ? first.fieldTextAt(0) : ""} }
 
     title: qsTr("Station network")
     dotColor: root.net.running ? Theme.accentColor : Theme.textSecondary
@@ -262,14 +262,32 @@ GlassPanel {
             Rectangle {
                 Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:120; color:Theme.bgDeep; radius:4; border.color:Theme.borderSoft
                 ListView {
+                    id:qsoComparisonList
                     anchors.fill:parent; anchors.margins:6; clip:true; spacing:8; model:root.net.qsoComparisonRows
                     ScrollBar.vertical:PanelScrollBar {}
-                    delegate:Text {
+                    delegate:Column {
+                        id:differenceRow
                         required property var modelData
-                        width:ListView.view.width-12; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textPrimary; font.pixelSize:12
-                        text:qsoComparisonDialog.label(modelData.kind) + " · " + modelData.uuid + "\n" +
-                             qsTr("Current: %1 %2 %3 %4 · rev %5").arg(modelData.localCall || "—").arg(modelData.localDate || "").arg(modelData.localBand || "").arg(modelData.localMode || "").arg(modelData.localRevision === null || modelData.localRevision === undefined ? "—" : modelData.localRevision) + "\n" +
-                             qsTr("Selected: %1 %2 %3 %4 · rev %5").arg(modelData.remoteCall || "—").arg(modelData.remoteDate || "").arg(modelData.remoteBand || "").arg(modelData.remoteMode || "").arg(modelData.remoteRevision === null || modelData.remoteRevision === undefined ? "—" : modelData.remoteRevision)
+                        width:ListView.view.width-12; spacing:3
+                        function fieldTextAt(index) { const item=fieldRepeater.itemAt(index); return item ? item.text : "" }
+                        Text { width:parent.width; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textPrimary; font.pixelSize:12
+                            text:qsoComparisonDialog.label(parent.modelData.kind) + " · " + parent.modelData.uuid + "\n" +
+                                 qsTr("Current: %1 %2 %3 %4 · rev %5").arg(parent.modelData.localCall || "—").arg(parent.modelData.localDate || "").arg(parent.modelData.localBand || "").arg(parent.modelData.localMode || "").arg(parent.modelData.localRevision === null || parent.modelData.localRevision === undefined ? "—" : parent.modelData.localRevision) + "\n" +
+                                 qsTr("Selected: %1 %2 %3 %4 · rev %5").arg(parent.modelData.remoteCall || "—").arg(parent.modelData.remoteDate || "").arg(parent.modelData.remoteBand || "").arg(parent.modelData.remoteMode || "").arg(parent.modelData.remoteRevision === null || parent.modelData.remoteRevision === undefined ? "—" : parent.modelData.remoteRevision)
+                        }
+                        Repeater {
+                            id:fieldRepeater
+                            model:parent.modelData.fields || []
+                            delegate:Text {
+                                required property var modelData
+                                width:differenceRow.width; wrapMode:Text.WrapAnywhere; textFormat:Text.PlainText; color:Theme.textSecondary; font.pixelSize:11
+                                text:qsTr("%1: current %2 · selected %3").arg(modelData.name + (modelData.nameTruncated ? "…" : ""))
+                                    .arg(modelData.localPresent ? modelData.local + (modelData.localTruncated ? "…" : "") : qsTr("not present"))
+                                    .arg(modelData.remotePresent ? modelData.remote + (modelData.remoteTruncated ? "…" : "") : qsTr("not present"))
+                            }
+                        }
+                        Text { width:parent.width; visible:(parent.modelData.fieldsOmitted || 0)>0; color:Theme.warningColor; font.pixelSize:11
+                            text:qsTr("%1 additional fields omitted").arg(parent.modelData.fieldsOmitted || 0) }
                     }
                 }
             }
