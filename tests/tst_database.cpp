@@ -62,6 +62,44 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestSerialCannotBeBoundToTwoConcurrentQsos()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("contest.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.beginContestSerialRequest("event","node","req","authority",1).ok); QVERIFY(db.acceptContestSerialGrant("event","node","req","authority",1).ok); }
+        std::atomic<int> ready{0}; std::atomic<bool> start{false}; InsertResult first,second;
+        auto insert=[&](const QString& call,InsertResult& result) {
+            LogDatabase db; if (!db.openExistingReadWrite(path)) return; ++ready;
+            while (!start.load()) std::this_thread::yield();
+            AdifRecord qso{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+            result=db.insertQsoWithContestSerial(qso,"manual","event","node","req","authority");
+        };
+        std::thread a(insert,QStringLiteral("K1AAA"),std::ref(first)),b(insert,QStringLiteral("K1BBB"),std::ref(second));
+        QElapsedTimer timer; timer.start(); while (ready.load()<2 && timer.elapsed()<10000) QTest::qWait(5);
+        start=true; a.join(); b.join(); QCOMPARE(ready.load(),2);
+        QCOMPARE(int(first.status==InsertResult::Status::Inserted)+int(second.status==InsertResult::Status::Inserted),1);
+        LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM qso")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+        QCOMPARE(db.contestSerialRequest("event","node","req").state,QString("consumed"));
+    }
+    void contestSerialAndQsoCommitTogether()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("contest.sqlite");
+        LogDatabase db; QVERIFY(db.open(path));
+        AdifRecord qso{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+        QVERIFY(db.beginContestSerialRequest("event","node","req-1","authority",10).ok);
+        QVERIFY(db.insertQsoWithContestSerial(qso,"manual","event","node","req-1","authority").status != InsertResult::Status::Inserted);
+        QVERIFY(db.acceptContestSerialGrant("event","node","req-1","authority",10).ok);
+        QSqlQuery trigger(db.connection()); QVERIFY(trigger.exec("CREATE TRIGGER fail_serial_use BEFORE UPDATE ON contest_serial_request WHEN NEW.state='consumed' BEGIN SELECT RAISE(ABORT,'injected'); END"));
+        QVERIFY(db.insertQsoWithContestSerial(qso,"manual","event","node","req-1","authority").status != InsertResult::Status::Inserted);
+        QSqlQuery count(db.connection()); QVERIFY(count.exec("SELECT COUNT(*) FROM qso")); QVERIFY(count.next()); QCOMPARE(count.value(0).toInt(),0); count.finish();
+        QCOMPARE(db.contestSerialRequest("event","node","req-1").state,QString("granted")); QVERIFY(trigger.exec("DROP TRIGGER fail_serial_use"));
+        auto conflict=qso; conflict.set("STX","12"); QVERIFY(db.insertQsoWithContestSerial(conflict,"manual","event","node","req-1","authority").status != InsertResult::Status::Inserted);
+        const auto inserted=db.insertQsoWithContestSerial(qso,"manual","event","node","req-1","authority"); QCOMPARE(inserted.status,InsertResult::Status::Inserted);
+        const auto record=db.record(inserted.id); QVERIFY(record); QCOMPARE(record->value("STX"),QString("10"));
+        const auto meta=db.meta(inserted.id); QVERIFY(meta); auto used=db.contestSerialRequest("event","node","req-1"); QCOMPARE(used.state,QString("consumed")); QCOMPARE(used.useId,meta->uuid);
+        QVERIFY(db.insertQsoWithContestSerial(qso,"manual","event","node","req-1","authority").status != InsertResult::Status::Inserted);
+        db.close(); QVERIFY(db.open(path)); used=db.contestSerialRequest("event","node","req-1"); QCOMPARE(used.state,QString("consumed")); QCOMPARE(used.useId,meta->uuid);
+        QSqlQuery after(db.connection()); QVERIFY(after.exec("SELECT COUNT(*) FROM qso")); QVERIFY(after.next()); QCOMPARE(after.value(0).toInt(),1);
+    }
     void contestSerialRequesterSurvivesLostReplyAndRestart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto authorityPath=dir.filePath("authority.sqlite"), clientPath=dir.filePath("client.sqlite");

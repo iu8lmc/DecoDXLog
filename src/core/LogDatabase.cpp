@@ -1101,6 +1101,43 @@ InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& sour
     return result;
 }
 
+InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, const QString& source,
+                                                     const QString& scope, const QString& requester,
+                                                     const QString& requestId, const QString& authority,
+                                                     const QString& sourceApp, bool manual,
+                                                     qint64 stationProfileId, bool checkDuplicate)
+{
+    InsertResult result;
+    if (!isOpen()) { result.message=QStringLiteral("database not open"); return result; }
+    QSqlDatabase db=connection(); QSqlQuery q(db);
+    if (!q.exec(QStringLiteral("BEGIN IMMEDIATE"))) { result.message=q.lastError().text(); return result; }
+    const auto fail=[&](const QString& error) {
+        db.rollback(); InsertResult r; r.message=error; return r;
+    };
+    q.prepare(QStringLiteral("SELECT authority,serial,state FROM contest_serial_request WHERE scope=? AND requester=? AND request_id=?"));
+    q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId);
+    if (!q.exec()) return fail(q.lastError().text());
+    if (!q.next()) return fail(QStringLiteral("Unknown serial request"));
+    const QString storedAuthority=q.value(0).toString(); const int serial=q.value(1).toInt(); const QString state=q.value(2).toString(); q.finish();
+    if (storedAuthority!=authority || state!=QLatin1String("granted") || serial<1)
+        return fail(QStringLiteral("The requested serial grant is unavailable or does not match the authority"));
+    const QString existing=input.value(QStringLiteral("STX")).trimmed();
+    if (!existing.isEmpty()) {
+        bool ok=false; const int number=existing.toInt(&ok);
+        if (!ok || number!=serial) return fail(QStringLiteral("The QSO serial differs from the granted serial"));
+    }
+    AdifRecord record=input; if (existing.isEmpty()) record.set(QStringLiteral("STX"),QString::number(serial));
+    result=insertQso(record,source,sourceApp,manual,stationProfileId,checkDuplicate);
+    if (result.status!=InsertResult::Status::Inserted) { db.rollback(); return result; }
+    const auto qso=meta(result.id);
+    if (!qso || qso->uuid.isEmpty()) return fail(QStringLiteral("Cannot identify the inserted QSO"));
+    q.prepare(QStringLiteral("UPDATE contest_serial_request SET state='consumed',use_id=?,updated_at=? WHERE scope=? AND requester=? AND request_id=? AND authority=? AND state='granted' AND serial=?"));
+    q.addBindValue(qso->uuid); q.addBindValue(nowIso()); q.addBindValue(scope); q.addBindValue(requester); q.addBindValue(requestId); q.addBindValue(authority); q.addBindValue(serial);
+    if (!q.exec() || q.numRowsAffected()!=1) return fail(q.lastError().text().isEmpty()?QStringLiteral("Could not bind the serial to the QSO"):q.lastError().text());
+    if (!db.commit()) return fail(db.lastError().text());
+    return result;
+}
+
 QString LogDatabase::snapshotJson(qint64 id) const
 {
     const auto r = record(id);
