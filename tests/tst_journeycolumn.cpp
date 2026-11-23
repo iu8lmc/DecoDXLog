@@ -1100,6 +1100,26 @@ private slots:
         QVERIFY2(output.contains("PROBE qslpages invalidated true") && output.contains("Plan is no longer current"),output.constData());
         QVERIFY2(!output.contains("TypeError"),output.constData());
     }
+    void qslPlannerGoalsFollowStationProfileAcrossRestart()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("qslPlanner/goalsJson",QStringLiteral("[\"wac\"]")); settings.sync(); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          StationProfile a; a.name="A"; a.stationCallsign="K1AAA";
+          StationProfile b; b.name="B"; b.stationCallsign="K1BBB";
+          QCOMPARE(db.saveStationProfile(a),qint64(1)); QCOMPARE(db.saveStationProfile(b),qint64(2)); }
+        QByteArray output; QVERIFY2(launch(dir,"qslscopesprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE qslscopes") && output.contains("\"first\":[\"dxcc\",\"waz\"]") &&
+                 output.contains("\"secondInitial\":[\"wac\"]") && output.contains("\"second\":[\"vucc\"]") &&
+                 output.contains("\"back\":[\"dxcc\",\"waz\"]") && output.contains("\"error\":\"\""),output.constData());
+        QByteArray reopened; QVERIFY2(launch(dir,"qslscopesprobe:restore",reopened,4500),reopened.constData());
+        QVERIFY2(reopened.contains("\"first\":[\"dxcc\",\"waz\"]") &&
+                 reopened.contains("\"secondInitial\":[\"vucc\"]") && reopened.contains("\"back\":[\"dxcc\",\"waz\"]"),reopened.constData());
+        QSettings settings(iniPath(dir),QSettings::IniFormat);
+        QCOMPARE(settings.value("qslPlanner/goalsJson").toString(),QStringLiteral("[\"wac\"]"));
+    }
+
     void qslPlannerDesktopShowsBenefitsAndInvalidation()
     {
         using namespace decolog::core;

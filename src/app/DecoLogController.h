@@ -549,6 +549,8 @@ public:
     Q_INVOKABLE QVariantList dxCampaignSpots(int maxAgeMinutes = 30) const;
     QVariantMap qslPlan() const { return m_qslPlan; }
     bool qslPlanBusy() const { return m_qslPlanBusy; }
+    Q_INVOKABLE QVariantMap qslGoalSelection() const;
+    Q_INVOKABLE QString saveQslGoalSelection(const QStringList& goals);
     Q_INVOKABLE void buildQslPlan(const QStringList& goals);
     Q_INVOKABLE bool qslPlanCurrent() const;
     Q_INVOKABLE QVariantMap qslPlanAlternativePage(qint64 id, const QString& award, const QString& key, int offset) const;

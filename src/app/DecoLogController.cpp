@@ -2595,6 +2595,25 @@ QVariantList DecoLogController::dxCampaignSpots(int maxAgeMinutes) const
     return spots;
 }
 
+QVariantMap DecoLogController::qslGoalSelection() const
+{
+    const int profile=m_awardFilter.stationProfileId;
+    QString error;
+    const auto goals=qslplanner::loadGoalSelection(m_db,profile,&error);
+    const QString scope=QStringLiteral("%1:%2").arg(m_db.openGeneration()).arg(profile);
+    return {{QStringLiteral("scope"),scope},{QStringLiteral("found"),bool(goals)},
+            {QStringLiteral("goals"),goals ? QVariant(*goals) : QVariant(QStringList{})},
+            {QStringLiteral("error"),error}};
+}
+
+QString DecoLogController::saveQslGoalSelection(const QStringList& goals)
+{
+    QString error;
+    if (!qslplanner::saveGoalSelection(m_db,m_awardFilter.stationProfileId,goals,&error))
+        return error.isEmpty() ? tr("Cannot save QSL goals") : error;
+    return {};
+}
+
 void DecoLogController::buildQslPlan(const QStringList& requested)
 {
     const QSet<QString> goals(requested.cbegin(), requested.cend());

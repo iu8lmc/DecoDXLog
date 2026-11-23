@@ -10,6 +10,53 @@
 #include <queue>
 
 namespace decolog::core::qslplanner {
+namespace {
+bool validGoalSelection(int profileId, const QStringList& goals)
+{
+    if (profileId < 0 || goals.size() > 128) return false;
+    QSet<QString> seen;
+    for (const auto& id : goals) {
+        if (id.isEmpty() || id.size() > 256 || seen.contains(id)) return false;
+        seen.insert(id);
+    }
+    return true;
+}
+QString goalSelectionKey(int profileId)
+{
+    return QStringLiteral("qslplanner.goals.v1.profile.%1").arg(profileId);
+}
+}
+std::optional<QStringList> loadGoalSelection(const LogDatabase& db, int profileId, QString* error)
+{
+    if (error) error->clear();
+    if (!db.isOpen() || !db.fileIdentityMatchesOpen() || profileId < 0) {
+        if (error) *error = QStringLiteral("Log unavailable or profile invalid"); return {};
+    }
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?"));
+    q.addBindValue(goalSelectionKey(profileId));
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return {}; }
+    if (!q.next()) { if (error && q.lastError().isValid()) *error=q.lastError().text(); return {}; }
+    QJsonParseError parse; const auto doc=QJsonDocument::fromJson(q.value(0).toString().toUtf8(),&parse);
+    if (parse.error!=QJsonParseError::NoError || !doc.isArray()) { if (error) *error=QStringLiteral("Invalid saved QSL goals"); return {}; }
+    QStringList goals; for (const auto& value:doc.array()) {
+        if (!value.isString()) { if (error) *error=QStringLiteral("Invalid saved QSL goals"); return {}; }
+        goals << value.toString();
+    }
+    if (!validGoalSelection(profileId,goals)) { if (error) *error=QStringLiteral("Invalid saved QSL goals"); return {}; }
+    return goals;
+}
+bool saveGoalSelection(LogDatabase& db, int profileId, const QStringList& goals, QString* error)
+{
+    if (error) error->clear();
+    if (!db.isOpen() || !db.fileIdentityMatchesOpen() || !validGoalSelection(profileId,goals)) {
+        if (error) *error=QStringLiteral("Log unavailable or QSL goals invalid"); return false;
+    }
+    const auto json=QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(goals)).toJson(QJsonDocument::Compact));
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
+    q.addBindValue(goalSelectionKey(profileId)); q.addBindValue(json);
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
+    return true;
+}
 PendingDetail pendingSince(const QslState& state,QDate today)
 {
     PendingDetail out; out.service=state.service; out.rawDate=state.sentDate.trimmed();

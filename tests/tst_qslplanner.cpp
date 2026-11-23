@@ -6,6 +6,32 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void selectionsAreScopedPerLogAndProfile()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QString error;
+        const QString a=dir.filePath("a.sqlite"), b=dir.filePath("b.sqlite");
+        { LogDatabase first; QVERIFY(first.open(a));
+          QVERIFY(!qslplanner::loadGoalSelection(first,0,&error)); QVERIFY(error.isEmpty());
+          QVERIFY(qslplanner::saveGoalSelection(first,0,{"dxcc","was"},&error));
+          QVERIFY(qslplanner::saveGoalSelection(first,3,{"vucc"},&error));
+          QVERIFY(qslplanner::saveGoalSelection(first,4,{},&error));
+          QVERIFY(!qslplanner::saveGoalSelection(first,-1,{"dxcc"},&error));
+          QVERIFY(!qslplanner::saveGoalSelection(first,3,{"dxcc","dxcc"},&error));
+          QCOMPARE(*qslplanner::loadGoalSelection(first,3,&error),QStringList({"vucc"}));
+          QSqlQuery invalid(first.connection());
+          QVERIFY(invalid.exec(QStringLiteral("INSERT INTO app_setting(key,value) VALUES('qslplanner.goals.v1.profile.9','not-json')")));
+          QVERIFY(!qslplanner::loadGoalSelection(first,9,&error)); QVERIFY(!error.isEmpty()); }
+
+        { LogDatabase first; QVERIFY(first.open(a));
+          QCOMPARE(*qslplanner::loadGoalSelection(first,0,&error),QStringList({"dxcc","was"}));
+          QCOMPARE(*qslplanner::loadGoalSelection(first,3,&error),QStringList({"vucc"}));
+          QVERIFY(qslplanner::loadGoalSelection(first,4,&error)->isEmpty());
+          QVERIFY(!qslplanner::loadGoalSelection(first,5,&error)); QVERIFY(error.isEmpty()); }
+        { LogDatabase second; QVERIFY(second.open(b));
+          QVERIFY(!qslplanner::loadGoalSelection(second,3,&error)); QVERIFY(error.isEmpty());
+          QVERIFY(qslplanner::saveGoalSelection(second,3,{"wac"},&error)); }
+        { LogDatabase first; QVERIFY(first.open(a)); QCOMPARE(*qslplanner::loadGoalSelection(first,3,&error),QStringList({"vucc"})); }
+    }
     void pendingDatesAreReportedWithoutGuessing()
     {
         const QDate today(2026,11,23);

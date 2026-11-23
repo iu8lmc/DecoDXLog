@@ -68,6 +68,9 @@ DialogFrame {
     onVuccScopeChanged: vuccResult=({})
     property var plannerGoals: ["dxcc"]
     property bool plannerSelectionDirty: false
+    property bool plannerLoading: false
+    property string plannerScope: ""
+    property string plannerSaveError: ""
     property bool plannerExternalProbe: false
     property bool plannerExternalSawStale: false
     Settings { id: plannerSettings; category: "qslPlanner"; property string goalsJson: '["dxcc"]' }
@@ -77,6 +80,32 @@ DialogFrame {
             const saved = JSON.parse(plannerSettings.goalsJson)
             if (Array.isArray(saved) && saved.every(v => typeof v === "string")) plannerGoals = saved
         } catch (error) { plannerGoals = ["dxcc"] }
+        Qt.callLater(function() { root.loadPlannerScope(true) })
+    }
+
+    function loadPlannerScope(force) {
+        const saved = decolog.qslGoalSelection()
+        if (saved.error) { plannerSaveError=saved.error; plannerScope=""; return }
+        if (!force && saved.scope === plannerScope) return
+        plannerLoading=true
+        plannerScope=saved.scope
+        plannerSaveError=""
+        if (saved.found) plannerGoals=saved.goals
+        else {
+            try {
+                const legacy=JSON.parse(plannerSettings.goalsJson)
+                plannerGoals=Array.isArray(legacy) && legacy.every(v => typeof v === "string") ? legacy : ["dxcc"]
+            } catch (error) { plannerGoals=["dxcc"] }
+        }
+        plannerLoading=false
+        plannerSelectionDirty=true
+        alternativesDialog.close(); paperConfirm.close()
+        schedulePlannerRefresh()
+    }
+    function persistPlannerGoals() {
+        if (!plannerScope) { plannerSaveError=qsTr("Open a log before saving goals"); return false }
+        plannerSaveError=decolog.saveQslGoalSelection(plannerGoals)
+        return !plannerSaveError
     }
 
     function schedulePlannerRefresh() {
@@ -104,6 +133,7 @@ DialogFrame {
     }
 
     function togglePlannerGoal(id, enabled) {
+        if (plannerLoading) return
         let selected = plannerGoals.slice()
         const at = selected.indexOf(id)
         if (enabled && at < 0) selected.push(id)
@@ -111,11 +141,27 @@ DialogFrame {
         plannerGoals = selected
         alternativesDialog.close()
         paperConfirm.close()
-        plannerSettings.goalsJson = JSON.stringify(selected)
+        persistPlannerGoals()
         plannerSelectionDirty = true
         schedulePlannerRefresh()
     }
 
+    function probeQslScopes(restore) {
+        openAt("dxcc")
+        decolog.awardProfile=1
+        qslPlanner.open()
+        loadPlannerScope(true)
+        if (!restore) { plannerGoals=["dxcc","waz"]; persistPlannerGoals() }
+        const first=plannerGoals.slice()
+        decolog.awardProfile=2
+        loadPlannerScope(false)
+        const secondInitial=plannerGoals.slice()
+        if (!restore) { plannerGoals=["vucc"]; persistPlannerGoals() }
+        const second=plannerGoals.slice()
+        decolog.awardProfile=1
+        loadPlannerScope(false)
+        console.warn("PROBE qslscopes " + JSON.stringify({first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError}))
+    }
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
     function probeQslExternal() { openAt("dxcc"); plannerExternalStart.start() }
     Timer { id:plannerExternalStart; interval:1000
@@ -227,7 +273,7 @@ DialogFrame {
         title: qsTr("Potential QSL plan")
         info: qsTr("Review before requesting; no messages are sent")
         dialogKey: "qslPlanner"
-        onVisibleChanged: if (visible) root.schedulePlannerRefresh()
+        onVisibleChanged: if (visible) root.loadPlannerScope(true)
         width: 960; height: 650
         body: ColumnLayout {
             spacing: 8
@@ -256,7 +302,7 @@ DialogFrame {
                     objectName: "buildQslPlanButton"
                     text: decolog.qslPlanBusy ? qsTr("Calculating…") : qsTr("Build plan")
                     enabled: !decolog.qslPlanBusy && root.plannerGoals.length > 0
-                    onClicked: { plannerSettings.goalsJson = JSON.stringify(root.plannerGoals); root.plannerSelectionDirty = false; decolog.buildQslPlan(root.plannerGoals) }
+                    onClicked: { if (!root.persistPlannerGoals()) return; root.plannerSelectionDirty = false; decolog.buildQslPlan(root.plannerGoals) }
                 }
                 GlassButton {
                     text: qsTr("Clear")
@@ -264,6 +310,7 @@ DialogFrame {
                     onClicked: { root.plannerGoals = []; alternativesDialog.close(); plannerSettings.goalsJson = "[]"; root.plannerSelectionDirty = true; plannerRefresh.stop() }
                 }
             }
+            Text { Layout.fillWidth: true; visible: !!root.plannerSaveError; color: Theme.textSecondary; wrapMode: Text.Wrap; text: root.plannerSaveError }
             Text {
                 id: qslPlanStatus
                 objectName: "qslPlanStatus"
@@ -726,7 +773,8 @@ DialogFrame {
 
     Connections {
         target: decolog
-        function onAwardsChanged() { root.revision++; root.marathonPreview=({}); marathonReview.close() }
+        function onAwardsChanged() { root.revision++; root.marathonPreview=({}); marathonReview.close(); if (qslPlanner.visible) root.loadPlannerScope(false) }
+        function onLogChanged() { if (qslPlanner.visible) root.loadPlannerScope(false) }
     }
 
     body: RowLayout {
