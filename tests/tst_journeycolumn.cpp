@@ -69,6 +69,19 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void stationNetworkExperimentalQsoDialog_data()
+    {
+        QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("warning");
+        QTest::newRow("English") << QStringLiteral("en") << QByteArray("QSO data is not encrypted");
+        QTest::newRow("Italian") << QStringLiteral("it") << QByteArray("i dati QSO non sono cifrati");
+    }
+    void stationNetworkExperimentalQsoDialog()
+    {
+        QFETCH(QString,language); QFETCH(QByteArray,warning); QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
+        QByteArray output; QVERIFY2(launch(dir,"netwireprobe",output,3500),output.constData());
+        QVERIFY2(output.contains("PROBE netwire") && output.contains("\"visible\":true") && output.contains(warning) && !output.contains("TypeError"),output.constData());
+    }
     void stationNetworkComparisonDialogShowsOfflineResult_data()
     {
         QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("expectedTitle"); QTest::addColumn<QByteArray>("expectedField");

@@ -47,6 +47,9 @@ class NetController : public QObject {
     Q_PROPERTY(QVariantList qsoComparisonRows READ qsoComparisonRows NOTIFY qsoComparisonChanged)
     Q_PROPERTY(bool qsoReviewBusy READ qsoReviewBusy NOTIFY qsoReviewChanged)
     Q_PROPERTY(QVariantMap qsoReview READ qsoReview NOTIFY qsoReviewChanged)
+    Q_PROPERTY(QVariantMap experimentalQsoPreview READ experimentalQsoPreview NOTIFY experimentalQsoChanged)
+    Q_PROPERTY(QString experimentalQsoStatus READ experimentalQsoStatus NOTIFY experimentalQsoChanged)
+    Q_PROPERTY(bool experimentalQsoSending READ experimentalQsoSending NOTIFY experimentalQsoChanged)
 
 public:
     struct Context {
@@ -109,6 +112,13 @@ public:
     Q_INVOKABLE bool reviewQsoComparison(const QString& uuid);
     Q_INVOKABLE QString applyReviewedMissingQso();
     Q_INVOKABLE QString applyReviewedExistingQso();
+    Q_INVOKABLE QString armExperimentalQsoReceiver(const QString& sender, const QString& transfer);
+    Q_INVOKABLE QString sendExperimentalQso(const QString& receiver, const QString& uuid, const QString& transfer);
+    Q_INVOKABLE QString requestExperimentalQsoMissing();
+    Q_INVOKABLE void clearExperimentalQso();
+    QVariantMap experimentalQsoPreview() const { return m_wirePreview; }
+    QString experimentalQsoStatus() const { return m_wireStatus; }
+    bool experimentalQsoSending() const { return m_wirePreparing || !m_wireIndices.isEmpty(); }
     Q_INVOKABLE QVariantMap qsoLongFieldPage(int fieldIndex, const QString& part, int offset);
     bool qsoReviewBusy() const { return m_qsoReviewBusy; }
     QVariantMap qsoReview() const { return m_qsoReview; }
@@ -141,6 +151,8 @@ signals:
     void durableSerialStatusChanged();
     void qsoComparisonChanged();
     void qsoReviewChanged();
+    void experimentalQsoChanged();
+    void experimentalQsoFrameSent(const QString& type, const QJsonObject& body);
 
 private:
     void restart();
@@ -201,6 +213,15 @@ private:
     int m_durableRetryMinimum{0};
     quint64 m_durableGeneration{0};
     bool m_durableBusy{false};
+    QThreadPool m_qsoWirePool;
+    QTimer m_qsoWireTimer, m_qsoWireExpiry;
+    std::shared_ptr<core::contestqso::Encoder> m_wireEncoder;
+    std::shared_ptr<core::contestqso::Receiver> m_wireReceiver;
+    QList<int> m_wireIndices;
+    QString m_wirePeer, m_wireSender, m_wireStatus;
+    QVariantMap m_wirePreview;
+    quint64 m_wireGeneration{0};
+    bool m_wirePreparing{false};
     QThreadPool m_qsoComparisonPool;
     QTimer m_qsoComparisonTimer;
     std::shared_ptr<std::atomic_bool> m_qsoComparisonCancel;

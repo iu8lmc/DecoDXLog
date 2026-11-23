@@ -11,6 +11,7 @@ GlassPanel {
     id: root
 
     readonly property var net: decolog.net
+    function probeExperimentalWire() { qsoWireDialog.open(); return {visible:qsoWireDialog.visible,title:qsoWireDialog.title,warning:qsoWireWarning.text} }
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
     function probeReview() { const rows=root.net.qsoComparisonRows; if (!rows.length || !root.net.reviewQsoComparison(rows[0].uuid)) return false; qsoDetailsDialog.open(); return true }
     function probeApply(accept) { if (!root.net.qsoReview.canApply) return false; qsoApplyDialog.open(); if (accept) qsoApplyDialog.confirmApply(); else qsoApplyDialog.close(); return true }
@@ -90,6 +91,7 @@ GlassPanel {
             Layout.fillWidth:true
             GlassButton { text:qsTr("Serial experiment…"); onClicked:serialAuthorityDialog.open() }
             GlassButton { text:qsTr("Compare logs…"); onClicked:qsoComparisonDialog.open() }
+            GlassButton { text:qsTr("QSO transfer experiment…"); onClicked:qsoWireDialog.open() }
             Item { Layout.fillWidth:true }
         }
 
@@ -224,6 +226,42 @@ GlassPanel {
                 } }
                 GlassButton { text: qsTr("Close"); onClicked: serialAuthorityDialog.close() }
             }
+        }
+    }
+
+    DialogFrame {
+        id:qsoWireDialog
+        transientParent:root.Window.window
+        title:qsTr("Experimental QSO transfer")
+        width:700; height:600
+        property string localError:""
+        onClosed:root.net.clearExperimentalQso()
+        body:ColumnLayout {
+            spacing:8
+            Text { id:qsoWireWarning; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Experimental UDP broadcast: QSO data is not encrypted and any listener on the network may read it. Station IDs are not authenticated. Only share data with trusted stations and networks.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                text:qsTr("Your station ID: %1. Both stations must enter the same transfer ID. The receiver arms first; the sender then sends one QSO. Received data is not added to the log.").arg(root.net.nodeId) }
+            LabeledField { label:qsTr("Other station ID"); StyledTextField { id:wirePeer; Layout.fillWidth:true } }
+            LabeledField { label:qsTr("Transfer ID"); RowLayout { Layout.fillWidth:true
+                StyledTextField { id:wireTransfer; Layout.fillWidth:true }
+                GlassButton { text:qsTr("Generate"); onClicked:wireTransfer.text=root.net.nodeId + "-" + Date.now().toString(36) }
+            } }
+            LabeledField { label:qsTr("QSO UUID to send"); StyledTextField { id:wireUuid; Layout.fillWidth:true } }
+            RowLayout {
+                GlassButton { text:qsTr("Arm receiver"); enabled:root.net.running; onClicked:qsoWireDialog.localError=root.net.armExperimentalQsoReceiver(wirePeer.text,wireTransfer.text) }
+                GlassButton { text:qsTr("Send QSO"); enabled:root.net.running && !root.net.experimentalQsoSending; onClicked:qsoWireDialog.localError=root.net.sendExperimentalQso(wirePeer.text,wireUuid.text,wireTransfer.text) }
+                GlassButton { text:qsTr("Request missing"); enabled:root.net.running; onClicked:qsoWireDialog.localError=root.net.requestExperimentalQsoMissing() }
+            }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textSecondary
+                text:qsoWireDialog.localError || root.net.experimentalQsoStatus }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.textPrimary
+                visible:root.net.experimentalQsoPreview.complete === true
+                text:qsTr("Received %1 · UUID %2 · revision %3 · deleted %4").arg(root.net.experimentalQsoPreview.call || "—").arg(root.net.experimentalQsoPreview.uuid || "").arg(root.net.experimentalQsoPreview.revision).arg(root.net.experimentalQsoPreview.deleted ? qsTr("yes") : qsTr("no")) }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                text:qsTr("Transfer state expires after five minutes. If no fragment arrives, ask the sender to send again; repeat missing requests as needed. Closing this window clears the transfer.") }
+            Item { Layout.fillHeight:true }
+            GlassButton { text:qsTr("Close"); onClicked:qsoWireDialog.close() }
         }
     }
 

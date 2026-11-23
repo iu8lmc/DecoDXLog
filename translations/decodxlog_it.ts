@@ -2273,6 +2273,21 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>QSO transfer experiment…</source><translation>Trasferimento QSO sperimentale…</translation></message>
+    <message><source>Experimental QSO transfer</source><translation>Trasferimento QSO sperimentale</translation></message>
+    <message><source>Experimental UDP broadcast: QSO data is not encrypted and any listener on the network may read it. Station IDs are not authenticated. Only share data with trusted stations and networks.</source><translation>Broadcast UDP sperimentale: i dati QSO non sono cifrati e chiunque ascolti sulla rete può leggerli. Gli ID delle stazioni non sono autenticati. Condividi dati solo con stazioni e reti attendibili.</translation></message>
+    <message><source>Your station ID: %1. Both stations must enter the same transfer ID. The receiver arms first; the sender then sends one QSO. Received data is not added to the log.</source><translation>ID di questa stazione: %1. Entrambe le stazioni devono inserire lo stesso ID di trasferimento. Il ricevitore si prepara per primo; il mittente invia poi un QSO. I dati ricevuti non vengono aggiunti al log.</translation></message>
+    <message><source>Other station ID</source><translation>ID dell’altra stazione</translation></message>
+    <message><source>Transfer ID</source><translation>ID trasferimento</translation></message>
+    <message><source>Generate</source><translation>Genera</translation></message>
+    <message><source>QSO UUID to send</source><translation>UUID del QSO da inviare</translation></message>
+    <message><source>Arm receiver</source><translation>Prepara ricezione</translation></message>
+    <message><source>Send QSO</source><translation>Invia QSO</translation></message>
+    <message><source>Request missing</source><translation>Richiedi mancanti</translation></message>
+    <message><source>Received %1 · UUID %2 · revision %3 · deleted %4</source><translation>Ricevuto %1 · UUID %2 · revisione %3 · cancellato %4</translation></message>
+    <message><source>yes</source><translation>sì</translation></message>
+    <message><source>no</source><translation>no</translation></message>
+    <message><source>Transfer state expires after five minutes. If no fragment arrives, ask the sender to send again; repeat missing requests as needed. Closing this window clears the transfer.</source><translation>Il trasferimento scade dopo cinque minuti. Se non arriva alcun frammento, chiedi al mittente di inviare di nuovo; ripeti la richiesta dei mancanti se necessario. La chiusura della finestra cancella il trasferimento.</translation></message>
     <message><source>Open and read every page of each long field before importing or applying. Remaining: %1</source><translation>Apri e leggi tutte le pagine di ogni campo lungo prima di importare o applicare. Rimanenti: %1</translation></message>
     <message><source>Read field name…</source><translation>Leggi il nome del campo…</translation></message>
     <message><source>Read current value…</source><translation>Leggi il valore corrente…</translation></message>
