@@ -9,6 +9,12 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QLibrary>
+#include <QSqlDriver>
+#include <QElapsedTimer>
+#include <atomic>
+#include <thread>
+#include <cstring>
 
 using namespace decolog::core;
 class TestRadioNet : public QObject {
@@ -28,6 +34,36 @@ class TestRadioNet : public QObject {
         // Comparison with the previous unguarded insertion path after the same closure.
         QCOMPARE(first.insertQso(record,"manual",{},true,0,false).status,InsertResult::Status::Inserted); QCOMPARE(first.qsoCount(),qint64(2));
         QCOMPARE(first.insertQso(record,"import",{},false,0,false).status,InsertResult::Status::Inserted);
+    }
+    void guardedInsertRejectsCloseBetweenCheckAndWrite()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("Explicit opt-in required for verified system SQLite driver");
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int (*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int (*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); if (!setAuthorizer) QSKIP("SQLite native authorizer unavailable");
+        struct Gate { std::atomic_bool ready{false}, entered{false}, done{false}, closed{false}, timedOut{false}; };
+        const auto hook=+[](void* opaque,int action,const char* table,const char*,const char*,const char*) {
+            auto* gate=static_cast<Gate*>(opaque); if (action==18 && table && std::strcmp(table,"qso")==0 && !gate->entered.exchange(true)) {
+                QElapsedTimer timer; timer.start(); while (!gate->done.load() && timer.elapsed()<5000) QThread::msleep(1); if (!gate->done.load()) gate->timedOut=true;
+            } return 0;
+        };
+        for (const bool guarded : {false,true}) {
+            QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("race.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+            QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=WAL")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString().toLower(),QString("wal")); q.finish();
+            RadioNet net(&db); QVERIFY(net.start("Net")); QVERIFY(net.checkIn("K1ABC","Alice","")); const qint64 sid=net.session().value("id").toLongLong();
+            q.prepare("SELECT s.uuid,m.id FROM radio_net_session s JOIN radio_net_member m ON m.session_id=s.id WHERE s.id=?"); q.addBindValue(sid); QVERIFY(q.exec()); QVERIFY(q.next()); const QString uuid=q.value(0).toString(); const qint64 mid=q.value(1).toLongLong(); q.finish();
+            QVariant handle=db.connection().driver()->handle(); if (QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native handle unavailable"); void* native=*static_cast<void**>(handle.data()); QVERIFY(native);
+            Gate gate; std::thread writer([&] { LogDatabase other; if (other.openExistingReadWrite(path)) { RadioNet otherNet(&other); if (otherNet.selectSession(sid)) { gate.ready=true; QElapsedTimer timer; timer.start(); while (!gate.entered.load() && timer.elapsed()<5000) QThread::msleep(1); if (gate.entered.load()) gate.closed=otherNet.closeSession(); } } gate.done=true; });
+            QElapsedTimer readyTimer; readyTimer.start(); while (!gate.ready.load() && !gate.done.load() && readyTimer.elapsed()<5000) QThread::msleep(1);
+            const bool ready=gate.ready.load(); const int installed=ready ? setAuthorizer(native,hook,&gate) : -1;
+            InsertResult result; if (installed==0) { AdifRecord r{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_RADIO_NET_SESSION",uuid},{"APP_DECOLOG_RADIO_NET_CALL","K1ABC"}};
+                result=db.insertQso(r,"manual",{},true,0,false,guarded?sid:0,guarded?mid:0); }
+            setAuthorizer(native,nullptr,nullptr); writer.join();
+            QVERIFY(ready); QCOMPARE(installed,0); QVERIFY(gate.entered.load()); QVERIFY(gate.done.load()); QVERIFY(gate.closed.load()); QVERIFY(!gate.timedOut.load());
+            QCOMPARE(result.status==InsertResult::Status::Inserted,!guarded); QCOMPARE(db.qsoCount(),guarded?qint64(0):qint64(1));
+        }
     }
     void radioNetGuardAndContestSerialCommitTogether()
     {
