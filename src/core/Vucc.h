@@ -19,6 +19,7 @@ struct Entry {
     QString myGrids;
     QString myGrid;
     QString otherEvidence; // recorded confirmations not accepted by this candidate filter
+    QString propMode, satName, rxBand, classification;
 };
 
 struct Rules {
@@ -26,6 +27,7 @@ struct Rules {
     QString site;
     QString band;
     int target{100};
+    QString scope{QStringLiteral("terrestrial")};
 };
 
 struct Result {

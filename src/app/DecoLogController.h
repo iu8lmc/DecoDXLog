@@ -566,7 +566,7 @@ public:
                                           int maxPerEntity = 1, qint64 stationProfileId = 0) const;
     // VUCC resta separato dal conteggio statistico dei locatori.
     Q_INVOKABLE QVariantMap vuccPreview(const QString& band, const QString& account = {},
-                                         const QString& site = {}, int target = 100) const;
+                                         const QString& site = {}, int target = 100, const QString& scope = QStringLiteral("terrestrial")) const;
 
     // ── Statistiche ─────────────────────────────────────────────────────────
     // `mode` vuoto = tutti i modi, `year` 0 = tutti gli anni. Ogni elenco e'

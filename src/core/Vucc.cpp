@@ -105,7 +105,10 @@ bool Result::isValid(QString* error) const
         if (error) *error = QStringLiteral("invalid VUCC target");
         return false;
     }
-    if (rules.band.trimmed().isEmpty()) {
+    if (rules.scope != QLatin1String("terrestrial") && rules.scope != QLatin1String("satellite")) {
+        if (error) *error = QStringLiteral("invalid VUCC scope"); return false;
+    }
+    if (rules.scope == QLatin1String("terrestrial") && rules.band.trimmed().isEmpty()) {
         if (error) *error = QStringLiteral("VUCC band is required");
         return false;
     }
@@ -134,7 +137,18 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             result.exclusions << QStringLiteral("QSO %1: invalid or inconsistent grid data").arg(entry.qsoId);
             continue;
         }
-        if (norm(entry.band) != norm(rules.band)) {
+        const QString propagation=norm(entry.propMode), satelliteName=norm(entry.satName);
+        if (!satelliteName.isEmpty() && propagation!=QLatin1String("SAT")) {
+            result.exclusions << QStringLiteral("QSO %1: inconsistent satellite metadata; review propagation mode").arg(entry.qsoId); continue;
+        }
+        const bool viaSatellite=propagation==QLatin1String("SAT");
+        if ((rules.scope==QLatin1String("satellite")) != viaSatellite) {
+            result.exclusions << QStringLiteral("QSO %1: propagation scope mismatch").arg(entry.qsoId); continue;
+        }
+        if (!viaSatellite && !entry.rxBand.trimmed().isEmpty() && norm(entry.band)!=norm(entry.rxBand)) {
+            result.exclusions << QStringLiteral("QSO %1: recorded crossband contact needs review").arg(entry.qsoId); continue;
+        }
+        if (!viaSatellite && norm(entry.band) != norm(rules.band)) {
             result.exclusions << QStringLiteral("QSO %1: band mismatch").arg(entry.qsoId);
             continue;
         }
@@ -170,6 +184,8 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             Entry credited = entry;
             credited.grid = grid;
             credited.evidence=accepted.join(QLatin1Char(',')); credited.otherEvidence=other.join(QLatin1Char(','));
+            credited.classification=viaSatellite ? (satelliteName.isEmpty() ? QStringLiteral("satellite-name-missing") : QStringLiteral("satellite"))
+                : propagation.isEmpty() ? QStringLiteral("terrestrial-unreported") : QStringLiteral("terrestrial");
             result.eligible << credited;
             grids.insert(grid);
         }
@@ -187,7 +203,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "IFNULL(p.operating_location, ''), "
             "EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
             "(SELECT group_concat(s.service, ',') FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
-            "IFNULL(q.adif_extra, '') "
+            "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,'') "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
             "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
@@ -202,6 +218,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.site = query.value(4).toString();
         entry.confirmed = query.value(5).toBool();
         entry.evidence = query.value(6).toString();
+        entry.propMode=query.value(8).toString(); entry.satName=query.value(9).toString(); entry.rxBand=query.value(10).toString();
         const QByteArray extra = query.value(7).toByteArray();
         if (!extra.isEmpty()) {
             QJsonParseError parseError;
@@ -243,7 +260,9 @@ QJsonDocument Result::toJson() const
                                 {QStringLiteral("reportedMyVuccGrids"), entry.myGrids},
                                 {QStringLiteral("reportedMyGrid"), entry.myGrid},
                                 {QStringLiteral("evidence"), entry.evidence},
-                                {QStringLiteral("otherEvidence"), entry.otherEvidence}});
+                                {QStringLiteral("otherEvidence"), entry.otherEvidence},
+                                {QStringLiteral("propMode"),entry.propMode},{QStringLiteral("satName"),entry.satName},
+                                {QStringLiteral("rxBand"),entry.rxBand},{QStringLiteral("classification"),entry.classification}});
     }
     QJsonArray exclusions;
     for (const auto& value : this->exclusions) exclusions.append(value);
@@ -252,6 +271,7 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("account"), rules.account},
                                      {QStringLiteral("site"), rules.site},
                                      {QStringLiteral("band"), rules.band},
+                                     {QStringLiteral("scope"), rules.scope},
                                      {QStringLiteral("target"), rules.target},
                                      {QStringLiteral("eligible"), rows},
                                      {QStringLiteral("exclusions"), exclusions}});

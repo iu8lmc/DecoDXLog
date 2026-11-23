@@ -11,6 +11,23 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void separatesTerrestrialAndSatelliteCandidates()
+    {
+        decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>2m<MODE:2>CW<GRIDSQUARE:4>EM10<QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1201<BAND:2>2m<BAND_RX:4>70cm<PROP_MODE:3>SAT<SAT_NAME:5>AO-91<MODE:2>FM<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1CCC<QSO_DATE:8>20260101<TIME_ON:4>1202<BAND:4>70cm<BAND_RX:2>2m<PROP_MODE:3>SAT<SAT_NAME:5>AO-92<MODE:2>FM<GRIDSQUARE:4>EM12<QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1DDD<QSO_DATE:8>20260101<TIME_ON:4>1203<BAND:2>2m<SAT_NAME:5>AO-91<MODE:2>FM<GRIDSQUARE:4>EM13<QSL_RCVD:1>Y<EOR>"
+            "<CALL:5>K1EEE<QSO_DATE:8>20260101<TIME_ON:4>1204<BAND:2>2m<BAND_RX:4>70cm<MODE:2>FM<GRIDSQUARE:4>EM14<QSL_RCVD:1>Y<EOR>";
+        QCOMPARE(db.importAdif(data).inserted,5); QString error; const auto entries=loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error));
+        const auto terrestrial=select(entries,Rules{{},{},"2m",100,"terrestrial"}); QCOMPARE(terrestrial.eligible.size(),1);
+        QCOMPARE(terrestrial.eligible.first().grid,QString("EM10")); QCOMPARE(terrestrial.eligible.first().classification,QString("terrestrial-unreported"));
+        const auto satellite=select(entries,Rules{{},{},"",100,"satellite"}); QCOMPARE(satellite.eligible.size(),2);
+        QCOMPARE(satellite.eligible[0].grid,QString("EM11")); QCOMPARE(satellite.eligible[1].grid,QString("EM12"));
+        QCOMPARE(satellite.eligible[0].satName,QString("AO-91")); QVERIFY(satellite.exclusions.join('\n').contains("inconsistent satellite"));
+        QVERIFY(terrestrial.exclusions.join('\n').contains("crossband")); QVERIFY(!satellite.officialRulesVerified);
+        QVERIFY(!select(entries,Rules{{},{},"2m",100,"invalid"}).isValid()); QCOMPARE(db.qsoCount(),qint64(5));
+    }
     void excludesUnsupportedElectronicConfirmationSources()
     {
         decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));

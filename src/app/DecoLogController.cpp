@@ -3165,9 +3165,9 @@ bool DecoLogController::saveCqMarathonExport(const QUrl& file, int year, const Q
 }
 
 QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& account,
-                                            const QString& site, int target) const
+                                            const QString& site, int target, const QString& scope) const
 {
-    core::vucc::Rules rules{account, site, band, target};
+    core::vucc::Rules rules{account, site, band, target,scope};
     QString error;
     const auto entries = core::vucc::loadEntries(m_db, &error);
     if (!error.isEmpty())
@@ -3186,10 +3186,15 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
                                 {QStringLiteral("reportedMyGrid"), entry.myGrid},
                                 {QStringLiteral("evidence"), entry.evidence},
                                 {QStringLiteral("otherEvidence"), entry.otherEvidence}};
+    for (qsizetype i=0;i<result.eligible.size();++i) {
+        auto row=eligible[i].toMap(); const auto& e=result.eligible[i];
+        row.insert(QStringLiteral("propMode"),e.propMode); row.insert(QStringLiteral("satName"),e.satName);
+        row.insert(QStringLiteral("rxBand"),e.rxBand); row.insert(QStringLiteral("classification"),e.classification); eligible[i]=row;
+    }
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},
                        {QStringLiteral("error"), validationError},
-                       {QStringLiteral("officialRulesVerified"), result.officialRulesVerified},
+                       {QStringLiteral("officialRulesVerified"), result.officialRulesVerified},{QStringLiteral("scope"),rules.scope},
                        {QStringLiteral("eligible"), eligible},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))}};

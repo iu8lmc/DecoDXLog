@@ -68,6 +68,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void vuccSatellitePreviewUsesSeparateCategory()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>2m<MODE:2>CW<GRIDSQUARE:4>EM10<QSL_RCVD:1>Y<EOR>"
+              "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1201<BAND:2>2m<BAND_RX:4>70cm<PROP_MODE:3>SAT<SAT_NAME:5>AO-91<MODE:2>FM<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EOR>";
+          QCOMPARE(db.importAdif(data).inserted,2); }
+        QByteArray output; QVERIFY2(launch(dir,"vuccsatelliteprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE vuccReview open=true row=EM11") && output.contains("satellite AO-91") && output.contains("TX 2m / RX 70cm") && output.contains("propagation scope mismatch") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void vuccReviewShowsAllowedAndUnsupportedEvidence()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

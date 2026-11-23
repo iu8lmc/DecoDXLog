@@ -44,12 +44,14 @@ DialogFrame {
     property string vuccBand: "6m"
     property string vuccAccount: ""
     property string vuccSite: ""
+    property string vuccScope: "terrestrial"
     property int vuccTarget: 100
     property var vuccResult: ({})
     onVuccBandChanged: vuccResult=({})
     onVuccAccountChanged: vuccResult=({})
     onVuccSiteChanged: vuccResult=({})
     onVuccTargetChanged: vuccResult=({})
+    onVuccScopeChanged: vuccResult=({})
     property var plannerGoals: ["dxcc"]
     property bool plannerSelectionDirty: false
     Settings { id: plannerSettings; category: "qslPlanner"; property string goalsJson: '["dxcc"]' }
@@ -493,11 +495,11 @@ DialogFrame {
     }
 
     function refreshVucc() {
-        vuccResult = decolog.vuccPreview(vuccBand, vuccAccount, vuccSite, vuccTarget)
+        vuccResult = decolog.vuccPreview(vuccBand, vuccAccount, vuccSite, vuccTarget, vuccScope)
     }
     Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close() } }
-    function probeVuccReview() {
-        openAt("dxcc"); vuccBand="6m"; refreshVucc(); vuccReview.open()
+    function probeVuccReview(satellite) {
+        openAt("dxcc"); vuccBand=satellite ? "2m" : "6m"; vuccScopePicker.currentIndex=satellite ? 1 : 0; refreshVucc(); vuccReview.open()
         Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")) })
     }
 
@@ -505,12 +507,12 @@ DialogFrame {
         id:vuccReview; title:qsTr("VUCC candidate review"); dialogKey:"vuccReview"; width:720; height:600; dotColor:Theme.secondaryColor
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Local LoTW or paper confirmation status only. Verify the confirmation, grids, location, band and account with ARRL; these candidates are not award credit. Other recorded services do not qualify this preview.") }
+                text:qsTr("Local LoTW or paper confirmation status only. Non-satellite contacts without propagation data are assumed non-satellite and require review. Verify confirmation, propagation, grids, location, band and account with ARRL; these candidates are not award credit.") }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Candidate grids and recorded evidence") }
             ListView { id:vuccCandidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.eligible || []
                 ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:vuccCandidateRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
-                    text:qsTr("%1 · QSO %2 · local confirmation: %3%4").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "") }
+                    text:qsTr("%1 · QSO %2 · local confirmation: %3%4 · %5").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "").arg(modelData.classification === "terrestrial-unreported" ? qsTr("propagation unreported; verify") : modelData.classification === "satellite-name-missing" ? qsTr("satellite name missing; verify") : modelData.classification === "satellite" ? qsTr("satellite %1 · TX %2 / RX %3").arg(modelData.satName).arg(modelData.band).arg(modelData.rxBand || qsTr("unknown")) : qsTr("propagation %1").arg(modelData.propMode)) }
             }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Excluded or duplicate candidates") }
             ListView { id:vuccExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.exclusions || []
@@ -951,7 +953,8 @@ DialogFrame {
                             color: Theme.textSecondary
                             font.pixelSize: 11
                         }
-                        StyledTextField { Layout.preferredWidth: 65; Accessible.name: qsTr("VUCC band"); text: root.vuccBand; onEditingFinished: root.vuccBand = text }
+                        StyledComboBox { id:vuccScopePicker; Layout.preferredWidth:145; Accessible.name:qsTr("VUCC category"); model:[qsTr("Non-satellite"),qsTr("Satellite")]; onCurrentIndexChanged:root.vuccScope=currentIndex===1 ? "satellite" : "terrestrial" }
+                        StyledTextField { Layout.preferredWidth: 65; enabled:root.vuccScope === "terrestrial"; Accessible.name: qsTr("VUCC band"); text: root.vuccBand; onEditingFinished: root.vuccBand = text }
                         StyledTextField { Layout.preferredWidth: 120; Accessible.name: qsTr("VUCC award account"); placeholderText: qsTr("Award account"); text: root.vuccAccount; onEditingFinished: root.vuccAccount = text }
                         StyledTextField { Layout.preferredWidth: 120; Accessible.name: qsTr("VUCC operating site"); placeholderText: qsTr("Operating site"); text: root.vuccSite; onEditingFinished: root.vuccSite = text }
                         StyledTextField { Layout.preferredWidth: 55; Accessible.name: qsTr("VUCC target"); text: String(root.vuccTarget); inputMethodHints: Qt.ImhDigitsOnly; onEditingFinished: root.vuccTarget = Math.max(1, parseInt(text) || 1) }
