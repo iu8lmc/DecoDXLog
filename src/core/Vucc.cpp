@@ -100,6 +100,20 @@ bool validGrid4(const QString& grid)
     return pattern.match(norm(grid)).hasMatch();
 }
 
+int initialThreshold(const QString& scope,const QString& band)
+{
+    if (scope==QLatin1String("satellite")) return 100;
+    if (scope!=QLatin1String("terrestrial")) return 0;
+    const QString b=norm(band);
+    if (b==QLatin1String("6M") || b==QLatin1String("2M")) return 100;
+    if (b==QLatin1String("1.25M") || b==QLatin1String("70CM")) return 50;
+    if (b==QLatin1String("33CM") || b==QLatin1String("23CM")) return 25;
+    if (b==QLatin1String("13CM")) return 10;
+    static const QSet<QString> higher{QStringLiteral("9CM"),QStringLiteral("6CM"),QStringLiteral("3CM"),QStringLiteral("1.25CM"),
+        QStringLiteral("6MM"),QStringLiteral("4MM"),QStringLiteral("2.5MM"),QStringLiteral("2MM"),QStringLiteral("1MM")};
+    return higher.contains(b) ? 5 : 0;
+}
+
 bool Result::isValid(QString* error) const
 {
     if (rules.target < 1 || rules.target > 10000) {
@@ -113,10 +127,7 @@ bool Result::isValid(QString* error) const
         if (error) *error = QStringLiteral("VUCC band is required");
         return false;
     }
-    static const QSet<QString> bands{QStringLiteral("6M"),QStringLiteral("2M"),QStringLiteral("1.25M"),QStringLiteral("70CM"),
-        QStringLiteral("33CM"),QStringLiteral("23CM"),QStringLiteral("13CM"),QStringLiteral("9CM"),QStringLiteral("6CM"),QStringLiteral("3CM"),
-        QStringLiteral("1.25CM"),QStringLiteral("6MM"),QStringLiteral("4MM"),QStringLiteral("2.5MM"),QStringLiteral("2MM"),QStringLiteral("1MM"),QStringLiteral("SUBMM")};
-    if (rules.scope == QLatin1String("terrestrial") && !bands.contains(norm(rules.band))) {
+    if (initialThreshold(rules.scope,rules.band)==0 && !(rules.scope==QLatin1String("terrestrial") && norm(rules.band)==QLatin1String("SUBMM"))) {
         if (error) *error=QStringLiteral("Band is not in the supported VUCC band list"); return false;
     }
     return true;
@@ -287,6 +298,7 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("site"), rules.site},
                                      {QStringLiteral("band"), rules.band},
                                      {QStringLiteral("scope"), rules.scope},
+                                     {QStringLiteral("initialThreshold"), initialThreshold(rules.scope,rules.band)},
                                      {QStringLiteral("target"), rules.target},
                                      {QStringLiteral("eligible"), rows},
                                      {QStringLiteral("exclusions"), exclusions}});

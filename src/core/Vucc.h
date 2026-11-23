@@ -43,5 +43,7 @@ struct Result {
 Result select(const QList<Entry>& entries, const Rules& rules);
 QList<Entry> loadEntries(const LogDatabase& db, QString* error = nullptr);
 bool validGrid4(const QString& grid);
+// Initial category threshold from the January 2026 VUCC rules; zero if unsupported.
+int initialThreshold(const QString& scope, const QString& band);
 
 } // namespace decolog::core::vucc

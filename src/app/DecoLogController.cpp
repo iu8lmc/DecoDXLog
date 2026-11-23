@@ -3164,6 +3164,11 @@ bool DecoLogController::saveCqMarathonExport(const QUrl& file, int year, const Q
     return output.write(data) == data.size() && output.commit();
 }
 
+int DecoLogController::vuccInitialThreshold(const QString& scope,const QString& band) const
+{
+    return core::vucc::initialThreshold(scope,band);
+}
+
 QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& account,
                                             const QString& site, int target, const QString& scope) const
 {
@@ -3195,6 +3200,7 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},
                        {QStringLiteral("error"), validationError},
                        {QStringLiteral("officialRulesVerified"), result.officialRulesVerified},{QStringLiteral("scope"),rules.scope},
+                       {QStringLiteral("initialThreshold"),core::vucc::initialThreshold(rules.scope,rules.band)},
                        {QStringLiteral("eligible"), eligible},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))}};

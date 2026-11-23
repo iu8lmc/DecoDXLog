@@ -47,6 +47,7 @@ DialogFrame {
     property string vuccScope: "terrestrial"
     property int vuccTarget: 100
     property var vuccResult: ({})
+    readonly property int vuccInitial: decolog.vuccInitialThreshold(vuccScope,vuccBand)
     onVuccBandChanged: vuccResult=({})
     onVuccAccountChanged: vuccResult=({})
     onVuccSiteChanged: vuccResult=({})
@@ -501,6 +502,13 @@ DialogFrame {
     function probeVuccReview(satellite) {
         openAt("dxcc"); vuccBand=satellite ? "2m" : "6m"; vuccScopePicker.currentIndex=satellite ? 1 : 0; refreshVucc(); vuccReview.open()
         Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")) })
+    }
+    function probeVuccThreshold() {
+        openAt("dxcc"); vuccScopePicker.currentIndex=0; vuccBand="70cm"; vuccTarget=125
+        console.warn("PROBE vuccThreshold before="+vuccTarget+" minimum="+vuccInitial+" label="+vuccThresholdLabel.text)
+        vuccUseMinimum.clicked(); vuccBand="13cm"; console.warn("PROBE vuccThreshold applied="+vuccTarget+" next="+vuccInitial+" field="+vuccTargetField.text)
+        vuccBand="4m"; console.warn("PROBE vuccThreshold unsupported="+vuccInitial+" enabled="+vuccUseMinimum.enabled)
+        vuccScopePicker.currentIndex=1; console.warn("PROBE vuccThreshold satellite="+vuccInitial+" target="+vuccTarget)
     }
 
     DialogFrame {
@@ -957,9 +965,14 @@ DialogFrame {
                         StyledTextField { Layout.preferredWidth: 65; enabled:root.vuccScope === "terrestrial"; Accessible.name: qsTr("VUCC band"); text: root.vuccBand; onEditingFinished: root.vuccBand = text }
                         StyledTextField { Layout.preferredWidth: 120; Accessible.name: qsTr("VUCC award account"); placeholderText: qsTr("Award account"); text: root.vuccAccount; onEditingFinished: root.vuccAccount = text }
                         StyledTextField { Layout.preferredWidth: 120; Accessible.name: qsTr("VUCC operating site"); placeholderText: qsTr("Operating site"); text: root.vuccSite; onEditingFinished: root.vuccSite = text }
-                        StyledTextField { Layout.preferredWidth: 55; Accessible.name: qsTr("VUCC target"); text: String(root.vuccTarget); inputMethodHints: Qt.ImhDigitsOnly; onEditingFinished: root.vuccTarget = Math.max(1, parseInt(text) || 1) }
+                        StyledTextField { id:vuccTargetField; Layout.preferredWidth: 55; Accessible.name: qsTr("VUCC target"); text: String(root.vuccTarget); inputMethodHints: Qt.ImhDigitsOnly; onEditingFinished: root.vuccTarget = Math.max(1, parseInt(text) || 1) }
                         GlassButton { Accessible.name: qsTr("Preview VUCC selection"); text: qsTr("Preview"); onClicked: root.refreshVucc() }
                         GlassButton { Accessible.name:qsTr("Review VUCC candidates"); text:qsTr("Review"); enabled:root.vuccResult.valid === true; onClicked:vuccReview.open() }
+                    }
+                    RowLayout {
+                        Text { id:vuccThresholdLabel; Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap; font.pixelSize:11
+                            text:root.vuccInitial ? qsTr("ARRL initial threshold: %1 grids (January 2026); your target remains editable.").arg(root.vuccInitial) : qsTr("No supported initial threshold for this selection.") }
+                        GlassButton { id:vuccUseMinimum; text:qsTr("Use initial threshold"); enabled:root.vuccInitial>0; onClicked:root.vuccTarget=root.vuccInitial }
                     }
                     Text {
                         Layout.fillWidth: true

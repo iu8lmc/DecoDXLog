@@ -68,6 +68,15 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void vuccThresholdCanBeAppliedWithoutOverwritingCustomGoal()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,"vuccthresholdprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE vuccThreshold before=125 minimum=50 label=ARRL initial threshold: 50 grids") &&
+                 output.contains("PROBE vuccThreshold applied=50 next=10 field=50") && output.contains("PROBE vuccThreshold unsupported=0 enabled=false") &&
+                 output.contains("PROBE vuccThreshold satellite=100 target=50") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void vuccReviewShowsDateBoundaryExclusion()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

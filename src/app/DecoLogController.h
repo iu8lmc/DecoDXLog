@@ -567,6 +567,7 @@ public:
     // VUCC resta separato dal conteggio statistico dei locatori.
     Q_INVOKABLE QVariantMap vuccPreview(const QString& band, const QString& account = {},
                                          const QString& site = {}, int target = 100, const QString& scope = QStringLiteral("terrestrial")) const;
+    Q_INVOKABLE int vuccInitialThreshold(const QString& scope,const QString& band) const;
 
     // ── Statistiche ─────────────────────────────────────────────────────────
     // `mode` vuoto = tutti i modi, `year` 0 = tutti gli anni. Ogni elenco e'

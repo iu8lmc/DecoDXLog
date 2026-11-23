@@ -11,6 +11,18 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void initialThresholdsMatchPublishedCategories()
+    {
+        QCOMPARE(initialThreshold("terrestrial","6m"),100); QCOMPARE(initialThreshold("terrestrial","2m"),100);
+        QCOMPARE(initialThreshold("terrestrial","1.25m"),50); QCOMPARE(initialThreshold("terrestrial","70cm"),50);
+        QCOMPARE(initialThreshold("terrestrial","33cm"),25); QCOMPARE(initialThreshold("terrestrial","23cm"),25);
+        QCOMPARE(initialThreshold("terrestrial","13cm"),10);
+        for (const auto &band:QStringList{"9cm","6cm","3cm","1.25cm","6mm","4mm","2.5mm","2mm","1mm"}) QCOMPARE(initialThreshold("terrestrial",band),5);
+        QCOMPARE(initialThreshold("terrestrial","submm"),0); // broad ADIF band does not identify a qualifying laser contact
+        QCOMPARE(initialThreshold("satellite",{}),100); QCOMPARE(initialThreshold("terrestrial","4m"),0); QCOMPARE(initialThreshold("invalid","6m"),0);
+        const auto preview=select({},Rules{{},{},"70cm",123}); QVERIFY(preview.isValid()); QCOMPARE(preview.rules.target,123);
+        QCOMPARE(preview.toJson().object().value("initialThreshold").toInt(),50);
+    }
     void appliesVuccDateAndSupportedBandBoundaries()
     {
         decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));
