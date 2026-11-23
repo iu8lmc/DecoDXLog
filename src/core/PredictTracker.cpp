@@ -237,7 +237,10 @@ void PredictTracker::receive()
         } else if (m_stage == 3) {
             bool ok = false;
             const double shift = raw.trimmed().toDouble(&ok);
-            if (!ok || !std::isfinite(shift)) {
+            // PREDICT's 100 MHz normalisation is a classical radial-velocity
+            // approximation. A magnitude at or above the reference frequency
+            // implies a radial speed at least equal to light speed in that model.
+            if (!ok || !std::isfinite(shift) || std::abs(shift) >= 100000000.0) {
                 fail(QStringLiteral("Invalid PREDICT Doppler response"));
                 return;
             }

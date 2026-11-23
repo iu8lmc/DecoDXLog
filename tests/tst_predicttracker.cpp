@@ -104,6 +104,29 @@ class TestPredictTracker : public QObject {
         QVERIFY(!done.takeFirst().at(0).toBool());
         QVERIFY(tracker.satellites().isEmpty());
     }
+    void rejectsPhysicallyImpossibleNormalizedDoppler()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0)); QByteArray shift="100000001\n"; QStringList commands;
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray request(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress host; quint16 port;
+                server.readDatagram(request.data(),request.size(),&host,&port); commands << QString::fromLatin1(request).trimmed(); QByteArray response;
+                if (request.startsWith("GET_MODE")) response="MULTI\n";
+                else if (request.startsWith("GET_SAT ")) response="OSCAR-7\n1\n2\n3\n4\n1800000000\n6\n7\n8\n9\n10\nD\n";
+                else if (request.startsWith("GET_DOPPLER ")) response=shift;
+                else response="OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n";
+                server.writeDatagram(response,host,port);
+            }
+        });
+        PredictTracker tracker; QSignalSpy done(&tracker,&PredictTracker::finished);
+        QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000);
+        QVERIFY(!done.first().at(0).toBool()); QVERIFY(tracker.snapshot().isEmpty());
+        QCOMPARE(commands,QStringList({"GET_MODE","GET_TLE OSCAR-7","GET_SAT OSCAR-7","GET_DOPPLER OSCAR-7"}));
+        commands.clear(); shift="-100000000\n"; QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,3000); QVERIFY(!done.last().at(0).toBool());
+        commands.clear(); shift="961.742249\n"; QVERIFY(tracker.request("127.0.0.1",server.localPort(),"OSCAR-7")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),3,3000);
+        QVERIFY(done.last().at(0).toBool()); QCOMPARE(tracker.snapshot().value("doppler100MHz").toDouble(),961.742249);
+        QCOMPARE(commands,QStringList({"GET_MODE","GET_TLE OSCAR-7","GET_SAT OSCAR-7","GET_DOPPLER OSCAR-7","GET_TLE OSCAR-7","GET_MODE"}));
+    }
     void rejectsTleChangeDuringSnapshot()
     {
         QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0)); int tleCount=0; QStringList commands;
