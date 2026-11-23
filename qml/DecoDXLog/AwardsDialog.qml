@@ -46,7 +46,7 @@ DialogFrame {
     property var marathonWorkingZones: []
     property string marathonExportMessage: ""
     property string marathonImportNotice: ""
-    onMarathonYearChanged: marathonPreview=({})
+    onMarathonYearChanged: { marathonPreview=({}); if (marathonYear===2026) marathonMaxPerEntity=1 }
     onMarathonCategoryChanged: marathonPreview=({})
     onMarathonBandChanged: marathonPreview=({})
     onMarathonMaxPerEntityChanged: marathonPreview=({})
@@ -578,6 +578,12 @@ DialogFrame {
         const loaded=loadMarathonReviewed("file://"+path)
         console.warn("PROBE marathonSingleBand band="+marathonPreview.band+" count="+count+" zones="+zones+" saved="+saved+" loaded="+loaded+" exclusions="+marathonPreview.exclusions.join("|"))
     }
+    function probeMarathonEntityLimit(profile) {
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2025; marathonMaxPerEntity=2
+        const before=marathonMaxPerEntity+","+marathonEntityLimit.enabled
+        marathonYear=2026; refreshMarathon()
+        console.warn("PROBE marathonEntityLimit before="+before+" after="+marathonMaxPerEntity+","+marathonEntityLimit.enabled+" entities="+marathonWorkingEntities.length+" zones="+marathonWorkingZones.length)
+    }
     function probeMarathonReviewedImport(path,profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
         const before=marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId
@@ -1037,8 +1043,10 @@ DialogFrame {
                             onActivated: root.marathonCategory = values[currentIndex]
                         }
                         StyledTextField {
+                            id:marathonEntityLimit
                             Layout.preferredWidth: 55
                             Accessible.name: qsTr("CQ DX Marathon maximum contacts per entity")
+                            enabled: root.marathonYear !== 2026
                             text: String(root.marathonMaxPerEntity)
                             inputMethodHints: Qt.ImhDigitsOnly
                             onEditingFinished: { root.marathonMaxPerEntity = Math.max(1, parseInt(text) || 1) }
@@ -1071,6 +1079,7 @@ DialogFrame {
                             model:[qsTr("All bands"),"160m","80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"]
                             readonly property var values:["","160m","80m","60m","40m","30m","20m","17m","15m","12m","10m","6m"]
                             currentIndex:Math.max(0,values.indexOf(root.marathonBand)); onActivated:root.marathonBand=values[currentIndex] }
+                        Text { visible:root.marathonYear===2026; text:qsTr("2026: one candidate per entity; zones are selected separately."); color:Theme.textSecondary; wrapMode:Text.Wrap; Layout.fillWidth:true }
                     }
                     Text {
                         Layout.fillWidth: true

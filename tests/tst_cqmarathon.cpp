@@ -11,6 +11,16 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void edition2026RequiresOneCandidatePerEntity()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","CW",when},{2,"K2BBB",291,3,"40m","CW",when}};
+        const auto invalid=select(entries,{2026,"mixed",2}); QString error;
+        QVERIFY(!invalid.isValid(&error)); QVERIFY(error.contains("2026")); QVERIFY(invalid.selected.isEmpty());
+        const auto valid=select(entries,{2026,"mixed",1}); QCOMPARE(valid.selected.size(),1); QCOMPARE(valid.zoneCandidates.size(),2);
+        QList<Entry> prior=entries; for (auto& e:prior) e.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
+        QCOMPARE(select(prior,{2025,"mixed",2}).selected.size(),2);
+    }
     void singleBandAndModeAreIndependent()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

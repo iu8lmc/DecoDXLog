@@ -96,6 +96,10 @@ bool Result::isValid(QString* error) const
         if (error) *error = QStringLiteral("invalid CQ DX Marathon entity limit");
         return false;
     }
+    if (rules.year==2026 && rules.maxPerEntity!=1) {
+        if (error) *error=QStringLiteral("2026 CQ DX Marathon requires one candidate per entity");
+        return false;
+    }
     if (!rules.band.trimmed().isEmpty() && !supportedBands().contains(rules.band.trimmed().toLower())) {
         if (error) *error=QStringLiteral("unsupported CQ DX Marathon band filter");
         return false;

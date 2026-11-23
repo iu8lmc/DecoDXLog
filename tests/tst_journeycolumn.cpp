@@ -69,6 +69,15 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathon2026LocksOneEntityAndKeepsZones()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","5"),qMakePair("K2BBB","3")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ",item.second}},"fixture",{},true,profile,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"marathonlimitprobe:"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("before=2,true after=1,false entities=1 zones=2") && !output.contains("TypeError"),output.constData());
+    }
     void marathonSingleBandPreviewAndJson()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
