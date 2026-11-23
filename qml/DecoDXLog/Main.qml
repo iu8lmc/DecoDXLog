@@ -25,6 +25,18 @@ RoundedWindow {
             }
         }
     }
+    Timer {
+        id: historicalRigProbeTimer
+        interval: 100
+        repeat: true
+        onTriggered: {
+            if (decolog.rig.connected && decolog.rig.split && decolog.rig.txFrequencyHz > 0) {
+                stop()
+                historicalQsoDialog.open()
+                historicalQsoDialog.probeHistoricalEntry()
+            }
+        }
+    }
 
     width: 1440
     height: 900
@@ -1261,11 +1273,14 @@ RoundedWindow {
         }
         else if (what[0] === "benchqso") { window.openContestDesk(); benchTimer.left = parseInt(what[1] || "5"); benchTimer.start() }
         else if (what[0] === "new") newQsoDialog.open()
+        else if (what[0] === "historical") historicalQsoDialog.open()
+        else if (what[0] === "historicalprobe") { historicalQsoDialog.open(); Qt.callLater(() => historicalQsoDialog.probeHistoricalEntry()) }
         else if (what[0] === "satellitesplit") {
             newQsoDialog.open()
             Qt.callLater(function () { newQsoDialog.probeSatelliteSplit() })
         }
         else if (what[0] === "rigsplitprobe") rigSplitProbeTimer.start()
+        else if (what[0] === "historicalrigprobe") historicalRigProbeTimer.start()
         else if (what[0] === "predictprobe") { predictDialog.open(); Qt.callLater(() => predictDialog.probe(what[1], what[2], what[3])) }
         else if (what[0] === "predictlist") { predictDialog.open(); Qt.callLater(() => predictDialog.probeList(what[1], what[2])) }
         else if (what[0] === "predictlive") { predictDialog.open(); Qt.callLater(() => predictDialog.probeLive(what[1], what[2], what[3])) }
@@ -1651,6 +1666,7 @@ RoundedWindow {
            onTriggered: decolog.tuneTo(mhz, mode) }
 
     NewQsoDialog { id: newQsoDialog }
+    NewQsoDialog { id: historicalQsoDialog; historicalMode: true; profileDialogKey: "historical-qso" }
     QsoDetailDialog { id: qsoDialog }
     property var profileQsoDialogs: []
     function openProfileQso(profileId) {
@@ -2693,6 +2709,7 @@ RoundedWindow {
             onActivationRequested: activationDialog.openDialog()
             onRadioNetRequested: radioNetDialog.open()
             onRoverRequested: roverDialog.open()
+            onHistoricalEntryRequested: historicalQsoDialog.open()
             onPredictRequested: predictDialog.open()
             contestModeOn: window.contestModeOn
             contestOpenPanels: contestLayout.shownList

@@ -22,6 +22,7 @@ Rectangle {
     signal activationRequested()
     signal radioNetRequested()
     signal roverRequested()
+    signal historicalEntryRequested()
     signal predictRequested()
     signal profilesRequested()
     // Il menu Pannelli e' un Popup nell'overlay della finestra principale:
@@ -176,6 +177,7 @@ Rectangle {
                 StyledMenuItem { text: qsTr("Radio net manager…"); onTriggered: root.radioNetRequested() }
                 StyledMenuItem { text: qsTr("Rover location history…"); onTriggered: root.roverRequested() }
                 StyledMenuItem { text: qsTr("PREDICT satellite tracker…"); onTriggered: root.predictRequested() }
+                StyledMenuItem { text: qsTr("Historical QSO entry…"); onTriggered: root.historicalEntryRequested() }
                 MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.borderSoft } }
                 StyledMenuItem { text: qsTr("Import a log (ADIF, CSV, N1MM)…"); onTriggered: root.importRequested() }
                 StyledMenuItem { text: qsTr("Undo last import…"); enabled: decolog.importProgress < 0; onTriggered: root.undoImportRequested() }

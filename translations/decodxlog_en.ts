@@ -5183,6 +5183,50 @@ Extra fields are preserved: %8</source>
         <source>My grid (optional)</source>
         <translation>My grid (optional)</translation>
     </message>
+    <message>
+        <source>Historical QSO entry</source>
+        <translation>Historical QSO entry</translation>
+    </message>
+    <message>
+        <source>Enter a valid UTC date first.</source>
+        <translation>Enter a valid UTC date first.</translation>
+    </message>
+    <message>
+        <source>Cannot advance this UTC date.</source>
+        <translation>Cannot advance this UTC date.</translation>
+    </message>
+    <message>
+        <source>Enter an explicit valid UTC date and time.</source>
+        <translation>Enter an explicit valid UTC date and time.</translation>
+    </message>
+    <message>
+        <source>The time is earlier on the same date. Confirm it or advance the UTC date.</source>
+        <translation>The time is earlier on the same date. Confirm it or advance the UTC date.</translation>
+    </message>
+    <message>
+        <source>Use the selected station profile for historical QSO</source>
+        <translation>Use the selected station profile for historical QSO</translation>
+    </message>
+    <message>
+        <source>Use selected station profile details</source>
+        <translation>Use selected station profile details</translation>
+    </message>
+    <message>
+        <source>Next UTC day</source>
+        <translation>Next UTC day</translation>
+    </message>
+    <message>
+        <source>Confirm earlier time on the same UTC date</source>
+        <translation>Confirm earlier time on the same UTC date</translation>
+    </message>
+    <message>
+        <source>Confirm the earlier time on this same UTC date, or use Next UTC day.</source>
+        <translation>Confirm the earlier time on this same UTC date, or use Next UTC day.</translation>
+    </message>
+    <message>
+        <source>Historical data: review before saving</source>
+        <translation>Historical data: review before saving</translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
@@ -10067,6 +10111,10 @@ Extra fields are preserved: %8</source>
         <source>Rover: %1</source>
         <translation>Rover: %1</translation>
     </message>
+    <message>
+        <source>Historical QSO entry…</source>
+        <translation>Historical QSO entry…</translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -12356,6 +12404,14 @@ Extra fields are preserved: %8</source>
     <message>
         <source>The radio net session uses a different station profile.</source>
         <translation>The radio net session uses a different station profile.</translation>
+    </message>
+    <message>
+        <source>Enter an explicit valid historical UTC time</source>
+        <translation>Enter an explicit valid historical UTC time</translation>
+    </message>
+    <message>
+        <source>Historical entry cannot be assigned to a current radio net session.</source>
+        <translation>Historical entry cannot be assigned to a current radio net session.</translation>
     </message>
 </context>
 <context>

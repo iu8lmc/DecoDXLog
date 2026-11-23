@@ -13,6 +13,9 @@ DialogFrame {
     property string profileDialogKey: ""
     property double radioNetSessionId: 0
     property double radioNetMemberId: 0
+    property bool historicalMode: false
+    property string historicalLastDate: ""
+    property int historicalLastSeconds: -1
     // Optional explicit handoff; applied only when opening a fresh dialog.
     property string initialCall: ""
     property string initialName: ""
@@ -32,13 +35,13 @@ DialogFrame {
     readonly property bool matchesCall: (lookup.call || "") === callField.text.trim().toUpperCase()
                                         && callField.text.trim().length > 0
 
-    title: qsTr("New QSO")
+    title: root.historicalMode ? qsTr("Historical QSO entry") : qsTr("New QSO")
     dotColor: Theme.accentColor
     info: root.stationProfile.name
           ? qsTr("Station: %1").arg(root.stationProfile.name) : qsTr("No station profile")
     dialogKey: root.profileDialogKey.length > 0 ? root.profileDialogKey : "newqso"
     width: 760
-    height: 660
+    height: root.historicalMode ? 820 : 660
 
     function submodesFor(mode) {
         switch (mode) {
@@ -62,6 +65,8 @@ DialogFrame {
         return band + "|" + m
     }
     function qsyTo(band, mode, bandChanged) {
+        if (root.historicalMode)
+            return
         if (!band || band === "—")
             return
         const m = String(mode || "").toUpperCase()
@@ -104,6 +109,8 @@ DialogFrame {
         return "599"
     }
     function applyDefaultReports() {
+        if (root.historicalMode)
+            return
         const want = root.defaultReport(root.tuneMode())
         if (root.defaultReports.indexOf(sentField.text.trim()) >= 0)
             sentField.text = want
@@ -124,10 +131,11 @@ DialogFrame {
                          satNameField, satModeField, rxFreqField])
             f.text = ""
         propModeBox.currentIndex = 0
-        sentField.text = root.defaultReport(root.tuneMode())
-        rcvdField.text = root.defaultReport(root.tuneMode())
+        sentField.text = root.historicalMode ? "" : root.defaultReport(root.tuneMode())
+        rcvdField.text = root.historicalMode ? "" : root.defaultReport(root.tuneMode())
         errorText.text = ""
-        resetTime()
+        if (root.historicalMode) { dateField.text = ""; timeField.text = ""; historicalEarlier.checked = false }
+        else resetTime()
         callField.forceActiveFocus()
     }
 
@@ -212,8 +220,71 @@ DialogFrame {
         myGridField.text = ownGrid
         root.submit(false)
     }
+    function probeHistoricalEntry() {
+        const roverOk = decolog.rover.start("Historical guard fixture", "JN71DC", 0)
+        const activationError = decolog.activation.start({kind: "free", name: "Historical guard fixture", myGrid: "JN50"})
+        const missingTimeError = decolog.logManualQso({call: "K1AAA", date: decolog.showDate("2026-12-31"), time: "", band: "20m", mode: "CW", historical_entry: true})
+        console.warn("PROBE historicalBackendMissing blocked=" + (missingTimeError.length > 0) + " count=" + decolog.currentLogInfo().qsos)
+        dateField.text = decolog.showDate("2026-12-31")
+        callField.text = "K1AAA"
+        timeField.text = ""
+        freqField.text = "14.050000"
+        modeBox.currentIndex = modeBox.find("CW")
+        root.submit(true)
+        console.warn("PROBE historicalMissingTime count=" + decolog.currentLogInfo().qsos + " kept=" + root.visible)
+        timeField.text = "23:58"
+        root.submit(true)
+        console.warn("PROBE historicalFirst count=" + decolog.currentLogInfo().qsos + " date=" + decolog.readDate(dateField.text) + " blankTime=" + (timeField.text === ""))
+        callField.text = "K1BBB"; timeField.text = "00:05"
+        root.submit(true)
+        console.warn("PROBE historicalEarlier count=" + decolog.currentLogInfo().qsos + " blocked=" + (errorText.text.length > 0))
+        root.advanceHistoricalDay()
+        timeField.text = "00:05"
+        root.submit(true)
+        console.warn("PROBE historicalNext count=" + decolog.currentLogInfo().qsos + " date=" + decolog.readDate(dateField.text))
+        callField.text = "K1CCC"; timeField.text = "00:03"; historicalEarlier.checked = true
+        root.submit(true)
+        console.warn("PROBE historicalConfirmed count=" + decolog.currentLogInfo().qsos + " rover=" + roverOk + " activationError=" + activationError)
+        historicalProfile.checked = true
+        callField.text = "K1DDD"; timeField.text = "00:04"
+        root.submit(true)
+        console.warn("PROBE historicalProfile count=" + decolog.currentLogInfo().qsos)
+        decolog.activation.stop()
+        decolog.rover.close()
+    }
+
+    function historicalSeconds(value) {
+        const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$|^(\d{2})(\d{2})$/.exec(String(value).trim())
+        if (!match) return -1
+        const hour = Number(match[1] || match[4]), minute = Number(match[2] || match[5]), second = Number(match[3] || 0)
+        return hour < 24 && minute < 60 && second < 60 ? hour * 3600 + minute * 60 + second : -1
+    }
+    function advanceHistoricalDay() {
+        const iso = decolog.readDate(dateField.text)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) { errorText.text = qsTr("Enter a valid UTC date first."); return }
+        const date = new Date(iso + "T12:00:00Z")
+        if (isNaN(date.getTime())) { errorText.text = qsTr("Enter a valid UTC date first."); return }
+        date.setUTCDate(date.getUTCDate() + 1)
+        const next = date.toISOString().slice(0, 10)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) { errorText.text = qsTr("Cannot advance this UTC date."); return }
+        dateField.text = decolog.showDate(next)
+        timeField.text = ""
+        historicalEarlier.checked = false
+        errorText.text = ""
+    }
 
     function submit(keep) {
+        const iso = root.historicalMode ? decolog.readDate(dateField.text) : ""
+        const seconds = root.historicalMode ? root.historicalSeconds(timeField.text) : -1
+        if (root.historicalMode && (!iso.length || seconds < 0)) {
+            errorText.text = qsTr("Enter an explicit valid UTC date and time.")
+            return
+        }
+        if (root.historicalMode && iso === root.historicalLastDate && root.historicalLastSeconds >= 0 &&
+                seconds < root.historicalLastSeconds && !historicalEarlier.checked) {
+            errorText.text = qsTr("The time is earlier on the same date. Confirm it or advance the UTC date.")
+            return
+        }
         const error = decolog.logManualQso({
             call: callField.text, date: dateField.text, time: timeField.text,
             band: bandBox.currentIndex > 0 ? bandBox.currentText : "", freq: freqField.text, freq_rx: rxFreqField.text,
@@ -228,17 +299,20 @@ DialogFrame {
             cnty: cntyField.text, cont: contField.text, cqz: cqzField.text, ituz: ituzField.text,
             dxcc: dxccField.text, qsl_via: qslViaField.text,
             station_profile_id: root.profileId,
-            radio_net_session_id: root.radioNetSessionId, radio_net_member_id: root.radioNetMemberId
+            radio_net_session_id: root.radioNetSessionId, radio_net_member_id: root.radioNetMemberId,
+            historical_entry: root.historicalMode, historical_use_profile: root.historicalMode && historicalProfile.checked
         })
         errorText.text = error
         if (error.length > 0)
             return
+        if (root.historicalMode) { root.historicalLastDate = iso; root.historicalLastSeconds = seconds; historicalEarlier.checked = false }
         if (keep) {
             for (const f of [callField, gridField, myGridField, nameField, qthField, commentField, countryField,
                              addressField, stateField, cntyField, contField, cqzField, ituzField,
                              dxccField, qslViaField])
                 f.text = ""
-            resetTime()
+            if (root.historicalMode) { timeField.text = ""; sentField.text = ""; rcvdField.text = "" }
+            else resetTime()
             callField.forceActiveFocus()
         } else {
             root.accept()
@@ -246,14 +320,25 @@ DialogFrame {
     }
 
     onOpened: {
+        root.historicalLastDate = ""
+        root.historicalLastSeconds = -1
         clearAll()
         root.trackerPrepared = root.initialSatellite.length > 0
         if (root.initialCall.length > 0) callField.text = root.initialCall
         if (root.initialName.length > 0) nameField.text = root.initialName
         root.initialCall = ""
         root.initialName = ""
-        if (decolog.shownFrequency.length)
+        if (!root.historicalMode && decolog.shownFrequency.length)
             freqField.text = decolog.shownFrequency
+        if (root.historicalMode) {
+            historicalProfile.checked = false
+            bandBox.currentIndex = 0
+            freqField.text = ""
+            modeBox.currentIndex = -1
+            modeBox.editText = ""
+            submodeBox.currentIndex = -1
+            submodeBox.editText = ""
+        }
         if (root.initialSatellite.length > 0) {
             satNameField.text = root.initialSatellite
             propModeBox.currentIndex = propModeBox.find("SAT")
@@ -264,7 +349,7 @@ DialogFrame {
         root.initialTxMHz = ""
         root.initialRxMHz = ""
         const pwr = root.stationProfile.defaultTxPwr
-        pwrField.text = pwr > 0 ? String(pwr) : ""
+        pwrField.text = !root.historicalMode && pwr > 0 ? String(pwr) : ""
     }
 
     // Nome, QTH e locatore dal callbook, solo nei campi ancora vuoti: quello che
@@ -273,7 +358,7 @@ DialogFrame {
         target: decolog
         function onLookupChanged() {
             const cb = decolog.callInfo.callbook
-            if (!root.visible || !decolog.callbookAutofill || !cb || !root.matchesCall)
+            if (root.historicalMode || !root.visible || !decolog.callbookAutofill || !cb || !root.matchesCall)
                 return
             if (nameField.text.length === 0) nameField.text = cb.name
             if (qthField.text.length === 0) qthField.text = cb.qth
@@ -331,7 +416,7 @@ DialogFrame {
                     font.pixelSize: 24
                     font.bold: true
                     font.letterSpacing: 2
-                    onTextChanged: decolog.lookupCall = text
+                    onTextChanged: if (!root.historicalMode) decolog.lookupCall = text
                     Keys.onReturnPressed: (event) => root.submitOnEnter(event)
                     Keys.onEnterPressed: (event) => root.submitOnEnter(event)
                 }
@@ -342,6 +427,7 @@ DialogFrame {
                 label: qsTr("Date UTC")
                 StyledTextField {
                     id: dateField
+                    objectName: "manualDateUtc"
                     Layout.fillWidth: true
                     fieldHeight: 44
                     font.pixelSize: 15
@@ -352,6 +438,7 @@ DialogFrame {
                         if (iso.length > 0)
                             text = decolog.showDate(iso)
                     }
+                    onTextChanged: if (root.historicalMode) historicalEarlier.checked = false
                 }
             }
             LabeledField {
@@ -360,9 +447,11 @@ DialogFrame {
                 label: qsTr("Time on")
                 StyledTextField {
                     id: timeField
+                    objectName: "manualTimeUtc"
                     Layout.fillWidth: true
                     fieldHeight: 44
                     font.pixelSize: 15
+                    onTextChanged: if (root.historicalMode) historicalEarlier.checked = false
                     rightPadding: nowPill.width + 14
                     Pill {
                         id: nowPill
@@ -374,16 +463,36 @@ DialogFrame {
                         rounded: false
                         pillHeight: 20
                         fontPixelSize: 10
-                        interactive: true
+                        interactive: !root.historicalMode
+                        visible: !root.historicalMode
                         onClicked: root.resetTime()
                     }
                 }
             }
         }
 
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            visible: root.historicalMode
+            CheckBox { id: historicalProfile; objectName: "historicalProfile"; enabled: !!root.stationProfile.id; Accessible.name: qsTr("Use the selected station profile for historical QSO") }
+            Text { Layout.fillWidth: true; text: qsTr("Use selected station profile details"); color: Theme.textSecondary; wrapMode: Text.Wrap }
+            GlassButton { objectName: "historicalNextDay"; text: qsTr("Next UTC day"); onClicked: root.advanceHistoricalDay() }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            visible: root.historicalMode && root.historicalLastSeconds >= 0 && decolog.readDate(dateField.text) === root.historicalLastDate && root.historicalSeconds(timeField.text) >= 0 && root.historicalSeconds(timeField.text) < root.historicalLastSeconds
+            CheckBox { id: historicalEarlier; objectName: "historicalEarlier"; Accessible.name: qsTr("Confirm earlier time on the same UTC date") }
+            Text { Layout.fillWidth: true; text: qsTr("Confirm the earlier time on this same UTC date, or use Next UTC day."); color: Theme.warningColor; wrapMode: Text.Wrap }
+        }
+
         // Quello che il log sa del nominativo.
         Rectangle {
             Layout.fillWidth: true
+            visible: !root.historicalMode
             Layout.leftMargin: 14
             Layout.rightMargin: 14
             implicitHeight: 34
@@ -485,6 +594,7 @@ DialogFrame {
                     label: qsTr("Mode")
                     StyledComboBox {
                         id: modeBox
+                        objectName: "manualMode"
                         onEditTextChanged: root.applyDefaultReports()
                         Layout.fillWidth: true
                         editable: true
@@ -720,7 +830,7 @@ DialogFrame {
             Layout.topMargin: 0
             spacing: 10
             Text {
-                text: "source=manual · dirty=1 · uuid client-side"
+                text: root.historicalMode ? qsTr("Historical data: review before saving") : "source=manual · dirty=1 · uuid client-side"
                 color: Theme.textSecondary
                 font.family: Theme.monoFamily
                 font.pixelSize: 11

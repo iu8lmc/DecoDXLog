@@ -50,6 +50,64 @@ TestCase {
     Component { id: panelComponent; NewQsoPanel { width: 580; height: 700 } }
     Component { id: dialogComponent; NewQsoDialog {} }
 
+    function test_historicalModeDoesNotTuneOrInheritCurrentTime() {
+        decolog.tuneCalls = 0
+        decolog.rig.connected = true
+        const form = createTemporaryObject(dialogComponent, testCase, {historicalMode: true})
+        verify(form !== null)
+        form.open()
+        compare(findChild(form, "manualDateUtc").text, "")
+        compare(findChild(form, "manualTimeUtc").text, "")
+        compare(findChild(form, "manualTxFrequency").text, "")
+        form.qsyTo("20m", "CW", true)
+        compare(decolog.tuneCalls, 0)
+        decolog.rig.connected = false
+    }
+
+    function test_historicalRolloverRequiresExplicitChoice() {
+        decolog.submissions = 0
+        const form = createTemporaryObject(dialogComponent, testCase, {historicalMode: true})
+        verify(form !== null)
+        form.open()
+        const call = findChild(form, "manualCallsignField")
+        const date = findChild(form, "manualDateUtc")
+        const time = findChild(form, "manualTimeUtc")
+        const freq = findChild(form, "manualTxFrequency")
+        const mode = findChild(form, "manualMode")
+        const earlier = findChild(form, "historicalEarlier")
+        const profile = findChild(form, "historicalProfile")
+        call.text = "K1AAA"; date.text = "2026-12-31"; time.text = "23:58"
+        freq.text = "14.050000"; mode.currentIndex = mode.find("CW")
+        form.submit(true)
+        compare(decolog.submissions, 1)
+        compare(decolog.submitted.historical_entry, true)
+        compare(decolog.submitted.historical_use_profile, false)
+        compare(date.text, "2026-12-31")
+        compare(time.text, "")
+        compare(freq.text, "14.050000")
+        call.text = "K1BBB"; time.text = "00:05"
+        form.submit(true)
+        compare(decolog.submissions, 1, "Earlier UTC time must require a decision")
+        verify(earlier.visible)
+        earlier.checked = true
+        profile.checked = true
+        form.submit(true)
+        compare(decolog.submissions, 2)
+        compare(decolog.submitted.date, "2026-12-31")
+        compare(decolog.submitted.historical_use_profile, true)
+        verify(!earlier.checked)
+        form.advanceHistoricalDay()
+        compare(date.text, "2027-01-01")
+        compare(time.text, "")
+        call.text = "K1CCC"; time.text = "00:06"
+        form.submit(true)
+        compare(decolog.submissions, 3)
+        compare(decolog.submitted.date, "2027-01-01")
+        date.text = "2024-02-28"
+        form.advanceHistoricalDay()
+        compare(date.text, "2024-02-29")
+    }
+
     function test_satelliteSplitFrequencies() {
         decolog.tuneCalls = 0
         decolog.rig.connected = true

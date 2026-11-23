@@ -3682,6 +3682,7 @@ void DecoLogController::resetNewQsoPanelSettings()
 QString DecoLogController::logManualQso(const QVariantMap& fields)
 {
     auto text = [&fields](const char* key) { return fields.value(QLatin1String(key)).toString().trimmed(); };
+    const bool historical = fields.value(QStringLiteral("historical_entry")).toBool();
 
     AdifRecord r;
     r.set(QStringLiteral("CALL"), text("call").toUpper());
@@ -3693,6 +3694,8 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         time = QTime::fromString(text("time"), QStringLiteral("HH:mm:ss"));
     if (!time.isValid())
         time = QTime::fromString(text("time"), QStringLiteral("HHmm"));
+    if (historical && !time.isValid())
+        return tr("Enter an explicit valid historical UTC time");
     if (date.isValid())
         r.set(QStringLiteral("QSO_DATE"), date.toString(QStringLiteral("yyyyMMdd")));
     if (time.isValid())
@@ -3712,7 +3715,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         if (!valid || !std::isfinite(mhz) || mhz <= 0)
             return tr("Enter a valid receive frequency in MHz");
     }
-    if (auto* rig = qobject_cast<RigController*>(m_rig); rig && rig->connected() && rig->split()
+    if (auto* rig = qobject_cast<RigController*>(m_rig); !historical && rig && rig->connected() && rig->split()
         && rig->txFrequencyHz() > 0 && freqRx.isEmpty()) {
         const double typed = freq.toDouble();
         const double rx = rig->frequencyHz() / 1e6;
@@ -3791,6 +3794,8 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
             return tr("Use the standard %1 field instead of a custom field.").arg(name);
         r.set(name, it.value().toString().trimmed());
     }
+    if (historical)
+        r.set(QStringLiteral("APP_DECOLOG_ENTRY_CONTEXT"), QStringLiteral("HISTORICAL"));
     // Contest: il numero ricevuto, come lo vuole ADIF.
     if (!text("srx").isEmpty()) {
         r.set(QStringLiteral("SRX"), text("srx"));
@@ -3805,10 +3810,14 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
             return tr("The selected station profile is not available.");
         profileId = requestedProfileId;
     }
-    if (m_activation->active() && m_activation->session().stationProfileId > 0)
+    if (!historical && m_activation->active() && m_activation->session().stationProfileId > 0)
         profileId = m_activation->session().stationProfileId;
+    if (historical && !fields.value(QStringLiteral("historical_use_profile")).toBool())
+        profileId = 0;
     const qint64 radioSessionId = fields.value(QStringLiteral("radio_net_session_id")).toLongLong();
     const qint64 radioMemberId = fields.value(QStringLiteral("radio_net_member_id")).toLongLong();
+    if (historical && (radioSessionId || radioMemberId))
+        return tr("Historical entry cannot be assigned to a current radio net session.");
     if (radioSessionId || radioMemberId) {
         QSqlQuery radio(m_db.connection());
         radio.prepare(QStringLiteral("SELECT s.uuid,m.call,s.station_profile_id FROM radio_net_session s "
@@ -3824,7 +3833,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_SESSION"), radio.value(0).toString());
         r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_CALL"), radio.value(1).toString());
     }
-    if (m_rover && !m_rover->session().isEmpty() && explicitMyGrid.isEmpty()) {
+    if (!historical && m_rover && !m_rover->session().isEmpty() && explicitMyGrid.isEmpty()) {
         if (m_activation->active())
             return tr("Enter the station locator explicitly when rover and activation are both active.");
         const qint64 roverProfile = m_rover->session().value(QStringLiteral("profileId")).toLongLong();
@@ -3837,8 +3846,10 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         r.set(QStringLiteral("MY_GRIDSQUARE"), roverGrid);
     }
     applyProfile(r, profileId);
-    applyEntity(r);
-    m_activation->applyTo(r);
+    if (!historical) {
+        applyEntity(r);
+        m_activation->applyTo(r);
+    }
     // A mano non si rifiuta nessun QSO per doppione: chi scrive sa cosa ha gia' nel log, e
     // ripassare la stessa stazione (in un'attivazione, o un'altra volta) e' normale.
     // Il controllo dei doppioni resta per Decodium e per i QSO che arrivano via UDP.
@@ -3848,16 +3859,20 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     case InsertResult::Status::Inserted: {
         decolog::StartupSpan t1("logManual: model insert");
         m_model->insertQso(res.id);
-        broadcastN1mmQso(r, res.id);
-        hamHubQso(r, res.id);
+        if (!historical) {
+            broadcastN1mmQso(r, res.id);
+            hamHubQso(r, res.id);
+        }
         }
         {
         decolog::StartupSpan t2("logManual: decolink+qsl+cloud+activation");
-        decoLinkQso(r, QStringLiteral("logged"), res.id, QStringLiteral("manual"), QStringLiteral("DecoDXLog"));
-        m_qsl->qsoLogged(res.id);
+        if (!historical) {
+            decoLinkQso(r, QStringLiteral("logged"), res.id, QStringLiteral("manual"), QStringLiteral("DecoDXLog"));
+            m_qsl->qsoLogged(res.id);
+        }
         m_cloud->qsoLogged();
-        m_activation->qsoLogged();
-        if (m_net)
+        if (!historical) m_activation->qsoLogged();
+        if (!historical && m_net)
             m_net->qsoLogged(res.id);
         addActivity(QStringLiteral("LOG"), tr("Logged %1 %2 %3 (manual)")
                                                .arg(r.value(QStringLiteral("CALL")), r.value(QStringLiteral("BAND")),
@@ -3870,12 +3885,14 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         }
         {
         decolog::StartupSpan t4("logManual: lookup+callinfo");
-        setLookupCall(r.value(QStringLiteral("CALL")));
-        refreshCallInfo();
+        if (!historical) {
+            setLookupCall(r.value(QStringLiteral("CALL")));
+            refreshCallInfo();
+        }
         }
         // Anche quello scritto a mano si completa: chi lo scrive di fretta,
         // fra un QSO e l'altro, non ha tempo di cercare il locatore.
-        completeFromCallbook(res.id, r.value(QStringLiteral("CALL")).toUpper());
+        if (!historical) completeFromCallbook(res.id, r.value(QStringLiteral("CALL")).toUpper());
         return {};
     case InsertResult::Status::Duplicate:
         return tr("Already in log (within %n minute(s))", nullptr, dedupManualMinutes());

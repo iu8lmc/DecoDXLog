@@ -55,6 +55,60 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void historicalEntryRequiresExplicitUtcAndIgnoresCurrentSessions()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        qint64 profileId = 0;
+        {
+            decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            decolog::core::StationProfile profile;
+            profile.name = "Historical fixture"; profile.stationCallsign = "9H1SR";
+            profile.myGridsquare = "JN71DC"; profile.isDefault = true;
+            profileId = db.saveStationProfile(profile); QVERIFY(profileId > 0);
+        }
+        QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("historicalprobe"), output), output.constData());
+        QVERIFY2(output.contains("PROBE historicalBackendMissing blocked=true count=0"), output.constData());
+        QVERIFY2(output.contains("PROBE historicalMissingTime count=0 kept=true"), output.constData());
+        QVERIFY2(output.contains("PROBE historicalFirst count=1 date=2026-12-31 blankTime=true"), output.constData());
+        QVERIFY2(output.contains("PROBE historicalEarlier count=1 blocked=true"), output.constData());
+        QVERIFY2(output.contains("PROBE historicalNext count=2 date=2027-01-01"), output.constData());
+        QVERIFY2(output.contains("PROBE historicalConfirmed count=3 rover=true activationError="), output.constData());
+        QVERIFY2(output.contains("PROBE historicalProfile count=4"), output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+        QCOMPARE(db.qsoCount(), 4);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT id,call,qso_datetime_on,station_profile_id FROM qso WHERE deleted=0 ORDER BY id"));
+        const QStringList expectedCalls{"K1AAA", "K1BBB", "K1CCC"};
+        const QStringList expectedDates{"2026-12-31T23:58:00Z", "2027-01-01T00:05:00Z", "2027-01-01T00:03:00Z"};
+        for (int i = 0; i < 3; ++i) {
+            QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), expectedCalls.at(i));
+            QCOMPARE(q.value(2).toString(), expectedDates.at(i)); QVERIFY(q.value(3).isNull());
+            const auto record = db.record(q.value(0).toLongLong()); QVERIFY(record.has_value());
+            QCOMPARE(record->value("APP_DECOLOG_ENTRY_CONTEXT"), QString("HISTORICAL"));
+            QVERIFY(record->value("MY_GRIDSQUARE").isEmpty());
+            QVERIFY(record->value("POTA_REF").isEmpty());
+            QVERIFY(record->value("RST_SENT").isEmpty());
+            QVERIFY(record->value("RST_RCVD").isEmpty());
+        }
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1DDD"));
+        QCOMPARE(q.value(2).toString(), QString("2027-01-01T00:04:00Z")); QCOMPARE(q.value(3).toLongLong(), profileId);
+        const auto withProfile = db.record(q.value(0).toLongLong()); QVERIFY(withProfile.has_value());
+        QCOMPARE(withProfile->value("MY_GRIDSQUARE"), QString("JN71DC"));
+        QCOMPARE(withProfile->value("STATION_CALLSIGN"), QString("9H1SR"));
+        QVERIFY(!q.next());
+        const QByteArray adif = db.exportAdif();
+        const auto exported = decolog::core::adif::parse(adif);
+        QCOMPARE(exported.records.size(), 4);
+        for (const auto &record : exported.records)
+            QCOMPARE(record.value("APP_DECOLOG_ENTRY_CONTEXT"), QString("HISTORICAL"));
+        decolog::core::LogDatabase imported; QVERIFY(imported.open(":memory:"));
+        QCOMPARE(imported.importAdif(adif).inserted, 4);
+        const auto roundtrip = decolog::core::adif::parse(imported.exportAdif());
+        QCOMPARE(roundtrip.records.size(), 4);
+        for (const auto &record : roundtrip.records)
+            QCOMPARE(record.value("APP_DECOLOG_ENTRY_CONTEXT"), QString("HISTORICAL"));
+    }
     void qslOcrDialogReadsImageWithoutChangingQso()
     {
         decolog::core::TesseractOcr engine;

@@ -5190,6 +5190,50 @@ Camps extra conservats: %8</translation>
         <source>My grid (optional)</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Historical QSO entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter a valid UTC date first.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Cannot advance this UTC date.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter an explicit valid UTC date and time.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>The time is earlier on the same date. Confirm it or advance the UTC date.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use the selected station profile for historical QSO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Use selected station profile details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Next UTC day</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirm earlier time on the same UTC date</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Confirm the earlier time on this same UTC date, or use Next UTC day.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Historical data: review before saving</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>NewQsoFieldsDialog</name>
@@ -10074,6 +10118,10 @@ Camps extra conservats: %8</translation>
         <source>Rover: %1</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Historical QSO entry…</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>TrafficMonitorWindow</name>
@@ -12362,6 +12410,14 @@ Camps extra conservats: %8</translation>
     </message>
     <message>
         <source>The radio net session uses a different station profile.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enter an explicit valid historical UTC time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Historical entry cannot be assigned to a current radio net session.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
