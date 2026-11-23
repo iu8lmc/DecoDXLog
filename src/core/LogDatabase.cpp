@@ -1106,7 +1106,17 @@ InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& sour
     }
 
     QSqlDatabase db = connection();
-    const bool ownTransaction = db.transaction();
+    QSqlQuery savepoint(db);
+    if (!savepoint.exec(QStringLiteral("SAVEPOINT decolog_insert_qso"))) {
+        result.message = savepoint.lastError().text();
+        m_lastError = result.message;
+        return result;
+    }
+    const auto rollbackInsert = [&] {
+        QSqlQuery rollback(db);
+        rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_insert_qso"));
+        rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_insert_qso"));
+    };
     QSqlQuery q(db);
     QStringList marks;
     marks.fill(QStringLiteral("?"), columns.size());
@@ -1115,23 +1125,29 @@ InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& sour
     for (const auto& v : values)
         q.addBindValue(v);
     if (!q.exec()) {
-        if (ownTransaction)
-            db.rollback();
-        result.status = InsertResult::Status::Error;
         result.message = q.lastError().text();
+        rollbackInsert();
+        result.status = InsertResult::Status::Error;
         m_lastError = result.message;
         return result;
     }
     result.id = q.lastInsertId().toLongLong();
     if (!p->qsl.isEmpty() && !writeQsl(result.id, p->qsl, false)) {
-        if (ownTransaction)
-            db.rollback();
+        rollbackInsert();
         result.status = InsertResult::Status::Error;
+        result.id = 0;
         result.message = QStringLiteral("cannot write QSL status");
+        m_lastError = result.message;
         return result;
     }
-    if (ownTransaction)
-        db.commit();
+    if (!savepoint.exec(QStringLiteral("RELEASE SAVEPOINT decolog_insert_qso"))) {
+        result.message = savepoint.lastError().text();
+        rollbackInsert();
+        result.status = InsertResult::Status::Error;
+        result.id = 0;
+        m_lastError = result.message;
+        return result;
+    }
     result.status = InsertResult::Status::Inserted;
     return result;
 }

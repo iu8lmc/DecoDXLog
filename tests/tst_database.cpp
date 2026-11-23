@@ -1814,6 +1814,26 @@ private slots:
         QCOMPARE(stored->responseBody, QByteArray("{\"id\":1}"));
     }
 
+    void nestedQsoInsertFailureRollsBackOnlyItsOwnWrites()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER fail_qsl BEFORE INSERT ON qsl_status BEGIN SELECT RAISE(FAIL, 'injected qsl failure'); END")));
+        QVERIFY(q.exec(QStringLiteral("BEGIN IMMEDIATE")));
+        const AdifRecord failing{{"CALL", "K1ERR"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                                 {"BAND", "20m"}, {"MODE", "CW"}, {"LOTW_QSL_SENT", "Y"}};
+        const auto result = db.insertQso(failing, "test");
+        QCOMPARE(result.status, InsertResult::Status::Error);
+        QCOMPARE(db.qsoCount(), qint64(0));
+        QVERIFY(q.exec(QStringLiteral("DROP TRIGGER fail_qsl")));
+        const auto good = db.insertQso(failing, "test");
+        QCOMPARE(good.status, InsertResult::Status::Inserted);
+        QVERIFY(q.exec(QStringLiteral("COMMIT")));
+        QCOMPARE(db.qsoCount(), qint64(1));
+        QVERIFY(db.record(good.id));
+        QCOMPARE(db.record(good.id)->value("LOTW_QSL_SENT"), QStringLiteral("Y"));
+    }
+
     void insertAndReadBack()
     {
         LogDatabase db;
