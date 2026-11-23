@@ -1,5 +1,6 @@
 // Database: schema, inserimento, duplicati e import/export senza perdite.
 #include "core/LogDatabase.h"
+#include "core/ContestNetInventory.h"
 #include "core/Maidenhead.h"
 
 #include <QCoreApplication>
@@ -62,6 +63,50 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void contestNetInventoryPinsSnapshotAndJournalCursor()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("inventory.sqlite");
+        LogDatabase writer; QVERIFY(writer.open(path));
+        auto make=[&](const QString& call) { return AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}}; };
+        const auto a=writer.insertQso(make("K1AAA"),"fixture"), b=writer.insertQso(make("K1BBB"),"fixture"), c=writer.insertQso(make("K1CCC"),"fixture"); QVERIFY(a.id>0 && b.id>0 && c.id>0); QVERIFY(writer.softDeleteQso(c.id));
+        const auto bUuid=writer.meta(b.id)->uuid; ContestNetInventory inventory; QVERIFY2(inventory.begin(path),qPrintable(inventory.error()));
+        const auto watermark=inventory.journalWatermark(); QVERIFY(watermark>0); QCOMPARE(inventory.logIdentity(),writer.identity());
+        QVERIFY(!inventory.fileIdentity().isEmpty()); QVERIFY(!inventory.next(0).ok); QVERIFY(!inventory.next(501).ok);
+        auto first=inventory.next(1); QVERIFY(first.ok); QCOMPARE(first.rows.size(),1); QVERIFY(first.hasMore); QCOMPARE(first.rows.first().id,a.id);
+        auto bEdited=*writer.record(b.id); bEdited.set("NAME","after snapshot"); QVERIFY(writer.updateQso(b.id,bEdited).status==InsertResult::Status::Inserted);
+        QVERIFY(writer.softDeleteQso(a.id)); const auto d=writer.insertQso(make("K1DDD"),"fixture"); QVERIFY(d.id>0);
+        QVERIFY(writer.adoptUuid(b.id,"cloud-adopted-uuid"));
+        auto second=inventory.next(10); QVERIFY(second.ok); QCOMPARE(second.rows.size(),2); QVERIFY(!second.hasMore);
+        QCOMPARE(second.rows.at(0).id,b.id); QCOMPARE(second.rows.at(0).uuid,bUuid); QCOMPARE(second.rows.at(0).revision,1); QVERIFY(!second.rows.at(0).deleted);
+        QCOMPARE(second.rows.at(1).id,c.id); QVERIFY(second.rows.at(1).deleted);
+        const auto later=writer.contestNetChangesAfter(watermark,10); QVERIFY(later.ok); QCOMPARE(later.changes.size(),4);
+        QCOMPARE(later.changes.last().previousQsoUuid,bUuid); QCOMPARE(later.changes.last().qsoUuid,QString("cloud-adopted-uuid"));
+        inventory.close(); QVERIFY(!inventory.next(10).ok);
+    }
+    void contestNetInventoryRejectsReplacedLogFile()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("inventory.sqlite"), clone=dir.filePath("clone.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QSqlQuery q(db.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
+        ContestNetInventory inventory; QVERIFY2(inventory.begin(path),qPrintable(inventory.error()));
+        if (!QFile::rename(path,path+".original")) QSKIP("Platform does not allow replacing an open SQLite file");
+        QVERIFY(QFile::rename(clone,path)); const auto page=inventory.next(10); QVERIFY(!page.ok); QVERIFY(page.rows.isEmpty()); QVERIFY(page.error.contains("changed"));
+    }
+    void contestNetInventoryIncludesExtremeRowId()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("ids.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET id=-9223372036854775808"));
+        ContestNetInventory inventory; QVERIFY(inventory.begin(path)); const auto page=inventory.next(1); QVERIFY(page.ok); QCOMPARE(page.rows.size(),1);
+        QCOMPARE(page.rows.first().id,std::numeric_limits<qint64>::min()); QVERIFY(!page.hasMore);
+    }
+    void contestNetInventoryRejectsOldOrMissingLogs()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto missing=dir.filePath("missing.sqlite"); ContestNetInventory inventory;
+        QVERIFY(!inventory.begin(missing)); QVERIFY(!QFileInfo::exists(missing));
+        const auto path=dir.filePath("old.sqlite"); { LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TRIGGER contest_net_qso_insert")); QVERIFY(q.exec("DROP TRIGGER contest_net_qso_revision")); QVERIFY(q.exec("DROP TABLE contest_net_change")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=28")); }
+        QVERIFY(!inventory.begin(path)); LogDatabase read; QVERIFY(read.openReadOnly(path)); QCOMPARE(read.schemaVersion(),27);
+    }
     void contestNetJournalBatchCostComparison()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); QList<qint64> durations;
