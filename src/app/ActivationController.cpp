@@ -949,9 +949,9 @@ static QVariantMap contestReportResult(const core::contestreport::Report& report
     return result;
 }
 
-bool ActivationController::startContestReportCandidates(const QVariantMap& row)
+bool ActivationController::startContestReportCandidates(const QVariantMap& row, int toleranceMinutes)
 {
-    if (m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
+    if (toleranceMinutes < 0 || toleranceMinutes > 5 || m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path().isEmpty() ||
         m_ctx.db->path()==QLatin1String(":memory:")) return false;
     const QString path=m_ctx.db->path(), identity=m_ctx.db->identity();
     const quint64 generation=m_ctx.db->openGeneration();
@@ -964,14 +964,15 @@ bool ActivationController::startContestReportCandidates(const QVariantMap& row)
     entry.receivedExchange=row.value(QStringLiteral("receivedExchange")).toString();
     entry.kind=row.value(QStringLiteral("kind")).toString(); entry.correction=row.value(QStringLiteral("correction")).toString();
     m_contestReportBusy=true; emit contestReportBusyChanged(); QPointer<ActivationController> self(this);
-    m_contestReportPool.start([self,path,identity,generation,entry] {
+    m_contestReportPool.start([self,path,identity,generation,entry,toleranceMinutes] {
         QVariantMap result{{QStringLiteral("line"),entry.lineNumber},{QStringLiteral("call"),entry.call},
-                           {QStringLiteral("reportFrequency"),entry.frequencyKhz},{QStringLiteral("reportExchange"),entry.receivedExchange}};
+                           {QStringLiteral("reportFrequency"),entry.frequencyKhz},{QStringLiteral("reportExchange"),entry.receivedExchange},
+                           {QStringLiteral("toleranceMinutes"),toleranceMinutes}};
         LogDatabase db;
         if (!db.openReadOnly(path)) result.insert(QStringLiteral("error"),db.lastError());
         else if (db.identity()!=identity) result.insert(QStringLiteral("error"),tr("The reviewed log identity changed."));
         else {
-            const auto found=core::contestreport::findCandidates(db,entry); QVariantList candidates;
+            const auto found=core::contestreport::findCandidates(db,entry,toleranceMinutes); QVariantList candidates;
             for (const auto& item : found.candidates)
                 candidates << QVariantMap{{QStringLiteral("id"),item.id},{QStringLiteral("uuid"),item.uuid},
                     {QStringLiteral("utc"),item.utc},{QStringLiteral("stationCall"),item.stationCall},

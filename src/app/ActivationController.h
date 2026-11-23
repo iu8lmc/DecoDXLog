@@ -82,7 +82,7 @@ public:
     bool previewBusy() const { return m_previewBusy; }
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
-    Q_INVOKABLE bool startContestReportCandidates(const QVariantMap& row);
+    Q_INVOKABLE bool startContestReportCandidates(const QVariantMap& row, int toleranceMinutes=0);
     Q_INVOKABLE bool isContestReportCandidateCurrent(qint64 id, const QString& uuid, int revision) const;
     Q_INVOKABLE bool archiveContestReportPreview();
     Q_INVOKABLE bool startContestReportHistory(qint64 beforeId = 0);

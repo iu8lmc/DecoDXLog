@@ -13,9 +13,13 @@
 
 namespace decolog::core::contestreport {
 
-CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
+CandidateResult findCandidates(const LogDatabase& db, const Entry& entry, int toleranceMinutes)
 {
     CandidateResult result;
+    if (toleranceMinutes < 0 || toleranceMinutes > 5) {
+        result.error=QStringLiteral("Time tolerance must be between 0 and 5 minutes.");
+        return result;
+    }
     const QDate day=QDate::fromString(entry.date,Qt::ISODate);
     const QTime minute=QTime::fromString(entry.time,QStringLiteral("HHmm"));
     bool frequencyOk=false; const double khz=entry.frequencyKhz.toDouble(&frequencyOk);
@@ -48,7 +52,8 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
         "WHERE q.deleted=0 AND q.call IN (?,?) AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
         + modeClause + QStringLiteral(" ORDER BY CASE WHEN q.call=? THEN 0 ELSE 1 END,q.qso_datetime_on,q.id LIMIT 6"));
     q.addBindValue(reportedCall); q.addBindValue(correctedCall); q.addBindValue(band);
-    q.addBindValue(start.toString(Qt::ISODate)); q.addBindValue(start.addSecs(60).toString(Qt::ISODate)); q.addBindValue(reportedCall);
+    q.addBindValue(start.addSecs(-60*toleranceMinutes).toString(Qt::ISODate));
+    q.addBindValue(start.addSecs(60*(toleranceMinutes+1)).toString(Qt::ISODate)); q.addBindValue(reportedCall);
     if (!q.exec()) { result.error=q.lastError().text(); return result; }
     while (q.next()) {
         if (result.candidates.size()==5) { result.truncated=true; break; }

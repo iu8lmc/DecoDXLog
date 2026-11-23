@@ -70,6 +70,22 @@ private slots:
         QCOMPARE(candidates.candidates.size(),5); QVERIFY(candidates.truncated);
         QCOMPARE(candidates.candidates.first().stationCall,QString("OTHER")); QCOMPARE(db.qsoCount(),qint64(8));
     }
+    void configurableMinuteWindowCrossesMidnightAndIsBounded()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const QString &date,const QString &time) {
+            return db.insertQso(AdifRecord{{"CALL","W1ABC"},{"QSO_DATE",date},{"TIME_ON",time},
+                {"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id;
+        };
+        const auto before=add("20241231","235959"), same=add("20250101","000030"), after=add("20250101","000100");
+        QVERIFY(before>0 && same>0 && after>0);
+        contestreport::Entry row; row.call="W1ABC"; row.date="2025-01-01"; row.time="0000"; row.frequencyKhz="14020"; row.mode="CW";
+        auto exact=contestreport::findCandidates(db,row,0); QVERIFY(exact.error.isEmpty()); QCOMPARE(exact.candidates.size(),1); QCOMPARE(exact.candidates.first().id,same);
+        auto widened=contestreport::findCandidates(db,row,1); QVERIFY(widened.error.isEmpty()); QCOMPARE(widened.candidates.size(),3);
+        QCOMPARE(widened.candidates[0].id,before); QCOMPARE(widened.candidates[1].id,same); QCOMPARE(widened.candidates[2].id,after);
+        QVERIFY(!contestreport::findCandidates(db,row,-1).error.isEmpty()); QVERIFY(!contestreport::findCandidates(db,row,6).error.isEmpty());
+        QCOMPARE(db.qsoCount(),qint64(3));
+    }
     void candidateStationDistinguishesCurrentProfileFromQso()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile profile; profile.name="station"; profile.stationCallsign="K1NEW";

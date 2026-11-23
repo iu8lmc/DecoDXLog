@@ -54,7 +54,7 @@ struct CandidateResult {
 
 // Read-only possible matches by reported or explicitly corrected call, band, mode family and UTC minute.
 // Results are suggestions, never an assertion of identity or an edit.
-CandidateResult findCandidates(const LogDatabase& db, const Entry& entry);
+CandidateResult findCandidates(const LogDatabase& db, const Entry& entry, int toleranceMinutes=0);
 
 // CQ WW LCR text as published by the contest organiser. Unsupported sections and
 // lines are retained, not interpreted as lost or corrected QSO.

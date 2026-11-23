@@ -19,6 +19,7 @@ RoundedWindow {
     property bool reportProbeSave: false
     property bool reportProbeFind: false
     property bool reportProbeOpen: false
+    property bool reportProbeWindow: false
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
@@ -49,7 +50,14 @@ RoundedWindow {
             reportCandidates.errorText=result.error || ""
             if (root.reportProbeFind) console.warn("PROBE lcr candidates " + (result.candidates || []).length + " " + reportCandidates.errorText)
             if (root.reportProbeFind && (result.candidates || []).length) console.warn("PROBE lcr basis " + result.candidates[0].matchBasis + " call " + result.candidates[0].call)
-            if (root.reportProbeOpen && (result.candidates || []).length) {
+            if (root.reportProbeWindow && result.toleranceMinutes === 0) {
+                console.warn("PROBE lcr exact " + (result.candidates || []).length)
+                candidateTolerance.value=1
+                Qt.callLater(() => retryCandidateSearch.clicked())
+                return
+            }
+            if (root.reportProbeWindow) console.warn("PROBE lcr window " + result.toleranceMinutes + " count " + (result.candidates || []).length)
+            if ((root.reportProbeOpen || root.reportProbeWindow) && (result.candidates || []).length) {
                 const id=result.candidates[0].id
                 reportCandidates.openCandidate(result.candidates[0])
                 Qt.callLater(() => console.warn("PROBE lcr opened " + window.probeQsoDialogOpen(id)))
@@ -928,9 +936,10 @@ RoundedWindow {
         property string saveMessage: ""
         property bool saveSuccess: false
         function findCandidates(row) {
-            reportCandidates.result=({}); reportCandidates.errorText=""
+            reportCandidates.row=row
+            candidateTolerance.value=0
             reportCandidates.open()
-            if (!decolog.activation.startContestReportCandidates(row)) reportCandidates.errorText=qsTr("Cannot search this log now.")
+            reportCandidates.search()
         }
         function saveSnapshot() {
             saveMessage = ""
@@ -978,6 +987,11 @@ RoundedWindow {
         id:reportCandidates
         property var result:({})
         property string errorText:""
+        property var row:({})
+        function search() {
+            result=({}); errorText=""
+            if (!decolog.activation.startContestReportCandidates(row, candidateTolerance.value)) errorText=qsTr("Cannot search this log now.")
+        }
         function openCandidate(candidate) {
             if (!decolog.activation.isContestReportCandidateCurrent(candidate.id,candidate.uuid,candidate.revision)) {
                 errorText=qsTr("This QSO or log changed; search again before opening."); return
@@ -989,10 +1003,15 @@ RoundedWindow {
         ColumnLayout {
             anchors.fill:parent; spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
-                text:qsTr("Suggestions share the reported or suggested corrected call, band, mode family and UTC minute. Check the station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
+                text:qsTr("Suggestions share the reported or suggested corrected call, band and mode family within the selected UTC minute window. Check time, station, frequency, exchange and context; current profile data may have changed. No QSO is changed.") }
+            RowLayout {
+                Text { text:qsTr("Additional minutes before and after"); color:Theme.textSecondary }
+                SpinBox { id:candidateTolerance; from:0; to:5; value:0; enabled:!decolog.activation.contestReportBusy; Accessible.name:qsTr("Additional minutes before and after") }
+                GlassButton { id:retryCandidateSearch; text:qsTr("Search again"); enabled:!decolog.activation.contestReportBusy; onClicked:reportCandidates.search() }
+            }
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.errorColor; visible:reportCandidates.errorText.length>0; text:reportCandidates.errorText }
             Text { Layout.fillWidth:true; color:Theme.textSecondary
-                text:decolog.activation.contestReportBusy ? qsTr("Searching…") : qsTr("Line %1 · %2 · %3 shown%4").arg(reportCandidates.result.line || "—").arg(reportCandidates.result.call || "").arg((reportCandidates.result.candidates || []).length).arg(reportCandidates.result.truncated ? qsTr(" · more matches exist") : "") }
+                text:decolog.activation.contestReportBusy ? qsTr("Searching…") : qsTr("Line %1 · %2 · ±%3 min · %4 shown%5").arg(reportCandidates.result.line || "—").arg(reportCandidates.result.call || "").arg(reportCandidates.result.toleranceMinutes || 0).arg((reportCandidates.result.candidates || []).length).arg(reportCandidates.result.truncated ? qsTr(" · more matches exist") : "") }
             ListView {
                 id:candidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:reportCandidates.result.candidates || []
                 ScrollBar.vertical:PanelScrollBar {}
