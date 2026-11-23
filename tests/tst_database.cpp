@@ -1859,6 +1859,33 @@ private slots:
         QCOMPARE(db.record(inserted.id)->value("LOTW_QSL_SENT"), QStringLiteral("Y"));
     }
 
+    void nestedDeleteFailureRestoresQsoHistoryAndServiceState()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto inserted = db.insertQso({{"CALL", "K1DEL"}, {"QSO_DATE", "20260101"}, {"TIME_ON", "1200"},
+                                            {"BAND", "20m"}, {"MODE", "CW"}}, "test");
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        QslState state; state.service = "crx"; state.sent = "Y"; state.remoteId = "remote-1";
+        QVERIFY(db.setQslState(inserted.id, state));
+        const auto revision = db.meta(inserted.id)->revision;
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER fail_remote_delete BEFORE UPDATE ON qsl_status BEGIN SELECT RAISE(FAIL, 'injected failure'); END")));
+        QVERIFY(q.exec(QStringLiteral("BEGIN IMMEDIATE")));
+        QVERIFY(!db.softDeleteQso(inserted.id));
+        QVERIFY(!db.meta(inserted.id)->deleted);
+        QCOMPARE(db.meta(inserted.id)->revision, revision);
+        QCOMPARE(db.qsoCount(), qint64(1));
+        QVERIFY(q.exec(QStringLiteral("SELECT sent, remote_id FROM qsl_status WHERE qso_id=%1 AND service='crx'").arg(inserted.id))); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toString(), QStringLiteral("Y")); QCOMPARE(q.value(1).toString(), QStringLiteral("remote-1")); q.finish();
+        QVERIFY(q.exec(QStringLiteral("SELECT COUNT(*) FROM qso_history"))); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 0); q.finish();
+        QVERIFY(q.exec(QStringLiteral("DROP TRIGGER fail_remote_delete")));
+        QVERIFY(db.softDeleteQso(inserted.id));
+        QVERIFY(q.exec(QStringLiteral("COMMIT")));
+        QVERIFY(db.meta(inserted.id)->deleted);
+        QVERIFY(q.exec(QStringLiteral("SELECT sent FROM qsl_status WHERE qso_id=%1 AND service='crx'").arg(inserted.id))); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toString(), QStringLiteral("D"));
+    }
+
     void insertAndReadBack()
     {
         LogDatabase db;

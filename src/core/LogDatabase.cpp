@@ -1637,10 +1637,17 @@ bool LogDatabase::softDeleteQso(qint64 id)
     const auto m = meta(id);
     if (!m || m->deleted)
         return false;
-    // Dentro una transazione gia' aperta (l'unione dei doppioni) si lavora in
-    // quella: chiuderla qui chiuderebbe anche la sua.
     QSqlDatabase db = connection();
-    const bool ownTransaction = db.transaction();
+    QSqlQuery savepoint(db);
+    if (!savepoint.exec(QStringLiteral("SAVEPOINT decolog_delete_qso"))) {
+        m_lastError = savepoint.lastError().text();
+        return false;
+    }
+    const auto rollbackDelete = [&] {
+        QSqlQuery rollback(db);
+        rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_delete_qso"));
+        rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_delete_qso"));
+    };
     QSqlQuery h(db);
     h.prepare(QStringLiteral(
         "INSERT INTO qso_history (qso_uuid, revision, snapshot, reason, recorded_at) VALUES (?, ?, ?, 'delete', ?)"));
@@ -1659,12 +1666,27 @@ bool LogDatabase::softDeleteQso(qint64 id)
     d.prepare(QStringLiteral("UPDATE qsl_status SET sent = 'D' WHERE qso_id = ? AND IFNULL(remote_id, '') <> '' "
                              "AND service IN ('%1')").arg(editableServices().join(QStringLiteral("','"))));
     d.addBindValue(id);
-    if (!h.exec() || !u.exec() || !d.exec()) {
-        if (ownTransaction)
-            db.rollback();
+    if (!h.exec()) {
+        m_lastError = h.lastError().text();
+        rollbackDelete();
         return false;
     }
-    return !ownTransaction || db.commit();
+    if (!u.exec()) {
+        m_lastError = u.lastError().text();
+        rollbackDelete();
+        return false;
+    }
+    if (!d.exec()) {
+        m_lastError = d.lastError().text();
+        rollbackDelete();
+        return false;
+    }
+    if (!savepoint.exec(QStringLiteral("RELEASE SAVEPOINT decolog_delete_qso"))) {
+        m_lastError = savepoint.lastError().text();
+        rollbackDelete();
+        return false;
+    }
+    return true;
 }
 
 namespace {
