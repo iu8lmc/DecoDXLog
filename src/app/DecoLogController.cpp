@@ -6866,9 +6866,11 @@ void DecoLogController::finishRecovery(const RecoveryJob& job, const decodiumlog
     const bool transaction = bulk && db.transaction();
     int saved = 0;
     int activationDuplicates = 0;
+    int activationNeedsReview = 0;
     for (const AdifRecord& r : missing) {
         switch (saveRecoveredQso(r, bulk, source)) {
         case Recovered::Saved: ++saved; break;
+        case Recovered::SavedNeedsReview: ++saved; ++activationNeedsReview; break;
         case Recovered::ActivationDuplicate: ++activationDuplicates; break;
         case Recovered::Known:
         case Recovered::Failed: break;
@@ -6877,6 +6879,7 @@ void DecoLogController::finishRecovery(const RecoveryJob& job, const decodiumlog
     if (transaction)
         db.commit();
     if (saved > 0) {
+        if (m_activation->active()) m_activation->refresh();
         if (bulk)
             timed(tr("reloading the log table"), [this] { m_model->reload(); });
         emit logChanged();
@@ -6900,10 +6903,12 @@ void DecoLogController::finishRecovery(const RecoveryJob& job, const decodiumlog
     if (activationDuplicates > 0)
         status += tr(" · %n skipped as duplicates of the open activation “%1”", "", activationDuplicates)
                       .arg(m_activation->session().title());
+    if (activationNeedsReview > 0)
+        status += tr(" · %n QSO(s) need activation-period review", "", activationNeedsReview);
     setStatus(status);
     if (saved > 0 || job.manual || activationDuplicates > 0)
         addActivity(source.category, status,
-                    activationDuplicates > 0 ? QStringLiteral("warning")
+                    activationDuplicates > 0 || activationNeedsReview > 0 ? QStringLiteral("warning")
                     : saved > 0              ? QStringLiteral("success")
                                              : QStringLiteral("info"));
     emit recoveryChanged();
@@ -6913,34 +6918,45 @@ void DecoLogController::finishRecovery(const RecoveryJob& job, const decodiumlog
 DecoLogController::Recovered DecoLogController::saveRecoveredQso(const AdifRecord& input, bool bulk,
                                                                  const RecoverySource& source)
 {
-    // Arrivato via UDP mentre si leggeva il file.
-    if (m_db.knowsQso(input))
-        return Recovered::Known;
+    if (m_db.knowsQso(input)) return Recovered::Known;
     const QString stationCall = input.value(QStringLiteral("STATION_CALLSIGN")).trimmed();
     const QString operatorCall = input.value(QStringLiteral("OPERATOR")).trimmed();
     qint64 profileId = m_db.profileForIdentity(stationCall, operatorCall);
-    if (profileId == 0 && stationCall.isEmpty() && operatorCall.isEmpty() && m_profiles)
+    const auto assignment = m_activation->recoveryAssignment(input);
+    const bool inTrackedPeriod = assignment.status == ActivationController::RecoveryAssignment::Status::Resolved;
+    const bool needsReview = assignment.status == ActivationController::RecoveryAssignment::Status::Uncertain;
+    if (inTrackedPeriod || needsReview) {
+        // A current profile is not proof of a historical operator or site.
+        if (stationCall.isEmpty() && operatorCall.isEmpty()) profileId = 0;
+        else if (profileId > 0 && m_profiles) {
+            const auto profile = m_profiles->byId(profileId);
+            const auto agrees = [](const QString& reported, const QString& expected) {
+                return reported.isEmpty() || (!expected.trimmed().isEmpty() && reported.compare(expected.trimmed(), Qt::CaseInsensitive) == 0);
+            };
+            if (profile.isEmpty() || !agrees(stationCall, profile.value(QStringLiteral("stationCallsign")).toString()) ||
+                !agrees(operatorCall, profile.value(QStringLiteral("operatorCall")).toString())) profileId = 0;
+        }
+    } else if (profileId == 0 && stationCall.isEmpty() && operatorCall.isEmpty() && m_profiles)
         profileId = m_profiles->activeProfileId();
     else if (profileId == 0 && m_db.stationProfiles(false).size() <= 1 && m_profiles)
         profileId = m_profiles->activeProfileId();
     AdifRecord enriched = input;
     adif::normalizeMode(enriched);
     applyEntity(enriched);
-    // In un'attivazione solo i QSO fatti dopo che e' cominciata.
-    const QDateTime at = decodiumlog::loggedAt(input);
-    const bool inActivation = m_activation->active() && at.isValid() && m_activation->session().startedAt.isValid()
-                              && at >= m_activation->session().startedAt;
-    const QString mode = enriched.value(QStringLiteral("SUBMODE")).isEmpty()
-                             ? enriched.value(QStringLiteral("MODE"))
-                             : enriched.value(QStringLiteral("SUBMODE"));
-    const QString call = enriched.value(QStringLiteral("CALL")).trimmed().toUpper();
-    if (inActivation) {
-        m_activation->applyTo(enriched);
-        if (m_activation->isDuplicate(call, enriched.value(QStringLiteral("BAND")), mode))
-            return Recovered::ActivationDuplicate;
-        if (m_activation->session().stationProfileId > 0)
-            profileId = m_activation->session().stationProfileId;
+    if (inTrackedPeriod) {
+        // Do not allocate or guess a contest serial for a recovered QSO.
+        assignment.session.applyTo(enriched, 0);
+    } else if (needsReview && enriched.value(QStringLiteral("APP_DECOLOG_ACTIVATION_REVIEW")).isEmpty()) {
+        enriched.set(QStringLiteral("APP_DECOLOG_ACTIVATION_REVIEW"), QStringLiteral("PERIOD_UNCERTAIN"));
     }
+    const QDateTime at = decodiumlog::loggedAt(input);
+    const QString call = enriched.value(QStringLiteral("CALL")).trimmed().toUpper();
+    const QString mode = enriched.value(QStringLiteral("SUBMODE")).isEmpty()
+        ? enriched.value(QStringLiteral("MODE")) : enriched.value(QStringLiteral("SUBMODE"));
+    if (inTrackedPeriod && m_activation->active() &&
+        assignment.session.sessionUuid == m_activation->session().sessionUuid &&
+        m_activation->isDuplicate(call, enriched.value(QStringLiteral("BAND")), mode))
+        return Recovered::ActivationDuplicate;
     const QString sourceApp = source.decodium ? QStringLiteral("Decodium") : source.label;
     const InsertResult r = m_db.insertQso(enriched, source.source, sourceApp, false, profileId);
     if (r.status != InsertResult::Status::Inserted) {
@@ -6951,13 +6967,11 @@ DecoLogController::Recovered DecoLogController::saveRecoveredQso(const AdifRecor
         return r.status == InsertResult::Status::Duplicate ? Recovered::Known : Recovered::Failed;
     }
     m_qsl->qsoLogged(r.id);
-    if (inActivation)
-        m_activation->qsoLogged();
     if (m_net)
         m_net->qsoLogged(r.id);
     m_cloud->qsoLogged();
     if (bulk)
-        return Recovered::Saved;
+        return needsReview ? Recovered::SavedNeedsReview : Recovered::Saved;
     m_model->insertQso(r.id);
     const QString band = enriched.value(QStringLiteral("BAND")).toLower();
     const QString time = at.isValid() ? at.toString(dates::format() + QStringLiteral(" HH:mm")) + QStringLiteral("Z")
@@ -6967,7 +6981,7 @@ DecoLogController::Recovered DecoLogController::saveRecoveredQso(const AdifRecor
                                 : tr("Recovered from %1 → %2 %3 %4 %5").arg(source.label, call, band, mode, time),
                 QStringLiteral("success"));
     completeFromCallbook(r.id, call);
-    return Recovered::Saved;
+    return needsReview ? Recovered::SavedNeedsReview : Recovered::Saved;
 }
 
 void DecoLogController::setConfirmAutoHours(int hours)

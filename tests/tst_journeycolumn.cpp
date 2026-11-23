@@ -51,7 +51,7 @@ private:
             QStringLiteral("--db"), dir.filePath(QStringLiteral("test.sqlite")), QStringLiteral("--port"), QStringLiteral("0"),
             QStringLiteral("--show"), probe, QStringLiteral("--grab"), dir.filePath(QStringLiteral("screen.png"))
         });
-        if (!app.waitForStarted(10000) || !app.waitForFinished(30000)) {
+        if (!app.waitForStarted(10000) || !app.waitForFinished(40000)) {
             output = app.errorString().toUtf8() + app.readAll();
             return false;
         }
@@ -59,6 +59,40 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void recoveredRecordsUseTheirJournalPeriod()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir, "", true);
+        const QString path=dir.filePath("test.sqlite");
+        const QDateTime now=QDateTime::currentDateTimeUtc();
+        const QDateTime start=now.addSecs(-2400), change=now.addSecs(-1800), stop=now.addSecs(-1200);
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            Activation a; a.active=true; a.kind=Activation::Kind::Pota; a.reference="IT-0001"; a.myGrid="JM75"; a.sessionUuid="historical-run"; a.startedAt=start;
+            Activation b=a; b.reference="IT-0002"; b.myGrid="JM76";
+            const auto json=[](const Activation& s) { return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(s.toMap())).toJson(QJsonDocument::Compact)); };
+            QSqlQuery q(db.connection()); q.prepare("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES(?,?,?,?,?)");
+            q.addBindValue(a.sessionUuid); q.addBindValue(start.toString(Qt::ISODateWithMs)); q.addBindValue(stop.toString(Qt::ISODateWithMs)); q.addBindValue(json(a)); q.addBindValue(json(b)); QVERIFY(q.exec());
+            const auto event=[&](const QDateTime& at, const QString& kind, const Activation& s) { QSqlQuery e(db.connection()); e.prepare("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES(?,?,?,?)"); e.addBindValue(a.sessionUuid); e.addBindValue(at.toString(Qt::ISODateWithMs)); e.addBindValue(kind); e.addBindValue(json(s)); return e.exec(); };
+            QVERIFY(event(start,"start",a)); QVERIFY(event(change,"update",b)); QVERIFY(event(stop,"stop",b));
+        }
+        const auto record=[](const QString& call,const QDateTime& on,const QDateTime& off) { return AdifRecord{{"CALL",call},{"QSO_DATE",on.toString("yyyyMMdd")},{"TIME_ON",on.toString("HHmmss")},{"QSO_DATE_OFF",off.toString("yyyyMMdd")},{"TIME_OFF",off.toString("HHmmss")},{"BAND","20m"},{"MODE","CW"}}; };
+        const QString log=dir.filePath("decodium_log.adi"); QFile f(log); QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("Decodium ADIF\n<EOH>\n");
+        f.write(adif::writeRecord(record("K1HAA",change.addSecs(-300),change.addSecs(-270))).toUtf8());
+        f.write(adif::writeRecord(record("K1HBB",change.addSecs(-10),change.addSecs(10))).toUtf8());
+        f.write(adif::writeRecord(record("K1HCC",change.addSecs(120),change.addSecs(150))).toUtf8()); f.close();
+        QSettings decodium(dir.filePath("settings/Decodium/Decodium3.ini"),QSettings::IniFormat); decodium.setValue("Logbooks/ActivePath",log); decodium.sync();
+        QByteArray output; QVERIFY2(launch(dir,"",output,26000),output.constData());
+        LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT id,call,IFNULL(station_profile_id,0) FROM qso WHERE call IN ('K1HAA','K1HBB','K1HCC') ORDER BY call"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(),QString("K1HAA")); auto first=db.record(q.value(0).toLongLong()); QVERIFY(first.has_value());
+        QCOMPARE(first->value("MY_POTA_REF"),QString("IT-0001")); QCOMPARE(first->value("MY_GRIDSQUARE"),QString("JM75")); QCOMPARE(first->value("APP_DECOLOG_ACTIVATION_UUID"),QString("historical-run")); QVERIFY(first->value("STX").isEmpty()); QCOMPARE(q.value(2).toLongLong(),qint64(0));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(),QString("K1HBB")); auto middle=db.record(q.value(0).toLongLong()); QVERIFY(middle.has_value());
+        QCOMPARE(middle->value("APP_DECOLOG_ACTIVATION_REVIEW"),QString("PERIOD_UNCERTAIN")); QVERIFY(middle->value("APP_DECOLOG_ACTIVATION_UUID").isEmpty()); QVERIFY(middle->value("MY_POTA_REF").isEmpty()); QCOMPARE(q.value(2).toLongLong(),qint64(0));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(),QString("K1HCC")); auto last=db.record(q.value(0).toLongLong()); QVERIFY(last.has_value());
+        QCOMPARE(last->value("MY_POTA_REF"),QString("IT-0002")); QCOMPARE(last->value("MY_GRIDSQUARE"),QString("JM76")); QVERIFY(last->value("STX").isEmpty()); QVERIFY(!q.next());
+    }
     void udpActivationUsesSessionProfileWithoutOverwritingSourceFields()
     {
         using namespace decolog::core;

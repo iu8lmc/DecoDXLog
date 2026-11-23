@@ -7,6 +7,8 @@
 #include "core/PotaCatalogue.h"
 
 #include <QSqlQuery>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 
 #include <QFile>
@@ -21,6 +23,39 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void recoveredQsoUsesOnlyUnambiguousJournalPeriod()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;
+        ActivationController act(std::move(ctx));
+        Activation first=Activation::fromMap({{"active",true},{"kind","pota"},{"reference","IT-0001"},{"myGrid","JM75"},{"sessionUuid","run-1"}});
+        Activation second=first; second.reference="IT-0002"; second.myGrid="JM76";
+        const auto json=[](const Activation& a) { return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(a.toMap())).toJson(QJsonDocument::Compact)); };
+        QSqlQuery q(db.connection()); q.prepare("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES(?,?,?,?,?)");
+        q.addBindValue("run-1"); q.addBindValue("2026-10-23T10:00:00.500Z"); q.addBindValue("2026-10-23T10:10:00.500Z"); q.addBindValue(json(first)); q.addBindValue(json(second)); QVERIFY(q.exec());
+        auto event=[&](const QString& at, const QString& type, const Activation& state) {
+            QSqlQuery e(db.connection()); e.prepare("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES(?,?,?,?)");
+            e.addBindValue("run-1"); e.addBindValue(at); e.addBindValue(type); e.addBindValue(json(state)); return e.exec(); };
+        QVERIFY(event("2026-10-23T10:00:00.500Z","start",first));
+        QVERIFY(event("2026-10-23T10:05:00.500Z","update",second));
+        QVERIFY(event("2026-10-23T10:10:00.500Z","stop",second));
+        auto record=[](const char* on, const char* off) { return AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261023"},{"TIME_ON",QString::fromLatin1(on)},{"TIME_OFF",QString::fromLatin1(off)}}; };
+        auto a=act.recoveryAssignment(record("100100","100200")); QCOMPARE(a.status, ActivationController::RecoveryAssignment::Status::Resolved);
+        QCOMPARE(a.session.reference, QString("IT-0001")); QCOMPARE(a.session.myGrid, QString("JM75"));
+        auto b=act.recoveryAssignment(record("100600","100700")); QCOMPARE(b.status, ActivationController::RecoveryAssignment::Status::Resolved);
+        QCOMPARE(b.session.reference, QString("IT-0002")); QCOMPARE(b.session.myGrid, QString("JM76"));
+        QCOMPARE(act.recoveryAssignment(record("100459","100501")).status, ActivationController::RecoveryAssignment::Status::Uncertain);
+        QCOMPARE(act.recoveryAssignment(record("1004","1005")).status, ActivationController::RecoveryAssignment::Status::Uncertain);
+        QCOMPARE(act.recoveryAssignment(record("bad","1002")).status, ActivationController::RecoveryAssignment::Status::Uncertain);
+        QCOMPARE(act.recoveryAssignment(record("1001","")).status, ActivationController::RecoveryAssignment::Status::Uncertain);
+        QCOMPARE(act.recoveryAssignment(record("101100","101200")).status, ActivationController::RecoveryAssignment::Status::None);
+        QVERIFY(db.connection().transaction());
+        QCOMPARE(act.recoveryAssignment(record("100100","100200")).status, ActivationController::RecoveryAssignment::Status::Resolved);
+        QVERIFY(db.connection().rollback());
+        AdifRecord conflicting=record("100100","100200"); conflicting.set("APP_DECOLOG_ACTIVATION_UUID","other-run");
+        QCOMPARE(act.recoveryAssignment(conflicting).status, ActivationController::RecoveryAssignment::Status::Uncertain);
+        QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('run-2','2026-10-23T10:01:00.000Z','2026-10-23T10:03:00.000Z','{}','{}')"));
+        QCOMPARE(act.recoveryAssignment(record("100130","100200")).status, ActivationController::RecoveryAssignment::Status::Uncertain);
+    }
     void activationHasStableSessionIdentity()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

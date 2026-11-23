@@ -967,7 +967,7 @@ private:
     void startRecovery(const RecoveryJob& job);
     void finishRecovery(const RecoveryJob& job, const core::decodiumlog::Tail& tail,
                         const QList<core::AdifRecord>& missing);
-    enum class Recovered { Saved, Known, ActivationDuplicate, Failed };
+    enum class Recovered { Saved, SavedNeedsReview, Known, ActivationDuplicate, Failed };
     Recovered saveRecoveredQso(const core::AdifRecord& record, bool bulk, const RecoverySource& source);
     QSet<QString> confirmedAwardKeys(const QString& awardId) const;
     void requestCallbook();

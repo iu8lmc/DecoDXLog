@@ -66,6 +66,14 @@ public:
         QString potaCataloguePath;
     };
 
+    struct RecoveryAssignment {
+        enum class Status { None, Resolved, Uncertain };
+        Status status{Status::None};
+        core::Activation session;
+    };
+    // Read-only, conservative lookup of a complete QSO interval in the journal.
+    RecoveryAssignment recoveryAssignment(const core::AdifRecord& record) const;
+
     explicit ActivationController(Context context, QObject* parent = nullptr);
     ~ActivationController() override;
     QObject* sotaCatalogue() const;

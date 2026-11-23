@@ -22,6 +22,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QTimeZone>
@@ -192,6 +193,92 @@ bool ActivationController::persistTransition(const Activation& next, const QStri
     }
     if (!ok || !db.commit()) { db.rollback(); return false; }
     return true;
+}
+
+ActivationController::RecoveryAssignment ActivationController::recoveryAssignment(const AdifRecord& record) const
+{
+    using Status = RecoveryAssignment::Status;
+    const auto uncertain = [] { return RecoveryAssignment{Status::Uncertain, {}}; };
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return uncertain();
+    QSqlQuery savepoint(m_ctx.db->connection());
+    if (!savepoint.exec(QStringLiteral("SAVEPOINT activation_recovery_lookup"))) return uncertain();
+    struct ReadScope {
+        QSqlDatabase db;
+        ~ReadScope() { QSqlQuery release(db); release.exec(QStringLiteral("RELEASE SAVEPOINT activation_recovery_lookup")); }
+    } readScope{m_ctx.db->connection()};
+    const auto parseAdif = [](const QString& rawDate, const QString& rawTime, QDateTime* at, int* precision) {
+        const QString dateText = rawDate.trimmed(), timeText = rawTime.trimmed();
+        static const QRegularExpression digits(QStringLiteral("^[0-9]{4}(?:[0-9]{2})?$"));
+        if (dateText.size() != 8 || !digits.match(timeText).hasMatch()) return false;
+        const QDate date = QDate::fromString(dateText, QStringLiteral("yyyyMMdd"));
+        const QTime time = QTime::fromString(timeText, timeText.size() == 4 ? QStringLiteral("HHmm") : QStringLiteral("HHmmss"));
+        if (!date.isValid() || !time.isValid()) return false;
+        *at = QDateTime(date, time, QTimeZone::UTC); *precision = timeText.size() == 4 ? 60 : 1; return true;
+    };
+    QDateTime begin, off; int onPrecision = 0, offPrecision = 0;
+    if (!parseAdif(record.value(QStringLiteral("QSO_DATE")), record.value(QStringLiteral("TIME_ON")), &begin, &onPrecision)) {
+        QSqlQuery anyRun(m_ctx.db->connection());
+        if (!anyRun.exec(QStringLiteral("SELECT 1 FROM activation_run LIMIT 1"))) return uncertain();
+        return m_session.active || anyRun.next() ? uncertain() : RecoveryAssignment{};
+    }
+    const QString rawOff = record.value(QStringLiteral("TIME_OFF")).trimmed();
+    const QString rawOffDate = record.value(QStringLiteral("QSO_DATE_OFF")).trimmed();
+    const bool complete = !rawOff.isEmpty() && parseAdif(rawOffDate.isEmpty() ? record.value(QStringLiteral("QSO_DATE")) : rawOffDate,
+                                                        rawOff, &off, &offPrecision);
+    QDateTime end = complete ? off.addSecs(offPrecision) : begin.addSecs(onPrecision);
+    if (complete && rawOffDate.isEmpty() && end <= begin) end = end.addDays(1);
+    if (end <= begin || begin > QDateTime::currentDateTimeUtc()) return uncertain();
+    const auto utcTime = [](const QString& text) {
+        if (!text.endsWith(QLatin1Char('Z'), Qt::CaseInsensitive)) return QDateTime{};
+        return QDateTime::fromString(text, Qt::ISODate).toUTC();
+    };
+    QSqlQuery runs(m_ctx.db->connection());
+    runs.prepare(QStringLiteral("SELECT uuid,started_at,ended_at FROM activation_run "
+                                "WHERE substr(started_at,1,10)<=? AND (ended_at IS NULL OR substr(ended_at,1,10)>=?) ORDER BY rowid"));
+    runs.addBindValue(end.date().toString(Qt::ISODate)); runs.addBindValue(begin.date().toString(Qt::ISODate));
+    if (!runs.exec()) return uncertain();
+    struct Run { QString uuid; QDateTime start; QDateTime end; bool closed{false}; };
+    QList<Run> overlapping;
+    while (runs.next()) {
+        Run run{runs.value(0).toString(), utcTime(runs.value(1).toString()), utcTime(runs.value(2).toString()), !runs.value(2).isNull()};
+        if (run.uuid.isEmpty() || !run.start.isValid() || (run.closed && (!run.end.isValid() || run.end <= run.start))) return uncertain();
+        if (run.start < end && (!run.closed || run.end > begin)) overlapping << run;
+    }
+    if (runs.lastError().isValid()) return uncertain();
+    if (m_session.active && m_session.sessionUuid.isEmpty() && m_session.startedAt.isValid() && m_session.startedAt < end)
+        return uncertain();
+    if (overlapping.isEmpty()) return {};
+    if (overlapping.size() != 1 || !complete) return uncertain();
+    const Run run = overlapping.first();
+    const QString reported = record.value(QStringLiteral("APP_DECOLOG_ACTIVATION_UUID")).trimmed();
+    if (!reported.isEmpty() && reported != run.uuid) return uncertain();
+    QSqlQuery changes(m_ctx.db->connection());
+    changes.prepare(QStringLiteral("SELECT event,changed_at,state_json FROM activation_run_change WHERE session_uuid=? ORDER BY id"));
+    changes.addBindValue(run.uuid);
+    if (!changes.exec()) return uncertain();
+    struct Event { QString kind; QDateTime at; Activation state; };
+    QList<Event> events;
+    while (changes.next()) {
+        const QString kind = changes.value(0).toString(); const QDateTime at = utcTime(changes.value(1).toString());
+        QJsonParseError error; const auto doc = QJsonDocument::fromJson(changes.value(2).toByteArray(), &error);
+        if (!at.isValid() || error.error != QJsonParseError::NoError || !doc.isObject()) return uncertain();
+        const Activation state = Activation::fromMap(doc.object().toVariantMap());
+        if (!state.active || state.sessionUuid != run.uuid || state.kind == Activation::Kind::None ||
+            (!events.isEmpty() && at <= events.last().at)) return uncertain();
+        if ((events.isEmpty() && kind != QLatin1String("start")) ||
+            (!events.isEmpty() && kind != QLatin1String("update") && kind != QLatin1String("stop")) ||
+            (!events.isEmpty() && events.last().kind == QLatin1String("stop"))) return uncertain();
+        events << Event{kind, at, state};
+    }
+    if (changes.lastError().isValid() || events.isEmpty() || events.first().at < run.start ||
+        (run.closed && (events.last().kind != QLatin1String("stop") || events.last().at != run.end)) ||
+        (!run.closed && events.last().kind == QLatin1String("stop"))) return uncertain();
+    for (qsizetype i = 0; i < events.size(); ++i) {
+        if (events.at(i).kind == QLatin1String("stop")) break;
+        const QDateTime until = i + 1 < events.size() ? events.at(i + 1).at : QDateTime::currentDateTimeUtc();
+        if (begin >= events.at(i).at && end <= until) return {Status::Resolved, events.at(i).state};
+    }
+    return uncertain();
 }
 
 QStringList ActivationController::kinds() const
