@@ -19,11 +19,13 @@ DialogFrame {
     property int selectedIndex: -1
     property bool ownsWork: false
     property bool probing: false
+    property bool probingReview: false
     readonly property var selected: selectedIndex >= 0 && selectedIndex < rows.length ? rows[selectedIndex] : ({})
     signal historyChanged()
     function refresh() { ownsWork = acquisition.review(qsoId, historyAnchors[historyAnchors.length - 1]) }
-    function openFor(id, probe) {
-        qsoId = id; historyAnchors = [0]; rows = []; selectedIndex = -1; probing = !!probe
+    onSelectedChanged: reviewText.text = selected.reviewId ? selected.reviewedText : (!selected.textTruncated ? (selected.text || "") : "")
+    function openFor(id, probe, reviewProbe) {
+        qsoId = id; historyAnchors = [0]; rows = []; selectedIndex = -1; probing = !!probe; probingReview=!!reviewProbe
         open(); refresh()
     }
     onClosed: if (root.ownsWork) root.acquisition.cancel()
@@ -39,9 +41,14 @@ DialogFrame {
                 root.rows = found.slice(0, 50)
                 root.selectedIndex = root.rows.length ? 0 : -1
                 if (root.probing && root.rows.length) confirmUndo.open()
+                if (root.probingReview && root.rows.length && !root.selected.reviewId) { reviewText.text="Operator corrected K1ABC"; saveReviewButton.clicked() }
+                else if (root.probingReview && root.rows.length && root.selected.reviewId) { console.warn("PROBE qslReview restored " + root.selected.reviewedText); root.probingReview=false }
             } else if (operation === "undo") {
                 if (root.probing) console.warn("PROBE qslUndo success=" + success + " removed=" + root.acquisition.result.removedLinks + " error=" + root.acquisition.error)
                 if (success) { root.historyChanged(); root.probing = false; root.refresh() }
+            } else if (operation === "saveReview") {
+                if (root.probingReview) console.warn("PROBE qslReview saved=" + success + " error=" + root.acquisition.error)
+                if (success) root.refresh()
             }
         }
     }
@@ -134,9 +141,21 @@ DialogFrame {
         Text { text: qsTr("Recognized text (first 4096 characters)"); color: Theme.textPrimary; font.bold: true }
         ScrollView {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: 70
             clip: true
             TextArea { readOnly: true; text: root.selected.text || ""; textFormat: TextEdit.PlainText; color: Theme.textPrimary; background: null; wrapMode: TextArea.Wrap; selectByMouse: true }
+        }
+        Text { Layout.fillWidth:true; text:qsTr("Operator-reviewed transcription (optional; previous revisions are retained)"); color:Theme.textPrimary; font.bold:true; wrapMode:Text.Wrap }
+        Text { Layout.fillWidth:true; visible:!!root.selected.textTruncated && !root.selected.reviewId; text:qsTr("The OCR preview is truncated; enter the reviewed text explicitly."); color:Theme.warningColor; wrapMode:Text.Wrap }
+        ScrollView {
+            Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+            TextArea { id:reviewText; textFormat:TextEdit.PlainText; color:Theme.textPrimary; background:null; wrapMode:TextArea.Wrap; selectByMouse:true; enabled:!!root.selected.id && !root.selected.undoneAt && !root.acquisition.busy }
+        }
+        RowLayout {
+            Layout.fillWidth:true
+            GlassButton { id:saveReviewButton; text:qsTr("Save reviewed text"); enabled:!!root.selected.id && !root.selected.undoneAt && !root.acquisition.busy && reviewText.text.trim().length>0 && reviewText.text.length<=65536
+                onClicked:root.ownsWork=root.acquisition.saveReview(Number(root.selected.id),String(root.selected.uuid),Number(root.selected.reviewId || 0),reviewText.text) }
+            Text { Layout.fillWidth:true; color:Theme.textSecondary; text:root.selected.reviewedAt ? qsTr("Latest review: %1").arg(root.selected.reviewedAt) : qsTr("No reviewed transcription saved"); wrapMode:Text.Wrap }
         }
         Text { Layout.fillWidth: true; visible: !!root.selected.id && !root.selected.undoneAt && !root.selected.guarded; text: qsTr("Undo is unavailable because a link is legacy, changed or missing. Review manually."); color: Theme.warningColor; wrapMode: Text.Wrap }
         RowLayout {

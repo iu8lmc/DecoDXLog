@@ -625,6 +625,25 @@ private slots:
         QCOMPARE(db.qslAttachmentData(attachment), bytes);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT undone_at FROM qsl_ocr_acquisition")); QVERIFY(q.next()); QVERIFY(!q.value(0).isNull());
     }
+    void qslOcrHistorySavesReviewedTextSeparately()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString image=QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"); QVERIFY(!image.isEmpty());
+        QFile f(image); QVERIFY(f.open(QIODevice::ReadOnly)); const QByteArray bytes=f.readAll();
+        const QString hash=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const auto qso=db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260923"},{"TIME_ON","143000"},{"BAND","20m"},{"MODE","SSB"}},"manual",{},true,0,false); QVERIFY(qso.id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT uuid,revision FROM qso WHERE id=1")); QVERIFY(q.next());
+          const QVariantList selected{QVariantMap{{"id",qso.id},{"uuid",q.value(0)},{"revision",q.value(1)}}}; std::atomic_bool cancelled{false};
+          QVERIFY(decolog::core::QslOcrAcquisition::execute(db.path(),image,hash,"card.png","Original OCR",selected,&cancelled).value("ok").toBool()); }
+        QByteArray output; QVERIFY2(launch(dir,"qslocrreview",output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE qslReview saved=true") && output.contains("PROBE qslReview restored Operator corrected K1ABC"),output.constData());
+        QByteArray reopened; QVERIFY2(launch(dir,"qslocrreview",reopened,4000),reopened.constData());
+        QVERIFY2(reopened.contains("PROBE qslReview restored Operator corrected K1ABC"),reopened.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT a.ocr_text,r.reviewed_text FROM qsl_ocr_acquisition a JOIN qsl_ocr_review r ON r.acquisition_id=a.id")); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toString(),QString("Original OCR")); QCOMPARE(q.value(1).toString(),QString("Operator corrected K1ABC")); QVERIFY(!q.next());
+        QCOMPARE(db.qsoCount(),qint64(1)); QVERIFY(db.record(1)->value("QSL_RCVD").isEmpty()); QCOMPARE(db.qslAttachments(1).size(),1);
+    }
     void roverManualQsoRespectsHistoryAndExplicitOverride()
     {
         QTemporaryDir dir;

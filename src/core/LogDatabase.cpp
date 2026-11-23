@@ -454,6 +454,8 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TABLE IF NOT EXISTS activation_run_change (id INTEGER PRIMARY KEY, session_uuid TEXT NOT NULL REFERENCES activation_run(uuid), changed_at TEXT NOT NULL, event TEXT NOT NULL, state_json TEXT NOT NULL)"),
               QStringLiteral("CREATE INDEX IF NOT EXISTS idx_activation_run_change ON activation_run_change(session_uuid,id)")}, nullptr},
         {22, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qso_reported_activation ON qso((CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)) WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END) IS NOT NULL")}, "adif_extra"},
+        {23, {QStringLiteral("CREATE TABLE IF NOT EXISTS qsl_ocr_review (id INTEGER PRIMARY KEY, acquisition_id INTEGER NOT NULL REFERENCES qsl_ocr_acquisition(id), reviewed_text TEXT NOT NULL, created_at TEXT NOT NULL)"),
+              QStringLiteral("CREATE INDEX IF NOT EXISTS idx_qsl_ocr_review_acquisition ON qsl_ocr_review(acquisition_id,id)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)

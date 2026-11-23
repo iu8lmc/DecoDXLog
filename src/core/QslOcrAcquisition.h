@@ -26,6 +26,9 @@ class QslOcrAcquisition : public QObject {
     Q_INVOKABLE void cancel();
     Q_INVOKABLE bool undo(qint64 acquisitionId, const QString &uuid);
     Q_INVOKABLE bool review(qint64 qsoId, qint64 beforeId);
+    Q_INVOKABLE bool saveReview(qint64 acquisitionId, const QString &uuid, qint64 expectedReviewId, const QString &text);
+    static QVariantMap saveReviewExecute(const QString &dbPath, qint64 acquisitionId, const QString &uuid,
+                                         qint64 expectedReviewId, const QString &text, const std::atomic_bool *cancelled);
     static QVariantMap execute(const QString &dbPath, const QString &snapshot, const QString &sha256,
                                const QString &sourceName, const QString &ocrText,
                                const QVariantList &selected, const std::atomic_bool *cancelled);

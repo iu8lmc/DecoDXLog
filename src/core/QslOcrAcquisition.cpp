@@ -106,11 +106,19 @@ bool QslOcrAcquisition::review(qint64 qsoId, qint64 beforeId)
                     }
                     if (detail.lastError().isValid()) { error = tr("Cannot review OCR acquisitions"); break; }
                     if (targets.isEmpty()) guarded = false;
+                    QSqlQuery revision(db);
+                    revision.prepare(QStringLiteral("SELECT id,reviewed_text,created_at FROM qsl_ocr_review WHERE acquisition_id=? ORDER BY id DESC LIMIT 1"));
+                    revision.addBindValue(id);
+                    if (!revision.exec()) { error = tr("Cannot review OCR acquisitions"); break; }
+                    const bool hasReview=revision.next();
                     rows << QVariantMap{{QStringLiteral("id"), id}, {QStringLiteral("uuid"), header.value(0)},
                                         {QStringLiteral("createdAt"), header.value(1)}, {QStringLiteral("sourceName"), header.value(2)},
                                         {QStringLiteral("sha256"), header.value(3)}, {QStringLiteral("text"), header.value(4)},
                                         {QStringLiteral("textTruncated"), header.value(5).toInt() > 4096},
                                         {QStringLiteral("undoneAt"), header.value(6)}, {QStringLiteral("targets"), targets},
+                                        {QStringLiteral("reviewId"),hasReview ? revision.value(0) : QVariant(qint64(0))},
+                                        {QStringLiteral("reviewedText"),hasReview ? revision.value(1) : QVariant(QString())},
+                                        {QStringLiteral("reviewedAt"),hasReview ? revision.value(2) : QVariant(QString())},
                                         {QStringLiteral("guarded"), guarded}};
                 }
                 if (q.lastError().isValid()) error = tr("Cannot review OCR acquisitions");
@@ -136,6 +144,60 @@ bool QslOcrAcquisition::review(qint64 qsoId, qint64 beforeId)
         }, Qt::QueuedConnection);
     });
     return true;
+}
+bool QslOcrAcquisition::saveReview(qint64 acquisitionId,const QString &uuid,qint64 expectedReviewId,const QString &text)
+{
+    if (m_busy) return false;
+    m_result.clear(); m_error.clear();
+    if (!m_db || !m_db->isOpen() || m_db->path().isEmpty() || m_db->path()==QLatin1String(":memory:")) {
+        m_error=tr("Choose an open file-backed log"); emit changed(); return false;
+    }
+    const QString path=m_db->path(); m_cancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_cancel;
+    m_busy=true; emit changed(); QPointer<QslOcrAcquisition> self(this);
+    m_pool.start([self,path,acquisitionId,uuid,expectedReviewId,text,cancelled] {
+        const QVariantMap result=saveReviewExecute(path,acquisitionId,uuid,expectedReviewId,text,cancelled.get());
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,result] {
+            if (!self) return; self->m_busy=false; self->m_cancel.reset(); self->m_result=result;
+            self->m_error=result.value(QStringLiteral("error")).toString(); emit self->changed(); emit self->finished(result.value(QStringLiteral("ok")).toBool());
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
+QVariantMap QslOcrAcquisition::saveReviewExecute(const QString &path,qint64 acquisitionId,const QString &uuid,qint64 expectedReviewId,const QString &text,const std::atomic_bool *cancelled)
+{
+    auto failed=[](const QString& error) { return QVariantMap{{QStringLiteral("ok"),false},{QStringLiteral("operation"),QStringLiteral("saveReview")},{QStringLiteral("error"),error}}; };
+    if (!cancelled || acquisitionId<=0 || uuid.isEmpty() || uuid.size()>80 || expectedReviewId<0 || text.trimmed().isEmpty() || text.size()>65536 || !QFileInfo(path).isFile())
+        return failed(tr("Choose an acquisition and a reviewed text of at most 65536 characters"));
+    if (cancelled->load()) return failed(tr("Review cancelled"));
+    const QString connection=QStringLiteral("qsl-ocr-text-")+QUuid::createUuid().toString(); QVariantMap result;
+    {
+        QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
+        db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_URI;QSQLITE_BUSY_TIMEOUT=250"));
+        db.setDatabaseName(QUrl::fromLocalFile(QFileInfo(path).absoluteFilePath()).toString(QUrl::FullyEncoded)+QStringLiteral("?mode=rw"));
+        QSqlQuery q(db); bool transaction=false; bool ok=db.open();
+        if (ok) ok=q.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
+        if (ok) { ok=q.exec(QStringLiteral("BEGIN IMMEDIATE")); transaction=ok; }
+        if (ok) {
+            q.prepare(QStringLiteral("SELECT COALESCE((SELECT MAX(id) FROM qsl_ocr_review WHERE acquisition_id=a.id),0) FROM qsl_ocr_acquisition a WHERE id=? AND uuid=? AND undone_at IS NULL"));
+            q.addBindValue(acquisitionId); q.addBindValue(uuid);
+            if (!q.exec() || !q.next()) { ok=false; result=failed(tr("Acquisition is unavailable or undone")); }
+            else if (q.value(0).toLongLong()!=expectedReviewId) { ok=false; result=failed(tr("Review changed; refresh before saving")); }
+        }
+        qint64 reviewId=0;
+        if (ok && !cancelled->load()) {
+            q.prepare(QStringLiteral("INSERT INTO qsl_ocr_review(acquisition_id,reviewed_text,created_at) VALUES(?,?,?)"));
+            q.addBindValue(acquisitionId); q.addBindValue(text); q.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+            ok=q.exec(); if (ok) reviewId=q.lastInsertId().toLongLong();
+        }
+        if (ok && !cancelled->load()) { ok=q.exec(QStringLiteral("COMMIT")); if (ok) transaction=false; }
+        else ok=false;
+        if (transaction) q.exec(QStringLiteral("ROLLBACK"));
+        if (ok) result={{QStringLiteral("ok"),true},{QStringLiteral("operation"),QStringLiteral("saveReview")},{QStringLiteral("reviewId"),reviewId}};
+        else if (result.isEmpty()) result=failed(cancelled->load()?tr("Review cancelled"):tr("Cannot save the reviewed text"));
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connection); return result;
 }
 bool QslOcrAcquisition::undo(qint64 acquisitionId, const QString &uuid)
 {

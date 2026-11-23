@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 22;
+constexpr int kSchemaVersion = 23;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -148,6 +148,21 @@ private slots:
             QVERIFY(q.next());
             QCOMPARE(q.value(0).toString(), QString("K1AAA"));
             QCOMPARE(q.value(1).toString(), QString("malformed"));
+        }
+    }
+    void ocrReviewSchemaMigratesWithoutChangingExistingAcquisition()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("schema22.sqlite");
+        {
+            LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection());
+            QVERIFY(q.exec("INSERT INTO qsl_attachment(sha256,filename,mime,size,data,created_at) VALUES('sha','a.png','image/png',1,X'01','2026-01-01')"));
+            QVERIFY(q.exec("INSERT INTO qsl_ocr_acquisition(uuid,attachment_id,sha256,source_name,ocr_text,created_at) VALUES('fixture',1,'sha','a.png','original text','2026-01-01')"));
+            QVERIFY(q.exec("DROP TABLE qsl_ocr_review")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=23"));
+        }
+        {
+            LogDatabase db; QVERIFY2(db.open(path),qPrintable(db.lastError())); QCOMPARE(db.schemaVersion(),kSchemaVersion);
+            QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT ocr_text FROM qsl_ocr_acquisition WHERE uuid='fixture'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(),QString("original text"));
+            QVERIFY(q.exec("SELECT COUNT(*) FROM qsl_ocr_review")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
         }
     }
     void roverHistorySchemaDoesNotCreateQsos()

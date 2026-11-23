@@ -1310,6 +1310,7 @@ RoundedWindow {
         else if (what[0] === "qslocrfiltered") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true, false, true)) }
         else if (what[0] === "qslocrattach") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr("file://" + what[1], true, true)) }
         else if (what[0] === "qslocrundo") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrHistory()) }
+        else if (what[0] === "qslocrreview") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrReview()) }
         else if (what[0] === "qslocrhistory") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.showOcrHistory()) }
         else if (what[0] === "radionet") {
             radioNetDialog.open()
