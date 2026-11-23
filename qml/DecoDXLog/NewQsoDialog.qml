@@ -83,7 +83,7 @@ DialogFrame {
             mhz = decolog.bandFrequency(band, m)
         if (mhz > 0)
             freqField.text = Number(mhz).toFixed(6)
-        if (decolog.rig.connected || decolog.decoLinkClients.length > 0) {
+        if (!root.trackerPrepared && (decolog.rig.connected || decolog.decoLinkClients.length > 0)) {
             root.lastQsy = Date.now()
             decolog.tuneTo(mhz, m)
         }
@@ -392,7 +392,7 @@ DialogFrame {
         Text {
             Layout.fillWidth: true
             visible: root.trackerPrepared
-            text: qsTr("Tracker frequencies are a fixed snapshot; review them before saving.")
+            text: qsTr("Tracker frequencies are a fixed snapshot; review them before saving. Band and mode changes in this draft do not tune the radio.")
             color: Theme.warningColor
             wrapMode: Text.Wrap
         }

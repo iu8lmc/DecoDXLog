@@ -132,6 +132,27 @@ TestCase {
         decolog.rig.connected = false
     }
 
+    function test_trackerModeSelectionDoesNotTuneConnectedRig() {
+        decolog.tuneCalls = 0
+        decolog.rig.connected = true
+        const ordinary = createTemporaryObject(dialogComponent, testCase)
+        verify(ordinary !== null); ordinary.open()
+        const ordinaryMode = findChild(ordinary, "manualMode")
+        ordinaryMode.currentIndex = ordinaryMode.find("CW")
+        ordinaryMode.activated(ordinaryMode.currentIndex)
+        compare(decolog.tuneCalls, 1, "Ordinary manual mode selection retains rig tuning")
+        ordinary.close()
+        const tracker = createTemporaryObject(dialogComponent, testCase)
+        tracker.initialSatellite = "FO-29"; tracker.initialTxMHz = "145.998596"; tracker.initialRxMHz = "435.004184"
+        tracker.open()
+        const mode = findChild(tracker, "manualMode")
+        mode.currentIndex = mode.find("CW"); mode.activated(mode.currentIndex)
+        tracker.qsyTo("20m", "CW", true)
+        compare(decolog.tuneCalls, 1, "Tracker draft must not tune the connected rig")
+        compare(findChild(tracker, "manualRxFrequency").text, "435.004184")
+        decolog.rig.connected = false
+    }
+
     function test_trackerDraftDoesNotTuneConnectedRig() {
         decolog.tuneCalls = 0
         decolog.rig.connected = true
