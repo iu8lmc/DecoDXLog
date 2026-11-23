@@ -159,6 +159,15 @@ private slots:
         QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("01020304"));
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
     }
+    void contestGoalsPersistAcrossActualAppRestart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray saved,loaded;
+        QVERIFY2(launch(dir,"contestsavegoalsprobe",saved,4500),saved.constData());
+        QVERIFY2(saved.contains("PROBE savedContestGoals saved=true a=5 b=1") && !saved.contains("TypeError"),saved.constData());
+        QVERIFY2(launch(dir,"contestloadgoalsprobe",loaded,4500),loaded.constData());
+        QVERIFY2(loaded.contains("PROBE savedContestGoals saved=false a=5 b=1") && !loaded.contains("TypeError"),loaded.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestComparisonShowsTwoPeriodsInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

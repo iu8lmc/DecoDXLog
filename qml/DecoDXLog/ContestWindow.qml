@@ -24,6 +24,14 @@ RoundedWindow {
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
+    function probeContestGoals(save) {
+        contestComparison.open()
+        comparisonContest.text="CQ-WW-CW"
+        comparisonA.setTexts(decolog.showDate("2024-11-23"),decolog.showDate("2024-11-23"))
+        comparisonB.setTexts(decolog.showDate("2025-11-22"),decolog.showDate("2025-11-22"))
+        contestComparison.probingGoals=save ? "save" : "load"
+        comparisonLoadGoals.clicked()
+    }
     function probeContestComparison(stale) {
         contestComparison.open()
         comparisonContest.text="CQ-WW-CW"
@@ -118,6 +126,22 @@ RoundedWindow {
     }
     Connections {
         target: decolog.activation
+        function onContestGoalsFinished(result) {
+            if (result.error) { contestComparison.goalsLoaded=false; contestComparison.goalMessage=result.error; return }
+            if (result.contest!==comparisonContest.text.trim() || result.fromA!==comparisonA.fromIso || result.toA!==comparisonA.toIso || result.fromB!==comparisonB.fromIso || result.toB!==comparisonB.toIso) {
+                contestComparison.goalsLoaded=false; contestComparison.goalMessage=qsTr("Selection changed; load goals again. A save may have completed for the previous selection."); return
+            }
+            contestComparison.goalRevisionA=result.revisionA; contestComparison.goalRevisionB=result.revisionB; contestComparison.goalsLoaded=true
+            comparisonGoalA.value=result.targetA; comparisonGoalB.value=result.targetB
+            contestComparison.goalMessage=result.saved ? qsTr("Goals saved in this log.") : qsTr("Goals loaded; edit and save explicitly.")
+            if (contestComparison.probingGoals === "save" && !result.saved) {
+                comparisonGoalA.value=5; comparisonGoalB.value=1
+                Qt.callLater(() => comparisonSaveGoals.clicked())
+            } else if (contestComparison.probingGoals.length) {
+                console.warn("PROBE savedContestGoals saved=" + result.saved + " a=" + result.targetA + " b=" + result.targetB)
+                contestComparison.probingGoals=""
+            }
+        }
         function onContestComparisonFinished(result) {
             if (!result.error && (contestComparison.startLogRevision!==root.comparisonLogRevision || result.contest!==comparisonContest.text.trim() || result.fromA!==comparisonA.fromIso || result.toA!==comparisonA.toIso || result.fromB!==comparisonB.fromIso || result.toB!==comparisonB.toIso)) {
                 contestComparison.result=({}); contestComparison.errorText=qsTr("The selection changed; compare again.")
@@ -237,7 +261,10 @@ RoundedWindow {
 
     Connections {
         target: decolog
-        function onLogChanged() { root.revision++; root.comparisonLogRevision++; contestComparison.result=({}) }
+        function onLogChanged() {
+            root.revision++; root.comparisonLogRevision++; contestComparison.result=({})
+            if (contestComparison.goalsLoaded) { contestComparison.invalidateGoals(); contestComparison.goalMessage=qsTr("Log changed; load goals again before saving.") }
+        }
     }
     Connections {
         target: decolog.activation
@@ -1099,25 +1126,40 @@ RoundedWindow {
         id:contestComparison; dialogKey:"contestComparison"; width:760; height:620
         title:qsTr("Compare contest periods"); dotColor:Theme.primaryColor
         property var result:({}); property string errorText:""; property bool probing:false; property bool probingStale:false; property int startLogRevision:0
+        property bool goalsLoaded:false; property int goalRevisionA:-1; property int goalRevisionB:-1
+        property string goalMessage:""; property string probingGoals:""
+        function invalidateGoals() { goalsLoaded=false; goalRevisionA=-1; goalRevisionB=-1; goalMessage="" }
+        function validGoalPeriods() { return comparisonContest.text.trim().length>0 && comparisonA.hasFrom && comparisonA.hasTo && comparisonB.hasFrom && comparisonB.hasTo && comparisonA.valid && comparisonB.valid }
+        function requestGoals(save) {
+            goalMessage=""
+            if (!validGoalPeriods()) { goalMessage=qsTr("Enter the contest ID and both dates for each period."); return }
+            if (!decolog.activation.requestContestGoals(comparisonContest.text.trim(),comparisonA.fromIso,comparisonA.toIso,comparisonB.fromIso,comparisonB.toIso,save,comparisonGoalA.value,comparisonGoalB.value,save ? goalRevisionA : 0,save ? goalRevisionB : 0))
+                { goalsLoaded=false; goalMessage=qsTr("Cannot save or load these goals; reload them for the current log.") }
+        }
         function goal(total,target) { return {percent:target>0 ? Math.round(total*100/target) : 0, remaining:Math.max(0,target-total)} }
-        Connections { target:comparisonA; function onFromIsoChanged() { contestComparison.result=({}); comparisonGoalA.value=0 } function onToIsoChanged() { contestComparison.result=({}); comparisonGoalA.value=0 } }
-        Connections { target:comparisonB; function onFromIsoChanged() { contestComparison.result=({}); comparisonGoalB.value=0 } function onToIsoChanged() { contestComparison.result=({}); comparisonGoalB.value=0 } }
+        Connections { target:comparisonA; function onFromIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalA.value=0 } function onToIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalA.value=0 } }
+        Connections { target:comparisonB; function onFromIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalB.value=0 } function onToIsoChanged() { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalB.value=0 } }
         ColumnLayout {
             anchors.fill:parent; spacing:8
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Missing operator or own radio stays unknown. Overlapping dates count in both periods. QSO goals are temporary and optional. These are logged activity counts, not scores, credit or eligibility.") }
+                text:qsTr("Counts QSO with the recorded contest ID in each inclusive UTC date range. Missing operator or own radio stays unknown. Overlapping dates count in both periods. QSO goals are optional; load and save them explicitly in this log. These are logged activity counts, not scores, credit or eligibility.") }
             RowLayout { Layout.fillWidth:true
                 Text { text:qsTr("Contest ID"); color:Theme.textSecondary }
-                StyledTextField { id:comparisonContest; Layout.fillWidth:true; placeholderText:qsTr("Recorded CONTEST_ID"); onTextChanged: { contestComparison.result=({}); comparisonGoalA.value=0; comparisonGoalB.value=0 } }
+                StyledTextField { id:comparisonContest; Layout.fillWidth:true; enabled:!decolog.activation.contestReportBusy; placeholderText:qsTr("Recorded CONTEST_ID"); onTextChanged: { contestComparison.result=({}); contestComparison.invalidateGoals(); comparisonGoalA.value=0; comparisonGoalB.value=0 } }
             }
-            DatePeriodFields { id:comparisonA; fromLabel:qsTr("Period A from") }
-            DatePeriodFields { id:comparisonB; fromLabel:qsTr("Period B from") }
+            DatePeriodFields { id:comparisonA; enabled:!decolog.activation.contestReportBusy; fromLabel:qsTr("Period A from") }
+            DatePeriodFields { id:comparisonB; enabled:!decolog.activation.contestReportBusy; fromLabel:qsTr("Period B from") }
             RowLayout {
                 Text { color:Theme.textSecondary; text:qsTr("QSO goals (0 = unset)") }
                 Text { color:Theme.textSecondary; text:qsTr("A") }
-                SpinBox { id:comparisonGoalA; from:0; to:100000; value:0; editable:true; Accessible.name:qsTr("Period A QSO goal") }
+                SpinBox { id:comparisonGoalA; from:0; to:100000; value:0; editable:true; enabled:!decolog.activation.contestReportBusy; Accessible.name:qsTr("Period A QSO goal") }
                 Text { color:Theme.textSecondary; text:qsTr("B") }
-                SpinBox { id:comparisonGoalB; from:0; to:100000; value:0; editable:true; Accessible.name:qsTr("Period B QSO goal") }
+                SpinBox { id:comparisonGoalB; from:0; to:100000; value:0; editable:true; enabled:!decolog.activation.contestReportBusy; Accessible.name:qsTr("Period B QSO goal") }
+            }
+            RowLayout {
+                GlassButton { id:comparisonLoadGoals; text:qsTr("Load goals"); enabled:!decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(false) }
+                GlassButton { id:comparisonSaveGoals; text:qsTr("Save goals"); enabled:contestComparison.goalsLoaded && !decolog.activation.contestReportBusy; onClicked:contestComparison.requestGoals(true) }
+                Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap; text:contestComparison.goalMessage }
             }
             RowLayout {
                 GlassButton { id:comparisonButton; text:qsTr("Compare"); enabled:!decolog.activation.contestReportBusy

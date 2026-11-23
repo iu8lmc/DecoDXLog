@@ -35,6 +35,20 @@ private slots:
         QCOMPARE(QDateTime::fromString(row.value("utc").toString(),Qt::ISODate).toSecsSinceEpoch(),at.toSecsSinceEpoch());
         QVERIFY(row.value("utc").toString().endsWith('Z'));
     }
+    void contestGoalsRequireCurrentLoadedLogAndPersist()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx)); QSignalSpy done(&act,&ActivationController::contestGoalsFinished);
+        auto request=[&](bool save,int a,int b,int ra,int rb) { return act.requestContestGoals("CQ-WW-CW","2024-11-23","2024-11-23","2025-11-22","2025-11-22",save,a,b,ra,rb); };
+        QVERIFY(!request(true,5,1,0,0)); QVERIFY(request(false,0,0,0,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        QVERIFY(done.last().at(0).toMap().value("error").toString().isEmpty());
+        QVERIFY(request(true,5,1,0,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
+        const auto saved=done.last().at(0).toMap(); QVERIFY2(saved.value("error").toString().isEmpty(),qPrintable(saved.value("error").toString()));
+        QCOMPARE(saved.value("revisionA").toInt(),1); QVERIFY(!request(true,8,2,0,0));
+        QVERIFY(db.open(dir.filePath("other.sqlite"))); QVERIFY(!request(true,8,2,1,1));
+        QVERIFY(db.open(dir.filePath("log.sqlite"))); QVERIFY(request(false,0,0,0,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),3,5000);
+        const auto loaded=done.last().at(0).toMap(); QCOMPARE(loaded.value("targetA").toInt(),5); QCOMPARE(loaded.value("targetB").toInt(),1); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestComparisonUsesCurrentLogAndRejectsLogSwitch()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

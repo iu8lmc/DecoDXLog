@@ -2,6 +2,7 @@
 #include "core/LogDatabase.h"
 #include <QTest>
 #include <QSqlQuery>
+#include <QTemporaryDir>
 using namespace decolog::core;
 class TestContestComparison : public QObject {
     Q_OBJECT
@@ -28,6 +29,40 @@ class TestContestComparison : public QObject {
         QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2024-11-23T12:00:99Z' WHERE call='K1BBB'"));
         const auto r=contestcomparison::compare(db.connection(),"CQ-WW-CW",QDate(2024,11,23),QDate(2024,11,23),QDate(2025,11,22),QDate(2025,11,22));
         QVERIFY2(r.error.isEmpty(),qPrintable(r.error)); QCOMPARE(r.totalA,1); QCOMPARE(r.invalidTimestamp,1);
+    }
+    void goalsAreBoundToContestAndPeriodAndRejectStaleWrites()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase a,b; const auto path=dir.filePath("log.sqlite"); QVERIFY(a.open(path)); QVERIFY(b.open(path));
+        const auto a0=QDate(2024,11,23), a1=QDate(2024,11,24), b0=QDate(2025,11,22), b1=QDate(2025,11,23);
+        auto empty=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",a0,a1,b0,b1); QVERIFY(empty.error.isEmpty());
+        QCOMPARE(empty.a.revision,0); QCOMPARE(empty.b.revision,0);
+        auto saved=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",a0,a1,b0,b1,5,7,0,0);
+        QVERIFY2(saved.error.isEmpty(),qPrintable(saved.error)); QCOMPARE(saved.a.revision,1); QCOMPARE(saved.b.target,7);
+        auto stale=contestcomparison::loadGoals(b.connection(),"CQ-WW-CW",a0,a1,b0,b1); QVERIFY(stale.error.isEmpty());
+        auto updated=contestcomparison::saveGoals(a.connection(),a.identity(),"CQ-WW-CW",a0,a1,b0,b1,10,20,1,1); QVERIFY(updated.error.isEmpty());
+        auto rejected=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",a0,a1,b0,b1,11,21,stale.a.revision,stale.b.revision);
+        QVERIFY(!rejected.error.isEmpty()); auto current=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",a0,a1,b0,b1);
+        QCOMPARE(current.a.target,10); QCOMPARE(current.b.target,20); QCOMPARE(current.a.revision,2);
+        auto secondStale=contestcomparison::saveGoals(b.connection(),b.identity(),"CQ-WW-CW",a0,a1,b0,b1,50,60,2,1);
+        QVERIFY(!secondStale.error.isEmpty()); current=contestcomparison::loadGoals(a.connection(),"CQ-WW-CW",a0,a1,b0,b1);
+        QCOMPARE(current.a.target,10); QCOMPARE(current.a.revision,2); QCOMPARE(current.b.target,20);
+        auto other=contestcomparison::loadGoals(a.connection(),"CQ-WW-SSB",a0,a1,b0,b1); QVERIFY(other.error.isEmpty()); QCOMPARE(other.a.revision,0);
+        auto wrongIdentity=contestcomparison::saveGoals(a.connection(),"wrong","CQ-WW-CW",a0,a1,b0,b1,12,22,2,2);
+        QVERIFY(!wrongIdentity.error.isEmpty()); QCOMPARE(a.qsoCount(),qint64(0));
+    }
+    void duplicatePeriodsAndGoalLimitAreSafe()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); const QDate a(2024,11,23),b(2025,11,22);
+        auto conflict=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,a,a,5,6,0,0);
+        QVERIFY(!conflict.error.isEmpty());
+        auto one=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,a,a,5,5,0,0);
+        QVERIFY2(one.error.isEmpty(),qPrintable(one.error)); QCOMPARE(one.a.revision,1); QCOMPARE(one.b.revision,1);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<998) INSERT INTO app_setting(key,value) SELECT printf('contest_goal.v1.fixture%04d',x),'{}' FROM n"));
+        auto failure=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,b,b,10,20,1,0);
+        QVERIFY(failure.error.isEmpty());
+        const QDate c(2026,11,21); auto over=contestcomparison::saveGoals(db.connection(),db.identity(),"CQ-WW-CW",a,a,c,c,11,30,2,0);
+        QVERIFY(!over.error.isEmpty()); auto current=contestcomparison::loadGoals(db.connection(),"CQ-WW-CW",a,a,b,b);
+        QVERIFY(current.error.isEmpty()); QCOMPARE(current.a.target,10); QCOMPARE(current.a.revision,2); QCOMPARE(current.b.target,20);
     }
     void comparesRecordedContestQsosAcrossPeriods()
     {
