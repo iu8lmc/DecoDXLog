@@ -23,8 +23,8 @@ bool validPayload(const QByteArray& data,const QByteArray& digest) {
     const auto doc=adif::parse(data);
     return doc.records.size()==1 && ContestNetInventory::fingerprint(doc.records.first())==digest;
 }
-// Local-only guard. Each result row is serialized and hashed separately so
-// attachment contents are not loaded into memory. Run within a transaction.
+// Local-only guard. Attachment blobs are read in bounded SQL slices.
+// Run within a transaction so metadata and slices share one snapshot.
 QByteArray localStateFingerprint(const QSqlDatabase& db,qint64 id) {
     const QStringList statements{
         QStringLiteral("SELECT * FROM qso WHERE id=?"),
@@ -46,6 +46,26 @@ QByteArray localStateFingerprint(const QSqlDatabase& db,qint64 id) {
         if (query.lastError().isValid() || (index==0 && count!=1)) return {};
         marker.clear(); QDataStream tail(&marker,QIODevice::WriteOnly); tail.setVersion(QDataStream::Qt_6_0); tail << count; hash.addData(marker);
     }
+    QSqlQuery attachments(db);
+    if (!attachments.prepare(QStringLiteral("SELECT a.id,length(a.data),typeof(a.data) FROM qsl_attachment_qso x LEFT JOIN qsl_attachment a ON a.id=x.attachment_id WHERE x.qso_id=? ORDER BY x.attachment_id"))) return {};
+    attachments.addBindValue(id); if (!attachments.exec()) return {};
+    QSqlQuery chunk(db); if (!chunk.prepare(QStringLiteral("SELECT substr(data,?,?) FROM qsl_attachment WHERE id=?"))) return {};
+    while (attachments.next()) {
+        if (attachments.value(0).isNull() || attachments.value(1).isNull() || attachments.value(2).toString()!=QLatin1String("blob")) return {};
+        const qint64 attachment=attachments.value(0).toLongLong(), size=attachments.value(1).toLongLong();
+        if (size<0) return {};
+        QByteArray marker; QDataStream stream(&marker,QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_0); stream << attachment << size;
+        if (stream.status()!=QDataStream::Ok) return {}; hash.addData(marker);
+        for (qint64 offset=0;offset<size;) {
+            const qint64 length=qMin<qint64>(1024*1024,size-offset);
+            chunk.bindValue(0,offset+1); chunk.bindValue(1,length); chunk.bindValue(2,attachment);
+            if (!chunk.exec() || !chunk.next()) return {};
+            const QByteArray bytes=chunk.value(0).toByteArray();
+            if (bytes.size()!=length) return {};
+            hash.addData(bytes); chunk.finish(); offset+=length;
+        }
+    }
+    if (attachments.lastError().isValid()) return {};
     return hash.result();
 }
 }

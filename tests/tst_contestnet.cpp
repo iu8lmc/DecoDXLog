@@ -242,7 +242,17 @@ private slots:
         QVERIFY(target.addQslAttachment("fixture image","card.jpg","image/jpeg",{add.id})>0);
         auto staleRelink=contestqso::applyReviewed(target,target.identity(),remote,review); QVERIFY(!staleRelink.ok);
         review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY(review.ok);
-        QSqlQuery fault(target.connection()); QVERIFY(fault.exec("ALTER TABLE qso_enrichment RENAME TO hidden_enrichment"));
+        QSqlQuery fault(target.connection()); QVERIFY(fault.exec("UPDATE qsl_attachment SET data=X'6669787475726520696D616746'"));
+        auto staleBytes=contestqso::applyReviewed(target,target.identity(),remote,review); QVERIFY(!staleBytes.ok);
+        QByteArray large(2097153,'x'); const auto largeId=target.addQslAttachment(large,"large.jpg","image/jpeg",{add.id}); QVERIFY(largeId>0);
+        review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY(review.ok);
+        large[1048576]='y'; fault.prepare("UPDATE qsl_attachment SET data=? WHERE id=?"); fault.addBindValue(large); fault.addBindValue(largeId); QVERIFY(fault.exec());
+        QVERIFY(!contestqso::applyReviewed(target,target.identity(),remote,review).ok);
+        review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY(review.ok);
+        large[2097152]='z'; fault.prepare("UPDATE qsl_attachment SET data=? WHERE id=?"); fault.addBindValue(large); fault.addBindValue(largeId); QVERIFY(fault.exec());
+        QVERIFY(!contestqso::applyReviewed(target,target.identity(),remote,review).ok);
+        review=contestqso::reviewExisting(target,target.identity(),remote); QVERIFY(review.ok);
+        QVERIFY(fault.exec("ALTER TABLE qso_enrichment RENAME TO hidden_enrichment"));
         auto unreadable=contestqso::applyReviewed(target,target.identity(),remote,review); QVERIFY(!unreadable.ok);
         QVERIFY(!contestqso::reviewExisting(target,target.identity(),remote).ok);
         QVERIFY(fault.exec("ALTER TABLE hidden_enrichment RENAME TO qso_enrichment"));
