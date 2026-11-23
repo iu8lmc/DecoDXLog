@@ -44,6 +44,7 @@ struct Activation {
     // Il file "call history" per suggerire lo scambio.
     QString   callHistory;
     QDateTime startedAt;
+    QString sessionUuid; // Empty for sessions created before session tracking.
 
     static QString kindId(Kind kind);
     static Kind kindFromId(const QString& id);

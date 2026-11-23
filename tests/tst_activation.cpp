@@ -17,6 +17,48 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void activationHasStableSessionIdentity()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        ActivationController::Context ctx; ctx.db = &db;
+        ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        QVERIFY(!act.state().value("sessionUuid").toString().isEmpty());
+    }
+    void trackedLifecycleIsAtomicAndLegacyStaysUntracked()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        ActivationController::Context ctx; ctx.db = &db;
+        ActivationController act(std::move(ctx));
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("CREATE TRIGGER reject_run BEFORE INSERT ON activation_run BEGIN SELECT RAISE(ABORT,'rejected'); END"));
+        QVERIFY(!act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        QVERIFY(!act.active());
+        QVERIFY(q.exec("DROP TRIGGER reject_run"));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        const QString id = act.state().value("sessionUuid").toString(); QVERIFY(!id.isEmpty());
+        AdifRecord first{{"CALL", "K1ABC"}}; act.session().applyTo(first, 0);
+        QCOMPARE(first.value("APP_DECOLOG_ACTIVATION_UUID"), id);
+        AdifRecord external{{"APP_DECOLOG_ACTIVATION_UUID", "external"}}; act.session().applyTo(external, 0);
+        QCOMPARE(external.value("APP_DECOLOG_ACTIVATION_UUID"), QString("external"));
+        auto updated = act.state(); updated["reference"] = "IT-0002"; updated["sessionUuid"] = "forged";
+        QVERIFY(q.exec("CREATE TRIGGER reject_change BEFORE INSERT ON activation_run_change BEGIN SELECT RAISE(ABORT,'rejected'); END"));
+        QVERIFY(!act.update(updated).isEmpty()); QCOMPARE(act.state().value("reference").toString(), QString("IT-0001"));
+        act.stop(); QVERIFY(act.active());
+        QVERIFY(q.exec("DROP TRIGGER reject_change"));
+        QVERIFY(act.update(updated).isEmpty()); QCOMPARE(act.state().value("sessionUuid").toString(), id);
+        act.stop(); QVERIFY(!act.active());
+        QVERIFY(q.exec("SELECT ended_at, (SELECT COUNT(*) FROM activation_run_change WHERE session_uuid=activation_run.uuid) FROM activation_run"));
+        QVERIFY(q.next()); QVERIFY(!q.value(0).toString().isEmpty()); QCOMPARE(q.value(1).toInt(), 3);
+        db.setSetting("activation.session", R"({"active":true,"kind":"pota","reference":"IT-0003","startedAt":"2026-11-23T10:00:00Z"})");
+        ActivationController::Context legacyContext; legacyContext.db = &db;
+        ActivationController legacy(std::move(legacyContext)); legacy.load(); QVERIFY(legacy.active());
+        QVERIFY(legacy.state().value("sessionUuid").toString().isEmpty());
+        AdifRecord old{{"CALL", "K1OLD"}}; legacy.session().applyTo(old, 0);
+        QVERIFY(old.value("APP_DECOLOG_ACTIVATION_UUID").isEmpty());
+        legacy.stop(); QVERIFY(!legacy.active());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM activation_run")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
+    }
     void simultaneousProgramReferencesStayIndependent()
     {
         const QVariantMap programs{{"sota", "I/LM-001"}, {"wwff", "IFF-0123"}};
@@ -85,6 +127,8 @@ private slots:
             QVariantMap legacyUpdate = act.state(); legacyUpdate.remove("programs");
             QVERIFY(act.update(legacyUpdate).isEmpty());
             QCOMPARE(act.state().value("programs").toMap().value("sota").toString(), QString("I/LM-002"));
+            QCOMPARE(db.record(firstId)->value("APP_DECOLOG_ACTIVATION_UUID"), act.state().value("sessionUuid").toString());
+            QCOMPARE(db.record(secondId)->value("APP_DECOLOG_ACTIVATION_UUID"), act.state().value("sessionUuid").toString());
             QCOMPARE(db.record(firstId)->value("MY_SOTA_REF"), QString("I/LM-001"));
             QCOMPARE(db.record(firstId)->value("SOTA_REF"), QString("G/LD-003"));
             QCOMPARE(db.record(secondId)->value("MY_SOTA_REF"), QString("I/LM-002"));
@@ -99,6 +143,7 @@ private slots:
             const QByteArray exported = db.exportAdif();
             LogDatabase imported; QVERIFY(imported.open(":memory:")); QCOMPARE(imported.importAdif(exported).inserted, 2);
             const auto records = adif::parse(imported.exportAdif()).records; QCOMPARE(records.size(), 2);
+            QCOMPARE(records.at(0).value("APP_DECOLOG_ACTIVATION_UUID"), act.state().value("sessionUuid").toString());
             QCOMPARE(records.at(0).value("MY_POTA_REF"), QString("IT-0001,IT-0002"));
             QCOMPARE(records.at(0).value("MY_SOTA_REF"), QString("I/LM-001"));
             QCOMPARE(records.at(0).value("MY_WWFF_REF"), QString("IFF-0123"));

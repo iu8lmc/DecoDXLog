@@ -15,6 +15,7 @@
 #include <QJsonObject>
 #include <QSqlQuery>
 #include <QTimeZone>
+#include <QUuid>
 
 namespace decolog::app {
 
@@ -99,6 +100,49 @@ void ActivationController::save()
                                                .toJson(QJsonDocument::Compact)));
 }
 
+bool ActivationController::persistTransition(const Activation& next, const QString& event)
+{
+    if (!m_ctx.db || !m_ctx.db->isOpen()) return false;
+    auto db = m_ctx.db->connection();
+    if (!db.transaction()) return false;
+    const auto json = [](const Activation& a) {
+        return QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(a.toMap())).toJson(QJsonDocument::Compact));
+    };
+    const QString now = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+    const auto record = [&](const Activation& a, const QString& action) {
+        if (a.sessionUuid.isEmpty()) return true;
+        QSqlQuery q(db);
+        if (action == QLatin1String("start")) {
+            q.prepare(QStringLiteral("INSERT INTO activation_run(uuid,started_at,initial_json,last_json) VALUES(?,?,?,?)"));
+            q.addBindValue(a.sessionUuid); q.addBindValue(a.startedAt.toString(Qt::ISODateWithMs));
+            q.addBindValue(json(a)); q.addBindValue(json(a));
+        } else {
+            q.prepare(action == QLatin1String("stop")
+                ? QStringLiteral("UPDATE activation_run SET ended_at=?,last_json=? WHERE uuid=? AND ended_at IS NULL")
+                : QStringLiteral("UPDATE activation_run SET last_json=? WHERE uuid=? AND ended_at IS NULL"));
+            if (action == QLatin1String("stop")) q.addBindValue(now);
+            q.addBindValue(json(a)); q.addBindValue(a.sessionUuid);
+        }
+        if (!q.exec() || q.numRowsAffected() != 1) return false;
+        QSqlQuery change(db);
+        change.prepare(QStringLiteral("INSERT INTO activation_run_change(session_uuid,changed_at,event,state_json) VALUES(?,?,?,?)"));
+        change.addBindValue(a.sessionUuid); change.addBindValue(now); change.addBindValue(action); change.addBindValue(json(a));
+        return change.exec();
+    };
+    bool ok = true;
+    if ((event == QLatin1String("start") && m_session.active) || event == QLatin1String("stop"))
+        ok = record(m_session, QStringLiteral("stop"));
+    if (ok && event != QLatin1String("stop")) ok = record(next, event);
+    QSqlQuery setting(db);
+    if (ok) {
+        setting.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
+        setting.addBindValue(QLatin1String(kSetting)); setting.addBindValue(json(next));
+        ok = setting.exec();
+    }
+    if (!ok || !db.commit()) { db.rollback(); return false; }
+    return true;
+}
+
 QStringList ActivationController::kinds() const
 {
     return {QStringLiteral("pota"), QStringLiteral("sota"), QStringLiteral("wwff"),
@@ -158,8 +202,9 @@ QString ActivationController::start(const QVariantMap& map)
     if (session.tag.isEmpty())
         session.tag = session.defaultTag();
     session.startedAt = QDateTime::currentDateTimeUtc();
+    session.sessionUuid = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    if (!persistTransition(session, QStringLiteral("start"))) return tr("Cannot save activation session");
     m_session = session;
-    save();
     loadHistoryOfSession();
     if (m_ctx.shareSerials)
         m_ctx.shareSerials(m_session.serialEnabled && m_session.sharedSerial);
@@ -202,8 +247,9 @@ QString ActivationController::update(const QVariantMap& map)
     const QString programError = normalizeAdditionalPrograms(session);
     if (!programError.isEmpty()) return programError;
     session.startedAt = started.isValid() ? started : QDateTime::currentDateTimeUtc();
+    session.sessionUuid = m_session.sessionUuid;
+    if (!persistTransition(session, QStringLiteral("update"))) return tr("Cannot save activation session");
     m_session = session;
-    save();
     loadHistoryOfSession();
     if (m_ctx.shareSerials)
         m_ctx.shareSerials(m_session.serialEnabled && m_session.sharedSerial);
@@ -217,6 +263,10 @@ void ActivationController::stop()
 {
     if (!m_session.active)
         return;
+    if (!persistTransition(Activation{}, QStringLiteral("stop"))) {
+        if (m_ctx.activity) m_ctx.activity(QStringLiteral("ACT"), tr("Cannot save activation session"), QStringLiteral("error"));
+        return;
+    }
     if (m_ctx.activity) {
         m_ctx.activity(QStringLiteral("ACT"),
                        tr("Session closed: %1 · %n QSO", nullptr, m_qsoCount).arg(m_session.title()),
@@ -226,7 +276,6 @@ void ActivationController::stop()
     m_history.clear();
     if (m_ctx.shareSerials)
         m_ctx.shareSerials(false);
-    save();
     recount();
     emit changed();
 }

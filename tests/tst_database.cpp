@@ -23,7 +23,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 20;
+constexpr int kSchemaVersion = 21;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.

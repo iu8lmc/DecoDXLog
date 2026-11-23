@@ -175,6 +175,7 @@ private:
     // Le chiavi dei moltiplicatori gia' in tasca, per sapere quali mancano.
     QSet<QString> workedMultipliers() const;
     void save();
+    bool persistTransition(const core::Activation& next, const QString& event);
     void recount();
     // La scheda della gara aperta con le modifiche di questa edizione.
     core::ContestRules currentRules() const;

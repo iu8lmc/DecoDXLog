@@ -126,6 +126,8 @@ void Activation::applyTo(AdifRecord& record, int serial) const
             record.set(QLatin1String(field), value);
     };
 
+    fill("APP_DECOLOG_ACTIVATION_UUID", sessionUuid);
+
     // I campi dell'attivatore: MY_*.
     switch (kind) {
     case Kind::Pota:
@@ -197,6 +199,7 @@ QVariantMap Activation::toMap() const
 {
     return {
         {QStringLiteral("active"), active},
+        {QStringLiteral("sessionUuid"), sessionUuid},
         {QStringLiteral("kind"), kindId(kind)},
         {QStringLiteral("reference"), reference},
         {QStringLiteral("programs"), programs},
@@ -222,6 +225,7 @@ Activation Activation::fromMap(const QVariantMap& m)
 {
     Activation a;
     a.active = m.value(QStringLiteral("active"), false).toBool();
+    a.sessionUuid = m.value(QStringLiteral("sessionUuid")).toString();
     a.kind = kindFromId(m.value(QStringLiteral("kind")).toString());
     a.reference = m.value(QStringLiteral("reference")).toString().trimmed().toUpper();
     a.programs = m.value(QStringLiteral("programs")).toMap();

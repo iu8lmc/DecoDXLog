@@ -439,6 +439,9 @@ bool LogDatabase::migrate()
               QStringLiteral("ALTER TABLE qsl_ocr_acquisition_qso ADD COLUMN link_token TEXT"),
               QStringLiteral("ALTER TABLE qsl_ocr_acquisition_qso ADD COLUMN link_revision INTEGER"),
               QStringLiteral("ALTER TABLE qsl_ocr_acquisition ADD COLUMN undone_at TEXT")}, nullptr},
+        {21, {QStringLiteral("CREATE TABLE IF NOT EXISTS activation_run (uuid TEXT PRIMARY KEY, started_at TEXT NOT NULL, ended_at TEXT, initial_json TEXT NOT NULL, last_json TEXT NOT NULL)"),
+              QStringLiteral("CREATE TABLE IF NOT EXISTS activation_run_change (id INTEGER PRIMARY KEY, session_uuid TEXT NOT NULL REFERENCES activation_run(uuid), changed_at TEXT NOT NULL, event TEXT NOT NULL, state_json TEXT NOT NULL)"),
+              QStringLiteral("CREATE INDEX IF NOT EXISTS idx_activation_run_change ON activation_run_change(session_uuid,id)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
