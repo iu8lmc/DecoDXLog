@@ -91,6 +91,18 @@ void ContestAudioController::stopPlayback()
     if (m_playbackFile) { m_playbackFile->close(); m_playbackFile->deleteLater(); m_playbackFile=nullptr; }
     emit changed();
 }
+bool ContestAudioController::recoverFile(const QUrl &partial)
+{
+    if (m_recording || playing() || !partial.isLocalFile()) {
+        m_message=tr("Stop recording and playback, then select a local partial file."); emit changed(); return false;
+    }
+    QString output, error;
+    if (!core::ContestAudioFile::recover(partial.toLocalFile(),&output,&error)) {
+        m_message=tr("Recovery failed: %1").arg(error); emit changed(); return false;
+    }
+    m_lastPath=output;
+    m_message=tr("Recording recovered. Review its timing and audio before use."); emit changed(); return true;
+}
 void ContestAudioController::chooseInput(int index)
 {
     if (m_recording) return;

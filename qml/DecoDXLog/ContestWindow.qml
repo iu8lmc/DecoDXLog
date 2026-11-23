@@ -38,6 +38,11 @@ RoundedWindow {
         contestAudioDialog.qsoCall=row.call || ""
         contestAudioDialog.open()
     }
+    function probeContestAudioRecovery(path) {
+        contestAudioDialog.open()
+        contestAudioDialog.recoverPartial(path)
+        console.warn("PROBE contestRecover success=" + (decolog.contestAudio.lastPath.length > 0) + " path=" + decolog.contestAudio.lastPath)
+    }
     function probeContestAudioPlayback(path) {
         openAudioForQso({utc:"2026-11-23T12:00:01Z", call:"K1ABC"})
         contestAudioDialog.playbackFile=path
@@ -889,9 +894,9 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
 
     FileDialog {
         id: contestReportExportFile
@@ -1030,6 +1035,7 @@ RoundedWindow {
         property url playbackFile: ""
         property string qsoUtc: ""
         property string qsoCall: ""
+        function recoverPartial(path) { decolog.contestAudio.recoverFile(path) }
         ColumnLayout {
             anchors.fill:parent; spacing:10
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
@@ -1054,7 +1060,11 @@ RoundedWindow {
             }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
                 text:decolog.contestAudio.message + (decolog.contestAudio.recording ? qsTr(" · %1 bytes").arg(decolog.contestAudio.bytesWritten) : "") }
-            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:decolog.contestAudio.lastPath }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { text:qsTr("Recover partial recording…"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing; onClicked:contestAudioRecoveryFile.open() }
+                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:decolog.contestAudio.lastPath }
+            }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
                 text:qsTr("Review QSO %1 at %2. Choose the recording covering its UTC time; playback starts up to 10 seconds earlier. Timing is approximate and does not prove an association.").arg(contestAudioDialog.qsoCall || "—").arg(contestAudioDialog.qsoUtc || "—") }
             RowLayout {
@@ -1073,6 +1083,7 @@ RoundedWindow {
             }
         }
     }
+    FileDialog { id:contestAudioRecoveryFile; title:qsTr("Choose interrupted contest recording"); fileMode:FileDialog.OpenFile; nameFilters:[qsTr("Partial contest audio (*.wav.part)")]; onAccepted:contestAudioDialog.recoverPartial(selectedFile) }
     FileDialog { id:contestAudioPlaybackFile; title:qsTr("Choose contest recording"); fileMode:FileDialog.OpenFile; nameFilters:[qsTr("WAV audio (*.wav)")]; onAccepted:contestAudioDialog.playbackFile=selectedFile }
     FolderDialog { id:contestAudioFolder; title:qsTr("Choose audio recording folder"); onAccepted:contestAudioDialog.folder=selectedFolder }
 

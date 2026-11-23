@@ -39,6 +39,7 @@ class ContestAudioController : public QObject {
     Q_INVOKABLE void chooseOutput(int index);
     Q_INVOKABLE bool playForQso(const QUrl &wav, const QString &qsoUtc);
     Q_INVOKABLE void stopPlayback();
+    Q_INVOKABLE bool recoverFile(const QUrl &partial);
     Q_INVOKABLE bool start(const QUrl &directory, int limitMiB);
     Q_INVOKABLE void stop();
     // Allows a locally supplied 16 kHz mono PCM stream, including deterministic tests.

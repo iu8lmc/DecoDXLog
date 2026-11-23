@@ -82,6 +82,24 @@ class TestContestAudioController : public QObject {
         QFile wav(finished.first().at(1).toString()); QVERIFY(wav.open(QIODevice::ReadOnly));
         QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("0102030405060708"));
     }
+    void explicitRecoveryPreservesConflictsAndRejectsWhileRecording()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::app::ContestAudioController controller;
+        Feed feed; QVERIFY(controller.startFromStream(&feed,dir.path(),32,QDateTime::currentDateTimeUtc()));
+        feed.push(QByteArray::fromHex("010203")); controller.stop();
+        const QString partial=controller.lastPath(); QVERIFY(partial.endsWith(".wav.part"));
+        const QString target=partial.left(partial.size()-5); QFile existing(target);
+        QVERIFY(existing.open(QIODevice::WriteOnly)); QCOMPARE(existing.write("original"),qint64(8)); existing.close();
+        QFile originalPartial(partial); QVERIFY(originalPartial.open(QIODevice::ReadOnly)); const QByteArray originalBytes=originalPartial.readAll(); originalPartial.close();
+        QVERIFY(!controller.recoverFile(QUrl::fromLocalFile(partial))); QVERIFY(QFile::exists(partial));
+        QVERIFY(originalPartial.open(QIODevice::ReadOnly)); QCOMPARE(originalPartial.readAll(),originalBytes); originalPartial.close();
+        QVERIFY(existing.open(QIODevice::ReadOnly)); QCOMPARE(existing.readAll(),QByteArray("original")); existing.close();
+        QVERIFY(existing.remove());
+        Feed active; QVERIFY(controller.startFromStream(&active,dir.path(),32,QDateTime::currentDateTimeUtc()));
+        QVERIFY(!controller.recoverFile(QUrl::fromLocalFile(partial))); QVERIFY(QFile::exists(partial)); controller.stop();
+        QVERIFY(controller.recoverFile(QUrl::fromLocalFile(partial))); QVERIFY(QFile::exists(target));
+        QFile wav(target); QVERIFY(wav.open(QIODevice::ReadOnly)); QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("0102"));
+    }
     void incompleteSampleIsPreservedAndAnotherRecordingCanStart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::app::ContestAudioController recorder;

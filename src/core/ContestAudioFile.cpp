@@ -25,12 +25,15 @@ bool finalize(QFile &file, const QString &path, QString *output, QString *error)
     if (size < 0 || size > maximumDataBytes || size % 2) {
         if (error) *error=QStringLiteral("Invalid or incomplete PCM data size"); return false;
     }
+    const QString destination=path.left(path.size()-5); // remove .part
+    if (QFile::exists(destination)) {
+        if (error) *error=QStringLiteral("A recording with this name already exists"); return false;
+    }
     if (!file.seek(0) || file.write(header(quint32(size))) != 44 || !file.flush()) {
         if (error) *error=file.errorString(); return false;
     }
     file.close();
-    const QString destination=path.left(path.size()-5); // remove .part
-    if (QFile::exists(destination) || !QFile::rename(path,destination)) {
+    if (!QFile::rename(path,destination)) {
         if (error) *error=QStringLiteral("Cannot move recovered recording to WAV"); return false;
     }
     if (output) *output=destination;
