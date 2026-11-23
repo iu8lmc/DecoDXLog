@@ -4018,6 +4018,8 @@ QString DecoLogController::saveNewQsoPanelSettings(const QStringList& visibleFie
             return tr("The unit for %1 is too long.").arg(checked.field);
         case newqso::CustomFieldError::InvalidCondition:
             return tr("The condition for %1 must refer to a different configured custom field and have a value.").arg(checked.field);
+        case newqso::CustomFieldError::InvalidFormula:
+            return tr("The formula for %1 is invalid, has an invalid dependency or forms a cycle.").arg(checked.field);
         case newqso::CustomFieldError::None:
             break;
         }
@@ -4149,9 +4151,16 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     // e quelli standard del pannello non si possono mascherare con una seconda
     // casella dallo stesso nome; i veri campi extra finiscono in adif_extra e
     // tornano nell'export ADIF senza perdere nulla.
-    const QVariantMap customFields = fields.value(QStringLiteral("custom_fields")).toMap();
+    QVariantMap customFields = fields.value(QStringLiteral("custom_fields")).toMap();
     const QStringList standardPanelFields = newqso::standardFields();
-    const QString customError=newqso::validateCustomValues(newQsoCustomFields(),customFields,QLocale());
+    const QVariantList definitions=newQsoCustomFields();
+    const auto derived=newqso::computeDerivedValues(definitions,customFields,QLocale());
+    if (!derived.error.isEmpty()) return derived.error;
+    QVariantMap normalizedCustom;
+    for (auto it=customFields.cbegin();it!=customFields.cend();++it) normalizedCustom.insert(newqso::normalizeAdifName(it.key()),it.value());
+    for (auto it=derived.values.cbegin();it!=derived.values.cend();++it) normalizedCustom.insert(it.key(),it.value());
+    customFields=normalizedCustom;
+    const QString customError=newqso::validateCustomValues(definitions,customFields,QLocale());
     if (!customError.isEmpty()) return customError;
     for (auto it = customFields.cbegin(); it != customFields.cend(); ++it) {
         const QString name = newqso::normalizeAdifName(it.key());
@@ -4162,6 +4171,20 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         if (standardPanelFields.contains(name))
             return tr("Use the standard %1 field instead of a custom field.").arg(name);
         r.set(name, it.value().toString().trimmed());
+    }
+    if (!derived.values.isEmpty()) {
+        const QString traceField=QStringLiteral("APP_DECOLOG_DERIVED_V1");
+        if (customFields.contains(traceField)) return tr("%1 conflicts with derived-field provenance; remove that custom value before logging.").arg(traceField);
+        QJsonObject formulas;
+        for (const QVariant& value : definitions) {
+            const auto definition=value.toMap(); const QString name=definition.value(QStringLiteral("name")).toString();
+            if (!derived.values.contains(name)) continue;
+            formulas.insert(name,QJsonObject{{QStringLiteral("expression"),definition.value(QStringLiteral("formula")).toString()},
+                                             {QStringLiteral("unit"),definition.value(QStringLiteral("unit")).toString()}});
+        }
+        const QJsonObject trace{{QStringLiteral("version"),1},{QStringLiteral("inputLocale"),QLocale().name()},
+                                {QStringLiteral("outputFormat"),QStringLiteral("C decimal, 15 significant digits")},{QStringLiteral("fields"),formulas}};
+        r.set(traceField,QString::fromUtf8(QJsonDocument(trace).toJson(QJsonDocument::Compact)));
     }
     if (historical)
         r.set(QStringLiteral("APP_DECOLOG_ENTRY_CONTEXT"), QStringLiteral("HISTORICAL"));

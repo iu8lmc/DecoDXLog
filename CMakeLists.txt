@@ -160,6 +160,7 @@ add_library(decolog_core STATIC
     src/core/Modes.cpp
     src/core/Modes.h
     src/core/NewQsoFields.cpp
+    src/core/DerivedFields.cpp
     src/core/NewQsoFields.h
     src/core/CwDecoder.cpp
     src/core/CwCalls.cpp

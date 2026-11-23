@@ -224,6 +224,15 @@ TestCase {
         verify(!decolog.submitted.iota, "A hidden island field must not add a reference")
     }
 
+    function test_derivedCustomFieldIsReadOnlyAndNotSubmittedAsInput() {
+        decolog.newQsoCustomFields=[{name:"APP_A",label:"A",type:"number"},{name:"APP_B",label:"B",type:"number",formula:"{APP_A} * 2"}]
+        const panel=createTemporaryObject(panelComponent,testCase); verify(panel !== null)
+        const input=findChild(panel,"customValue_APP_A"), derived=findChild(panel,"customValue_APP_B")
+        verify(input !== null && derived !== null); compare(input.readOnly,false); compare(derived.readOnly,true)
+        input.text="12"; const values=panel.customAdifValues(); compare(values.APP_A,"12"); verify(values.APP_B === undefined)
+        decolog.newQsoCustomFields=[]
+    }
+
     function test_disconnectedAndConnectedSources() {
         const panel = createTemporaryObject(panelComponent, testCase)
         verify(panel !== null)

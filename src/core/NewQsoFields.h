@@ -9,6 +9,7 @@
 #include <QString>
 #include <QStringList>
 #include <QVariantList>
+#include <QVariantMap>
 #include <QLocale>
 
 namespace decolog::core::newqso {
@@ -26,6 +27,7 @@ enum class CustomFieldError {
     InvalidChoices,
     InvalidUnit,
     InvalidCondition,
+    InvalidFormula,
 };
 
 struct CustomFieldsResult {
@@ -35,6 +37,7 @@ struct CustomFieldsResult {
 
     bool ok() const { return error == CustomFieldError::None; }
 };
+struct DerivedValuesResult { QVariantMap values; QString error; };
 
 // Campi opzionali gia' gestiti dal pannello e quelli visibili per impostazione
 // predefinita. STATE, IOTA e TX_PWR sono disponibili ma inizialmente spenti, per non
@@ -54,6 +57,9 @@ CustomFieldsResult validateCustomFields(const QVariantList& fields);
 // Returns an explanatory error; the caller retains the original ADIF text.
 QString validateCustomValue(const QVariantMap& definition, const QString& value, const QLocale& locale);
 QString validateCustomValues(const QVariantList& definitions, const QVariantMap& values, const QLocale& locale);
+// Derived outputs use canonical C-locale decimal text; original inputs are untouched.
+DerivedValuesResult computeDerivedValues(const QVariantList& definitions, const QVariantMap& values, const QLocale& locale);
+QString validateDerivedFormulas(const QVariantList& definitions, QString* invalidField = nullptr);
 
 QString encodeCustomFields(const QVariantList& fields);
 QVariantList decodeCustomFields(const QString& json, bool* legacyIota = nullptr);

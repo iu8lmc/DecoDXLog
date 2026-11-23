@@ -139,6 +139,11 @@ CustomFieldsResult validateCustomFields(const QVariantList& fields)
         if (type!=QLatin1String("text")) normalized.insert(QStringLiteral("type"),type);
         if (!unit.isEmpty()) normalized.insert(QStringLiteral("unit"),unit);
         if (!choices.isEmpty()) normalized.insert(QStringLiteral("choices"),choices);
+        const QString formula=item.value(QStringLiteral("formula")).toString().trimmed();
+        if (!formula.isEmpty()) {
+            if (type!=QLatin1String("number") || formula.size()>256) { result.error=CustomFieldError::InvalidFormula; result.field=name; return result; }
+            normalized.insert(QStringLiteral("formula"),formula);
+        }
         const QVariantMap condition=item.value(QStringLiteral("requiredIf")).toMap();
         const QString dependency=normalizeAdifName(condition.value(QStringLiteral("field")).toString());
         const QString expected=condition.value(QStringLiteral("equals")).toString().trimmed();
@@ -156,6 +161,8 @@ CustomFieldsResult validateCustomFields(const QVariantList& fields)
             result.error=CustomFieldError::InvalidCondition; result.field=item.value(QStringLiteral("name")).toString(); return result;
         }
     }
+    QString invalidField;
+    if (!validateDerivedFormulas(result.fields,&invalidField).isEmpty()) { result.error=CustomFieldError::InvalidFormula; result.field=invalidField; return result; }
     return result;
 }
 
@@ -187,7 +194,7 @@ QString validateCustomValues(const QVariantList& definitions,const QVariantMap& 
         const QString text=normalized.value(name).toString(); const auto condition=definition.value(QStringLiteral("requiredIf")).toMap();
         if (!condition.isEmpty() && normalized.value(condition.value(QStringLiteral("field")).toString()).toString()==condition.value(QStringLiteral("equals")).toString() && text.isEmpty())
             return QStringLiteral("%1: Required when %2 equals %3").arg(name,condition.value(QStringLiteral("field")).toString(),condition.value(QStringLiteral("equals")).toString());
-        const QString error=validateCustomValue(definition,text,locale);
+        const QString error=validateCustomValue(definition,text,definition.value(QStringLiteral("formula")).toString().isEmpty() ? locale : QLocale::c());
         if (!error.isEmpty()) return QStringLiteral("%1: %2").arg(name,error);
     }
     return {};

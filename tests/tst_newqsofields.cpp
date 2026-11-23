@@ -132,6 +132,33 @@ private slots:
         defs[1]=QVariantMap{{"name","APP_TEAM"},{"requiredIf",QVariantMap{{"field","APP_TEAM"},{"equals","X"}}}};
         QVERIFY(!newqso::validateCustomFields(defs).ok());
     }
+    void derivedNumericFieldsAreDeterministicAndRejectCycles()
+    {
+        QVariantList defs{QVariantMap{{"name","APP_A"},{"type","number"}},QVariantMap{{"name","APP_B"},{"type","number"}},
+            QVariantMap{{"name","APP_TOTAL"},{"type","number"},{"formula","({APP_A} + {APP_B}) * 2"}},
+            QVariantMap{{"name","APP_RESULT"},{"type","number"},{"formula","{APP_TOTAL} / 4"}}};
+        const auto checked=newqso::validateCustomFields(defs); QVERIFY(checked.ok());
+        QCOMPARE(newqso::decodeCustomFields(newqso::encodeCustomFields(defs)),checked.fields);
+        const auto result=newqso::computeDerivedValues(checked.fields,{{"APP_A","1,5"},{"APP_B","2,5"}},QLocale(QLocale::Italian));
+        QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.values.value("APP_TOTAL").toString(),QString("8")); QCOMPARE(result.values.value("APP_RESULT").toString(),QString("2"));
+        const auto missing=newqso::computeDerivedValues(checked.fields,{{"APP_A","1"}},QLocale::c()); QVERIFY(missing.error.isEmpty()); QVERIFY(!missing.values.contains("APP_TOTAL"));
+        QVERIFY(!newqso::computeDerivedValues(checked.fields,{{"APP_A","1"},{"APP_B","2"},{"APP_TOTAL","999"}},QLocale::c()).error.isEmpty());
+        defs[2]=QVariantMap{{"name","APP_TOTAL"},{"type","number"},{"formula","{APP_RESULT}+1"}}; QVERIFY(!newqso::validateCustomFields(defs).ok());
+        defs[2]=QVariantMap{{"name","APP_TOTAL"},{"type","number"},{"formula","system(1)"}}; QVERIFY(!newqso::validateCustomFields(defs).ok());
+        defs[2]=QVariantMap{{"name","APP_TOTAL"},{"type","number"},{"formula","{APP_A}/0"}}; const auto divide=newqso::validateCustomFields(defs); QVERIFY(divide.ok());
+        QVERIFY(!newqso::computeDerivedValues(divide.fields,{{"APP_A","1"}},QLocale::c()).error.isEmpty());
+        const QVariantList fractions{QVariantMap{{"name","APP_A"},{"type","number"}},QVariantMap{{"name","APP_OUT"},{"type","number"},{"formula","-({APP_A} + 1.5) / 4"}}};
+        const auto fractionDefs=newqso::validateCustomFields(fractions); QVERIFY(fractionDefs.ok());
+        const auto fraction=newqso::computeDerivedValues(fractionDefs.fields,{{"APP_A","1,5"}},QLocale(QLocale::Italian)); QVERIFY(fraction.error.isEmpty()); QCOMPARE(fraction.values.value("APP_OUT").toString(),QString("-0.75"));
+        QVariantMap combined{{"APP_A","1,5"}}; combined.insert("APP_OUT",fraction.values.value("APP_OUT")); QVERIFY(newqso::validateCustomValues(fractionDefs.fields,combined,QLocale(QLocale::Italian)).isEmpty());
+        const QVariantList unknown{QVariantMap{{"name","APP_OUT"},{"type","number"},{"formula","{CALL}+1"}}}; QVERIFY(!newqso::validateCustomFields(unknown).ok());
+        const QVariantList tooDeep{QVariantMap{{"name","APP_OUT"},{"type","number"},{"formula",QString(40,'(')+"1"+QString(40,')')}}}; QVERIFY(!newqso::validateCustomFields(tooDeep).ok());
+        const QVariantList required{QVariantMap{{"name","APP_A"},{"type","number"}},QVariantMap{{"name","APP_SWITCH"},{"type","text"}},
+            QVariantMap{{"name","APP_OUT"},{"type","number"},{"formula","{APP_A}*2"},{"requiredIf",QVariantMap{{"field","APP_SWITCH"},{"equals","Y"}}}}};
+        const auto requiredDefs=newqso::validateCustomFields(required); QVERIFY(requiredDefs.ok());
+        const auto noInput=newqso::computeDerivedValues(requiredDefs.fields,{{"APP_SWITCH","Y"}},QLocale::c()); QVERIFY(noInput.error.isEmpty()); QVERIFY(noInput.values.isEmpty());
+        QVERIFY(!newqso::validateCustomValues(requiredDefs.fields,{{"APP_SWITCH","Y"}},QLocale::c()).isEmpty());
+    }
 };
 
 QTEST_GUILESS_MAIN(TestNewQsoFields)

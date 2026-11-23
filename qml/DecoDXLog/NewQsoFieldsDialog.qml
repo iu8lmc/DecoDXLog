@@ -27,7 +27,7 @@ DialogFrame {
         customModel.clear()
         if (!useDefaults) {
             for (const field of decolog.newQsoCustomFields)
-                customModel.append({ fieldName: field.name, fieldLabel: field.label, fieldType:field.type || "text", fieldUnit:field.unit || "", fieldChoices:(field.choices || []).join(", "), fieldDepends:(field.requiredIf || {}).field || "", fieldExpected:(field.requiredIf || {}).equals || "" })
+                customModel.append({ fieldName: field.name, fieldLabel: field.label, fieldType:field.type || "text", fieldUnit:field.unit || "", fieldChoices:(field.choices || []).join(", "), fieldDepends:(field.requiredIf || {}).field || "", fieldExpected:(field.requiredIf || {}).equals || "",fieldFormula:field.formula || "" })
         }
         settingsError.text = ""
         Qt.callLater(function() {
@@ -52,7 +52,7 @@ DialogFrame {
         for (let i = 0; i < customRepeater.count; ++i) {
             const item = customRepeater.itemAt(i)
             if (item)
-                custom.push({ name: item.fieldNameText, label: item.fieldLabelText, type:item.selectedType, unit:item.unitText, choices:item.choicesText.split(",").map(x => x.trim()).filter(x => x.length), requiredIf:{field:item.dependsText, equals:item.expectedText} })
+                custom.push({ name: item.fieldNameText, label: item.fieldLabelText, type:item.selectedType, unit:item.unitText, choices:item.choicesText.split(",").map(x => x.trim()).filter(x => x.length), requiredIf:{field:item.dependsText, equals:item.expectedText},formula:item.formulaText })
         }
         const error = decolog.saveNewQsoPanelSettings(visible, custom, enterToLogToggle.checked)
         settingsError.text = error
@@ -62,8 +62,9 @@ DialogFrame {
 
     onOpened: reload()
     function probeTyped() {
-        customModel.clear(); customModel.append({fieldName:"APP_TYPED_POWER",fieldLabel:"Power",fieldType:"number",fieldUnit:"W",fieldChoices:"",fieldDepends:"",fieldExpected:""})
-        customModel.append({fieldName:"APP_TYPED_NOTE",fieldLabel:"Note",fieldType:"text",fieldUnit:"",fieldChoices:"",fieldDepends:"APP_TYPED_POWER",fieldExpected:"12"})
+        customModel.clear(); customModel.append({fieldName:"APP_TYPED_POWER",fieldLabel:"Power",fieldType:"number",fieldUnit:"W",fieldChoices:"",fieldDepends:"",fieldExpected:"",fieldFormula:""})
+        customModel.append({fieldName:"APP_TYPED_NOTE",fieldLabel:"Note",fieldType:"text",fieldUnit:"",fieldChoices:"",fieldDepends:"APP_TYPED_POWER",fieldExpected:"12",fieldFormula:""})
+        customModel.append({fieldName:"APP_TYPED_DOUBLE",fieldLabel:"Double",fieldType:"number",fieldUnit:"W",fieldChoices:"",fieldDepends:"",fieldExpected:"",fieldFormula:"{APP_TYPED_POWER} * 2"})
         Qt.callLater(function() { const row=customRepeater.itemAt(0); if (!row) { console.warn("PROBE typed missing field"); return }; console.warn("PROBE typed editor " + row.selectedType + " " + row.unitText); root.save() })
     }
 
@@ -129,7 +130,7 @@ DialogFrame {
             GlassButton {
                 text: qsTr("Add field")
                 enabled: customModel.count < 12
-                onClicked: customModel.append({ fieldName: "", fieldLabel: "", fieldType:"text", fieldUnit:"", fieldChoices:"",fieldDepends:"",fieldExpected:"" })
+                onClicked: customModel.append({ fieldName: "", fieldLabel: "", fieldType:"text", fieldUnit:"", fieldChoices:"",fieldDepends:"",fieldExpected:"",fieldFormula:"" })
             }
         }
 
@@ -140,6 +141,8 @@ DialogFrame {
             wrapMode: Text.WordWrap
             font.pixelSize: 11
         }
+        Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap; font.pixelSize:11
+            text:qsTr("Numeric formulas use {FIELD}, decimal constants with a dot, +, -, *, / and parentheses. Refer only to configured numeric custom fields. Missing inputs leave the result empty; the formula and input locale are recorded with the QSO.") }
 
         ScrollView {
             Layout.fillWidth: true
@@ -174,12 +177,14 @@ DialogFrame {
                         required property string fieldChoices
                         required property string fieldDepends
                         required property string fieldExpected
+                        required property string fieldFormula
                         property alias fieldNameText: nameField.text
                         property alias fieldLabelText: labelField.text
                         property alias unitText: unitField.text
                         property alias choicesText: choicesField.text
                         property alias dependsText: dependsField.text
                         property alias expectedText: expectedField.text
+                        property alias formulaText: formulaField.text
                         readonly property string selectedType: typeChoice.keys[typeChoice.currentIndex] || "text"
                         Layout.fillWidth: true
                         spacing: 8
@@ -233,6 +238,8 @@ DialogFrame {
                             StyledTextField { id:dependsField; Layout.fillWidth:true; text:customRow.fieldDepends; uppercase:true; placeholderText:qsTr("Required if custom field…"); Accessible.name:qsTr("Required if custom field") }
                             StyledTextField { id:expectedField; Layout.fillWidth:true; text:customRow.fieldExpected; placeholderText:qsTr("…equals this value"); Accessible.name:qsTr("Required if field equals") }
                         }
+                        StyledTextField { id:formulaField; Layout.fillWidth:true; text:customRow.fieldFormula; visible:customRow.selectedType==="number" || text.length>0
+                            placeholderText:qsTr("Optional formula, e.g. {APP_POWER} * 2"); Accessible.name:qsTr("Numeric derived field formula") }
                     }
                 }
             }

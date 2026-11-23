@@ -677,10 +677,13 @@ GlassPanel {
                             Layout.fillWidth: true
                             label: String(modelData.label || modelData.name) + (modelData.unit ? " (" + modelData.unit + ")" : "")
                                    + (modelData.requiredIf ? " · " + qsTr("required if %1 = %2").arg(modelData.requiredIf.field).arg(modelData.requiredIf.equals) : "")
+                                   + (modelData.formula ? " · " + qsTr("calculated: %1").arg(modelData.formula) : "")
                             StyledTextField {
                                 id: customInput
+                                objectName: "customValue_" + String(modelData.name)
                                 Layout.fillWidth: true
-                                placeholderText: modelData.type === "date" ? qsTr("YYYY-MM-DD") : modelData.type === "boolean" ? qsTr("Y or N") : modelData.type === "list" ? (modelData.choices || []).join(" / ") : ""
+                                readOnly:!!modelData.formula
+                                placeholderText: modelData.formula ? qsTr("Calculated when logging") : modelData.type === "date" ? qsTr("YYYY-MM-DD") : modelData.type === "boolean" ? qsTr("Y or N") : modelData.type === "list" ? (modelData.choices || []).join(" / ") : ""
                                 Accessible.name: qsTr("%1 (%2) value").arg(String(modelData.label || modelData.name)).arg(String(modelData.name))
                             }
                         }

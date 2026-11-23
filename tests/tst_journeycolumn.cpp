@@ -17,6 +17,7 @@
 #include "core/QslPlanner.h"
 #include "core/DxCampaign.h"
 #include "core/ActivityReport.h"
+#include "core/NewQsoFields.h"
 #include "core/WsjtxProtocol.h"
 #include <QUdpSocket>
 #include <QElapsedTimer>
@@ -24,6 +25,7 @@
 #include "core/TesseractOcr.h"
 #include "core/QslOcrAcquisition.h"
 #include <QCryptographicHash>
+#include <algorithm>
 
 class TestJourneyColumn : public QObject {
     Q_OBJECT
@@ -178,9 +180,19 @@ private slots:
         QVERIFY2(launch(dir,"typedfieldsprobe",output,4500),output.constData());
         QVERIFY2(output.contains("PROBE typed editor number W") && output.contains("\"type\":\"number\"") && output.contains("\"unit\":\"W\""),output.constData());
         QVERIFY2(output.contains("\"invalid\":\"APP_TYPED_POWER:") && output.contains("\"missing\":\"APP_TYPED_NOTE:") && output.contains("\"valid\":\"\""),output.constData());
+        QVERIFY2(output.contains("\"supplied\":\"APP_TYPED_DOUBLE:") && output.contains("\"formula\":\"{APP_TYPED_POWER} * 2\""),output.constData());
+        QVERIFY2(output.contains("\"conflict\":\"APP_DECOLOG_DERIVED_V1 conflicts"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(1));
         const auto record=db.record(1); QVERIFY(record); QCOMPARE(record->value("APP_TYPED_POWER"),QString("12")); QCOMPARE(record->value("APP_TYPED_NOTE"),QString("portable"));
+        QCOMPARE(record->value("APP_TYPED_DOUBLE"),QString("24"));
+        const auto trace=QJsonDocument::fromJson(record->value("APP_DECOLOG_DERIVED_V1").toUtf8()).object(); QCOMPARE(trace.value("version").toInt(),1);
+        QVERIFY(!trace.value("inputLocale").toString().isEmpty()); QCOMPARE(trace.value("fields").toObject().value("APP_TYPED_DOUBLE").toObject().value("expression").toString(),QString("{APP_TYPED_POWER} * 2"));
         QVERIFY(db.exportAdif(QList<qint64>{1}).contains("<app_typed_power:2>12"));
+        QVERIFY(db.exportAdif(QList<qint64>{1}).contains("<app_typed_double:2>24"));
+        decolog::core::LogDatabase roundtrip; QVERIFY(roundtrip.open(":memory:")); QCOMPARE(roundtrip.importAdif(db.exportAdif(QList<qint64>{1})).inserted,1);
+        const auto imported=roundtrip.record(1); QVERIFY(imported); QCOMPARE(imported->value("APP_DECOLOG_DERIVED_V1"),record->value("APP_DECOLOG_DERIVED_V1"));
+        QSettings settings(iniPath(dir),QSettings::IniFormat); const auto defs=decolog::core::newqso::decodeCustomFields(settings.value("ui/newQso/customFields").toString());
+        QVERIFY(std::any_of(defs.cbegin(),defs.cend(),[](const QVariant& v) { const auto d=v.toMap(); return d.value("name")=="APP_TYPED_DOUBLE" && d.value("formula")=="{APP_TYPED_POWER} * 2"; }));
     }
     void watchedCampaignCanAlertOnlyForOpenGoals()
     {
