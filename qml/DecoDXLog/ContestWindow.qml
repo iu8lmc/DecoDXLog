@@ -1091,7 +1091,7 @@ RoundedWindow {
         ColumnLayout {
             anchors.fill:parent; spacing:10
             Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
-                text:qsTr("Optional local audio recording. Select the receiving audio input and a folder; this does not control the radio or PTT. Recording continues if this window is closed.") }
+                text:qsTr("Optional local audio recording. The folder limit counts contest WAV and partial files and never deletes them. Select the receiving input and a folder; this does not control the radio or PTT. Recording continues if this window is closed.") }
             RowLayout {
                 Layout.fillWidth:true
                 Text { text:qsTr("Input"); color:Theme.textSecondary }
@@ -1106,7 +1106,7 @@ RoundedWindow {
                 Text { Layout.fillWidth:true; text:contestAudioDialog.folder ? String(contestAudioDialog.folder) : qsTr("No folder selected"); color:Theme.textSecondary; elide:Text.ElideMiddle }
             }
             RowLayout {
-                Text { text:qsTr("Maximum recording size (MiB)"); color:Theme.textSecondary }
+                Text { text:qsTr("Total contest audio folder limit (MiB)"); color:Theme.textSecondary }
                 SpinBox { id:contestAudioLimit; from:1; to:1024; value:128; editable:true; enabled:!decolog.contestAudio.recording }
                 GlassButton { id:contestAudioStart; text:qsTr("Start recording"); enabled:!decolog.contestAudio.recording && String(contestAudioDialog.folder).length>0
                     onClicked:decolog.contestAudio.start(contestAudioDialog.folder,contestAudioLimit.value) }

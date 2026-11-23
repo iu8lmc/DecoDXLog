@@ -10,6 +10,7 @@ class ContestAudioFile {
   public:
     struct WriteResult { qint64 written{0}; bool limitReached{false}; QString error; };
     struct Location { qint64 offsetMs{0}; qint64 durationMs{0}; int sampleRate{0}; QDateTime startUtc; QString error; };
+    struct FolderBudget { qint64 usedBytes{0}; qint64 remainingDataBytes{0}; int files{0}; QString error; };
     struct Match { QString path; Location location; };
     struct SearchResult { QList<Match> matches; int inspected{0}; bool truncated{false}; QString error; };
     bool start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc, int sampleRate=16000);
@@ -22,6 +23,7 @@ class ContestAudioFile {
     qint64 bytesWritten() const { return m_bytes; }
     static bool recover(const QString &partialPath, QString *outputPath, QString *error);
     static Location locate(const QString &wavPath, const QDateTime &qsoUtc);
+    static FolderBudget folderBudget(const QString &directory, qint64 limitBytes, int maxFiles=1000);
     static SearchResult findMatching(const QString &directory, const QDateTime &qsoUtc, int maxFiles=1000, int maxResults=50);
   private:
     QFile m_file;

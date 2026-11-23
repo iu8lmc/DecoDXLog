@@ -68,6 +68,18 @@ class TestContestAudio : public QObject {
         QFile altered(path); QVERIFY(altered.open(QIODevice::ReadWrite)); QVERIFY(altered.seek(40)); altered.write("bad!"); altered.close();
         QVERIFY(!ContestAudioFile::locate(path,start).error.isEmpty());
     }
+    void folderBudgetIncludesWavAndPartialsWithoutDeletingFiles()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile first,second; const auto now=QDateTime::currentDateTimeUtc();
+        QVERIFY(first.start(dir.path(),100,now)); QCOMPARE(first.append(QByteArray(4,'x')).written,qint64(4)); QString wav; QVERIFY(first.finish(&wav));
+        QVERIFY(second.start(dir.path(),100,now)); QCOMPARE(second.append(QByteArray(2,'y')).written,qint64(2)); const QString partial=second.partialPath(); second.abandon();
+        QFile other(dir.filePath("other.wav")); QVERIFY(other.open(QIODevice::WriteOnly)); QCOMPARE(other.write(QByteArray(500,'z')),qint64(500)); other.close();
+        auto budget=ContestAudioFile::folderBudget(dir.path(),150,1000); QVERIFY2(budget.error.isEmpty(),qPrintable(budget.error));
+        QCOMPARE(budget.usedBytes,qint64(94)); QCOMPARE(budget.remainingDataBytes,qint64(12)); QCOMPARE(budget.files,2);
+        budget=ContestAudioFile::folderBudget(dir.path(),100,1000); QCOMPARE(budget.remainingDataBytes,qint64(0));
+        QVERIFY(!ContestAudioFile::folderBudget(dir.path(),150,1).error.isEmpty());
+        QVERIFY(QFile::exists(wav)); QVERIFY(QFile::exists(partial)); QVERIFY(QFile::exists(other.fileName()));
+    }
     void findsBoundedRecordingsCoveringQsoTime()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

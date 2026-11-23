@@ -144,6 +144,26 @@ ContestAudioFile::Location ContestAudioFile::locate(const QString &path, const Q
     return result;
 }
 
+ContestAudioFile::FolderBudget ContestAudioFile::folderBudget(const QString &directory, qint64 limitBytes, int maxFiles)
+{
+    FolderBudget result; const QFileInfo folder(directory);
+    if (!folder.isDir() || !folder.isReadable() || limitBytes<46 || limitBytes>maximumDataBytes || maxFiles<1 || maxFiles>1000) {
+        result.error=QStringLiteral("Invalid audio folder, budget or scan limit"); return result;
+    }
+    QDirIterator it(directory,{QStringLiteral("contest-audio-*.wav"),QStringLiteral("contest-audio-*.wav.part")},
+                    QDir::Files | QDir::NoSymLinks | QDir::Hidden | QDir::System);
+    while (it.hasNext()) {
+        if (result.files==maxFiles) { result.error=QStringLiteral("Too many audio files to check the folder budget"); return result; }
+        it.next(); ++result.files; const qint64 size=it.fileInfo().size();
+        if (size<0 || result.usedBytes>std::numeric_limits<qint64>::max()-size) {
+            result.error=QStringLiteral("Cannot determine audio folder usage"); return result;
+        }
+        result.usedBytes+=size;
+    }
+    result.remainingDataBytes=qMax<qint64>(0,limitBytes-result.usedBytes-44);
+    result.remainingDataBytes-=result.remainingDataBytes%2;
+    return result;
+}
 ContestAudioFile::SearchResult ContestAudioFile::findMatching(const QString &directory, const QDateTime &qsoUtc, int maxFiles, int maxResults)
 {
     SearchResult result;

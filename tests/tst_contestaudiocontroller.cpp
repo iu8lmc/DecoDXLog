@@ -6,11 +6,15 @@
 #include <QAudioSource>
 #include <QMediaDevices>
 #include <QBuffer>
+#include <QDir>
 #include <QtEndian>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QCoreApplication>
 #include <QSettings>
+#include <QLockFile>
+#include <QProcess>
+#include <cstdio>
 #include <QTest>
 class Feed : public QIODevice {
     Q_OBJECT
@@ -96,6 +100,39 @@ class TestContestAudioController : public QObject {
         controller.chooseOutput(out); QVERIFY(controller.playForQso(QUrl::fromLocalFile(path),"2026-11-23T12:00:01Z"));
         controller.reconcileOutputDevices({outputs[out-1].id()}); QVERIFY(controller.playing());
         controller.reconcileOutputDevices({}); QVERIFY(!controller.playing()); QVERIFY(controller.message().contains("disconnected",Qt::CaseInsensitive));
+    }
+    void folderBudgetAndLockCoordinateRecordersWhenConfigured()
+    {
+        const QString name=qEnvironmentVariable("DECOLOG_TEST_LOOPBACK"); if (name.isEmpty()) QSKIP("Set DECOLOG_TEST_LOOPBACK");
+        const auto inputs=QMediaDevices::audioInputs(); int row=-1;
+        for (int i=0;i<inputs.size();++i) if (inputs[i].description()==name) { row=i+1; break; }
+        QVERIFY(row>0); QTemporaryDir dir; QVERIFY(dir.isValid());
+        decolog::app::ContestAudioController first,second; first.chooseInput(row); second.chooseInput(row);
+        QVERIFY2(first.start(QUrl::fromLocalFile(dir.path()),1),qPrintable(first.message()));
+        QVERIFY(!second.start(QUrl::fromLocalFile(dir.path()),1)); QVERIFY(first.recording());
+        const auto partials=QDir(dir.path()).entryList({"contest-audio-*.wav.part"},QDir::Files); QCOMPARE(partials.size(),1);
+        QVERIFY(!second.recoverFile(QUrl::fromLocalFile(dir.filePath(partials.first()))));
+        QTest::qWait(250); first.stop(); QVERIFY2(second.start(QUrl::fromLocalFile(dir.path()),1),qPrintable(second.message())); second.stop();
+        QFile large(dir.filePath("contest-audio-existing.wav")); QVERIFY(large.open(QIODevice::WriteOnly)); QVERIFY(large.resize(1024*1024)); large.close();
+        QVERIFY(!second.start(QUrl::fromLocalFile(dir.path()),1)); QVERIFY(second.message().contains("limit",Qt::CaseInsensitive));
+        QVERIFY(QFile::exists(large.fileName()));
+    }
+    void folderLockRejectsAnotherProcessWhenConfigured()
+    {
+        const QString name=qEnvironmentVariable("DECOLOG_TEST_LOOPBACK"); if (name.isEmpty()) QSKIP("Set DECOLOG_TEST_LOOPBACK");
+        const auto inputs=QMediaDevices::audioInputs(); int row=-1;
+        for (int i=0;i<inputs.size();++i) if (inputs[i].description()==name) { row=i+1; break; }
+        QVERIFY(row>0); QTemporaryDir dir; QVERIFY(dir.isValid()); QProcess holder;
+        holder.start(QCoreApplication::applicationFilePath(),{"--hold-audio-lock",dir.path()});
+        QVERIFY(holder.waitForStarted()); QVERIFY(holder.waitForReadyRead(3000)); QCOMPARE(holder.readLine(),QByteArray("locked\n"));
+        decolog::app::ContestAudioController controller; controller.chooseInput(row);
+        QVERIFY(!controller.start(QUrl::fromLocalFile(dir.path()),1));
+        holder.write("x"); QVERIFY(holder.waitForFinished(3000)); QCOMPARE(holder.exitCode(),0);
+        QVERIFY2(controller.start(QUrl::fromLocalFile(dir.path()),1),qPrintable(controller.message())); controller.stop();
+        holder.start(QCoreApplication::applicationFilePath(),{"--hold-audio-lock",dir.path()});
+        QVERIFY(holder.waitForStarted()); QVERIFY(holder.waitForReadyRead(3000)); QCOMPARE(holder.readLine(),QByteArray("locked\n"));
+        holder.kill(); QVERIFY(holder.waitForFinished(3000));
+        QVERIFY2(controller.start(QUrl::fromLocalFile(dir.path()),1),qPrintable(controller.message())); controller.stop();
     }
     void capturesFragmentedNativeStereoFloat()
     {
@@ -195,7 +232,12 @@ class TestContestAudioController : public QObject {
 };
 int main(int argc, char **argv)
 {
-    QCoreApplication app(argc,argv); QTemporaryDir settingsDir;
+    QCoreApplication app(argc,argv);
+    if (app.arguments().size()==3 && app.arguments()[1]==QLatin1String("--hold-audio-lock")) {
+        QLockFile lock(QDir(app.arguments()[2]).filePath(".decodxlog-contest-audio.lock")); lock.setStaleLockTime(0);
+        if (!lock.tryLock(0)) return 1; std::fputs("locked\n",stdout); std::fflush(stdout); std::getchar(); return 0;
+    }
+    QTemporaryDir settingsDir;
     if (!settingsDir.isValid()) return 1;
     QCoreApplication::setOrganizationName("DecoAudioFixture"); QCoreApplication::setApplicationName("Tests");
     QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,settingsDir.path());

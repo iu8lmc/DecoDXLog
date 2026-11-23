@@ -5,6 +5,9 @@
 #include <QAudioSource>
 #include <QAudioSink>
 #include <QFile>
+#include <QFileInfo>
+#include <QDir>
+#include <QLockFile>
 #include <QMediaDevices>
 #include <QSettings>
 #include <QIODevice>
@@ -169,6 +172,9 @@ bool ContestAudioController::recoverFile(const QUrl &partial)
     if (m_recording || playing() || !partial.isLocalFile()) {
         m_message=tr("Stop recording and playback, then select a local partial file."); emit changed(); return false;
     }
+    QLockFile lock(QDir(QFileInfo(partial.toLocalFile()).absolutePath()).filePath(QStringLiteral(".decodxlog-contest-audio.lock")));
+    lock.setStaleLockTime(0);
+    if (!lock.tryLock(0)) { m_message=tr("Audio folder is in use by another recording or recovery."); emit changed(); return false; }
     QString output, error;
     if (!core::ContestAudioFile::recover(partial.toLocalFile(),&output,&error)) {
         m_message=tr("Recovery failed: %1").arg(error); emit changed(); return false;
@@ -200,6 +206,15 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
     if (!audiodev::canConvertToMonoInt16(format) || format.sampleRate()<8000 || format.sampleRate()>192000) {
         m_message=tr("Selected input has an unsupported audio format."); emit changed(); return false;
     }
+    auto lock=std::make_unique<QLockFile>(QDir(directory.toLocalFile()).filePath(QStringLiteral(".decodxlog-contest-audio.lock")));
+    lock->setStaleLockTime(0);
+    if (!lock->tryLock(0)) { m_message=tr("Audio folder is in use or unavailable."); emit changed(); return false; }
+    const auto budget=core::ContestAudioFile::folderBudget(directory.toLocalFile(),qint64(limitMiB)*1024*1024);
+    if (!budget.error.isEmpty() || budget.remainingDataBytes<2) {
+        m_message=budget.error.isEmpty() ? tr("Contest audio folder limit reached; choose a larger limit or another folder.") : budget.error;
+        emit changed(); return false;
+    }
+    m_directoryLock=std::move(lock);
     m_activeInputId=device.id();
     m_source=new QAudioSource(device,format,this);
     connect(m_source,&QAudioSource::stateChanged,this,[this](QtAudio::State state) {
@@ -207,8 +222,8 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
             finish(false,tr("Audio input stopped unexpectedly."));
     });
     QIODevice *stream=m_source->start();
-    if (!stream || !startFromStream(stream,directory.toLocalFile(),qint64(limitMiB)*1024*1024,QDateTime::currentDateTimeUtc(),format)) {
-        m_source->stop(); m_source->deleteLater(); m_source=nullptr; m_activeInputId.clear();
+    if (!stream || !startFromStream(stream,directory.toLocalFile(),budget.remainingDataBytes,QDateTime::currentDateTimeUtc(),format)) {
+        m_source->stop(); m_source->deleteLater(); m_source=nullptr; m_activeInputId.clear(); m_directoryLock.reset();
         if (m_message.isEmpty()) m_message=tr("Cannot start audio input.");
         emit changed(); return false;
     }
@@ -266,6 +281,6 @@ void ContestAudioController::finish(bool success, const QString &reason)
     else if (success && !m_file.finish(&path)) { success=false; m_message=m_file.error(); m_file.abandon(); }
     else if (!success) { m_file.abandon(); m_message=reason; }
     else m_message=reason;
-    m_lastPath=path; emit changed(); emit finished(success,path,m_message);
+    m_directoryLock.reset(); m_lastPath=path; emit changed(); emit finished(success,path,m_message);
 }
 }

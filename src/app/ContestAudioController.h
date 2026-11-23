@@ -8,11 +8,13 @@
 #include <QTimer>
 #include <QThreadPool>
 #include <QUrl>
+#include <memory>
 class QAudioSource;
 class QAudioSink;
 class QFile;
 class QIODevice;
 class QMediaDevices;
+class QLockFile;
 namespace decolog::app {
 class ContestAudioController : public QObject {
     Q_OBJECT
@@ -77,6 +79,7 @@ class ContestAudioController : public QObject {
     int m_playbackRate{0};
     bool m_seeking{false};
     QThreadPool m_searchPool;
+    std::unique_ptr<QLockFile> m_directoryLock;
     bool m_searchBusy{false};
     QByteArray m_inputId, m_outputId, m_activeInputId, m_activeOutputId, m_inputPending;
     QAudioFormat m_inputFormat;
