@@ -141,6 +141,7 @@ Result select(const QList<Entry>& entries, const Rules& rules)
                 result.exclusions << QStringLiteral("QSO %1: maritime mobile designation; location requires review").arg(entry.qsoId); continue;
             }
         }
+        if (entry.cqZone >= 1 && entry.cqZone <= 40) result.zoneAlternatives << entry;
         const bool newZone = entry.cqZone >= 1 && entry.cqZone <= 40 && !zones.contains(entry.cqZone);
         if (newZone) {
             result.zoneCandidates << entry;
@@ -182,6 +183,7 @@ Result select(const QList<Entry>& entries, const Rules& rules)
                                            .arg(entry.qsoId).arg(entry.cqZone).arg(candidate.entityCode);
             }
         }
+        result.entityAlternatives << candidate;
         if (entityCount.value(candidate.entityCode) >= rules.maxPerEntity) {
             if (!newZone)
                 result.exclusions << QStringLiteral("QSO %1: entity limit reached and no new valid zone").arg(entry.qsoId);

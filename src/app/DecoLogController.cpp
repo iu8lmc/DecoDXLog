@@ -3140,6 +3140,8 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                        {QStringLiteral("error"), validationError},
                        {QStringLiteral("selected"), rows(result.selected)},
                        {QStringLiteral("zoneCandidates"), rows(result.zoneCandidates)},
+                       {QStringLiteral("entityAlternatives"), rows(result.entityAlternatives)},
+                       {QStringLiteral("zoneAlternatives"), rows(result.zoneAlternatives)},
                        {QStringLiteral("zoneCandidateCount"), result.zoneCandidates.size()},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("warnings"), result.warnings},

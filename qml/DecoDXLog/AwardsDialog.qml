@@ -41,6 +41,8 @@ DialogFrame {
     property string marathonCategory: "mixed"
     property int marathonMaxPerEntity: 1
     property var marathonPreview: ({})
+    property var marathonWorkingEntities: []
+    property var marathonWorkingZones: []
     onMarathonYearChanged: marathonPreview=({})
     onMarathonCategoryChanged: marathonPreview=({})
     onMarathonMaxPerEntityChanged: marathonPreview=({})
@@ -500,10 +502,38 @@ DialogFrame {
     function refreshMarathon() {
         marathonPreview = decolog.cqMarathonPreview(marathonYear, marathonCategory,
                                                      marathonMaxPerEntity, decolog.awardProfile)
+        marathonWorkingEntities = (marathonPreview.selected || []).slice()
+        marathonWorkingZones = (marathonPreview.zoneCandidates || []).slice()
+    }
+    function cycleMarathonCandidate(kind, index) {
+        const entity = kind === "entity"
+        const selected = (entity ? marathonWorkingEntities : marathonWorkingZones).slice()
+        const current = selected[index]
+        if (!current) return false
+        const alternatives = (entity ? marathonPreview.entityAlternatives : marathonPreview.zoneAlternatives) || []
+        const key = entity ? "entityCode" : "cqZone"
+        const options = alternatives.filter(x => x[key] === current[key])
+        const start = options.findIndex(x => x.qsoId === current.qsoId)
+        for (let offset = 1; offset < options.length; ++offset) {
+            const candidate = options[(start + offset) % options.length]
+            if (selected.some((x, i) => i !== index && x.qsoId === candidate.qsoId)) continue
+            selected[index] = candidate
+            if (entity) marathonWorkingEntities = selected; else marathonWorkingZones = selected
+            return true
+        }
+        return false
     }
     function probeMarathonReview(profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
         Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); const c=marathonEntityRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")+" entity="+(c ? c.text : "missing")) })
+    }
+    function probeMarathonAlternatives(profile) {
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
+        const beforeEntity=marathonWorkingEntities[0].qsoId, beforeZone=marathonWorkingZones[0].qsoId
+        const entityChanged=cycleMarathonCandidate("entity",0), zoneAfterEntity=marathonWorkingZones[0].qsoId
+        const zoneChanged=cycleMarathonCandidate("zone",0)
+        Qt.callLater(function() { const e=marathonEntityRows.itemAtIndex(0), z=marathonZoneRows.itemAtIndex(0)
+            console.warn("PROBE marathonAlternatives before="+beforeEntity+","+beforeZone+" entityChanged="+entityChanged+" zoneAfterEntity="+zoneAfterEntity+" zoneChanged="+zoneChanged+" entity="+(e?e.text:"missing")+" zone="+(z?z.text:"missing")) })
     }
     function beginMarathonAdif(file,year,profile) {
         marathonAdifMessage=decolog.exportCqMarathonReviewAdif(file,year,profile)
@@ -566,16 +596,20 @@ DialogFrame {
     DialogFrame { id:marathonReview; title:qsTr("CQ DX Marathon candidate review"); dialogKey:"marathonReview"; width:740; height:650; dotColor:Theme.secondaryColor
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
-                text:qsTr("Preliminary recorded data, not an official score or award credit. For 2026 the entity check uses DX Marathon list v1.1, described as of 2023. Review entity, zone, callsign, station location, frequency and propagation in the official tool. The review ADIF includes alternatives.") }
+                text:qsTr("Preliminary data, not official credit. The 2026 list v1.1 is described as of 2023. Replacements are temporary: JSON exports the automatic selection; review ADIF includes all alternatives. Review the entry in the official tool.") }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Entity candidates") }
-            ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.selected || []; ScrollBar.vertical:PanelScrollBar {}
-                delegate:Text { required property var modelData; width:marathonEntityRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
-                    text:qsTr("QSO %1 · %2 · Marathon entity %3 · DXCC %4 · REGION %5 · %6 · CQ zone %7 · %8 %9 · %10").arg(modelData.qsoId).arg(modelData.call).arg(modelData.entityCode).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.region || qsTr("not recorded")).arg(modelData.entityBasis).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
+            ListView { id:marathonEntityRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonWorkingEntities; ScrollBar.vertical:PanelScrollBar {}
+                delegate:RowLayout { required property var modelData; required property int index; width:marathonEntityRows.width
+                    readonly property string text: qsTr("QSO %1 · %2 · Marathon entity %3 · DXCC %4 · REGION %5 · %6 · CQ zone %7 · %8 %9 · %10").arg(modelData.qsoId).arg(modelData.call).arg(modelData.entityCode).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.region || qsTr("not recorded")).arg(modelData.entityBasis).arg(modelData.cqZone || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp)
+                    Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:parent.text }
+                    GlassButton { text:qsTr("Next alternative"); onClicked:root.cycleMarathonCandidate("entity",index) } } }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Independent zone candidates") }
-            ListView { id:marathonZoneRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.zoneCandidates || []; ScrollBar.vertical:PanelScrollBar {}
-                delegate:Text { required property var modelData; width:marathonZoneRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
-                    text:qsTr("QSO %1 · %2 · CQ zone %3 · DXCC %4 · %5 %6 · %7").arg(modelData.qsoId).arg(modelData.call).arg(modelData.cqZone).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
-            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Exclusions and review warnings") }
+            ListView { id:marathonZoneRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonWorkingZones; ScrollBar.vertical:PanelScrollBar {}
+                delegate:RowLayout { required property var modelData; required property int index; width:marathonZoneRows.width
+                    readonly property string text: qsTr("QSO %1 · %2 · CQ zone %3 · DXCC %4 · %5 %6 · %7").arg(modelData.qsoId).arg(modelData.call).arg(modelData.cqZone).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp)
+                    Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:parent.text }
+                    GlassButton { text:qsTr("Next alternative"); onClicked:root.cycleMarathonCandidate("zone",index) } } }
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Automatic selection exclusions and review warnings") }
             ListView { id:marathonExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:(root.marathonPreview.exclusions || []).concat(root.marathonPreview.warnings || []); ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:marathonExcludedRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary; text:modelData } }
             GlassButton { text:qsTr("Close"); onClicked:marathonReview.close() }

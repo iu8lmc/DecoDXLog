@@ -33,6 +33,8 @@ struct Result {
     Rules rules;
     QList<Entry> selected;
     QList<Entry> zoneCandidates; // preliminary, independent of entity selection
+    QList<Entry> entityAlternatives; // all eligible contacts before per-entity limit
+    QList<Entry> zoneAlternatives; // all eligible contacts with valid recorded zone
     QStringList exclusions;
     QStringList warnings; // potential data conflicts; candidate eligibility is unchanged
     bool isValid(QString* error = nullptr) const;

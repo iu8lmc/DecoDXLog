@@ -11,6 +11,19 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void replacementAlternativesPreserveIndependentEntityAndZoneScopes()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","CW",when},
+                                   {2,"K2BBB",291,3,"20m","CW",when},
+                                   {3,"K3CCC",291,5,"40m","CW",when},
+                                   {4,"K4DDD",291,5,"2m","CW",when}};
+        const auto result=select(entries,{2026,"mixed",1});
+        QCOMPARE(result.selected.size(),1); QCOMPARE(result.zoneCandidates.size(),2);
+        QCOMPARE(result.entityAlternatives.size(),3); QCOMPARE(result.zoneAlternatives.size(),3);
+        QCOMPARE(result.entityAlternatives.at(2).qsoId,qint64(3));
+        QCOMPARE(result.zoneAlternatives.at(1).cqZone,3);
+    }
     void discordantEntityAndZoneAreVisibleForReview()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
