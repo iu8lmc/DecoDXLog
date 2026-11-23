@@ -27,7 +27,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 28;
+constexpr int kSchemaVersion = 29;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -95,7 +95,45 @@ private slots:
         QslState qsl; qsl.service="lotw"; qsl.sent="Y"; QVERIFY(db.setQslState(result.id,qsl));
         ContestNetInventory thirdSnapshot; QVERIFY(thirdSnapshot.begin(path)); const auto thirdPage=thirdSnapshot.next(10); QVERIFY(thirdPage.ok); QCOMPARE(thirdPage.rows.size(),1);
         QCOMPARE(secondPage.rows.first().revision,thirdPage.rows.first().revision); QVERIFY(secondPage.rows.first().contentHash!=thirdPage.rows.first().contentHash);
-        QCOMPARE(secondSnapshot.journalWatermark(),thirdSnapshot.journalWatermark());
+        QVERIFY(thirdSnapshot.journalWatermark()>secondSnapshot.journalWatermark());
+        const auto qslChanges=db.contestNetChangesAfter(secondSnapshot.journalWatermark(),10); QVERIFY(qslChanges.ok); QCOMPARE(qslChanges.changes.size(),1);
+        QCOMPARE(qslChanges.changes.first().qsoUuid,thirdPage.rows.first().uuid); QCOMPARE(qslChanges.changes.first().revision,thirdPage.rows.first().revision);
+    }
+    void contestNetJournalTracksQslChangesAndRollback()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("qsl.sqlite")));
+        const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        auto first=db.contestNetChangesAfter(0,10); QVERIFY(first.ok); QCOMPARE(first.changes.size(),1); const auto watermark=first.changes.last().sequence;
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("BEGIN IMMEDIATE")); QslState state; state.service="lotw"; state.sent="Y"; QVERIFY(db.setQslState(qso.id,state)); QVERIFY(q.exec("ROLLBACK"));
+        QVERIFY(db.contestNetChangesAfter(watermark,10).changes.isEmpty()); QVERIFY(db.setQslState(qso.id,state));
+        auto inserted=db.contestNetChangesAfter(watermark,10); QVERIFY(inserted.ok); QCOMPARE(inserted.changes.size(),1); QCOMPARE(inserted.changes.first().qsoUuid,db.meta(qso.id)->uuid); QCOMPARE(inserted.changes.first().revision,1);
+        auto cursor=inserted.changes.last().sequence;
+        QVERIFY(q.exec("UPDATE qsl_status SET remote_id='local-id',last_error='diagnostic' WHERE service='lotw'")); QVERIFY(db.contestNetChangesAfter(cursor,10).changes.isEmpty());
+        QVERIFY(q.exec("UPDATE qsl_status SET sent=sent WHERE service='lotw'")); QVERIFY(db.contestNetChangesAfter(cursor,10).changes.isEmpty());
+        QVERIFY(q.exec("UPDATE qsl_status SET sent_date='20260102' WHERE service='lotw'")); auto changed=db.contestNetChangesAfter(cursor,10); QCOMPARE(changed.changes.size(),1); cursor=changed.changes.last().sequence;
+        QVERIFY(q.exec("DELETE FROM qsl_status WHERE service='lotw'")); const auto removed=db.contestNetChangesAfter(cursor,10); QVERIFY(removed.ok); QCOMPARE(removed.changes.size(),1); QCOMPARE(removed.changes.first().qsoUuid,db.meta(qso.id)->uuid);
+        const auto second=db.insertQso(AdifRecord{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(second.id>0); QVERIFY(db.setQslState(qso.id,state));
+        const auto beforeMove=db.contestNetChangesAfter(0,20); QVERIFY(beforeMove.ok); cursor=beforeMove.changes.last().sequence;
+        QVERIFY(q.exec("UPDATE qsl_status SET qso_id="+QString::number(second.id)+" WHERE qso_id="+QString::number(qso.id)));
+        const auto moved=db.contestNetChangesAfter(cursor,10); QVERIFY(moved.ok); QCOMPARE(moved.changes.size(),2);
+        const QSet<QString> affected{moved.changes.at(0).qsoUuid,moved.changes.at(1).qsoUuid};
+        QCOMPARE(affected,QSet<QString>({db.meta(qso.id)->uuid,db.meta(second.id)->uuid}));
+    }
+    void contestNetQslJournalMigratesFrom28()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("legacy.sqlite"); qint64 qsoId=0; qint64 watermark=0;
+        { LogDatabase db; QVERIFY(db.open(path)); const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0); qsoId=qso.id;
+          QslState state; state.service="lotw"; state.sent="Y"; QVERIFY(db.setQslState(qsoId,state)); const auto before=db.contestNetChangesAfter(0,10); QVERIFY(before.ok); watermark=before.changes.last().sequence;
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_update")); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_delete")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=29")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),29); QCOMPARE(db.qsoCount(),1); QVERIFY(db.contestNetChangesAfter(watermark,10).changes.isEmpty());
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qsl_status SET sent='N' WHERE qso_id="+QString::number(qsoId))); const auto after=db.contestNetChangesAfter(watermark,10); QVERIFY(after.ok); QCOMPARE(after.changes.size(),1); QCOMPARE(after.changes.first().qsoUuid,db.meta(qsoId)->uuid); }
+    }
+    void contestNetInventoryRejectsIncompleteQslJournalSchema()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("schema28.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_update")); QVERIFY(q.exec("DROP TRIGGER contest_net_qsl_delete")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=29")); }
+        ContestNetInventory inventory; QVERIFY(!inventory.begin(path)); QVERIFY(inventory.error().contains("migration"));
+        LogDatabase read; QVERIFY(read.openReadOnly(path)); QCOMPARE(read.schemaVersion(),28);
     }
     void contestNetInventoryRejectsUnreadableQslData()
     {

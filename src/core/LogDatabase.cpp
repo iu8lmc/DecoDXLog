@@ -532,6 +532,14 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qso_revision AFTER UPDATE OF uuid,revision,deleted ON qso "
               "WHEN OLD.uuid<>NEW.uuid OR OLD.revision<>NEW.revision OR OLD.deleted<>NEW.deleted BEGIN "
               "INSERT INTO contest_net_change(qso_uuid,previous_qso_uuid,revision,deleted,recorded_at) VALUES(NEW.uuid,CASE WHEN OLD.uuid<>NEW.uuid THEN OLD.uuid ELSE NULL END,NEW.revision,NEW.deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now')); END")}, nullptr},
+        {29, {QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qsl_insert AFTER INSERT ON qsl_status BEGIN "
+              "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=NEW.qso_id; END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qsl_update AFTER UPDATE OF qso_id,service,sent,sent_date,rcvd,rcvd_date,via ON qsl_status "
+              "WHEN OLD.qso_id IS NOT NEW.qso_id OR OLD.service IS NOT NEW.service OR OLD.sent IS NOT NEW.sent OR OLD.sent_date IS NOT NEW.sent_date OR OLD.rcvd IS NOT NEW.rcvd OR OLD.rcvd_date IS NOT NEW.rcvd_date OR OLD.via IS NOT NEW.via BEGIN "
+              "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=NEW.qso_id; "
+              "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=OLD.qso_id AND OLD.qso_id IS NOT NEW.qso_id; END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS contest_net_qsl_delete AFTER DELETE ON qsl_status BEGIN "
+              "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=OLD.qso_id; END")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)

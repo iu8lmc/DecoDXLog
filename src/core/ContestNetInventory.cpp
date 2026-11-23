@@ -30,7 +30,7 @@ bool ContestNetInventory::begin(const QString& path)
     if (path.isEmpty() || path==QLatin1String(":memory:")) { m_error=QStringLiteral("A file-backed log is required"); return false; }
     if (!m_db.openReadOnly(path)) { m_error=m_db.lastError(); close(); return false; }
     if (m_db.openFileIdentity().isEmpty() || !m_db.fileIdentityMatchesOpen()) { m_error=QStringLiteral("Log file identity unavailable"); close(); return false; }
-    if (m_db.schemaVersion()<28) { m_error=QStringLiteral("Log requires migration before inventory"); close(); return false; }
+    if (m_db.schemaVersion()<29) { m_error=QStringLiteral("Log requires migration before inventory"); close(); return false; }
     {
         QSqlQuery q(m_db.connection());
         if (!q.exec(QStringLiteral("BEGIN"))) { m_error=q.lastError().text(); }
