@@ -35,6 +35,10 @@ private slots:
         const auto result=done.first().at(0).toMap(); QVERIFY2(result.value("error").toString().isEmpty(),qPrintable(result.value("error").toString()));
         const auto matches=result.value("candidates").toList(); QCOMPARE(matches.size(),1); QCOMPARE(matches.first().toMap().value("id").toLongLong(),inserted.id);
         QCOMPARE(matches.first().toMap().value("stationCall").toString(),QString("K1ABC"));
+        const auto candidate=matches.first().toMap();
+        QVERIFY(act.isContestReportCandidateCurrent(candidate.value("id").toLongLong(),candidate.value("uuid").toString(),candidate.value("revision").toInt()));
+        auto changed=*db.record(inserted.id); changed.set("COMMENT","later edit"); QCOMPARE(db.updateQso(inserted.id,changed).status,InsertResult::Status::Inserted);
+        QVERIFY(!act.isContestReportCandidateCurrent(candidate.value("id").toLongLong(),candidate.value("uuid").toString(),candidate.value("revision").toInt()));
         QVERIFY(act.startContestReportCandidates(row)); QVERIFY(db.open(dir.filePath("other.sqlite"))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
         QVERIFY(!done.last().at(0).toMap().value("error").toString().isEmpty()); QCOMPARE(db.qsoCount(),qint64(0));
     }

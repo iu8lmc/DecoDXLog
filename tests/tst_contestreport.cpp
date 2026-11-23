@@ -28,6 +28,16 @@ private slots:
         auto unknown=parsed.entries.first(); unknown.mode="unsupported"; QVERIFY(!contestreport::findCandidates(db,unknown).error.isEmpty());
         QCOMPARE(db.qsoCount(),qint64(5));
     }
+    void candidateExposesRecordedComparisonFieldsWithoutGuessing()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto id=db.insertQso(AdifRecord{{"CALL","DL1ABC"},{"QSO_DATE","20241123"},{"TIME_ON","120145"},
+            {"BAND","20m"},{"MODE","CW"},{"FREQ","14.021"},{"SRX_STRING","14"},{"CONTEST_ID","CQ-WW-CW"}},"fixture",{},true).id; QVERIFY(id>0);
+        contestreport::Entry row; row.call="DL1ABC"; row.date="2024-11-23"; row.time="1201"; row.frequencyKhz="14020"; row.mode="CW";
+        const auto found=contestreport::findCandidates(db,row); QVERIFY2(found.error.isEmpty(),qPrintable(found.error)); QCOMPARE(found.candidates.size(),1);
+        const auto candidate=found.candidates.first(); QCOMPARE(candidate.revision,1); QCOMPARE(candidate.frequencyKhz,QString("14021"));
+        QCOMPARE(candidate.receivedExchange,QString("14")); QCOMPARE(candidate.contestId,QString("CQ-WW-CW"));
+    }
     void candidateSearchBoundsAmbiguityAndHandlesUtcMidnight()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
@@ -51,6 +61,8 @@ private slots:
         contestreport::Entry row; row.call="DL1ABC"; row.date="2024-11-23"; row.time="1201"; row.frequencyKhz="14020"; row.mode="PH";
         const auto matches=contestreport::findCandidates(db,row); QVERIFY(matches.error.isEmpty()); QCOMPARE(matches.candidates.size(),1);
         QCOMPARE(matches.candidates.first().stationCall,QString("K1NEW")); QCOMPARE(matches.candidates.first().stationSource,QString("profile"));
+        QVERIFY(matches.candidates.first().frequencyKhz.isEmpty()); QVERIFY(matches.candidates.first().receivedExchange.isEmpty());
+        QVERIFY(matches.candidates.first().contestId.isEmpty());
     }
     void parsesKnownSectionsWithoutLosingUnknownLines()
     {

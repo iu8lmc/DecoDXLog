@@ -83,6 +83,7 @@ public:
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
     Q_INVOKABLE bool startContestReportCandidates(const QVariantMap& row);
+    Q_INVOKABLE bool isContestReportCandidateCurrent(qint64 id, const QString& uuid, int revision) const;
     Q_INVOKABLE bool archiveContestReportPreview();
     Q_INVOKABLE bool startContestReportHistory(qint64 beforeId = 0);
     Q_INVOKABLE bool startArchivedContestReportPreview(qint64 id, const QString& sha256);
@@ -214,6 +215,10 @@ private:
     core::PotaCatalogue* m_potaCatalogue{nullptr};
     QThreadPool m_previewPool;
     QThreadPool m_contestReportPool;
+    QHash<qint64, QPair<QString,int>> m_contestCandidates;
+    QString m_contestCandidatesLogPath;
+    QString m_contestCandidatesLogIdentity;
+    quint64 m_contestCandidatesLogGeneration{0};
     bool m_contestReportBusy{false};
     QByteArray m_contestReportSnapshot;
     QString m_contestReportLogPath;

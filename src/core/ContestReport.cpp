@@ -34,7 +34,10 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
     q.prepare(QStringLiteral("SELECT q.id,q.uuid,q.qso_datetime_on,"
         "COALESCE(NULLIF(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.STATION_CALLSIGN') END,''),p.station_callsign,''),"
         "CASE WHEN NULLIF(CASE WHEN json_valid(q.adif_extra) THEN json_extract(q.adif_extra,'$.STATION_CALLSIGN') END,'') IS NOT NULL THEN 'qso' "
-        "WHEN NULLIF(p.station_callsign,'') IS NOT NULL THEN 'profile' ELSE 'unknown' END "
+        "WHEN NULLIF(p.station_callsign,'') IS NOT NULL THEN 'profile' ELSE 'unknown' END, "
+        "q.revision,q.freq,"
+        "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(NULLIF(json_extract(q.adif_extra,'$.SRX_STRING'),''),json_extract(q.adif_extra,'$.SRX'),'') ELSE '' END,"
+        "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(json_extract(q.adif_extra,'$.CONTEST_ID'),'') ELSE '' END "
         "FROM qso q LEFT JOIN station_profile p ON p.id=q.station_profile_id "
         "WHERE q.deleted=0 AND q.call=? AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
         + modeClause + QStringLiteral(" ORDER BY q.qso_datetime_on,q.id LIMIT 6"));
@@ -43,7 +46,9 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry)
     if (!q.exec()) { result.error=q.lastError().text(); return result; }
     while (q.next()) {
         if (result.candidates.size()==5) { result.truncated=true; break; }
-        result.candidates.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toString(),q.value(4).toString()});
+        const QString frequency=q.value(6).isNull() ? QString() : QString::number(q.value(6).toDouble()*1000.0,'g',12);
+        result.candidates.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toString(),
+                                  q.value(4).toString(),q.value(5).toInt(),frequency,q.value(7).toString(),q.value(8).toString()});
     }
     return result;
 }

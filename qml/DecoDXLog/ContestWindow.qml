@@ -18,6 +18,7 @@ RoundedWindow {
     property bool reportProbe: false
     property bool reportProbeSave: false
     property bool reportProbeFind: false
+    property bool reportProbeOpen: false
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
@@ -47,6 +48,11 @@ RoundedWindow {
             reportCandidates.result=result
             reportCandidates.errorText=result.error || ""
             if (root.reportProbeFind) console.warn("PROBE lcr candidates " + (result.candidates || []).length + " " + reportCandidates.errorText)
+            if (root.reportProbeOpen && (result.candidates || []).length) {
+                const id=result.candidates[0].id
+                reportCandidates.openCandidate(result.candidates[0])
+                Qt.callLater(() => console.warn("PROBE lcr opened " + window.probeQsoDialogOpen(id)))
+            }
         }
         function onContestReportHistoryFinished(result) {
             reportHistory.result = result
@@ -971,6 +977,12 @@ RoundedWindow {
         id:reportCandidates
         property var result:({})
         property string errorText:""
+        function openCandidate(candidate) {
+            if (!decolog.activation.isContestReportCandidateCurrent(candidate.id,candidate.uuid,candidate.revision)) {
+                errorText=qsTr("This QSO or log changed; search again before opening."); return
+            }
+            close(); reportReview.close(); window.openQso(candidate.id); window.raise(); window.requestActivate()
+        }
         dialogKey:"contestReportCandidates"; width:650; height:400
         title:qsTr("Possible local QSO"); dotColor:Theme.primaryColor
         ColumnLayout {
@@ -983,8 +995,15 @@ RoundedWindow {
             ListView {
                 id:candidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:reportCandidates.result.candidates || []
                 ScrollBar.vertical:PanelScrollBar {}
-                delegate:Text { required property var modelData; width:candidateRows.width; wrapMode:Text.WordWrap; color:Theme.textPrimary; font.family:Theme.monoFamily
-                    text:qsTr("QSO #%1 · %2 · station %3 (%4)").arg(modelData.id).arg(modelData.utc).arg(modelData.stationCall || qsTr("unknown")).arg(modelData.stationSource) }
+                delegate:RowLayout { required property var modelData; width:candidateRows.width; spacing:6
+                    Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.textPrimary; font.family:Theme.monoFamily
+                        text:qsTr("QSO #%1 · %2 · station %3 (%4)\nFrequency: QSO %5 kHz / report %6 kHz · received: QSO %7 / report %8 · contest %9")
+                            .arg(modelData.id).arg(modelData.utc).arg(modelData.stationCall || qsTr("unknown")).arg(modelData.stationSource)
+                            .arg(modelData.frequency || qsTr("unknown")).arg(reportCandidates.result.reportFrequency || qsTr("unknown"))
+                            .arg(modelData.receivedExchange || qsTr("unknown")).arg(reportCandidates.result.reportExchange || qsTr("unknown"))
+                            .arg(modelData.contestId || qsTr("unknown")) }
+                    GlassButton { text:qsTr("Open QSO"); onClicked:reportCandidates.openCandidate(modelData) }
+                }
             }
             GlassButton { Layout.alignment:Qt.AlignRight; text:qsTr("Close"); onClicked:reportCandidates.close() }
         }

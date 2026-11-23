@@ -382,6 +382,7 @@ RoundedWindow {
         if (id > 0)
             qsoDialog.openFor(id)
     }
+    function probeQsoDialogOpen(id) { return qsoDialog.visible && qsoDialog.qsoId === id }
     function focusSearch() { topBar.focusSearch() }
     function openStats() {
         statsWindow.active = true
@@ -1646,7 +1647,7 @@ RoundedWindow {
         else if (what[0] === "newqsofields") newQsoFieldsTimer.start()
         else if (what[0] === "typedfieldsprobe") typedFieldsProbe.start()
         else if (what[0] === "callqueueprobe") callQueueProbe.start()
-        else if (what[0] === "cqwwreportprobe" || what[0] === "cqwwarchiveprobe" || what[0] === "cqwwfindprobe") { window.openContest(); cqwwReportProbe.start() }
+        else if (what[0] === "cqwwreportprobe" || what[0] === "cqwwarchiveprobe" || what[0] === "cqwwfindprobe" || what[0] === "cqwwopenprobe") { window.openContest(); cqwwReportProbe.start() }
         else if (what[0] === "cqwwhistoryprobe" || what[0] === "cqwwexportprobe") { window.openContest(); cqwwHistoryProbe.start() }
         else if (what[0] === "awards") {
             // awards:<id>[:map|:missing|:unconfirmed]
@@ -1731,7 +1732,7 @@ RoundedWindow {
         onTriggered: { if (statsWindow.item) { const name=startupShow.split(":")[0]; if (name==="namedreportprobe") statsWindow.item.probeNamedReports(); else if (name==="namedrestoreprobe") statsWindow.item.probeNamedRestore(); else if (name==="customrestoreprobe") statsWindow.item.probeCustomRestore(); else statsWindow.item.probeReport("file://" + startupShow.split(":")[1],name==="customreportprobe" || name==="custompdfprobe" ? "custom" : name==="clubreportprobe" || name==="clubpdfprobe" ? "club" : name==="confirmationreportprobe" || name==="confirmationpdfprobe" ? "confirmation" : "activity",name.indexOf("pdfprobe")>=0) } else console.warn("PROBE activityreport missing window") }
     }
     Timer { id:cqwwHistoryProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportHistoryProbe=true; contestWindow.item.reportExportProbePath=startupShow.split(":")[0] === "cqwwexportprobe" ? startupShow.split(":").slice(1).join(":") : ""; contestWindow.item.probeReportHistory() } else console.warn("PROBE lcr history missing window") } }
-    Timer { id:cqwwReportProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportProbeSave = startupShow.split(":")[0] === "cqwwarchiveprobe"; contestWindow.item.reportProbeFind = startupShow.split(":")[0] === "cqwwfindprobe"; contestWindow.item.inspectContestReport("file://" + startupShow.split(":").slice(1).join(":"), true) } else console.warn("PROBE lcr missing window") } }
+    Timer { id:cqwwReportProbe; interval:1000; onTriggered: { if (contestWindow.item) { contestWindow.item.reportProbeSave = startupShow.split(":")[0] === "cqwwarchiveprobe"; contestWindow.item.reportProbeFind = startupShow.split(":")[0] === "cqwwfindprobe" || startupShow.split(":")[0] === "cqwwopenprobe"; contestWindow.item.reportProbeOpen = startupShow.split(":")[0] === "cqwwopenprobe"; contestWindow.item.inspectContestReport("file://" + startupShow.split(":").slice(1).join(":"), true) } else console.warn("PROBE lcr missing window") } }
     Timer { id:callQueueProbe; interval:1000; onTriggered: { const p=window.panelItem("newqso"); if (p && p.item) p.item.probeCallQueue(); else console.warn("PROBE callqueue missing panel") } }
     Timer {
         id:typedFieldsProbe; interval:1000

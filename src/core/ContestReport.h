@@ -39,6 +39,10 @@ struct Candidate {
     QString utc;
     QString stationCall; // may be the current profile when QSO has no station call
     QString stationSource; // qso, profile or unknown
+    int revision{0};
+    QString frequencyKhz;
+    QString receivedExchange;
+    QString contestId;
 };
 struct CandidateResult {
     QString error;
