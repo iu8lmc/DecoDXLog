@@ -25,6 +25,7 @@
 #include "app/NetController.h"
 #include "app/So2rController.h"
 #include "app/VoiceKeyerController.h"
+#include "app/ContestAudioController.h"
 #include "app/QsoTableModel.h"
 #include "app/StationProfileModel.h"
 #include "core/Awards.h"
@@ -106,6 +107,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* so2r READ so2r CONSTANT)
     // Il keyer vocale (DVK) per la fonia.
     Q_PROPERTY(QObject* dvk READ dvk CONSTANT)
+    Q_PROPERTY(QObject* contestAudio READ contestAudio CONSTANT)
     // La radio via Hamlib, con le macro in CW per i contest.
     Q_PROPERTY(QObject* rig READ rig CONSTANT)
     Q_PROPERTY(QObject* cloud READ cloud CONSTANT)
@@ -362,6 +364,7 @@ public:
     QObject* net() const { return m_net; }
     QObject* so2r() const { return m_so2r; }
     QObject* dvk() const { return m_dvk; }
+    QObject* contestAudio() const { return m_contestAudio; }
     // Si opera in fonia (SSB, AM, FM)? Allora i tasti funzione sono il DVK.
     Q_INVOKABLE bool phoneMode() const;
     // Un tasto funzione: in fonia il messaggio registrato, altrimenti la macro CW.
@@ -1198,6 +1201,7 @@ private:
     NetController*       m_net{nullptr};
     So2rController*      m_so2r{nullptr};
     VoiceKeyerController* m_dvk{nullptr};
+    ContestAudioController* m_contestAudio{nullptr};
     RigController*       m_rig{nullptr};
     CloudController*     m_cloud{nullptr};
     ActivationController* m_activation{nullptr};

@@ -12,6 +12,7 @@ class ContestAudioFile {
     WriteResult append(const QByteArray &data);
     bool checkpoint(); // flushes userspace buffers; not a power-loss durability guarantee
     bool finish(QString *outputPath=nullptr);
+    void abandon(); // leave the partial file for explicit recovery
     QString partialPath() const { return m_path; }
     QString error() const { return m_error; }
     qint64 bytesWritten() const { return m_bytes; }

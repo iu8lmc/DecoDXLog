@@ -23,6 +23,20 @@ RoundedWindow {
     property bool reportHistoryProbe: false
     property string reportExportProbePath: ""
     function probeReportHistory() { reportHistory.openHistory() }
+    function probeContestAudio(folder) {
+        contestAudioDialog.open()
+        contestAudioDialog.folder=folder
+        const index=decolog.contestAudio.inputs.indexOf("BlackHole 2ch")
+        if (index < 0) { console.warn("PROBE contestAudio inputMissing"); return }
+        decolog.contestAudio.chooseInput(index)
+        contestAudioStart.clicked()
+        console.warn("PROBE contestAudio started=" + decolog.contestAudio.recording + " dialog=" + contestAudioDialog.visible)
+        if (decolog.contestAudio.recording) audioProbeStop.start()
+    }
+    Timer { id:audioProbeStop; interval:1100; onTriggered: {
+        contestAudioStop.clicked()
+        console.warn("PROBE contestAudio stopped=" + !decolog.contestAudio.recording + " path=" + decolog.contestAudio.lastPath)
+    } }
     function inspectContestReport(url, probe) {
         reportProbe = !!probe
         reportReview.result = ({})
@@ -842,6 +856,8 @@ RoundedWindow {
             GlassButton { text:qsTr("Report history…"); buttonHeight:26; fontPixelSize:12
                 enabled:!decolog.activation.contestReportBusy
                 onClicked:reportHistory.openHistory() }
+            GlassButton { text: decolog.contestAudio.recording ? qsTr("Audio recording…") : qsTr("Session audio…"); buttonHeight:26; fontPixelSize:12
+                onClicked: contestAudioDialog.open() }
             Item { Layout.fillWidth: true }
             Text {
                 text: qsTr("Enter logs · Esc clears · space moves to the report")
@@ -852,9 +868,9 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; enabled: !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; enabled: !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; enabled: !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
 
     FileDialog {
         id: contestReportExportFile
@@ -985,6 +1001,39 @@ RoundedWindow {
             }
         }
     }
+
+    DialogFrame {
+        id:contestAudioDialog
+        dialogKey:"contestAudio"; width:620; height:330; title:qsTr("Contest session audio"); dotColor:Theme.primaryColor
+        property url folder: ""
+        ColumnLayout {
+            anchors.fill:parent; spacing:10
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.warningColor
+                text:qsTr("Optional local audio recording. Select the receiving audio input and a folder; this does not control the radio or PTT. Recording continues if this window is closed.") }
+            RowLayout {
+                Layout.fillWidth:true
+                Text { text:qsTr("Input"); color:Theme.textSecondary }
+                StyledComboBox { Layout.fillWidth:true; model:decolog.contestAudio.inputs; currentIndex:decolog.contestAudio.inputIndex
+                    enabled:!decolog.contestAudio.recording; onActivated:decolog.contestAudio.chooseInput(currentIndex) }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { text:qsTr("Choose folder…"); enabled:!decolog.contestAudio.recording; onClicked:contestAudioFolder.open() }
+                Text { Layout.fillWidth:true; text:contestAudioDialog.folder ? String(contestAudioDialog.folder) : qsTr("No folder selected"); color:Theme.textSecondary; elide:Text.ElideMiddle }
+            }
+            RowLayout {
+                Text { text:qsTr("Maximum recording size (MiB)"); color:Theme.textSecondary }
+                SpinBox { id:contestAudioLimit; from:1; to:1024; value:128; editable:true; enabled:!decolog.contestAudio.recording }
+                GlassButton { id:contestAudioStart; text:qsTr("Start recording"); enabled:!decolog.contestAudio.recording && String(contestAudioDialog.folder).length>0
+                    onClicked:decolog.contestAudio.start(contestAudioDialog.folder,contestAudioLimit.value) }
+                GlassButton { id:contestAudioStop; text:qsTr("Stop"); enabled:decolog.contestAudio.recording; onClicked:decolog.contestAudio.stop() }
+            }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textPrimary
+                text:decolog.contestAudio.message + (decolog.contestAudio.recording ? qsTr(" · %1 bytes").arg(decolog.contestAudio.bytesWritten) : "") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:decolog.contestAudio.lastPath }
+        }
+    }
+    FolderDialog { id:contestAudioFolder; title:qsTr("Choose audio recording folder"); onAccepted:contestAudioDialog.folder=selectedFolder }
 
     DialogFrame {
         id:reportCandidates

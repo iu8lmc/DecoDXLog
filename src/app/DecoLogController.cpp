@@ -703,6 +703,8 @@ void DecoLogController::shutdown()
     m_decoLink.stop();
     m_hamHubLink.stop();
 
+    if (m_contestAudio)
+        m_contestAudio->stop();
     if (m_dvk)
         m_dvk->stop();
     if (m_rig)
@@ -1137,6 +1139,7 @@ bool DecoLogController::openDatabase(const QString& path)
             rig->ptt(on);
     };
     m_dvk = new VoiceKeyerController(std::move(dvkCtx), this);
+    m_contestAudio = new ContestAudioController(this);
 
     RigController::Context rigCtx;
     rigCtx.alternateRig = [this]() -> core::RigLink* {

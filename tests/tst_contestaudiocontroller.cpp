@@ -1,0 +1,85 @@
+#include "app/ContestAudioController.h"
+#include <QFile>
+#include <QAudioDevice>
+#include <QAudioFormat>
+#include <QAudioSink>
+#include <QMediaDevices>
+#include <QBuffer>
+#include <QtEndian>
+#include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QTest>
+class Feed : public QIODevice {
+    Q_OBJECT
+  public:
+    Feed() { open(QIODevice::ReadOnly); }
+    bool isSequential() const override { return true; }
+    void push(const QByteArray &data) { buffer+=data; emit readyRead(); }
+    qint64 bytesAvailable() const override { return buffer.size()+QIODevice::bytesAvailable(); }
+  protected:
+    qint64 readData(char *data,qint64 max) override { const qint64 n=qMin(max,qint64(buffer.size())); memcpy(data,buffer.constData(),size_t(n)); buffer.remove(0,n); return n; }
+    qint64 writeData(const char*,qint64) override { return -1; }
+  private: QByteArray buffer;
+};
+class TestContestAudioController : public QObject {
+    Q_OBJECT
+  private slots:
+    void virtualLoopbackWhenConfigured()
+    {
+        const QString deviceName=qEnvironmentVariable("DECOLOG_TEST_LOOPBACK");
+        if (deviceName.isEmpty()) QSKIP("Set DECOLOG_TEST_LOOPBACK to an isolated virtual audio device");
+        const auto inputs=QMediaDevices::audioInputs(), outputs=QMediaDevices::audioOutputs();
+        QAudioDevice input,output; int inputRow=-1;
+        for (int i=0;i<inputs.size();++i) if (inputs[i].description()==deviceName) { input=inputs[i]; inputRow=i+1; break; }
+        for (const auto &item:outputs) if (item.description()==deviceName) { output=item; break; }
+        QVERIFY2(!input.isNull() && !output.isNull(),"Virtual input/output not found");
+        QAudioFormat format; format.setSampleRate(16000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
+        QVERIFY2(input.isFormatSupported(format) && output.isFormatSupported(format),"Virtual device does not support 16 kHz mono PCM");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::app::ContestAudioController recorder;
+        recorder.chooseInput(inputRow); QVERIFY2(recorder.start(QUrl::fromLocalFile(dir.path()),1),qPrintable(recorder.message()));
+        QByteArray samples; for (int i=0;i<16000;++i) { char b[2]; qToLittleEndian<qint16>((i%100<50)?12000:-12000,b); samples.append(b,2); }
+        QBuffer source(&samples); QVERIFY(source.open(QIODevice::ReadOnly)); QAudioSink sink(output,format); sink.start(&source);
+        QTest::qWait(1400); sink.stop(); recorder.stop();
+        QFile wav(recorder.lastPath()); QVERIFY2(wav.open(QIODevice::ReadOnly),qPrintable(recorder.message()));
+        const auto pcm=wav.readAll().mid(44); QVERIFY(pcm.size()>4000);
+        bool signal=false; for (int i=0;i+1<pcm.size();i+=2) if (qAbs(qFromLittleEndian<qint16>(pcm.constData()+i))>1000) { signal=true; break; }
+        QVERIFY2(signal,"Virtual loopback recording contains no test signal");
+    }
+    void capturesStreamAndStopsAtLimit()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); Feed feed;
+        decolog::app::ContestAudioController recorder;
+        QSignalSpy finished(&recorder,&decolog::app::ContestAudioController::finished);
+        QVERIFY(recorder.startFromStream(&feed,dir.path(),8,QDateTime::currentDateTimeUtc()));
+        QVERIFY(recorder.recording()); feed.push(QByteArray::fromHex("010203"));
+        QCOMPARE(recorder.bytesWritten(),qint64(2)); feed.push(QByteArray::fromHex("0405060708"));
+        QCOMPARE(finished.size(),1); QVERIFY(!recorder.recording()); QVERIFY(finished.first().at(0).toBool());
+        QFile wav(finished.first().at(1).toString()); QVERIFY(wav.open(QIODevice::ReadOnly));
+        QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("0102030405060708"));
+    }
+    void incompleteSampleIsPreservedAndAnotherRecordingCanStart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::app::ContestAudioController recorder;
+        QSignalSpy finished(&recorder,&decolog::app::ContestAudioController::finished);
+        Feed feed; QVERIFY(recorder.startFromStream(&feed,dir.path(),32,QDateTime::currentDateTimeUtc()));
+        feed.push(QByteArray::fromHex("010203")); recorder.stop(); QCOMPARE(finished.size(),1);
+        QVERIFY(!finished.first().at(0).toBool()); QString partial=finished.first().at(1).toString(); QVERIFY(QFile::exists(partial));
+        QString recovered,error; QVERIFY2(decolog::core::ContestAudioFile::recover(partial,&recovered,&error),qPrintable(error));
+        QFile wav(recovered); QVERIFY(wav.open(QIODevice::ReadOnly)); QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("0102"));
+        QVERIFY(recorder.startFromStream(&feed,dir.path(),32,QDateTime::currentDateTimeUtc())); recorder.stop();
+        QCOMPARE(finished.size(),2); QVERIFY(finished.last().at(0).toBool());
+    }
+    void explicitStopAndDestroyedStream()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::app::ContestAudioController recorder;
+        QSignalSpy finished(&recorder,&decolog::app::ContestAudioController::finished);
+        Feed *feed=new Feed; QVERIFY(recorder.startFromStream(feed,dir.path(),32,QDateTime::currentDateTimeUtc()));
+        feed->push(QByteArray::fromHex("0102")); recorder.stop(); QCOMPARE(finished.size(),1);
+        QVERIFY(finished.takeFirst().at(0).toBool()); delete feed;
+        feed=new Feed; QVERIFY(recorder.startFromStream(feed,dir.path(),32,QDateTime::currentDateTimeUtc()));
+        feed->push(QByteArray::fromHex("0304")); delete feed;
+        QCOMPARE(finished.size(),1); QVERIFY(!finished.first().at(0).toBool()); QVERIFY(!recorder.recording());
+    }
+};
+QTEST_GUILESS_MAIN(TestContestAudioController)
+#include "tst_contestaudiocontroller.moc"

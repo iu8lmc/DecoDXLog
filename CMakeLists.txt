@@ -401,6 +401,8 @@ qt_add_executable(decolog
     src/app/RadioProfileModel.cpp
     src/app/RadioProfileModel.h
     src/app/VoiceKeyerController.cpp
+    src/app/ContestAudioController.cpp
+    src/app/ContestAudioController.h
     src/app/VoiceKeyerController.h
     src/app/So2rController.cpp
     src/app/So2rController.h
@@ -747,6 +749,11 @@ if(DECODXLOG_BUILD_TESTS)
         set_target_properties(tst_${name} PROPERTIES WIN32_EXECUTABLE OFF)
         add_test(NAME ${name} COMMAND tst_${name})
     endforeach()
+
+    qt_add_executable(tst_contestaudiocontroller tests/tst_contestaudiocontroller.cpp src/app/ContestAudioController.cpp src/app/ContestAudioController.h src/app/AudioDevices.cpp src/app/AudioDevices.h)
+    target_link_libraries(tst_contestaudiocontroller PRIVATE decolog_core Qt6::Multimedia Qt6::Test)
+    set_target_properties(tst_contestaudiocontroller PROPERTIES WIN32_EXECUTABLE OFF)
+    add_test(NAME contestaudiocontroller COMMAND tst_contestaudiocontroller)
 
     qt_add_executable(tst_rig_hamlib tests/tst_rig_hamlib.cpp)
     target_link_libraries(tst_rig_hamlib PRIVATE decolog_core Qt6::Test)

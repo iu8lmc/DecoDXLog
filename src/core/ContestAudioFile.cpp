@@ -83,6 +83,10 @@ bool ContestAudioFile::finish(QString *outputPath)
     }
     return finalize(m_file,m_path,outputPath,&m_error);
 }
+void ContestAudioFile::abandon()
+{
+    if (m_file.isOpen()) { m_file.flush(); m_file.close(); }
+}
 bool ContestAudioFile::recover(const QString &path, QString *outputPath, QString *error)
 {
     static const QRegularExpression expected(QStringLiteral("^contest-audio-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.wav\\.part$"));

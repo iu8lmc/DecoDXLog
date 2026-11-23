@@ -67,6 +67,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void contestAudioControlsUseVirtualInputWhenConfigured()
+    {
+        if (qEnvironmentVariable("DECOLOG_TEST_LOOPBACK") != QLatin1String("BlackHole 2ch")) QSKIP("Set DECOLOG_TEST_LOOPBACK=BlackHole 2ch");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("contestaudioprobe:")+dir.path(),output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE contestAudio started=true dialog=true") && output.contains("PROBE contestAudio stopped=true") &&
+                 !output.contains("TypeError"),output.constData());
+        const auto recordings=QDir(dir.path()).entryInfoList({"contest-audio-*.wav"},QDir::Files);
+        QCOMPARE(recordings.size(),1); QVERIFY(recordings.first().size()>44);
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestReportFindsCandidateInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
