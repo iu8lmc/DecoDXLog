@@ -4,12 +4,12 @@
 #include <QString>
 
 namespace decolog::core {
-// Fixed PCM: 16 kHz, mono, signed 16-bit little-endian. No audio-device or PTT access.
+// Mono signed 16-bit little-endian PCM. No audio-device or PTT access.
 class ContestAudioFile {
   public:
     struct WriteResult { qint64 written{0}; bool limitReached{false}; QString error; };
-    struct Location { qint64 offsetMs{0}; qint64 durationMs{0}; QDateTime startUtc; QString error; };
-    bool start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc);
+    struct Location { qint64 offsetMs{0}; qint64 durationMs{0}; int sampleRate{0}; QDateTime startUtc; QString error; };
+    bool start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc, int sampleRate=16000);
     WriteResult append(const QByteArray &data);
     bool checkpoint(); // flushes userspace buffers; not a power-loss durability guarantee
     bool finish(QString *outputPath=nullptr);

@@ -84,7 +84,7 @@ private slots:
         if (qEnvironmentVariable("DECOLOG_TEST_LOOPBACK") != QLatin1String("BlackHole 2ch")) QSKIP("Set DECOLOG_TEST_LOOPBACK=BlackHole 2ch");
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
-        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'a')).written,qint64(64000));
+        QVERIFY(writer.start(dir.path(),192000,start,48000)); QCOMPARE(writer.append(QByteArray(192000,'a')).written,qint64(192000));
         QString path; QVERIFY(writer.finish(&path)); QByteArray output;
         QVERIFY2(launch(dir,QStringLiteral("contestaudioplayprobe:")+path,output,5000),output.constData());
         QVERIFY2(output.contains("PROBE contestPlayback playing=true qso=K1ABC") && output.contains("PROBE contestPlayback stopped=true") &&

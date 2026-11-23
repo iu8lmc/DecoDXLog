@@ -10,14 +10,23 @@
 namespace decolog::core {
 namespace {
 constexpr qint64 maximumDataBytes = 1024LL * 1024 * 1024;
-QByteArray header(quint32 size)
+QByteArray header(quint32 size, int sampleRate)
 {
     QByteArray h;
     auto u16=[&](quint16 v) { char b[2]; qToLittleEndian(v,b); h.append(b,2); };
     auto u32=[&](quint32 v) { char b[4]; qToLittleEndian(v,b); h.append(b,4); };
     h.append("RIFF",4); u32(36+size); h.append("WAVEfmt ",8); u32(16); u16(1); u16(1);
-    u32(16000); u32(32000); u16(2); u16(16); h.append("data",4); u32(size);
+    u32(quint32(sampleRate)); u32(quint32(sampleRate)*2); u16(2); u16(16); h.append("data",4); u32(size);
     return h;
+}
+int validatedRate(QByteArray actual)
+{
+    if (actual.size()!=44) return 0;
+    const quint32 rate=qFromLittleEndian<quint32>(actual.constData()+24);
+    if (rate<8000 || rate>192000) return 0;
+    const QByteArray expected=header(0,int(rate));
+    actual.replace(4,4,expected.mid(4,4)); actual.replace(40,4,expected.mid(40,4));
+    return actual==expected ? int(rate) : 0;
 }
 bool finalize(QFile &file, const QString &path, QString *output, QString *error)
 {
@@ -25,11 +34,14 @@ bool finalize(QFile &file, const QString &path, QString *output, QString *error)
     if (size < 0 || size > maximumDataBytes || size % 2) {
         if (error) *error=QStringLiteral("Invalid or incomplete PCM data size"); return false;
     }
+    if (!file.seek(0)) { if (error) *error=file.errorString(); return false; }
+    const int rate=validatedRate(file.read(44));
+    if (!rate) { if (error) *error=QStringLiteral("Unexpected WAV format"); return false; }
     const QString destination=path.left(path.size()-5); // remove .part
     if (QFile::exists(destination)) {
         if (error) *error=QStringLiteral("A recording with this name already exists"); return false;
     }
-    if (!file.seek(0) || file.write(header(quint32(size))) != 44 || !file.flush()) {
+    if (!file.seek(0) || file.write(header(quint32(size),rate)) != 44 || !file.flush()) {
         if (error) *error=file.errorString(); return false;
     }
     file.close();
@@ -40,15 +52,15 @@ bool finalize(QFile &file, const QString &path, QString *output, QString *error)
     return true;
 }
 }
-bool ContestAudioFile::start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc)
+bool ContestAudioFile::start(const QString &directory, qint64 maxDataBytes, const QDateTime &startUtc, int sampleRate)
 {
-    if (m_file.isOpen() || maxDataBytes < 2 || maxDataBytes > maximumDataBytes || !startUtc.isValid() || !QDir(directory).exists()) {
+    if (sampleRate < 8000 || sampleRate > 192000 || m_file.isOpen() || maxDataBytes < 2 || maxDataBytes > maximumDataBytes || !startUtc.isValid() || !QDir(directory).exists()) {
         m_error=QStringLiteral("Invalid recording directory, time or size limit"); return false;
     }
     const QString name=QStringLiteral("contest-audio-%1-%2.wav.part")
         .arg(startUtc.toUTC().toString(QStringLiteral("yyyyMMdd'T'HHmmsszzz'Z'")),QUuid::createUuid().toString(QUuid::WithoutBraces));
     m_path=QDir(directory).filePath(name); m_file.setFileName(m_path);
-    if (!m_file.open(QIODevice::ReadWrite | QIODevice::NewOnly) || m_file.write(header(0)) != 44 || !m_file.flush()) {
+    if (!m_file.open(QIODevice::ReadWrite | QIODevice::NewOnly) || m_file.write(header(0,sampleRate)) != 44 || !m_file.flush()) {
         m_error=m_file.errorString(); m_file.close(); return false;
     }
     m_pending.clear(); m_error.clear(); m_bytes=0; m_limit=maxDataBytes-(maxDataBytes%2);
@@ -100,10 +112,7 @@ bool ContestAudioFile::recover(const QString &path, QString *outputPath, QString
     }
     QFile f(path);
     if (!f.open(QIODevice::ReadWrite)) { if (error) *error=f.errorString(); return false; }
-    QByteArray actual=f.read(44), expectedHeader=header(0);
-    if (actual.size()!=44) { if (error) *error=QStringLiteral("Incomplete WAV header"); return false; }
-    actual.replace(4,4,expectedHeader.mid(4,4)); actual.replace(40,4,expectedHeader.mid(40,4));
-    if (actual != expectedHeader) { if (error) *error=QStringLiteral("Unexpected WAV format"); return false; }
+    if (!validatedRate(f.read(44))) { if (error) *error=QStringLiteral("Unexpected or incomplete WAV format"); return false; }
     return finalize(f,path,outputPath,error);
 }
 ContestAudioFile::Location ContestAudioFile::locate(const QString &path, const QDateTime &qsoUtc)
@@ -120,10 +129,13 @@ ContestAudioFile::Location ContestAudioFile::locate(const QString &path, const Q
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) { result.error=file.errorString(); return result; }
     const qint64 size=file.size()-44;
-    if (size < 0 || size > maximumDataBytes || size%2 || file.read(44)!=header(quint32(size))) {
+    const QByteArray actual=file.read(44);
+    const int rate=validatedRate(actual);
+    if (size < 0 || size > maximumDataBytes || size%2 || !rate || actual!=header(quint32(size),rate)) {
         result.error=QStringLiteral("Invalid or incomplete contest WAV"); return result;
     }
-    result.durationMs=size*1000/32000;
+    result.sampleRate=rate;
+    result.durationMs=size*1000/(qint64(rate)*2);
     result.offsetMs=result.startUtc.msecsTo(qsoUtc.toUTC());
     if (result.offsetMs<0 || result.offsetMs>=result.durationMs)
         result.error=QStringLiteral("QSO time is outside this recording");

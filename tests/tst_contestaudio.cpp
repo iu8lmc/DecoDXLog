@@ -43,6 +43,18 @@ class TestContestAudio : public QObject {
         QFile file(recovered); QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll().mid(44),QByteArray::fromHex("01020304"));
     }
+    void preservesNativeSampleRateAcrossRecoveryAndLookup()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile file;
+        const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(file.start(dir.path(),96000,start,48000)); QCOMPARE(file.append(QByteArray(96000,'x')).written,qint64(96000));
+        const QString partial=file.partialPath(); file.abandon(); QString path,error;
+        QVERIFY2(ContestAudioFile::recover(partial,&path,&error),qPrintable(error));
+        QFile wav(path); QVERIFY(wav.open(QIODevice::ReadOnly)); const QByteArray h=wav.read(44);
+        QCOMPARE(qFromLittleEndian<quint32>(h.constData()+24),quint32(48000));
+        const auto location=ContestAudioFile::locate(path,start.addMSecs(500)); QVERIFY(location.error.isEmpty());
+        QCOMPARE(location.sampleRate,48000); QCOMPARE(location.offsetMs,qint64(500)); QCOMPARE(location.durationMs,qint64(1000));
+    }
     void locatesQsoOnlyWithinValidatedRecording()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile file;

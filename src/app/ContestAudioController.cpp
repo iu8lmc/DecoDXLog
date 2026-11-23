@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QMediaDevices>
 #include <QIODevice>
+#include <QtEndian>
 
 namespace decolog::app {
 ContestAudioController::ContestAudioController(QObject *parent) : QObject(parent), m_devices(new QMediaDevices(this))
@@ -65,14 +66,14 @@ bool ContestAudioController::playForQso(const QUrl &wav, const QString &qsoUtc)
     QAudioDevice device;
     if (m_defaultOutput) device=QMediaDevices::defaultAudioOutput();
     else for (const auto &item:QMediaDevices::audioOutputs()) if (item.id()==m_outputId) { device=item; break; }
-    QAudioFormat format; format.setSampleRate(16000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
+    QAudioFormat format; format.setSampleRate(location.sampleRate); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
     if (device.isNull() || !device.isFormatSupported(format)) {
-        m_message=tr("Selected playback output is unavailable or cannot play 16 kHz mono PCM."); emit changed(); return false;
+        m_message=tr("Selected playback output is unavailable or does not support this recording format."); emit changed(); return false;
     }
     stopPlayback();
     m_playbackFile=new QFile(wav.toLocalFile(),this);
     const qint64 position=qMax<qint64>(0,location.offsetMs-10000);
-    if (!m_playbackFile->open(QIODevice::ReadOnly) || !m_playbackFile->seek(44+position*32)) {
+    if (!m_playbackFile->open(QIODevice::ReadOnly) || !m_playbackFile->seek(44+(position*location.sampleRate/1000)*2)) {
         m_message=tr("Cannot open or seek the recording."); m_playbackFile->deleteLater(); m_playbackFile=nullptr; emit changed(); return false;
     }
     m_sink=new QAudioSink(device,format,this);
@@ -121,8 +122,10 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
     if (m_defaultInput) device=QMediaDevices::defaultAudioInput();
     else for (const auto &item : QMediaDevices::audioInputs()) if (item.id()==m_inputId) { device=item; break; }
     QAudioFormat format; format.setSampleRate(16000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
-    if (device.isNull() || !device.isFormatSupported(format)) {
-        m_message=tr("Selected input is unavailable or cannot capture 16 kHz mono PCM."); emit changed(); return false;
+    if (device.isNull()) { m_message=tr("Selected audio input is unavailable."); emit changed(); return false; }
+    if (!device.isFormatSupported(format)) format=device.preferredFormat();
+    if (!audiodev::canConvertToMonoInt16(format) || format.sampleRate()<8000 || format.sampleRate()>192000) {
+        m_message=tr("Selected input has an unsupported audio format."); emit changed(); return false;
     }
     m_source=new QAudioSource(device,format,this);
     connect(m_source,&QAudioSource::stateChanged,this,[this](QtAudio::State state) {
@@ -130,17 +133,23 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
             finish(false,tr("Audio input stopped unexpectedly."));
     });
     QIODevice *stream=m_source->start();
-    if (!stream || !startFromStream(stream,directory.toLocalFile(),qint64(limitMiB)*1024*1024,QDateTime::currentDateTimeUtc())) {
+    if (!stream || !startFromStream(stream,directory.toLocalFile(),qint64(limitMiB)*1024*1024,QDateTime::currentDateTimeUtc(),format)) {
         m_source->stop(); m_source->deleteLater(); m_source=nullptr;
         if (m_message.isEmpty()) m_message=tr("Cannot start audio input.");
         emit changed(); return false;
     }
     return true;
 }
-bool ContestAudioController::startFromStream(QIODevice *stream, const QString &directory, qint64 maxBytes, const QDateTime &startUtc)
+bool ContestAudioController::startFromStream(QIODevice *stream, const QString &directory, qint64 maxBytes, const QDateTime &startUtc, const QAudioFormat &sourceFormat)
 {
     if (m_recording || !stream || !stream->isReadable()) return false;
-    if (!m_file.start(directory,maxBytes,startUtc)) { m_message=m_file.error(); emit changed(); return false; }
+    m_inputFormat=sourceFormat;
+    if (!m_inputFormat.isValid()) { m_inputFormat.setSampleRate(16000); m_inputFormat.setChannelCount(1); m_inputFormat.setSampleFormat(QAudioFormat::Int16); }
+    if (!audiodev::canConvertToMonoInt16(m_inputFormat) || m_inputFormat.sampleRate()<8000 || m_inputFormat.sampleRate()>192000) {
+        m_message=tr("Unsupported audio format."); emit changed(); return false;
+    }
+    if (!m_file.start(directory,maxBytes,startUtc,m_inputFormat.sampleRate())) { m_message=m_file.error(); emit changed(); return false; }
+    m_inputPending.clear();
     m_stream=stream; m_recording=true; m_lastPath.clear(); m_message=tr("Recording session audio.");
     connect(stream,&QIODevice::readyRead,this,&ContestAudioController::drain);
     connect(stream,&QObject::destroyed,this,[this] { if (m_recording) finish(false,tr("Audio stream ended unexpectedly.")); });
@@ -151,12 +160,18 @@ bool ContestAudioController::startFromStream(QIODevice *stream, const QString &d
 void ContestAudioController::drain()
 {
     if (!m_recording || !m_stream) return;
-    const QByteArray data=m_stream->readAll();
-    if (data.isEmpty()) return;
-    const auto result=m_file.append(data);
+    m_inputPending.append(m_stream->readAll());
+    const auto converted=audiodev::convertToMonoInt16(m_inputPending,m_inputFormat);
+    if (!converted.consumedBytes) return;
+    m_inputPending.remove(0,converted.consumedBytes);
+    QByteArray samples=converted.samples;
+#if Q_BYTE_ORDER == Q_BIG_ENDIAN
+    for (qsizetype i=0;i+1<samples.size();i+=2) { const char first=samples.at(i); samples[i]=samples.at(i+1); samples[i+1]=first; }
+#endif
+    const auto result=m_file.append(samples);
     if (!result.error.isEmpty()) { finish(false,result.error); return; }
     emit changed();
-    if (result.limitReached) finish(true,tr("Recording stopped at the size limit."));
+    if (result.limitReached) { m_inputPending.clear(); finish(true,tr("Recording stopped at the size limit.")); }
 }
 void ContestAudioController::stop()
 {
@@ -172,7 +187,8 @@ void ContestAudioController::finish(bool success, const QString &reason)
     m_stream=nullptr;
     if (m_source) { auto *source=m_source; m_source=nullptr; source->stop(); source->deleteLater(); }
     QString path=m_file.partialPath();
-    if (success && !m_file.finish(&path)) { success=false; m_message=m_file.error(); m_file.abandon(); }
+    if (success && !m_inputPending.isEmpty()) { success=false; m_file.abandon(); m_message=tr("Incomplete audio frame; recover the partial recording."); }
+    else if (success && !m_file.finish(&path)) { success=false; m_message=m_file.error(); m_file.abandon(); }
     else if (!success) { m_file.abandon(); m_message=reason; }
     else m_message=reason;
     m_lastPath=path; emit changed(); emit finished(success,path,m_message);

@@ -1,6 +1,7 @@
 #pragma once
 #include "core/ContestAudioFile.h"
 #include <QByteArray>
+#include <QAudioFormat>
 #include <QDateTime>
 #include <QObject>
 #include <QPointer>
@@ -42,8 +43,9 @@ class ContestAudioController : public QObject {
     Q_INVOKABLE bool recoverFile(const QUrl &partial);
     Q_INVOKABLE bool start(const QUrl &directory, int limitMiB);
     Q_INVOKABLE void stop();
-    // Allows a locally supplied 16 kHz mono PCM stream, including deterministic tests.
-    bool startFromStream(QIODevice *stream, const QString &directory, qint64 maxBytes, const QDateTime &startUtc);
+    // Locally supplied PCM stream; an invalid format means 16 kHz mono Int16.
+    bool startFromStream(QIODevice *stream, const QString &directory, qint64 maxBytes, const QDateTime &startUtc,
+                         const QAudioFormat &format=QAudioFormat());
   signals:
     void changed();
     void devicesChanged();
@@ -58,7 +60,8 @@ class ContestAudioController : public QObject {
     QFile *m_playbackFile{nullptr};
     QMediaDevices *m_devices{nullptr};
     QTimer m_checkpoint;
-    QByteArray m_inputId, m_outputId;
+    QByteArray m_inputId, m_outputId, m_inputPending;
+    QAudioFormat m_inputFormat;
     bool m_defaultOutput{true};
     bool m_defaultInput{true}, m_recording{false};
     QString m_message, m_lastPath;

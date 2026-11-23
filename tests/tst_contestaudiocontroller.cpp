@@ -55,11 +55,11 @@ class TestContestAudioController : public QObject {
         for (const auto &item:inputs) if (item.description()==name) { input=item; break; }
         for (int i=0;i<outputs.size();++i) if (outputs[i].description()==name) { outputRow=i+1; break; }
         QVERIFY(!input.isNull()); QVERIFY(outputRow>0);
-        QAudioFormat format; format.setSampleRate(16000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
+        QAudioFormat format; format.setSampleRate(48000); format.setChannelCount(1); format.setSampleFormat(QAudioFormat::Int16);
         QVERIFY(input.isFormatSupported(format)); QTemporaryDir dir; QVERIFY(dir.isValid());
         decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
-        QVERIFY(writer.start(dir.path(),64000,start)); QByteArray samples;
-        for (int i=0;i<32000;++i) { char b[2]; qToLittleEndian<qint16>((i%100<50)?12000:-12000,b); samples.append(b,2); }
+        QVERIFY(writer.start(dir.path(),192000,start,48000)); QByteArray samples;
+        for (int i=0;i<96000;++i) { char b[2]; qToLittleEndian<qint16>((i%100<50)?12000:-12000,b); samples.append(b,2); }
         QCOMPARE(writer.append(samples).written,qint64(samples.size())); QString path; QVERIFY(writer.finish(&path));
         QAudioSource source(input,format); QIODevice *stream=source.start(); QVERIFY(stream); QByteArray captured;
         connect(stream,&QIODevice::readyRead,&source,[&] { captured+=stream->readAll(); });
@@ -69,6 +69,19 @@ class TestContestAudioController : public QObject {
         QTest::qWait(1700); player.stopPlayback(); source.stop();
         bool signal=false; for (int i=0;i+1<captured.size();i+=2) if (qAbs(qFromLittleEndian<qint16>(captured.constData()+i))>1000) { signal=true; break; }
         QVERIFY2(signal,"No audio observed from QSO playback through virtual output");
+    }
+    void capturesFragmentedNativeStereoFloat()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); Feed feed; decolog::app::ContestAudioController recorder;
+        QAudioFormat format; format.setSampleRate(48000); format.setChannelCount(2); format.setSampleFormat(QAudioFormat::Float);
+        QVERIFY(recorder.startFromStream(&feed,dir.path(),320,QDateTime::currentDateTimeUtc(),format));
+        const float samples[]={0.5f,0.5f,-0.5f,-0.5f}; QByteArray data(reinterpret_cast<const char*>(samples),sizeof(samples));
+        feed.push(data.left(5)); QCOMPARE(recorder.bytesWritten(),qint64(0)); feed.push(data.mid(5));
+        QCOMPARE(recorder.bytesWritten(),qint64(4)); recorder.stop();
+        QFile wav(recorder.lastPath()); QVERIFY(wav.open(QIODevice::ReadOnly)); const QByteArray bytes=wav.readAll();
+        QCOMPARE(qFromLittleEndian<quint32>(bytes.constData()+24),quint32(48000));
+        QCOMPARE(qFromLittleEndian<qint16>(bytes.constData()+44),qint16(16384));
+        QCOMPARE(qFromLittleEndian<qint16>(bytes.constData()+46),qint16(-16384));
     }
     void capturesStreamAndStopsAtLimit()
     {
