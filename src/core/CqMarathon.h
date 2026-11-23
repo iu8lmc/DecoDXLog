@@ -49,6 +49,7 @@ ReviewAdif reviewAdif(const LogDatabase& db, int year, qint64 stationProfileId, 
 Result select(const QList<Entry>& entries, const Rules& rules);
 // Replaces candidates atomically, preserving the same covered entity/zone counts.
 bool applyReviewChoices(Result& result, const QList<qint64>& entityIds, const QList<qint64>& zoneIds, QString* error = nullptr);
+bool restoreReviewChoices(Result& result, const QJsonObject& file, const QString& expectedSnapshot, QString* error = nullptr);
 QList<Entry> loadEntries(const LogDatabase& db, QString* error = nullptr);
 
 } // namespace decolog::core::cqmarathon

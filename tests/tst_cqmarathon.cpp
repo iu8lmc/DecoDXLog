@@ -11,6 +11,27 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void reviewedJsonRoundTripRequiresMatchingSnapshot()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"K1AAA",291,5,"20m","CW",when,7}, {2,"K2BBB",291,3,"20m","CW",when,7},
+                                   {3,"K3CCC",291,5,"40m","CW",when,7}};
+        auto original=select(entries,{2026,"mixed",1,7}); QString error;
+        QVERIFY(applyReviewChoices(original,{2},{3,2},&error));
+        auto file=original.toJson().object(); file.insert("previewSnapshot","snapshot-A");
+        auto restored=select(entries,{2026,"mixed",1,7});
+        QVERIFY(restoreReviewChoices(restored,file,"snapshot-A",&error));
+        QCOMPARE(restored.selected.first().qsoId,qint64(2)); QCOMPARE(restored.zoneCandidates.first().qsoId,qint64(3));
+        const auto before=restored.toJson().toJson();
+        QVERIFY(!restoreReviewChoices(restored,file,"other-log",&error)); QCOMPARE(restored.toJson().toJson(),before);
+        file.remove("previewSnapshot"); QVERIFY(!restoreReviewChoices(restored,file,"snapshot-A",&error));
+        file.insert("previewSnapshot","snapshot-A"); file.insert("stationProfileId",8);
+        QVERIFY(!restoreReviewChoices(restored,file,"snapshot-A",&error));
+        file.insert("stationProfileId",7);
+        auto invalid=file.value("selected").toArray(); auto row=invalid.at(0).toObject(); row.insert("qsoId",1.5); invalid[0]=row;
+        file.insert("selected",invalid); QVERIFY(!restoreReviewChoices(restored,file,"snapshot-A",&error));
+        QCOMPARE(restored.toJson().toJson(),before);
+    }
     void reviewedChoicesAreValidatedAndExported()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

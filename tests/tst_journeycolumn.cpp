@@ -68,6 +68,19 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonReviewedJsonRoundTripRejectsChangedLog()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          for (const auto& item : {qMakePair("K1AAA","5"), qMakePair("K2BBB","3"), qMakePair("K3CCC","5")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",item.first},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"CQZ",item.second}},"fixture",{},true,profile,false).id>0); }
+        const QString path=dir.filePath("review.json"); QByteArray output;
+        QVERIFY2(launch(dir,"marathonroundtripprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("saved= before=1,1 loaded= after=2,3") && !output.contains("TypeError"),output.constData());
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery update(db.connection()); QVERIFY(update.exec("UPDATE qso SET call='K3CHANGED' WHERE call='K3CCC'")); }
+        QVERIFY2(launch(dir,"marathonimportprobe:"+path+":"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("error=Review file does not match the current log and preview before=1,1 after=1,1") && !output.contains("TypeError"),output.constData());
+    }
     void marathonReviewedJsonExportsIndependentChoices()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

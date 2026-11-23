@@ -69,6 +69,15 @@ QString marathonSnapshot(const cqmarathon::Result& result, const QString& identi
     const QByteArray data=QByteArray::number(id.size())+':'+id+result.toJson().toJson(QJsonDocument::Compact);
     return QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex());
 }
+QVariantList marathonRows(const QList<cqmarathon::Entry>& entries)
+{
+    QVariantList list;
+    for (const auto& entry : entries) list << QVariantMap{{QStringLiteral("qsoId"),entry.qsoId}, {QStringLiteral("call"),entry.call},
+        {QStringLiteral("dxcc"),entry.dxcc}, {QStringLiteral("region"),entry.region}, {QStringLiteral("entityCode"),entry.entityCode},
+        {QStringLiteral("entityBasis"),entry.entityBasis}, {QStringLiteral("cqZone"),entry.cqZone}, {QStringLiteral("band"),entry.band},
+        {QStringLiteral("mode"),entry.mode}, {QStringLiteral("timestamp"),entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
+    return list;
+}
 bool marathonTargetIsLog(const QString& targetPath, const QString& dbPath)
 {
     if (dbPath.isEmpty() || dbPath==QLatin1String(":memory:")) return false;
@@ -3138,27 +3147,13 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                            {QStringLiteral("exclusions"), QStringList()}};
 
     const core::cqmarathon::Result result = core::cqmarathon::select(entries, rules);
-    const auto rows=[](const QList<core::cqmarathon::Entry>& entries) {
-        QVariantList list;
-        for (const auto& entry : entries) list << QVariantMap{{QStringLiteral("qsoId"), entry.qsoId},
-                                {QStringLiteral("call"), entry.call},
-                                {QStringLiteral("dxcc"), entry.dxcc},
-                                {QStringLiteral("region"), entry.region},
-                                {QStringLiteral("entityCode"), entry.entityCode},
-                                {QStringLiteral("entityBasis"), entry.entityBasis},
-                                {QStringLiteral("cqZone"), entry.cqZone},
-                                {QStringLiteral("band"), entry.band},
-                                {QStringLiteral("mode"), entry.mode},
-                                {QStringLiteral("timestamp"), entry.timestamp.toUTC().toString(Qt::ISODateWithMs)}};
-        return list;
-    };
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},
                        {QStringLiteral("error"), validationError},
-                       {QStringLiteral("selected"), rows(result.selected)},
-                       {QStringLiteral("zoneCandidates"), rows(result.zoneCandidates)},
-                       {QStringLiteral("entityAlternatives"), rows(result.entityAlternatives)},
-                       {QStringLiteral("zoneAlternatives"), rows(result.zoneAlternatives)},
+                       {QStringLiteral("selected"), marathonRows(result.selected)},
+                       {QStringLiteral("zoneCandidates"), marathonRows(result.zoneCandidates)},
+                       {QStringLiteral("entityAlternatives"), marathonRows(result.entityAlternatives)},
+                       {QStringLiteral("zoneAlternatives"), marathonRows(result.zoneAlternatives)},
                        {QStringLiteral("zoneCandidateCount"), result.zoneCandidates.size()},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("warnings"), result.warnings},
@@ -3213,9 +3208,31 @@ QString DecoLogController::saveReviewedCqMarathonExport(const QUrl& file, int ye
         return error.isEmpty() ? tr("Invalid reviewed choices") : error;
     QSaveFile output(file.toLocalFile());
     if (!output.open(QIODevice::WriteOnly)) return output.errorString();
-    const auto bytes=result.toJson().toJson(QJsonDocument::Indented);
+    auto document=result.toJson().object(); document.insert(QStringLiteral("previewSnapshot"),snapshot);
+    const auto bytes=QJsonDocument(document).toJson(QJsonDocument::Indented);
     if (output.write(bytes)!=bytes.size() || !output.commit()) return output.errorString();
     return {};
+}
+
+QVariantMap DecoLogController::loadReviewedCqMarathonExport(const QUrl& file, int year, const QString& category,
+        int maxPerEntity, qint64 stationProfileId, const QString& snapshot) const
+{
+    const auto fail=[](const QString& error) { return QVariantMap{{QStringLiteral("error"),error}}; };
+    if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return fail(tr("Choose a local JSON file"));
+    if (!m_db.isOpen() || m_db.identity().isEmpty() || stationProfileId<=0 || !m_db.stationProfile(stationProfileId)) return fail(tr("The log or station profile is unavailable"));
+    QFile input(file.toLocalFile());
+    if (!input.open(QIODevice::ReadOnly)) return fail(input.errorString());
+    if (input.size()>128*1024*1024) return fail(tr("Review file exceeds 128 MiB"));
+    QJsonParseError parseError; const auto json=QJsonDocument::fromJson(input.readAll(),&parseError);
+    if (parseError.error!=QJsonParseError::NoError || !json.isObject()) return fail(tr("Invalid review JSON"));
+    QString error; const auto entries=cqmarathon::loadEntries(m_db,&error);
+    if (!error.isEmpty()) return fail(error);
+    auto result=cqmarathon::select(entries,{year,category,maxPerEntity,stationProfileId});
+    if (!result.isValid(&error)) return fail(error);
+    if (snapshot.isEmpty() || snapshot!=marathonSnapshot(result,m_db.identity())) return fail(tr("The preview changed; refresh it before importing"));
+    if (!cqmarathon::restoreReviewChoices(result,json.object(),snapshot,&error)) return fail(error);
+    return {{QStringLiteral("error"),QString()}, {QStringLiteral("selected"),marathonRows(result.selected)},
+            {QStringLiteral("zoneCandidates"),marathonRows(result.zoneCandidates)}};
 }
 
 QString DecoLogController::exportCqMarathonReviewAdif(const QUrl& file,int year,qint64 stationProfileId)

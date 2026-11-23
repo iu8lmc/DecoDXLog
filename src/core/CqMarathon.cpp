@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QSet>
 #include <algorithm>
+#include <cmath>
 #include <QSqlQuery>
 #include <QSqlError>
 
@@ -222,6 +223,33 @@ bool applyReviewChoices(Result& result, const QList<qint64>& entityIds, const QL
     }
     result.selected=entities; result.zoneCandidates=zones; result.reviewed=true;
     return true;
+}
+
+bool restoreReviewChoices(Result& result, const QJsonObject& file, const QString& expectedSnapshot, QString* error)
+{
+    const auto fail=[&]() { if (error) *error=QStringLiteral("Review file does not match the current log and preview"); return false; };
+    if (expectedSnapshot.isEmpty() || file.value(QStringLiteral("previewSnapshot")).toString()!=expectedSnapshot ||
+        file.value(QStringLiteral("format")).toString()!=QLatin1String("decodxlog-cq-marathon-1") ||
+        file.value(QStringLiteral("selectionKind")).toString()!=QLatin1String("reviewed") ||
+        file.value(QStringLiteral("edition")).toInt(-1)!=result.rules.year ||
+        file.value(QStringLiteral("category")).toString()!=normalizedCategory(result.rules.category) ||
+        file.value(QStringLiteral("maxPerEntity")).toInt(-1)!=result.rules.maxPerEntity ||
+        file.value(QStringLiteral("stationProfileId")).toDouble(-1)!=double(result.rules.stationProfileId)) return fail();
+    const auto ids=[](const QJsonValue& value,QList<qint64>& out) {
+        if (!value.isArray()) return false;
+        for (const auto& item : value.toArray()) {
+            if (!item.isObject()) return false;
+            const auto raw=item.toObject().value(QStringLiteral("qsoId"));
+            if (!raw.isDouble()) return false;
+            const double number=raw.toDouble();
+            if (!std::isfinite(number) || number<1 || number>9007199254740991.0 || std::floor(number)!=number) return false;
+            out << static_cast<qint64>(number);
+        }
+        return true;
+    };
+    QList<qint64> entities,zones;
+    if (!ids(file.value(QStringLiteral("selected")),entities) || !ids(file.value(QStringLiteral("zoneCandidates")),zones)) return fail();
+    return applyReviewChoices(result,entities,zones,error);
 }
 
 QList<Entry> loadEntries(const LogDatabase& db, QString* error)
