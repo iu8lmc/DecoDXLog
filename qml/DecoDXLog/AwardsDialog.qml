@@ -575,8 +575,8 @@ DialogFrame {
             ListView { id:marathonZoneRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.zoneCandidates || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:marathonZoneRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
                     text:qsTr("QSO %1 · %2 · CQ zone %3 · DXCC %4 · %5 %6 · %7").arg(modelData.qsoId).arg(modelData.call).arg(modelData.cqZone).arg(modelData.dxcc || qsTr("unknown")).arg(modelData.band).arg(modelData.mode).arg(modelData.timestamp) } }
-            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Exclusions") }
-            ListView { id:marathonExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.marathonPreview.exclusions || []; ScrollBar.vertical:PanelScrollBar {}
+            Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Exclusions and review warnings") }
+            ListView { id:marathonExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:(root.marathonPreview.exclusions || []).concat(root.marathonPreview.warnings || []); ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:marathonExcludedRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary; text:modelData } }
             GlassButton { text:qsTr("Close"); onClicked:marathonReview.close() }
         }

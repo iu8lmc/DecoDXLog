@@ -68,6 +68,14 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void marathonReviewDisplaysEntityZoneWarning()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Marathon"; p.stationCallsign="K1XYZ"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","I1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","248"},{"CQZ","5"}},"fixture",{},true,profile,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,"marathonreviewprobe:"+QString::number(profile),output,4500),output.constData());
+        QVERIFY2(output.contains("CQ zone 5 is not listed for entity 248") && output.contains("Marathon entity 248") && !output.contains("TypeError"),output.constData());
+    }
     void marathonReviewShowsUnknownEntityAndKeepsZone()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;

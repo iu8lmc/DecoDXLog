@@ -3142,6 +3142,7 @@ QVariantMap DecoLogController::cqMarathonPreview(int year, const QString& catego
                        {QStringLiteral("zoneCandidates"), rows(result.zoneCandidates)},
                        {QStringLiteral("zoneCandidateCount"), result.zoneCandidates.size()},
                        {QStringLiteral("exclusions"), result.exclusions},
+                       {QStringLiteral("warnings"), result.warnings},
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))},
                        {QStringLiteral("edition"), rules.year},
                        {QStringLiteral("category"), rules.category.trimmed().toLower()},

@@ -174,6 +174,13 @@ Result select(const QList<Entry>& entries, const Rules& rules)
                                          .arg(entry.qsoId).arg(candidate.entityCode);
                 continue;
             }
+            if (entry.cqZone >= 1 && entry.cqZone <= 40) {
+                const auto it = std::lower_bound(detail::publishedEntityCodes.begin(), detail::publishedEntityCodes.end(), candidate.entityCode);
+                const auto index = static_cast<std::size_t>(it - detail::publishedEntityCodes.begin());
+                if ((detail::publishedZoneMasks[index] & (std::uint64_t{1} << (entry.cqZone - 1))) == 0)
+                    result.warnings << QStringLiteral("QSO %1: CQ zone %2 is not listed for entity %3 in v1.1; review recorded data")
+                                           .arg(entry.qsoId).arg(entry.cqZone).arg(candidate.entityCode);
+            }
         }
         if (entityCount.value(candidate.entityCode) >= rules.maxPerEntity) {
             if (!newZone)
@@ -234,6 +241,8 @@ QJsonDocument Result::toJson() const
     for (const Entry& entry : zoneCandidates) zones.append(row(entry));
     QJsonArray exclusions;
     for (const QString& value : this->exclusions) exclusions.append(value);
+    QJsonArray warnings;
+    for (const QString& value : this->warnings) warnings.append(value);
     return QJsonDocument(QJsonObject{{QStringLiteral("format"), QStringLiteral("decodxlog-cq-marathon-1")},
                                      {QStringLiteral("edition"), rules.year},
                                      {QStringLiteral("category"), normalizedCategory(rules.category)},
@@ -243,6 +252,7 @@ QJsonDocument Result::toJson() const
                                      {QStringLiteral("zoneCandidates"), zones},
                                      {QStringLiteral("entityListVersion"), rules.year == 2026 ? QStringLiteral("DX Marathon v1.1; list as of 2023") : QString()},
                                      {QStringLiteral("officialRulesVerified"), false},
+                                     {QStringLiteral("warnings"), warnings},
                                      {QStringLiteral("exclusions"), exclusions}});
 }
 

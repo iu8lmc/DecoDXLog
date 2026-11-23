@@ -11,6 +11,27 @@ using namespace decolog::core::cqmarathon;
 class TestCqMarathon : public QObject {
     Q_OBJECT
 private slots:
+    void discordantEntityAndZoneAreVisibleForReview()
+    {
+        const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);
+        const QList<Entry> entries{{1,"I1AAA",248,5,"20m","CW",when},
+                                   {2,"K1BBB",291,3,"20m","CW",when},
+                                   {3,"K1CCC",999,2,"20m","CW",when},
+                                   {4,"K1DDD",0,4,"20m","CW",when}};
+        const auto result=select(entries,{2026,"mixed",1});
+        QCOMPARE(result.selected.size(),2); QCOMPARE(result.zoneCandidates.size(),4);
+        const auto messages=result.warnings.join('\n');
+        QVERIFY(messages.contains("QSO 1: CQ zone 5 is not listed for entity 248"));
+        QVERIFY(!messages.contains("QSO 2: CQ zone"));
+        QVERIFY(!messages.contains("QSO 3: CQ zone"));
+        QVERIFY(!messages.contains("QSO 4: CQ zone"));
+        QCOMPARE(result.toJson().object().value("warnings").toArray().size(),1);
+        Entry african{5,"IG9AAA",248,33,"20m","CW",when}; african.region="AI";
+        QVERIFY(select({african},{2026,"mixed",1}).warnings.isEmpty());
+        african.cqZone=15; QVERIFY(select({african},{2026,"mixed",1}).warnings.join('\n').contains("entity 903"));
+        african.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
+        QVERIFY(select({african},{2025,"mixed",1}).warnings.isEmpty());
+    }
     void unknownEntityDoesNotSuppressZoneCandidate()
     {
         const QDateTime when(QDate(2026,3,1),QTime(12,0),QTimeZone::UTC);

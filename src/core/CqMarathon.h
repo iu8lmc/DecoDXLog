@@ -34,6 +34,7 @@ struct Result {
     QList<Entry> selected;
     QList<Entry> zoneCandidates; // preliminary, independent of entity selection
     QStringList exclusions;
+    QStringList warnings; // potential data conflicts; candidate eligibility is unchanged
     bool isValid(QString* error = nullptr) const;
     QJsonDocument toJson() const;
 };
