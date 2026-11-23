@@ -918,6 +918,36 @@ QVariantList ActivationController::closedRuns(qint64 beforeRowId) const
     return rows;
 }
 
+static QVariantMap contestReportResult(const core::contestreport::Report& report)
+{
+    QVariantMap result;
+    result.insert(QStringLiteral("error"), report.error);
+    result.insert(QStringLiteral("contest"), report.contest);
+    result.insert(QStringLiteral("ownCall"), report.ownCall);
+    result.insert(QStringLiteral("total"), report.entries.size());
+    result.insert(QStringLiteral("unknownTotal"), report.unrecognizedLines.size());
+    QVariantList entries, unknown;
+    int nil=0, calls=0, exchanges=0;
+    for (const auto& entry : report.entries) {
+        if (entry.kind == QLatin1String("not_in_log")) ++nil;
+        else if (entry.kind == QLatin1String("incorrect_call")) ++calls;
+        else if (entry.kind == QLatin1String("incorrect_exchange")) ++exchanges;
+        if (entries.size() < 500)
+            entries << QVariantMap{{QStringLiteral("line"), entry.lineNumber}, {QStringLiteral("kind"), entry.kind},
+        {QStringLiteral("date"), entry.date}, {QStringLiteral("time"), entry.time},
+        {QStringLiteral("frequency"), entry.frequencyKhz}, {QStringLiteral("call"), entry.call},
+        {QStringLiteral("correction"), entry.correction}, {QStringLiteral("original"), entry.original.left(1024)}};
+    }
+    for (int index : report.unrecognizedLines) {
+        if (unknown.size() >= 200) break;
+        unknown << QVariantMap{{QStringLiteral("line"), index+1}, {QStringLiteral("text"), report.lines.at(index).left(1024)}};
+    }
+    result.insert(QStringLiteral("entries"), entries); result.insert(QStringLiteral("unknown"), unknown);
+    result.insert(QStringLiteral("nil"), nil); result.insert(QStringLiteral("incorrectCall"), calls);
+    result.insert(QStringLiteral("incorrectExchange"), exchanges);
+    return result;
+}
+
 bool ActivationController::startContestReportPreview(const QUrl& file)
 {
     if (m_contestReportBusy || !file.isLocalFile() || file.toLocalFile().isEmpty()) return false;
@@ -941,30 +971,7 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
                 report.error = tr("Could not read the complete report file.");
             }
             if (report.error.isEmpty()) snapshot = bytes;
-            result.insert(QStringLiteral("error"), report.error);
-            result.insert(QStringLiteral("contest"), report.contest);
-            result.insert(QStringLiteral("ownCall"), report.ownCall);
-            result.insert(QStringLiteral("total"), report.entries.size());
-            result.insert(QStringLiteral("unknownTotal"), report.unrecognizedLines.size());
-            QVariantList entries, unknown;
-            int nil=0, calls=0, exchanges=0;
-            for (const auto& entry : report.entries) {
-                if (entry.kind == QLatin1String("not_in_log")) ++nil;
-                else if (entry.kind == QLatin1String("incorrect_call")) ++calls;
-                else if (entry.kind == QLatin1String("incorrect_exchange")) ++exchanges;
-                if (entries.size() < 500)
-                    entries << QVariantMap{{QStringLiteral("line"), entry.lineNumber}, {QStringLiteral("kind"), entry.kind},
-                        {QStringLiteral("date"), entry.date}, {QStringLiteral("time"), entry.time},
-                        {QStringLiteral("frequency"), entry.frequencyKhz}, {QStringLiteral("call"), entry.call},
-                        {QStringLiteral("correction"), entry.correction}, {QStringLiteral("original"), entry.original.left(1024)}};
-            }
-            for (int index : report.unrecognizedLines) {
-                if (unknown.size() >= 200) break;
-                unknown << QVariantMap{{QStringLiteral("line"), index+1}, {QStringLiteral("text"), report.lines.at(index).left(1024)}};
-            }
-            result.insert(QStringLiteral("entries"), entries); result.insert(QStringLiteral("unknown"), unknown);
-            result.insert(QStringLiteral("nil"), nil); result.insert(QStringLiteral("incorrectCall"), calls);
-            result.insert(QStringLiteral("incorrectExchange"), exchanges);
+            result = contestReportResult(report);
         }
         if (!self) return;
         QMetaObject::invokeMethod(self.data(), [self, result, snapshot, path, logPath, logGeneration] {
@@ -983,6 +990,93 @@ bool ActivationController::startContestReportPreview(const QUrl& file)
             self->m_contestReportBusy = false; emit self->contestReportBusyChanged();
             emit self->contestReportFinished(delivered);
         }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+bool ActivationController::startContestReportHistory(qint64 beforeId)
+{
+    if (m_contestReportBusy || beforeId < 0 || !m_ctx.db || !m_ctx.db->isOpen() ||
+        m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:")) return false;
+    const QString path=m_ctx.db->path(); const quint64 generation=m_ctx.db->openGeneration();
+    m_contestReportHistoryIds.clear();
+    m_contestReportBusy=true; emit contestReportBusyChanged();
+    QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self,path,generation,beforeId] {
+        QVariantMap result; QVariantList rows; QHash<qint64,QString> identities;
+        LogDatabase db;
+        if (!db.openReadOnly(path)) result.insert(QStringLiteral("error"),db.lastError());
+        else {
+            QSqlQuery q(db.connection());
+            q.prepare(QStringLiteral("SELECT id,sha256,filename,contest,own_call,imported_at FROM contest_report_archive "
+                                     "WHERE (?=0 OR id<?) ORDER BY id DESC LIMIT 101"));
+            q.addBindValue(beforeId); q.addBindValue(beforeId);
+            if (!q.exec()) result.insert(QStringLiteral("error"),q.lastError().text());
+            else {
+                while (q.next()) {
+                    if (rows.size()==100) { result.insert(QStringLiteral("hasMore"),true); break; }
+                    const qint64 id=q.value(0).toLongLong(); const QString sha=q.value(1).toString();
+                    identities.insert(id,sha);
+                    rows << QVariantMap{{QStringLiteral("id"),id},{QStringLiteral("sha256"),sha},
+                        {QStringLiteral("filename"),q.value(2)},{QStringLiteral("contest"),q.value(3)},
+                        {QStringLiteral("ownCall"),q.value(4)},{QStringLiteral("importedAt"),q.value(5)}};
+                }
+                result.insert(QStringLiteral("reports"),rows);
+            }
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self,path,generation,result,identities] {
+            if (!self) return;
+            QVariantMap delivered=result;
+            if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=path ||
+                self->m_ctx.db->openGeneration()!=generation) {
+                delivered={{QStringLiteral("error"),tr("The log changed; reload report history.")}};
+            } else if (result.value(QStringLiteral("error")).toString().isEmpty()) {
+                self->m_contestReportHistoryIds=identities;
+                self->m_contestReportHistoryPath=path;
+                self->m_contestReportHistoryGeneration=generation;
+            }
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged();
+            emit self->contestReportHistoryFinished(delivered);
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
+
+bool ActivationController::startArchivedContestReportPreview(qint64 id, const QString& sha256)
+{
+    if (m_contestReportBusy || !m_ctx.db || !m_ctx.db->isOpen() || id<=0 ||
+        m_ctx.db->path()!=m_contestReportHistoryPath || m_ctx.db->openGeneration()!=m_contestReportHistoryGeneration ||
+        !m_contestReportHistoryIds.contains(id) || m_contestReportHistoryIds.value(id)!=sha256) return false;
+    const QString path=m_contestReportHistoryPath; const quint64 generation=m_contestReportHistoryGeneration;
+    m_contestReportSnapshot.clear(); m_contestReportBusy=true; emit contestReportBusyChanged();
+    QPointer<ActivationController> self(this);
+    m_contestReportPool.start([self,path,generation,id,sha256] {
+        QVariantMap result; LogDatabase db;
+        if (!db.openReadOnly(path)) result.insert(QStringLiteral("error"),db.lastError());
+        else {
+            QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT sha256,length(original),CASE WHEN length(original)<=2097152 THEN original END FROM contest_report_archive WHERE id=?")); q.addBindValue(id);
+            if (!q.exec()) result.insert(QStringLiteral("error"),q.lastError().text());
+            else if (!q.next()) result.insert(QStringLiteral("error"),tr("The archived report is no longer available."));
+            else {
+                const QByteArray bytes=q.value(2).toByteArray();
+                const QString actual=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+                if (q.value(1).toLongLong()>2*1024*1024 || q.value(0).toString()!=sha256 || actual!=sha256)
+                    result.insert(QStringLiteral("error"),tr("The archived report changed or is damaged."));
+                else result=contestReportResult(core::contestreport::parseCqWw(bytes));
+            }
+        }
+        result.insert(QStringLiteral("archived"),true);
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self,path,generation,result] {
+            if (!self) return;
+            QVariantMap delivered=result;
+            if (!self->m_ctx.db || !self->m_ctx.db->isOpen() || self->m_ctx.db->path()!=path ||
+                self->m_ctx.db->openGeneration()!=generation)
+                delivered={{QStringLiteral("error"),tr("The log changed; reload report history.")}};
+            self->m_contestReportBusy=false; emit self->contestReportBusyChanged();
+            emit self->contestReportFinished(delivered);
+        },Qt::QueuedConnection);
     });
     return true;
 }

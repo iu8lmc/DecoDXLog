@@ -23,6 +23,52 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void archivedContestReportHistoryReopensAndChecksIdentity()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString log=dir.filePath("log.sqlite");
+        const QByteArray bytes="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n"
+            "14020 CW 2024-11-23 1201 K1ABC 05 DL1ABC 14\nunknown line\n";
+        LogDatabase db; QVERIFY(db.open(log)); QString error; const qint64 id=db.archiveContestReport(bytes,"source.rpt",&error); QVERIFY2(id>0,qPrintable(error));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy history(&act,&ActivationController::contestReportHistoryFinished);
+        QSignalSpy preview(&act,&ActivationController::contestReportFinished);
+        QVERIFY(act.startContestReportHistory()); QTRY_COMPARE_WITH_TIMEOUT(history.size(),1,5000);
+        const auto list=history.first().at(0).toMap().value("reports").toList(); QCOMPARE(list.size(),1);
+        const auto row=list.first().toMap(); QCOMPARE(row.value("id").toLongLong(),id);
+        QVERIFY(!act.startArchivedContestReportPreview(id,QStringLiteral("wrong")));
+        QVERIFY(act.startArchivedContestReportPreview(id,row.value("sha256").toString())); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
+        const auto result=preview.first().at(0).toMap(); QVERIFY2(result.value("error").toString().isEmpty(),qPrintable(result.value("error").toString()));
+        QCOMPARE(result.value("total").toInt(),1); QCOMPARE(result.value("unknownTotal").toInt(),1);
+        QCOMPARE(db.contestReportBytes(id),bytes); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+    void archivedContestReportHistoryPagesWithoutLosingRows()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("paged.sqlite")));
+        QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection());
+        q.prepare("INSERT INTO contest_report_archive(sha256,filename,contest,own_call,original,imported_at) VALUES(?,?,?,?,?,?)");
+        for (int i=1;i<=101;++i) { q.bindValue(0,QString::number(i)); q.bindValue(1,"report.rpt"); q.bindValue(2,"contest"); q.bindValue(3,"K1ABC"); q.bindValue(4,QByteArray("fixture")); q.bindValue(5,"2026-01-01"); QVERIFY(q.exec()); }
+        QVERIFY(db.connection().commit()); ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy done(&act,&ActivationController::contestReportHistoryFinished); QVERIFY(act.startContestReportHistory()); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        const auto first=done.last().at(0).toMap(); const auto rows=first.value("reports").toList(); QCOMPARE(rows.size(),100); QVERIFY(first.value("hasMore").toBool());
+        const qint64 cursor=rows.last().toMap().value("id").toLongLong(); QVERIFY(act.startContestReportHistory(cursor)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
+        const auto second=done.last().at(0).toMap(); QCOMPARE(second.value("reports").toList().size(),1); QVERIFY(!second.value("hasMore").toBool());
+        QVERIFY(!act.startArchivedContestReportPreview(rows.first().toMap().value("id").toLongLong(),rows.first().toMap().value("sha256").toString()));
+    }
+    void archivedContestReportHistoryRejectsLogSwitchAndCorruption()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("first.sqlite");
+        const QByteArray bytes="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n";
+        LogDatabase db; QVERIFY(db.open(path)); QString error; const qint64 id=db.archiveContestReport(bytes,"report.rpt",&error); QVERIFY(id>0);
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QSignalSpy history(&act,&ActivationController::contestReportHistoryFinished); QSignalSpy preview(&act,&ActivationController::contestReportFinished);
+        QVERIFY(act.startContestReportHistory()); QVERIFY(db.open(dir.filePath("second.sqlite"))); QTRY_COMPARE_WITH_TIMEOUT(history.size(),1,5000);
+        QVERIFY(!history.last().at(0).toMap().value("error").toString().isEmpty());
+        QVERIFY(db.open(path)); QVERIFY(act.startContestReportHistory()); QTRY_COMPARE_WITH_TIMEOUT(history.size(),2,5000);
+        const auto row=history.last().at(0).toMap().value("reports").toList().first().toMap();
+        QSqlQuery q(db.connection()); q.prepare("UPDATE contest_report_archive SET original=? WHERE id=?"); q.addBindValue(QByteArray("tampered")); q.addBindValue(id); QVERIFY(q.exec());
+        QVERIFY(act.startArchivedContestReportPreview(id,row.value("sha256").toString())); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
+        QVERIFY(preview.last().at(0).toMap().value("error").toString().contains("damaged")); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void archiveContestReportUsesReviewedSnapshotAndRejectsLogChange()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString filePath=dir.filePath("report.rpt");

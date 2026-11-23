@@ -17,6 +17,8 @@ RoundedWindow {
     property int revision: 0
     property bool reportProbe: false
     property bool reportProbeSave: false
+    property bool reportHistoryProbe: false
+    function probeReportHistory() { reportHistory.openHistory() }
     function inspectContestReport(url, probe) {
         reportProbe = !!probe
         reportReview.result = ({})
@@ -34,8 +36,17 @@ RoundedWindow {
             const entries = (result.entries || []).map(e => ({line:e.line, text:e.original, kind:e.kind}))
             const unknown = (result.unknown || []).map(e => ({line:e.line, text:e.text, kind:"unrecognised"}))
             reportReview.entries = entries.concat(unknown)
+            if (root.reportHistoryProbe) console.warn("PROBE lcr reopened " + result.total + " " + result.unknownTotal + " " + reportReview.errorText)
             if (root.reportProbe) console.warn("PROBE lcr ready " + result.total + " " + result.unknownTotal + " " + reportReview.entries.length + " " + reportReview.errorText)
             if (root.reportProbeSave && result.archiveReady) reportReview.saveSnapshot()
+        }
+        function onContestReportHistoryFinished(result) {
+            reportHistory.result = result
+            reportHistory.errorText = result.error || ""
+            if (root.reportHistoryProbe) {
+                console.warn("PROBE lcr history " + (result.reports || []).length + " " + reportHistory.errorText)
+                if ((result.reports || []).length) reportHistory.openSelected(result.reports[0])
+            }
         }
         function onContestReportArchiveFinished(success, message) {
             reportReview.saveMessage = message
@@ -794,6 +805,9 @@ RoundedWindow {
                 enabled: !decolog.activation.contestReportBusy
                 onClicked: contestReportFile.open()
             }
+            GlassButton { text:qsTr("Report history…"); buttonHeight:26; fontPixelSize:12
+                enabled:!decolog.activation.contestReportBusy
+                onClicked:reportHistory.openHistory() }
             Item { Layout.fillWidth: true }
             Text {
                 text: qsTr("Enter logs · Esc clears · space moves to the report")
@@ -804,9 +818,9 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; enabled: !reportReview.visible && !contestReportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; enabled: !reportReview.visible && !contestReportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; enabled: !reportReview.visible && !contestReportFile.visible; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !reportReview.visible && !reportHistory.visible && !contestReportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !reportReview.visible && !reportHistory.visible && !contestReportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !reportReview.visible && !reportHistory.visible && !contestReportFile.visible; onActivated: root.clearEntry() }
 
     FileDialog {
         id: contestReportFile
@@ -814,6 +828,53 @@ RoundedWindow {
         fileMode: FileDialog.OpenFile
         nameFilters: [qsTr("Text reports (*.rpt *.txt)"), qsTr("All files (*)")]
         onAccepted: root.inspectContestReport(selectedFile, false)
+    }
+    DialogFrame {
+        id: reportHistory
+        property var result: ({})
+        property var previousPages: []
+        property real beforeId: 0
+        property string errorText: ""
+        dialogKey:"contestReportHistory"; width:760; height:520
+        title:qsTr("Archived CQ WW reports"); dotColor:Theme.primaryColor
+        function loadPage(before) {
+            result=({}); errorText=""; beforeId=before
+            if (!decolog.activation.startContestReportHistory(before)) errorText=qsTr("Cannot load report history.")
+        }
+        function openHistory() { previousPages=[]; open(); loadPage(0) }
+        function openSelected(row) {
+            reportReview.result=({}); reportReview.entries=[]; reportReview.errorText=""; reportReview.saveMessage=""
+            if (!decolog.activation.startArchivedContestReportPreview(row.id,row.sha256)) {
+                errorText=qsTr("The log or report changed; reload the history."); return
+            }
+            close(); reportReview.open()
+        }
+        ColumnLayout {
+            anchors.fill:parent; spacing:8
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.textSecondary
+                text:qsTr("Original report copies in the current log. Opening a copy does not change QSO.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.WordWrap; color:Theme.errorColor; visible:reportHistory.errorText.length>0; text:reportHistory.errorText }
+            Text { visible:decolog.activation.contestReportBusy; color:Theme.textSecondary; text:qsTr("Loading…") }
+            ListView {
+                id:historyRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:reportHistory.result.reports || []
+                ScrollBar.vertical:PanelScrollBar {}
+                delegate:RowLayout {
+                    required property var modelData; width:historyRows.width; spacing:8
+                    Text { Layout.fillWidth:true; color:Theme.textPrimary; elide:Text.ElideRight
+                        text:modelData.importedAt + " · " + modelData.ownCall + " · " + modelData.contest + " · " + modelData.filename }
+                    GlassButton { text:qsTr("Review"); enabled:!decolog.activation.contestReportBusy; onClicked:reportHistory.openSelected(modelData) }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth:true
+                GlassButton { text:qsTr("Previous"); enabled:reportHistory.previousPages.length>0 && !decolog.activation.contestReportBusy
+                    onClicked:{ const pages=reportHistory.previousPages.slice(); const before=pages.pop(); reportHistory.previousPages=pages; reportHistory.loadPage(before) } }
+                GlassButton { text:qsTr("Next"); enabled:!!reportHistory.result.hasMore && !decolog.activation.contestReportBusy && (reportHistory.result.reports || []).length>0
+                    onClicked:{ const rows=reportHistory.result.reports; const pages=reportHistory.previousPages.slice(); pages.push(reportHistory.beforeId); reportHistory.previousPages=pages; reportHistory.loadPage(rows[rows.length-1].id) } }
+                Item { Layout.fillWidth:true }
+                GlassButton { text:qsTr("Close"); onClicked:reportHistory.close() }
+            }
+        }
     }
     DialogFrame {
         id: reportReview

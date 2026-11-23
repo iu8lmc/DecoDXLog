@@ -67,6 +67,17 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void contestReportHistoryReopensAfterRestart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
+        const QByteArray source="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n"
+            "14020 CW 2024-11-23 1201 K1ABC 05 DL1ABC 14\nunknown row\n";
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log)); QString error; QVERIFY2(db.archiveContestReport(source,"source.rpt",&error)>0,qPrintable(error)); }
+        QByteArray output; QVERIFY2(launch(dir,"cqwwhistoryprobe",output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE lcr history 1 ") && output.contains("PROBE lcr reopened 1 1 ") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(log)); const auto reports=db.contestReports(); QCOMPARE(reports.size(),1);
+        QCOMPARE(db.contestReportBytes(reports.first().id),source); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestReportArchiveSavesReviewedCopy()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

@@ -83,6 +83,8 @@ public:
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
     Q_INVOKABLE bool archiveContestReportPreview();
+    Q_INVOKABLE bool startContestReportHistory(qint64 beforeId = 0);
+    Q_INVOKABLE bool startArchivedContestReportPreview(qint64 id, const QString& sha256);
     bool partitionExportBusy() const { return m_partitionExportBusy; }
     Q_INVOKABLE bool startPartitionExport(const QVariantMap& group, const QUrl& destination);
     Q_INVOKABLE void cancelPartitionExport();
@@ -197,6 +199,7 @@ signals:
     void contestReportBusyChanged();
     void contestReportFinished(const QVariantMap& result);
     void contestReportArchiveFinished(bool success, const QString& message);
+    void contestReportHistoryFinished(const QVariantMap& result);
     void previewFinished(bool success);
     void partitionExportChanged();
     void partitionExportFinished(bool success, const QString& message);
@@ -212,6 +215,9 @@ private:
     QString m_contestReportLogPath;
     QString m_contestReportSourceName;
     quint64 m_contestReportLogGeneration{0};
+    QHash<qint64, QString> m_contestReportHistoryIds;
+    QString m_contestReportHistoryPath;
+    quint64 m_contestReportHistoryGeneration{0};
     QThreadPool m_partitionExportPool;
     std::shared_ptr<std::atomic_bool> m_partitionExportCancel;
     bool m_partitionExportBusy{false};
