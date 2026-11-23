@@ -65,6 +65,12 @@ private slots:
         QVERIFY2(output.contains("PROBE multiInvalidUpdate blocked=true sota=I/LM-001"), output.constData());
         QVERIFY2(output.contains("PROBE multiSaved count=2 firstError= secondError="), output.constData());
         QVERIFY2(output.contains("PROBE multiPreview reported=2 groups=5 error="), output.constData());
+        QVERIFY2(output.contains("PROBE multiExport started=true"), output.constData());
+        QVERIFY2(output.contains("PROBE multiExport success=true error="), output.constData());
+        QFile partition(dir.filePath("test.sqlite.probe.adi")); QVERIFY(partition.open(QIODevice::ReadOnly));
+        const auto exported = decolog::core::adif::parse(partition.readAll()).records; QCOMPARE(exported.size(), 2);
+        for (const auto& row : exported) { QCOMPARE(row.value("MY_POTA_REF"), QString("IT-0001"));
+            QCOMPARE(row.value("MY_SIG"), QString("POTA")); QCOMPARE(row.value("MY_SIG_INFO"), QString("IT-0001")); }
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(), 2);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,call FROM qso WHERE deleted=0 ORDER BY id"));
         QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1AAA"));

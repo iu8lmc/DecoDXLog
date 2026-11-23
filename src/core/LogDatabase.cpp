@@ -268,6 +268,17 @@ bool LogDatabase::open(const QString& path)
     return true;
 }
 
+bool LogDatabase::openReadOnly(const QString& path)
+{
+    close();
+    QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), m_connectionName);
+    db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100"));
+    db.setDatabaseName(path);
+    if (!db.open()) { m_lastError = db.lastError().text(); return false; }
+    m_path = path;
+    return true;
+}
+
 void LogDatabase::close()
 {
     if (!QSqlDatabase::contains(m_connectionName))

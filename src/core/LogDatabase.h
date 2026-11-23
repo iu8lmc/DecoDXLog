@@ -245,6 +245,8 @@ public:
 
     // Crea il file e lo schema se mancano. ":memory:" per i test.
     bool open(const QString& path);
+    // Read-only connection to an existing, already migrated log.
+    bool openReadOnly(const QString& path);
     void close();
     bool isOpen() const;
     QString path() const { return m_path; }

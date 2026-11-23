@@ -142,6 +142,54 @@ private slots:
         QVERIFY(!act.previewResult().value("error").toString().isEmpty());
         QVERIFY(act.previewResult().value("groups").toList().isEmpty());
     }
+    void partitionExportIsIsolatedAndRejectsStalePreview()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001,IT-0002"},
+                           {"programs", QVariantMap{{"wwff", "IFF-0123"}}}}).isEmpty());
+        AdifRecord r{{"CALL", "K1ABC"}, {"QSO_DATE", "20261231"}, {"TIME_ON", "235900"},
+                     {"BAND", "20m"}, {"MODE", "CW"}, {"POTA_REF", "US-1234"}, {"OPERATOR", "9H1AA"}};
+        act.session().applyTo(r, 0); const auto inserted = db.insertQso(r, "manual", {}, true, 0, false);
+        QCOMPARE(inserted.status, InsertResult::Status::Inserted);
+        AdifRecord next{{"CALL", "K1DEF"}, {"QSO_DATE", "20270101"}, {"TIME_ON", "000100"},
+                        {"BAND", "20m"}, {"MODE", "CW"}, {"OPERATOR", "9H1BB"}};
+        act.session().applyTo(next, 0);
+        QCOMPARE(db.insertQso(next, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
+        QSignalSpy previewed(&act, &ActivationController::previewFinished);
+        QVERIFY(act.startPartitionPreview()); QTRY_COMPARE_WITH_TIMEOUT(previewed.size(), 1, 5000); QVERIFY(previewed.at(0).at(0).toBool());
+        QVariantMap chosen, wwff;
+        for (const auto& value : act.previewResult().value("groups").toList()) {
+            const auto group = value.toMap();
+            if (group.value("day") != "2026-12-31") continue;
+            if (group.value("program") == "POTA" && group.value("reference") == "IT-0001") chosen = group;
+            if (group.value("program") == "WWFF" && group.value("reference") == "IFF-0123") wwff = group;
+        }
+        QVERIFY(!chosen.isEmpty()); QVERIFY(!wwff.isEmpty());
+        QVERIFY(!act.startPartitionExport(chosen, QUrl::fromLocalFile(dir.filePath("log.sqlite"))));
+        const QString path = dir.filePath("park.adi"); QSignalSpy exported(&act, &ActivationController::partitionExportFinished);
+        QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY2(exported.at(0).at(0).toBool(), qPrintable(exported.at(0).at(1).toString()));
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const auto data = file.readAll(); file.close();
+        const auto records = adif::parse(data).records; QCOMPARE(records.size(), 1);
+        QCOMPARE(records.at(0).value("MY_POTA_REF"), QString("IT-0001"));
+        QCOMPARE(records.at(0).value("MY_SIG"), QString("POTA"));
+        QCOMPARE(records.at(0).value("MY_SIG_INFO"), QString("IT-0001"));
+        QCOMPARE(records.at(0).value("POTA_REF"), QString("US-1234"));
+        QCOMPARE(db.record(inserted.id)->value("MY_POTA_REF"), QString("IT-0001,IT-0002"));
+        exported.clear(); const QString wwffPath = dir.filePath("wwff.adi");
+        QVERIFY(act.startPartitionExport(wwff, QUrl::fromLocalFile(wwffPath)));
+        QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY2(exported.at(0).at(0).toBool(), qPrintable(exported.at(0).at(1).toString()));
+        QFile wwffFile(wwffPath); QVERIFY(wwffFile.open(QIODevice::ReadOnly)); const auto wwffRecords = adif::parse(wwffFile.readAll()).records;
+        QCOMPARE(wwffRecords.size(), 1); QCOMPARE(wwffRecords.at(0).value("MY_SIG"), QString("WWFF"));
+        QCOMPARE(wwffRecords.at(0).value("MY_SIG_INFO"), QString("IFF-0123"));
+        QCOMPARE(wwffRecords.at(0).value("POTA_REF"), QString("US-1234"));
+        r.set("COMMENT", "changed after preview"); QCOMPARE(db.updateQso(inserted.id, r).status, InsertResult::Status::Inserted);
+        exported.clear(); QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY(!exported.at(0).at(0).toBool());
+        QVERIFY(file.open(QIODevice::ReadOnly)); QCOMPARE(file.readAll(), data);
+    }
     void simultaneousProgramReferencesStayIndependent()
     {
         const QVariantMap programs{{"sota", "I/LM-001"}, {"wwff", "IFF-0123"}};

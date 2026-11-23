@@ -9,6 +9,9 @@
 #include "core/Spots.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QSaveFile>
+#include <filesystem>
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
@@ -84,13 +87,16 @@ ActivationController::ActivationController(Context context, QObject* parent)
 ActivationController::~ActivationController()
 {
     if (m_previewCancel) m_previewCancel->store(true);
+    if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     m_previewPool.waitForDone();
+    m_partitionExportPool.waitForDone();
 }
 
 void ActivationController::invalidatePreview()
 {
     ++m_previewGeneration;
     if (m_previewCancel) m_previewCancel->store(true);
+    if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     if (!m_previewResult.isEmpty()) { m_previewResult.clear(); emit previewChanged(); }
 }
 
@@ -654,21 +660,23 @@ QVariantList ActivationController::qsoIds() const
 }
 
 namespace {
-QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled)
+QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled,
+                                 bool ownsTransaction = true, const QString& selectedKey = {}, QList<qint64>* selectedIds = nullptr)
 {
     QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
     const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
     const auto tr = [](const char* text) { return QCoreApplication::translate("ActivationController", text); };
-    if (!db.transaction()) return fail(tr("Cannot open a consistent preview of the log."));
-    struct ReadTransaction { QSqlDatabase db; bool committed{false}; ~ReadTransaction() { if (!committed) db.rollback(); } } transaction{db};
+    if (ownsTransaction && !db.transaction()) return fail(tr("Cannot open a consistent preview of the log."));
+    struct ReadTransaction { QSqlDatabase db; bool committed{false}; ~ReadTransaction() { if (!committed) db.rollback(); } } transaction{db, !ownsTransaction};
     QSqlQuery exists(db);
     exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=? AND ended_at IS NULL")); exists.addBindValue(uuid);
     if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
     QSqlQuery q(db); q.setForwardOnly(true);
-    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
+    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
     q.addBindValue(uuid);
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
     QMap<QString, QVariantMap> groups;
+    QMap<QString, QByteArray> hashes;
     int count = 0, missingDate = 0, missingReference = 0;
     const QList<QPair<QString, QString>> fields{{QStringLiteral("POTA"), QStringLiteral("MY_POTA_REF")},
         {QStringLiteral("SOTA"), QStringLiteral("MY_SOTA_REF")}, {QStringLiteral("WWFF"), QStringLiteral("MY_WWFF_REF")},
@@ -696,16 +704,23 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (!groups.contains(key)) groups.insert(key, {{QStringLiteral("program"), pair.first}, {QStringLiteral("reference"), reference},
                     {QStringLiteral("day"), day}, {QStringLiteral("operator"), op}, {QStringLiteral("grid"), grid}, {QStringLiteral("count"), 0}});
                 groups[key][QStringLiteral("count")] = groups[key].value(QStringLiteral("count")).toInt() + 1;
+                const QByteArray identity = QJsonDocument(QJsonArray{q.value(3).toString(), QString::number(q.value(4).toLongLong())}).toJson(QJsonDocument::Compact);
+                hashes[key] = QCryptographicHash::hash(hashes.value(key) + identity, QCryptographicHash::Sha256);
+                if (selectedIds && key == selectedKey) selectedIds->append(q.value(2).toLongLong());
             }
         }
         if (!found) ++missingReference;
     }
     if (q.lastError().isValid()) return fail(tr("Cannot read the session QSO."));
     if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
-    QVariantList rows; for (const auto& row : groups) rows << row;
+    QVariantList rows;
+    for (auto it = groups.begin(); it != groups.end(); ++it) {
+        it.value()[QStringLiteral("fingerprint")] = QString::fromLatin1(hashes.value(it.key()).toHex());
+        rows << it.value();
+    }
     result[QStringLiteral("groups")] = rows; result[QStringLiteral("reportedCount")] = count;
     result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
-    if (!db.commit()) return fail(tr("Cannot complete the log preview."));
+    if (ownsTransaction && !db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;
     return result;
 }
@@ -759,6 +774,97 @@ bool ActivationController::startPartitionPreview()
                 : cancelled->load() ? QVariantMap{{QStringLiteral("error"), tr("Preview cancelled.")}} : result;
             const bool success = self->m_previewResult.value(QStringLiteral("error")).toString().isEmpty();
             emit self->previewChanged(); emit self->previewFinished(success);
+        }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+void ActivationController::cancelPartitionExport()
+{
+    if (m_partitionExportCancel) m_partitionExportCancel->store(true);
+}
+
+bool ActivationController::startPartitionExport(const QVariantMap& group, const QUrl& destination)
+{
+    if (m_partitionExportBusy || m_previewBusy || !destination.isLocalFile() || !m_session.active ||
+        !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path() == QLatin1String(":memory:")) return false;
+    const QString program = group.value(QStringLiteral("program")).toString();
+    if (program != QLatin1String("POTA") && program != QLatin1String("WWFF")) return false;
+    bool found = false;
+    for (const auto& item : m_previewResult.value(QStringLiteral("groups")).toList())
+        if (item.toMap() == group) { found = true; break; }
+    if (!found) return false;
+    const QString path = m_ctx.db->path();
+    const QString output = destination.toLocalFile();
+    if (output.isEmpty()) return false;
+    const QFileInfo outInfo(output);
+    for (const QString& protectedPath : {path, path + QStringLiteral("-wal"), path + QStringLiteral("-shm"), path + QStringLiteral("-journal")}) {
+        const QFileInfo protectedInfo(protectedPath);
+        std::error_code ec;
+        const bool sameExistingFile = std::filesystem::equivalent(std::filesystem::path(output.toStdString()), std::filesystem::path(protectedPath.toStdString()), ec);
+        if (outInfo.absoluteFilePath() == protectedInfo.absoluteFilePath() || (!ec && sameExistingFile)) return false;
+    }
+    const QString uuid = m_session.sessionUuid;
+    const QString key = QString::fromUtf8(QJsonDocument(QJsonArray{program, group.value(QStringLiteral("reference")).toString(),
+        group.value(QStringLiteral("day")).toString(), group.value(QStringLiteral("operator")).toString(), group.value(QStringLiteral("grid")).toString()}).toJson(QJsonDocument::Compact));
+    const QString expected = group.value(QStringLiteral("fingerprint")).toString();
+    if (expected.isEmpty()) return false;
+    m_partitionExportCancel = std::make_shared<std::atomic_bool>(false);
+    const auto cancelled = m_partitionExportCancel;
+    m_partitionExportBusy = true; emit partitionExportChanged();
+    QPointer<ActivationController> self(this);
+    m_partitionExportPool.start([self, path, output, uuid, key, group, expected, program, cancelled] {
+        QString error;
+        LogDatabase db;
+        if (!db.openReadOnly(path)) error = tr("Cannot open the log for export.");
+        else if (!db.connection().transaction()) error = tr("Cannot open a consistent export snapshot.");
+        else {
+            QList<qint64> ids;
+            const QVariantMap preview = scanPartitionPreview(db.connection(), uuid, cancelled, false, key, &ids);
+            error = preview.value(QStringLiteral("error")).toString();
+            bool same = false;
+            for (const auto& value : preview.value(QStringLiteral("groups")).toList()) {
+                const QVariantMap current = value.toMap();
+                if (current.value(QStringLiteral("fingerprint")).toString() == expected &&
+                    current.value(QStringLiteral("program")) == group.value(QStringLiteral("program")) &&
+                    current.value(QStringLiteral("reference")) == group.value(QStringLiteral("reference")) &&
+                    current.value(QStringLiteral("day")) == group.value(QStringLiteral("day")) &&
+                    current.value(QStringLiteral("operator")) == group.value(QStringLiteral("operator")) &&
+                    current.value(QStringLiteral("grid")) == group.value(QStringLiteral("grid"))) { same = true; break; }
+            }
+            if (error.isEmpty() && (!same || ids.isEmpty() || ids.size() != group.value(QStringLiteral("count")).toInt()))
+                error = tr("The selected group changed; calculate the preview again.");
+            AdifDocument doc;
+            if (error.isEmpty()) {
+                doc = adif::parse(db.exportAdif(ids, QCoreApplication::applicationVersion()));
+                if (doc.records.size() != ids.size()) error = tr("Cannot read every QSO in the selected group.");
+            }
+            if (error.isEmpty()) {
+                const QString ref = group.value(QStringLiteral("reference")).toString();
+                for (AdifRecord& record : doc.records) {
+                    if (program == QLatin1String("POTA")) record.set(QStringLiteral("MY_POTA_REF"), ref);
+                    else record.set(QStringLiteral("MY_WWFF_REF"), ref);
+                    record.set(QStringLiteral("MY_SIG"), program);
+                    record.set(QStringLiteral("MY_SIG_INFO"), program == QLatin1String("POTA") ? ref.section(QLatin1Char('@'), 0, 0) : ref);
+                }
+            }
+            if (!db.connection().commit() && error.isEmpty()) error = tr("Cannot complete the export snapshot.");
+            if (cancelled->load() && error.isEmpty()) error = tr("Export cancelled.");
+            if (error.isEmpty()) {
+                QSaveFile file(output);
+                if (!file.open(QIODevice::WriteOnly)) error = file.errorString();
+                else {
+                    const QByteArray data = adif::writeDocument(doc);
+                    if (file.write(data) != data.size() || cancelled->load()) { file.cancelWriting(); error = tr("Cannot write the export or export cancelled."); }
+                    else if (!file.commit()) error = file.errorString();
+                }
+            }
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, error] {
+            if (!self) return;
+            self->m_partitionExportBusy = false; self->m_partitionExportCancel.reset(); emit self->partitionExportChanged();
+            emit self->partitionExportFinished(error.isEmpty(), error);
         }, Qt::QueuedConnection);
     });
     return true;

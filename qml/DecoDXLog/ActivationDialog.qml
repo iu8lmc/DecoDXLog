@@ -16,7 +16,10 @@ DialogFrame {
     property var partitionPreview: ({})
     property bool previewShown: false
     property bool probeAwaitPreview: false
+    property bool probeAwaitExport: false
     property int previewPage: 0
+    property var exportGroup: ({})
+    property string partitionMessage: ""
 
     // `kind` apre gia' sul tipo giusto: "contest" quando si arriva dal contest.
     function openDialog(kind) {
@@ -25,6 +28,7 @@ DialogFrame {
                                myGrid: decolog.myGrid, tag: "", band: "", mode: "",
                                serialEnabled: kind === "contest", nextSerial: 1 }
         errorText.text = ""
+        partitionMessage = ""
         previewShown = false
         open()
     }
@@ -74,11 +78,24 @@ DialogFrame {
                 root.previewPage = 0
             }
         }
+        function onPartitionExportFinished(success, message) {
+            errorText.text = success ? "" : message
+            root.partitionMessage = success ? qsTr("Partition file saved. Review it before submission.") : ""
+            if (root.probeAwaitExport) {
+                root.probeAwaitExport = false
+                console.warn("PROBE multiExport success=" + success + " error=" + message)
+                root.act.stop()
+            }
+        }
         function onPreviewFinished(success) {
             if (root.probeAwaitPreview) {
                 root.probeAwaitPreview = false
                 console.warn("PROBE multiPreview reported=" + root.partitionPreview.reportedCount + " groups=" + (root.partitionPreview.groups || []).length + " error=" + (root.partitionPreview.error || ""))
-                root.act.stop()
+                const group = (root.partitionPreview.groups || []).find(g => g.program === "POTA" && g.reference === "IT-0001")
+                root.probeAwaitExport = true
+                const started = group && root.act.startPartitionExport(group, "file://" + decolog.currentLogInfo().path + ".probe.adi")
+                console.warn("PROBE multiExport started=" + !!started)
+                if (!started) { root.probeAwaitExport = false; root.act.stop() }
             }
         }
     }
@@ -120,6 +137,18 @@ DialogFrame {
         currentFile: "file:///" + root.state.fileName
         nameFilters: [qsTr("ADIF files (*.adi)")]
         onAccepted: errorText.text = root.act.exportAdif(selectedFile)
+    }
+
+    FileDialog {
+        id: partitionExportDialog
+        title: qsTr("Save programme partition")
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "adi"
+        nameFilters: [qsTr("ADIF files (*.adi)")]
+        onAccepted: {
+            if (!root.act.startPartitionExport(root.exportGroup, selectedFile))
+                errorText.text = qsTr("Cannot start the export. Recalculate the preview and choose a different file.")
+        }
     }
 
     component Note: Text {
@@ -444,6 +473,15 @@ DialogFrame {
                 else root.act.startPartitionPreview()
             }
         }
+        GlassButton {
+            visible: root.act.partitionExportBusy
+            text: qsTr("Cancel partition export")
+            onClicked: root.act.cancelPartitionExport()
+        }
+        Note {
+            visible: root.partitionMessage.length > 0
+            text: root.partitionMessage
+        }
         Note {
             visible: root.previewShown
             color: Theme.warningColor
@@ -455,11 +493,20 @@ DialogFrame {
         }
         Repeater {
             model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.groups || []).slice(root.previewPage * 100, (root.previewPage + 1) * 100) : []
-            Note {
+            RowLayout {
                 required property var modelData
-                text: qsTr("%1 · %2 · %3 UTC · operator %4 · grid %5: %6 QSO")
-                    .arg(modelData.program).arg(modelData.reference).arg(modelData.day)
-                    .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
+                Layout.fillWidth: true
+                Note {
+                    text: qsTr("%1 · %2 · %3 UTC · operator %4 · grid %5: %6 QSO")
+                        .arg(modelData.program).arg(modelData.reference).arg(modelData.day)
+                        .arg(modelData.operator || "—").arg(modelData.grid || "—").arg(modelData.count)
+                }
+                GlassButton {
+                    visible: modelData.program === "POTA" || modelData.program === "WWFF"
+                    enabled: !root.act.partitionExportBusy && !root.act.previewBusy
+                    text: qsTr("Export…")
+                    onClicked: { root.exportGroup = modelData; partitionExportDialog.open() }
+                }
             }
         }
         RowLayout {

@@ -29,6 +29,7 @@ class ActivationController : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool active READ active NOTIFY changed)
     Q_PROPERTY(bool previewBusy READ previewBusy NOTIFY previewChanged)
+    Q_PROPERTY(bool partitionExportBusy READ partitionExportBusy NOTIFY partitionExportChanged)
     Q_PROPERTY(QVariantMap previewResult READ previewResult NOTIFY previewChanged)
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
     Q_PROPERTY(QString title READ title NOTIFY changed)
@@ -64,6 +65,9 @@ public:
     explicit ActivationController(Context context, QObject* parent = nullptr);
     ~ActivationController() override;
     bool previewBusy() const { return m_previewBusy; }
+    bool partitionExportBusy() const { return m_partitionExportBusy; }
+    Q_INVOKABLE bool startPartitionExport(const QVariantMap& group, const QUrl& destination);
+    Q_INVOKABLE void cancelPartitionExport();
     QVariantMap previewResult() const { return m_previewResult; }
     Q_INVOKABLE bool startPartitionPreview();
     Q_INVOKABLE void cancelPartitionPreview();
@@ -171,10 +175,15 @@ signals:
     void changed();
     void previewChanged();
     void previewFinished(bool success);
+    void partitionExportChanged();
+    void partitionExportFinished(bool success, const QString& message);
 
 private:
     void invalidatePreview();
     QThreadPool m_previewPool;
+    QThreadPool m_partitionExportPool;
+    std::shared_ptr<std::atomic_bool> m_partitionExportCancel;
+    bool m_partitionExportBusy{false};
     std::shared_ptr<std::atomic_bool> m_previewCancel;
     quint64 m_previewGeneration{0};
     bool m_previewBusy{false};
