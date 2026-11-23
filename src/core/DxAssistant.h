@@ -27,6 +27,8 @@ struct Candidate {
     bool historical{false};
     QString awardAccount;
     QString source;
+    QString spotKey;
+    double frequencyKhz{0.0};
 };
 
 struct Preferences {

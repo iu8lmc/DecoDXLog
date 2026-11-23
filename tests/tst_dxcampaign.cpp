@@ -1,11 +1,34 @@
 #include "core/DxCampaign.h"
 #include "core/LogDatabase.h"
+#include "core/Spots.h"
+#include <QTimeZone>
 #include <QTemporaryDir>
 #include <QTest>
 using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void spotsRequireExactCallCampaignPeriodAndFreshness()
+    {
+        dxcampaign::Campaign c; c.title="Trip"; c.calls={"ZZ1AAA","ZZ1BBB"}; c.start=QDate(2026,1,2); c.end=QDate(2026,1,3);
+        c.source="fixture"; c.verifiedAt=QDateTime::fromString("2026-01-01T00:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW","SSB"};
+        const QDateTime now(QDate(2026,1,2),QTime(0,10),QTimeZone::UTC);
+        auto make=[&](const QString& call,const QDateTime& time,const QString& band,const QString& mode) { EnrichedSpot e; e.spot.dxCall=call; e.spot.time=time; e.spot.band=band; e.spot.mode=mode; return e; };
+        const auto fresh=make("ZZ1AAA",now.addSecs(-30),"20m","CW");
+        const auto second=make("zz1bbb",now.addSecs(-60),"20m","USB");
+        const auto stale=make("ZZ1AAA",now.addSecs(-31*60),"20m","CW");
+        const auto before=make("ZZ1AAA",now.addSecs(-11*60),"20m","CW");
+        const auto future=make("ZZ1AAA",now.addSecs(1),"20m","CW");
+        const auto other=make("ZZ1AAA/P",now,"20m","CW");
+        const auto wrongBand=make("ZZ1AAA",now,"40m","CW"), unknown=make("ZZ1AAA",now,"20m","");
+        const auto fm=make("ZZ1AAA",now,"20m","FM"), ambiguous=make("ZZ1AAA",now,"20m","DIGI");
+        const auto matches=dxcampaign::freshSpots(c,{fresh,second,stale,before,future,other,wrongBand,unknown,fm,ambiguous},now,30);
+        QCOMPARE(matches.size(),2); QCOMPARE(matches[0].spot.dxCall,QString("ZZ1AAA")); QCOMPARE(matches[1].spot.dxCall,QString("zz1bbb"));
+        c.start=QDate(2026,1,1); const auto atLimit=make("ZZ1AAA",now.addSecs(-1800),"20m","CW");
+        const auto pastLimit=make("ZZ1AAA",now.addMSecs(-1800001),"20m","CW");
+        QCOMPARE(dxcampaign::freshSpots(c,{atLimit,pastLimit},now,30).size(),1);
+        c.archived=true; QVERIFY(dxcampaign::freshSpots(c,{fresh},now,30).isEmpty());
+    }
     void matrixRespectsProfileAndRejectsInvalidChanges()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile a; a.name="A"; a.stationCallsign="9H1AA"; const qint64 first=db.saveStationProfile(a);
@@ -18,6 +41,17 @@ private slots:
         c.stationProfileId=second; QVERIFY(dxcampaign::save(db,c,&error)); QCOMPARE(dxcampaign::matrix(db,c,&error).first().worked,1);
         c.calls << "ZZ1BBB"; QVERIFY(!dxcampaign::save(db,c,&error)); QVERIFY(!error.isEmpty()); QCOMPARE(dxcampaign::list(db,&error).size(),1);
         const auto stored=dxcampaign::load(db,c.id); QVERIFY(stored); QCOMPARE(stored->revision,2); QCOMPARE(stored->calls.size(),2);
+    }
+    void sidebandMapsToSsbWithoutConflatingFm()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c; c.title="Trip"; c.calls={"ZZ1AAA","ZZ1BBB"};
+        c.start=QDate(2026,1,1); c.end=QDate(2026,1,2); c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate);
+        c.bands={"20m"}; c.modes={"SSB"}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","ZZ1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","SSB"},{"SUBMODE","USB"}},"import").id>0);
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","ZZ1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","FM"}},"import").id>0);
+        QCOMPARE(dxcampaign::matrix(db,c,&error).first().worked,1);
+        c.modes << "USB"; QVERIFY(dxcampaign::save(db,c,&error)); const auto matrix=dxcampaign::matrix(db,c,&error);
+        QCOMPARE(matrix.size(),2); QCOMPARE(matrix[0].worked,0); QCOMPARE(matrix[1].worked,1);
     }
     void independentPeriodsMultiCallConfirmationAndRestart()
     {

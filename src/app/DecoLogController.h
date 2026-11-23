@@ -535,6 +535,7 @@ public:
     Q_INVOKABLE bool saveDxCampaign(const QVariantMap& values);
     Q_INVOKABLE bool selectDxCampaign(const QString& id);
     Q_INVOKABLE void refreshDxCampaign();
+    Q_INVOKABLE QVariantList dxCampaignSpots(int maxAgeMinutes = 30) const;
     QVariantMap qslPlan() const { return m_qslPlan; }
     bool qslPlanBusy() const { return m_qslPlanBusy; }
     Q_INVOKABLE void buildQslPlan(const QStringList& goals);

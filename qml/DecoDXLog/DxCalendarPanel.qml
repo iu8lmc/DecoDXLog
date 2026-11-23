@@ -15,6 +15,7 @@ GlassPanel {
     property var cacheBackend: typeof dxCalendarCache === "undefined" ? null : dxCalendarCache
     readonly property var campaignBackend: typeof decolog === "undefined" ? null : decolog
     property string calendarObserved: ""
+    property int campaignSpotRevision: 0
     property var visibleEntries: []
     property int parseSerial: 0
     property int filterSerial: 0
@@ -87,6 +88,14 @@ GlassPanel {
             if (error) root.statusText = qsTr("Calendar updated, but the offline copy could not be saved.")
         }
     }
+    Connections {
+        target: root.campaignBackend ? root.campaignBackend.cluster : null
+        ignoreUnknownSignals: true
+        function onSpotsUpdated() { ++root.campaignSpotRevision }
+        function onFilterChanged() { ++root.campaignSpotRevision }
+        function onSettingsChanged() { ++root.campaignSpotRevision }
+    }
+    Timer { interval:5000; repeat:true; running:campaignDialog.visible; onTriggered:++root.campaignSpotRevision }
     function requestFilter() {
         if (!query || !filter) return
         ++filterSerial
@@ -205,6 +214,26 @@ GlassPanel {
         const campaigns=root.campaignBackend.dxCampaigns
         console.warn("PROBE dxcampaign restored " + JSON.stringify(campaigns))
         if (campaigns.length) { root.campaignBackend.selectDxCampaign(campaigns[0].id); campaignDialog.edit(root.campaignBackend.dxCampaign); campaignProbeRestored.start() }
+    }
+    function probeCampaignSpots() {
+        campaignDialog.edit({bands:["20m"],modes:["CW"]})
+        const campaigns=root.campaignBackend.dxCampaigns
+        if (!campaigns.length) { console.warn("PROBE dxspots missing campaign"); return }
+        root.campaignBackend.selectDxCampaign(campaigns[0].id); campaignDialog.edit(root.campaignBackend.dxCampaign)
+        root.campaignBackend.cluster.filter={maxAgeMinutes:30}
+        root.campaignBackend.cluster.injectLine("DX de IK1AAA: 14025.0 3Y0J CW 1200Z")
+        root.campaignBackend.cluster.injectLine("DX de IK1AAA: 14025.0 K1XYZ CW 1200Z")
+        campaignSpotProbe.start()
+    }
+    Timer {
+        id:campaignSpotProbe; interval:800
+        onTriggered: {
+            const spots=root.campaignBackend.dxCampaignSpots(30)
+            console.warn("PROBE dxspots matching " + JSON.stringify(spots))
+            const row=campaignSpots.itemAtIndex(0); console.warn("PROBE dxspots rendered " + (row ? row.text : "missing"))
+            root.campaignBackend.cluster.filter={bands:["40m"],maxAgeMinutes:30}
+            console.warn("PROBE dxspots filtered " + JSON.stringify(root.campaignBackend.dxCampaignSpots(30)))
+        }
     }
     Timer {
         id:campaignProbeRestored; interval:200; repeat:true; property int tries:0
@@ -373,6 +402,22 @@ GlassPanel {
                     delegate: Text {
                         required property var modelData; width:ListView.view.width; color:root.textColor
                         text: modelData.band + " · " + modelData.mode + " · " + (modelData.confirmed > 0 ? qsTr("confirmed") : modelData.worked > 0 ? qsTr("worked") : qsTr("missing")) + " (" + modelData.worked + "/" + modelData.confirmed + ")"
+                    }
+                }
+                Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor
+                    text:qsTr("Fresh spots for the saved campaign (30 min, current cluster filters). DX Assistant ranks the cluster's global log context, not the selected profile or verified award credit.") }
+                ListView {
+                    id:campaignSpots; objectName:"dxCampaignSpots"; Layout.fillWidth:true; Layout.preferredHeight:110; clip:true
+                    model: {
+                        root.campaignSpotRevision
+                        if (!campaignDialog.visible || !root.campaignBackend || root.campaignBackend.dxCampaign.id !== campaignDialog.draft.id) return []
+                        return root.campaignBackend.dxCampaignSpots(30)
+                    }
+                    delegate: Text {
+                        required property var modelData; width:ListView.view.width; wrapMode:Text.Wrap; color:root.textColor
+                        text:modelData.call + " · " + modelData.band + " · " + modelData.mode + " · " + modelData.frequencyKhz + " kHz · "
+                            + qsTr("score %1").arg(modelData.score) + " · " + modelData.spottedAt + " · " + (modelData.source || qsTr("source unknown"))
+                            + " · " + (modelData.reasons || []).join(", ") + ((modelData.limitations || []).length ? " · " + (modelData.limitations || []).join(", ") : "")
                     }
                 }
             }

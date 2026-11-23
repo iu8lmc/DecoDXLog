@@ -942,9 +942,19 @@ QVariantList ClusterController::mapSpots() const
 
 QVariantList ClusterController::assistantRecommendations() const
 {
+    return rankVisibleSpots(m_model.visible(),QDateTime::currentDateTimeUtc());
+}
+
+QVariantList ClusterController::campaignRecommendations(const core::dxcampaign::Campaign& campaign, int maxAgeMinutes) const
+{
+    const QDateTime now=QDateTime::currentDateTimeUtc();
+    return rankVisibleSpots(core::dxcampaign::freshSpots(campaign,m_model.visible(),now,maxAgeMinutes),now);
+}
+
+QVariantList ClusterController::rankVisibleSpots(const QList<EnrichedSpot>& visible, const QDateTime& now) const
+{
     QList<core::dxassistant::Candidate> candidates;
-    const QDateTime now = QDateTime::currentDateTimeUtc();
-    for (const EnrichedSpot& e : m_model.visible()) {
+    for (const EnrichedSpot& e : visible) {
         core::dxassistant::Candidate c;
         c.call = e.spot.dxCall;
         c.band = e.spot.band;
@@ -955,6 +965,8 @@ QVariantList ClusterController::assistantRecommendations() const
         c.confirmed = (e.status & core::StatusUnconfirmed) == 0;
         c.observed = true;
         c.source = e.spot.source;
+        c.spotKey = e.key();
+        c.frequencyKhz = e.spot.freqKhz;
         c.hasHistory = m_index.qsoCount() > 0;
         if (m_ctx.propagationForecast) {
             const QVariantMap forecast = m_ctx.propagationForecast(e.spot.dxGrid, e.spot.band,
@@ -972,6 +984,9 @@ QVariantList ClusterController::assistantRecommendations() const
             {QStringLiteral("band"), r.candidate.band},
             {QStringLiteral("mode"), r.candidate.mode},
             {QStringLiteral("source"), r.candidate.source},
+            {QStringLiteral("spotKey"), r.candidate.spotKey},
+            {QStringLiteral("frequencyKhz"), r.candidate.frequencyKhz},
+            {QStringLiteral("spottedAt"), r.candidate.spottedAt.toUTC().toString(Qt::ISODateWithMs)},
             {QStringLiteral("score"), r.score},
             {QStringLiteral("reasons"), r.reasons},
             {QStringLiteral("limitations"), r.limitations},

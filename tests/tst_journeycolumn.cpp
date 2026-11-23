@@ -61,6 +61,18 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void dxCampaignShowsOnlyMatchingFilteredRankedSpots()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); dxcampaign::Campaign c;
+          const auto now=QDateTime::currentDateTimeUtc(); c.title="Live fixture"; c.calls={"3Y0J"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="synthetic"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignspotprobe",output,6000),output.constData());
+        QVERIFY2(output.contains("PROBE dxspots matching") && output.contains("\"call\":\"3Y0J\"") && output.contains("\"spotKey\":\"3Y0J|20m|CW\""),output.constData());
+        QVERIFY2(output.contains("PROBE dxspots rendered 3Y0J") && output.contains("PROBE dxspots filtered []"),output.constData());
+        QVERIFY2(!output.contains("\"call\":\"K1XYZ\"") && !output.contains("TypeError"),output.constData());
+    }
     void dxCampaignDateReviewChangesOnlyChosenExpedition()
     {
         using namespace decolog::core;

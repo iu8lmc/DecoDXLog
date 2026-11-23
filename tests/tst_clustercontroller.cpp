@@ -66,6 +66,28 @@ class TestClusterController : public QObject {
     Q_OBJECT
 
 private slots:
+    void campaignRankingUsesVisibleFreshSpots()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ClusterController::Context ctx; ctx.db=&db;
+        ClusterController cluster(std::move(ctx)); cluster.setFilter({{"maxAgeMinutes",60}}); cluster.setAssistantPreferences({});
+        auto* model=qobject_cast<SpotModel*>(cluster.spots()); QVERIFY(model);
+        const QDateTime now=QDateTime::currentDateTimeUtc(); bool isNew=false;
+        auto add=[&](const QString& call,const QString& band,const QString& mode,int age,int status) {
+            EnrichedSpot e; e.spot.dxCall=call; e.spot.band=band; e.spot.mode=mode; e.spot.time=now.addSecs(-age); e.spot.freqKhz=band=="20m"?14025:7025; e.status=status; model->add(e,&isNew);
+        };
+        add("3Y0J","20m","CW",60,StatusNewDxcc); add("3Y0K","40m","CW",60,0);
+        add("3Y0L","20m","FT8",31*60,StatusNewDxcc); add("K1XYZ","20m","CW",60,StatusNewDxcc);
+        dxcampaign::Campaign c; c.title="Fixture"; c.calls={"3Y0J","3Y0K","3Y0L"}; c.start=now.date().addDays(-1); c.end=now.date();
+        c.source="fixture"; c.verifiedAt=now; c.bands={"20m","40m"}; c.modes={"CW","FT8"};
+        const auto ranked=cluster.campaignRecommendations(c,30); QCOMPARE(ranked.size(),2);
+        QCOMPARE(ranked.first().toMap().value("call").toString(),QString("3Y0J"));
+        QCOMPARE(ranked.first().toMap().value("spotKey").toString(),QString("3Y0J|20m|CW"));
+        QVERIFY(ranked.first().toMap().value("reasons").toStringList().contains("new DXCC"));
+        cluster.setFilter({{"bands",QStringList{"40m"}},{"maxAgeMinutes",60}});
+        const auto filtered=cluster.campaignRecommendations(c,30); QCOMPARE(filtered.size(),1); QCOMPARE(filtered.first().toMap().value("call").toString(),QString("3Y0K"));
+        c.archived=true; QVERIFY(cluster.campaignRecommendations(c,30).isEmpty());
+        cluster.setFilter({});
+    }
     void initTestCase()
     {
         // Impostazioni e cache in una cartella di prova, non in quelle di DecoDXLog.

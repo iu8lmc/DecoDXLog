@@ -12,6 +12,7 @@
 #include "core/Countries.h"
 #include "core/Spots.h"
 #include "core/DxAssistant.h"
+#include "core/DxCampaign.h"
 #include "core/VoiceAnnouncer.h"
 
 #include <QHash>
@@ -196,6 +197,7 @@ public:
     Q_INVOKABLE QVariantList mapSpots() const;
     // Ranking descrittivo degli spot attuali. Non sintonizza e non trasmette.
     Q_INVOKABLE QVariantList assistantRecommendations() const;
+    QVariantList campaignRecommendations(const core::dxcampaign::Campaign& campaign, int maxAgeMinutes) const;
     // La band map di una banda: {band, lowKhz, highKhz, spots: [{key, call, freqKhz,
     // mode, status, statusLabel, ageMinutes, count, entity, comment}]}. Con
     // `useFilter` passano solo gli spot che il filtro del cluster lascia vedere
@@ -240,6 +242,7 @@ signals:
     void spotAimed(const QString& call, bool hasPosition, double lat, double lon, int azimuth);
 
 private:
+    QVariantList rankVisibleSpots(const QList<core::EnrichedSpot>& spots, const QDateTime& now) const;
     struct AlertRule {
         QString id;
         QString name;

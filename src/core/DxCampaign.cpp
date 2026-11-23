@@ -12,6 +12,12 @@
 namespace decolog::core::dxcampaign {
 namespace {
 const QString prefix=QStringLiteral("dx_campaign.");
+QString campaignMode(const QString& text)
+{
+    const QString mode=text.trimmed().toUpper();
+    if (mode==QLatin1String("USB") || mode==QLatin1String("LSB")) return QStringLiteral("SSB");
+    return mode;
+}
 bool fail(QString* error,const QString& message) { if(error) *error=message; return false; }
 bool valid(const Campaign& c,QString* error)
 {
@@ -116,11 +122,32 @@ QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)
     q.addBindValue(c.stationProfileId); q.addBindValue(c.stationProfileId);
     if(!q.exec()) { fail(error,q.lastError().text()); return {}; }
     while(q.next()) {
-        const QString band=q.value(0).toString().toLower(), mode=(q.value(2).toString().isEmpty()?q.value(1).toString():q.value(2).toString()).toUpper();
+        const QString band=q.value(0).toString().toLower();
+        const QString rawMode=(q.value(2).toString().isEmpty()?q.value(1).toString():q.value(2).toString()).trimmed().toUpper();
+        const QString mode=campaignMode(rawMode);
         const QDateTime time=QDateTime::fromString(q.value(3).toString(),Qt::ISODate); if(!time.isValid() || time.timeSpec()==Qt::LocalTime) continue;
         const QDate day=time.toUTC().date(); if(day<c.start || day>c.end) continue;
-        for(Cell& cell:out) if(cell.band==band && cell.mode==mode) { ++cell.worked; if(q.value(4).toBool()) ++cell.confirmed; break; }
+        for(Cell& cell:out) if(!mode.isEmpty() && cell.band==band &&
+            (c.modes.contains(rawMode) ? cell.mode==rawMode : campaignMode(cell.mode)==mode)) { ++cell.worked; if(q.value(4).toBool()) ++cell.confirmed; break; }
     }
     if(q.lastError().isValid()) { fail(error,q.lastError().text()); return {}; } if(error) error->clear(); return out;
+}
+QList<EnrichedSpot> freshSpots(const Campaign& c,const QList<EnrichedSpot>& visible,
+                               const QDateTime& now,int maxAgeMinutes)
+{
+    QList<EnrichedSpot> out;
+    if (c.archived || !valid(c,nullptr) || !now.isValid() || now.timeSpec()==Qt::LocalTime || maxAgeMinutes<1 || maxAgeMinutes>60) return out;
+    const QDateTime current=now.toUTC();
+    for (const EnrichedSpot& e : visible) {
+        const Spot& spot=e.spot;
+        if (!spot.time.isValid() || spot.time.timeSpec()==Qt::LocalTime) continue;
+        const QDateTime at=spot.time.toUTC(); const qint64 age=at.msecsTo(current);
+        if (age<0 || age>qint64(maxAgeMinutes)*60000 || at.date()<c.start || at.date()>c.end) continue;
+        if (!c.calls.contains(spot.dxCall.trimmed(),Qt::CaseInsensitive) || !c.bands.contains(spot.band.trimmed(),Qt::CaseInsensitive) || spot.mode.trimmed().isEmpty()) continue;
+        const QString key=campaignMode(spot.mode); if (key.isEmpty() || key==QLatin1String("DIGI") || key==QLatin1String("DATA")) continue; bool modeMatches=false;
+        for (const QString& mode : c.modes) if (campaignMode(mode)==key) { modeMatches=true; break; }
+        if (modeMatches) out << e;
+    }
+    return out;
 }
 }

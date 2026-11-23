@@ -1280,6 +1280,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignprobe") { window.showPanel("dxcalendar"); dxCampaignProbe.start() }
         else if (what[0] === "dxcampaignrestoreprobe") { window.showPanel("dxcalendar"); dxCampaignRestoreProbe.start() }
         else if (what[0] === "dxdatesprobe") { window.showPanel("dxcalendar"); dxDatesProbe.start() }
+        else if (what[0] === "dxcampaignspotprobe") { window.showPanel("dxcalendar"); dxCampaignSpotProbe.start() }
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
         else if (what[0] === "potacatalogueprobe") Qt.callLater(() => activationDialog.probePotaCatalogue())
         else if (what[0] === "sotaupdateprobe") Qt.callLater(() => activationDialog.probeSotaUpdate())
@@ -1638,6 +1639,7 @@ RoundedWindow {
     Timer { id:dxCampaignProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaign(); else console.warn("PROBE dxcampaign missing panel") } }
     Timer { id:dxCampaignRestoreProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaignRestore(); else console.warn("PROBE dxcampaign missing panel") } }
     Timer { id:dxDatesProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeDateReview(); else console.warn("PROBE dxdates missing panel") } }
+    Timer { id:dxCampaignSpotProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaignSpots(); else console.warn("PROBE dxspots missing panel") } }
     // Per le prove: svuota il Cloud appena entrato.
     Timer { id: purgeAfterLogin; interval: 4000; onTriggered: decolog.cloud.purgeCloud("DELETE") }
 

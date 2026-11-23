@@ -2342,6 +2342,14 @@ void DecoLogController::refreshDxCampaign()
     });
 }
 
+QVariantList DecoLogController::dxCampaignSpots(int maxAgeMinutes) const
+{
+    if (!m_cluster || m_dxCampaign.isEmpty() || m_dxCampaignPath!=m_db.path()) return {};
+    const auto campaign=dxcampaign::load(m_db,m_dxCampaign.value(QStringLiteral("id")).toString());
+    if (!campaign || campaign->revision!=m_dxCampaign.value(QStringLiteral("revision")).toInt()) return {};
+    return m_cluster->campaignRecommendations(*campaign,maxAgeMinutes);
+}
+
 void DecoLogController::buildQslPlan(const QStringList& requested)
 {
     const QSet<QString> goals(requested.cbegin(), requested.cend());
