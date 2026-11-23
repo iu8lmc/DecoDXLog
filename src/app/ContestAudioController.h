@@ -50,6 +50,9 @@ class ContestAudioController : public QObject {
     Q_INVOKABLE bool seekPlayback(int seconds);
     Q_INVOKABLE bool recoverFile(const QUrl &partial);
     Q_INVOKABLE bool findRecordings(const QUrl &folder, const QString &qsoUtc);
+    // Reconcile the active streams against a fresh backend device inventory.
+    void reconcileInputDevices(const QList<QByteArray> &ids);
+    void reconcileOutputDevices(const QList<QByteArray> &ids);
     Q_INVOKABLE bool start(const QUrl &directory, int limitMiB);
     Q_INVOKABLE void stop();
     // Locally supplied PCM stream; an invalid format means 16 kHz mono Int16.
@@ -75,7 +78,7 @@ class ContestAudioController : public QObject {
     bool m_seeking{false};
     QThreadPool m_searchPool;
     bool m_searchBusy{false};
-    QByteArray m_inputId, m_outputId, m_inputPending;
+    QByteArray m_inputId, m_outputId, m_activeInputId, m_activeOutputId, m_inputPending;
     QAudioFormat m_inputFormat;
     bool m_defaultOutput{true};
     bool m_defaultInput{true}, m_recording{false};

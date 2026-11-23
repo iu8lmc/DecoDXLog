@@ -18,8 +18,14 @@ ContestAudioController::ContestAudioController(QObject *parent) : QObject(parent
     m_inputId=settings.value(QStringLiteral("contestAudio/inputId")).toByteArray();
     m_defaultOutput=settings.value(QStringLiteral("contestAudio/outputDefault"),true).toBool();
     m_outputId=settings.value(QStringLiteral("contestAudio/outputId")).toByteArray();
-    connect(m_devices,&QMediaDevices::audioInputsChanged,this,&ContestAudioController::devicesChanged);
-    connect(m_devices,&QMediaDevices::audioOutputsChanged,this,&ContestAudioController::devicesChanged);
+    connect(m_devices,&QMediaDevices::audioInputsChanged,this,[this] {
+        QList<QByteArray> ids; for (const auto &device:QMediaDevices::audioInputs()) ids.append(device.id());
+        reconcileInputDevices(ids); emit devicesChanged();
+    });
+    connect(m_devices,&QMediaDevices::audioOutputsChanged,this,[this] {
+        QList<QByteArray> ids; for (const auto &device:QMediaDevices::audioOutputs()) ids.append(device.id());
+        reconcileOutputDevices(ids); emit devicesChanged();
+    });
     m_searchPool.setMaxThreadCount(1);
     m_playbackTimer.setInterval(250);
     connect(&m_playbackTimer,&QTimer::timeout,this,[this] { emit changed(); });
@@ -27,6 +33,17 @@ ContestAudioController::ContestAudioController(QObject *parent) : QObject(parent
     connect(&m_checkpoint,&QTimer::timeout,this,[this] { if (m_recording && !m_file.checkpoint()) finish(false,m_file.error()); });
 }
 ContestAudioController::~ContestAudioController() { m_searchPool.waitForDone(); if (m_recording) stop(); stopPlayback(); }
+void ContestAudioController::reconcileInputDevices(const QList<QByteArray> &ids)
+{
+    if (m_recording && m_source && !m_activeInputId.isEmpty() && !ids.contains(m_activeInputId))
+        finish(false,tr("Audio input disconnected; recording left partial for recovery."));
+}
+void ContestAudioController::reconcileOutputDevices(const QList<QByteArray> &ids)
+{
+    if (m_sink && !m_activeOutputId.isEmpty() && !ids.contains(m_activeOutputId)) {
+        stopPlayback(); m_message=tr("Audio output disconnected; playback stopped."); emit changed();
+    }
+}
 QStringList ContestAudioController::inputs() const
 {
     QStringList result{tr("System default")};
@@ -94,6 +111,7 @@ bool ContestAudioController::playForQso(const QUrl &wav, const QString &qsoUtc)
         m_message=tr("Cannot open or seek the recording."); m_playbackFile->deleteLater(); m_playbackFile=nullptr; emit changed(); return false;
     }
     m_playbackBaseMs=position; m_playbackDurationMs=location.durationMs; m_playbackRate=location.sampleRate;
+    m_activeOutputId=device.id();
     m_sink=new QAudioSink(device,format,this);
     connect(m_sink,&QAudioSink::stateChanged,this,[this](QtAudio::State state) {
         if (!m_sink || m_seeking) return;
@@ -120,7 +138,7 @@ void ContestAudioController::stopPlayback()
     m_playbackTimer.stop();
     if (m_sink) { auto *sink=m_sink; m_sink=nullptr; sink->stop(); sink->deleteLater(); }
     if (m_playbackFile) { m_playbackFile->close(); m_playbackFile->deleteLater(); m_playbackFile=nullptr; }
-    m_playbackBaseMs=0; m_playbackDurationMs=0; m_playbackRate=0;
+    m_playbackBaseMs=0; m_playbackDurationMs=0; m_playbackRate=0; m_activeOutputId.clear();
     emit changed();
 }
 bool ContestAudioController::findRecordings(const QUrl &folder, const QString &qsoUtc)
@@ -182,6 +200,7 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
     if (!audiodev::canConvertToMonoInt16(format) || format.sampleRate()<8000 || format.sampleRate()>192000) {
         m_message=tr("Selected input has an unsupported audio format."); emit changed(); return false;
     }
+    m_activeInputId=device.id();
     m_source=new QAudioSource(device,format,this);
     connect(m_source,&QAudioSource::stateChanged,this,[this](QtAudio::State state) {
         if (m_recording && state==QtAudio::StoppedState && m_source && m_source->error()!=QtAudio::NoError)
@@ -189,7 +208,7 @@ bool ContestAudioController::start(const QUrl &directory, int limitMiB)
     });
     QIODevice *stream=m_source->start();
     if (!stream || !startFromStream(stream,directory.toLocalFile(),qint64(limitMiB)*1024*1024,QDateTime::currentDateTimeUtc(),format)) {
-        m_source->stop(); m_source->deleteLater(); m_source=nullptr;
+        m_source->stop(); m_source->deleteLater(); m_source=nullptr; m_activeInputId.clear();
         if (m_message.isEmpty()) m_message=tr("Cannot start audio input.");
         emit changed(); return false;
     }
@@ -241,6 +260,7 @@ void ContestAudioController::finish(bool success, const QString &reason)
     if (m_stream) m_stream->disconnect(this);
     m_stream=nullptr;
     if (m_source) { auto *source=m_source; m_source=nullptr; source->stop(); source->deleteLater(); }
+    m_activeInputId.clear();
     QString path=m_file.partialPath();
     if (success && !m_inputPending.isEmpty()) { success=false; m_file.abandon(); m_message=tr("Incomplete audio frame; recover the partial recording."); }
     else if (success && !m_file.finish(&path)) { success=false; m_message=m_file.error(); m_file.abandon(); }

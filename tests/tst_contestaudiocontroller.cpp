@@ -75,6 +75,28 @@ class TestContestAudioController : public QObject {
         bool signal=false; for (int i=0;i+1<captured.size();i+=2) if (qAbs(qFromLittleEndian<qint16>(captured.constData()+i))>1000) { signal=true; break; }
         QVERIFY2(signal,"No audio observed from QSO playback through virtual output");
     }
+    void activeDeviceLossStopsWithoutFallbackWhenConfigured()
+    {
+        const QString name=qEnvironmentVariable("DECOLOG_TEST_LOOPBACK");
+        if (name.isEmpty()) QSKIP("Set DECOLOG_TEST_LOOPBACK to an isolated virtual audio device");
+        const auto inputs=QMediaDevices::audioInputs(),outputs=QMediaDevices::audioOutputs(); int in=-1,out=-1;
+        for (int i=0;i<inputs.size();++i) if (inputs[i].description()==name) { in=i+1; break; }
+        for (int i=0;i<outputs.size();++i) if (outputs[i].description()==name) { out=i+1; break; }
+        QVERIFY(in>0 && out>0); QTemporaryDir dir; QVERIFY(dir.isValid());
+        decolog::app::ContestAudioController controller; controller.chooseInput(in); QSignalSpy done(&controller,&decolog::app::ContestAudioController::finished);
+        QVERIFY2(controller.start(QUrl::fromLocalFile(dir.path()),1),qPrintable(controller.message()));
+        QTest::qWait(300); QVERIFY(controller.bytesWritten()>0);
+        controller.reconcileInputDevices({inputs[in-1].id()}); QVERIFY(controller.recording());
+        controller.reconcileInputDevices({}); QVERIFY(!controller.recording()); QCOMPARE(done.size(),1); QVERIFY(!done.first().at(0).toBool());
+        const QString partial=done.first().at(1).toString(); QVERIFY(partial.endsWith(".wav.part")); QVERIFY(QFile::exists(partial));
+        QString recovered,error; QVERIFY2(decolog::core::ContestAudioFile::recover(partial,&recovered,&error),qPrintable(error));
+        QVERIFY(QFileInfo(recovered).size()>44);
+        decolog::core::ContestAudioFile writer; const auto start=QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate);
+        QVERIFY(writer.start(dir.path(),64000,start)); QCOMPARE(writer.append(QByteArray(64000,'x')).written,qint64(64000)); QString path; QVERIFY(writer.finish(&path));
+        controller.chooseOutput(out); QVERIFY(controller.playForQso(QUrl::fromLocalFile(path),"2026-11-23T12:00:01Z"));
+        controller.reconcileOutputDevices({outputs[out-1].id()}); QVERIFY(controller.playing());
+        controller.reconcileOutputDevices({}); QVERIFY(!controller.playing()); QVERIFY(controller.message().contains("disconnected",Qt::CaseInsensitive));
+    }
     void capturesFragmentedNativeStereoFloat()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); Feed feed; decolog::app::ContestAudioController recorder;
