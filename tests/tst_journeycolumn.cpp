@@ -32,13 +32,13 @@ private:
             s.setValue(QStringLiteral("layout/journeyColumnMigrated"), true);
         s.sync();
     }
-    static bool launch(const QTemporaryDir& dir, const QString& probe, QByteArray& output)
+    static bool launch(const QTemporaryDir& dir, const QString& probe, QByteArray& output, int grabMs = 2800)
     {
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
         env.insert(QStringLiteral("QT_QUICK_BACKEND"), QStringLiteral("software"));
         env.insert(QStringLiteral("DECODXLOG_DATA_ROOT"), dir.filePath(QStringLiteral("data")));
-        env.insert(QStringLiteral("DECODXLOG_GRAB_MS"), QStringLiteral("2800"));
+        env.insert(QStringLiteral("DECODXLOG_GRAB_MS"), QString::number(grabMs));
         QProcess app;
         app.setProcessEnvironment(env);
         app.setProcessChannelMode(QProcess::MergedChannels);
@@ -55,6 +55,14 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void sotaOfficialUpdateInDesktopWhenRequested()
+    {
+        if (qEnvironmentVariable("DECOLOG_SOTA_LIVE_UI") != QLatin1String("1")) QSKIP("Live desktop update not requested");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("sotaupdateprobe"), output, 12000), output.constData());
+        QVERIFY2(output.contains("PROBE sotaOnline success=true source=official-https"), output.constData());
+        QVERIFY(QFileInfo::exists(dir.filePath("data/sota-catalogue.sqlite")));
+    }
     void sotaCatalogueCanBeImportedAndCheckedInDesktop()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); QFile fixture(dir.filePath("test.sqlite.sota.csv"));

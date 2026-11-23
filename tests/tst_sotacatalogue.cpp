@@ -6,10 +6,23 @@
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTcpServer>
+#include <QTcpSocket>
 using decolog::core::SotaCatalogue;
 class TestSotaCatalogue : public QObject {
     Q_OBJECT
 private slots:
+    void liveOfficialUpdateWhenRequested()
+    {
+        if (qEnvironmentVariable("DECOLOG_SOTA_LIVE") != QLatin1String("1")) QSKIP("Live SOTA download not requested");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); SotaCatalogue catalogue(dir.filePath("live.sqlite"));
+        QSignalSpy done(&catalogue, &SotaCatalogue::finished); QVERIFY(catalogue.updateFromOfficial());
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 120000);
+        QVERIFY2(done.at(0).at(0).toBool(), qPrintable(done.at(0).at(1).toString()));
+        const auto info = catalogue.info(); QCOMPARE(info.value("source").toString(), QString("official-https"));
+        QVERIFY(info.value("count").toInt() > 100000); QVERIFY(info.value("sourceUrl").toString().startsWith("https://"));
+        qInfo() << "live SOTA update" << info;
+    }
     void officialSnapshotWhenProvided()
     {
         const QString path = qEnvironmentVariable("DECOLOG_SOTA_FIXTURE");
@@ -22,6 +35,44 @@ private slots:
         const auto info = catalogue.info(); QVERIFY(info.value("count").toInt() > 100000);
         QCOMPARE(catalogue.lookup("3B8/MU-001", QDate(2026, 11, 23)).value("status").toString(), QString("active"));
         qInfo() << "catalogue snapshot" << info;
+    }
+    void networkUpdatePreservesOldCatalogueOnFailure()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        const QByteArray csv("SOTA Summits List (Date=22/11/2026)\nSummitCode,AssociationName,RegionName,SummitName,AltM,AltFt,GridRef1,GridRef2,Longitude,Latitude,Points,BonusPoints,ValidFrom,ValidTo,ActivationCount,ActivationDate,ActivationCall\nI/LM-001,Italy,Lombardy,Monte Test,100,328,0,0,9,45,2,0,01/01/2020,31/12/2030,0,,\n");
+        connect(&server, &QTcpServer::newConnection, &server, [&] {
+            while (auto* socket = server.nextPendingConnection()) {
+                connect(socket, &QTcpSocket::readyRead, socket, [socket, csv] {
+                    const QByteArray request = socket->readAll();
+                    if (request.contains("GET /ok ")) socket->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(csv.size()) + "\r\nConnection: close\r\n\r\n" + csv);
+                    else if (request.contains("GET /redirect ")) socket->write("HTTP/1.1 302 Found\r\nLocation: http://example.com/unsafe\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    else if (request.contains("GET /redirect-ok ")) socket->write("HTTP/1.1 302 Found\r\nLocation: /ok\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    else if (request.contains("GET /truncated ")) socket->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(csv.size() + 20) + "\r\nConnection: close\r\n\r\n" + csv);
+                    else if (request.contains("GET /oversize ")) socket->write("HTTP/1.1 200 OK\r\nContent-Length: 134217729\r\nConnection: close\r\n\r\n");
+                    else if (request.contains("GET /malformed ")) socket->write("HTTP/1.1 200 OK\r\nContent-Length: 3\r\nConnection: close\r\n\r\nbad");
+                    else socket->write("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    socket->disconnectFromHost();
+                });
+            }
+        });
+        const auto url = [&](const QString& path) { return QUrl(QString("http://127.0.0.1:%1/%2").arg(server.serverPort()).arg(path)); };
+        SotaCatalogue catalogue(dir.filePath("catalog.sqlite")); QSignalSpy done(&catalogue, &SotaCatalogue::finished);
+        QVERIFY(catalogue.updateFromLoopbackForTest(url("ok")));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 10000); QVERIFY2(done.at(0).at(0).toBool(), qPrintable(done.at(0).at(1).toString()));
+        QCOMPARE(catalogue.info().value("source").toString(), QString("network-unverified"));
+        QCOMPARE(catalogue.lookup("I/LM-001", QDate(2026, 1, 1)).value("status").toString(), QString("active"));
+        done.clear(); QVERIFY(catalogue.updateFromLoopbackForTest(url("redirect-ok")));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 10000); QVERIFY2(done.at(0).at(0).toBool(), qPrintable(done.at(0).at(1).toString()));
+        for (const QString& path : {QString("bad"), QString("redirect"), QString("truncated"), QString("oversize"), QString("malformed")}) {
+            done.clear(); QVERIFY(catalogue.updateFromLoopbackForTest(url(path)));
+            QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 10000); QVERIFY(!done.at(0).at(0).toBool());
+            QCOMPARE(catalogue.lookup("I/LM-001", QDate(2026, 1, 1)).value("status").toString(), QString("active"));
+        }
+        done.clear(); QVERIFY(catalogue.updateFromLoopbackForTest(url("ok"))); catalogue.cancel();
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 10000); QVERIFY(!done.at(0).at(0).toBool());
+        QCOMPARE(catalogue.lookup("I/LM-001", QDate(2026, 1, 1)).value("status").toString(), QString("active"));
+        QVERIFY(!catalogue.updateFromLoopbackForTest(QUrl("http://example.com/")));
     }
     void importDoesNotReplaceUnrelatedExistingFile()
     {

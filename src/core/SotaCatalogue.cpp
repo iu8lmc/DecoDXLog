@@ -7,6 +7,9 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QPointer>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QSqlDatabase>
@@ -21,6 +24,13 @@ namespace {
 constexpr qint64 kMaxInput = 128 * 1024 * 1024;
 constexpr qint64 kMaxLine = 1024 * 1024;
 QString uniqueName() { return QStringLiteral("sota-catalogue-") + QUuid::createUuid().toString(); }
+bool officialUrl(const QUrl& url)
+{
+    return url.isValid() && url.scheme() == QLatin1String("https") && url.userInfo().isEmpty() &&
+        !url.hasFragment() && !url.hasQuery() && url.path() == QLatin1String("/summitslist.csv") &&
+        (url.port() == -1 || url.port() == 443) &&
+        (url.host() == QLatin1String("www.sotadata.org.uk") || url.host() == QLatin1String("storage.sota.org.uk"));
+}
 // The published snapshot is one CSV record per line. Reject ambiguous quoting
 // instead of installing a truncated or partially parsed catalogue.
 bool csvLine(const QString& line, QStringList* values)
@@ -59,7 +69,8 @@ bool canReplaceCatalogue(const QString& path)
     QSqlDatabase::removeDatabase(connection);
     return ours;
 }
-QString build(const QString& inputPath, const QString& outputPath, const std::shared_ptr<std::atomic_bool>& cancelled)
+QString build(const QString& inputPath, const QString& outputPath, const std::shared_ptr<std::atomic_bool>& cancelled,
+              const QString& source, const QString& sourceUrl, const QString& fileName)
 {
     const auto tr = [](const char* message) { return QCoreApplication::translate("SotaCatalogue", message); };
     if (!canReplaceCatalogue(outputPath)) return tr("The destination exists and is not a SOTA catalogue.");
@@ -127,7 +138,7 @@ QString build(const QString& inputPath, const QString& outputPath, const std::sh
                 QSqlQuery meta(db); meta.prepare(QStringLiteral("INSERT INTO metadata(key,value) VALUES(?,?)"));
                 const QVariantMap values{{QStringLiteral("version"), version.toString(Qt::ISODate)}, {QStringLiteral("sha256"), digest},
                     {QStringLiteral("importedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate)},
-                    {QStringLiteral("source"), QStringLiteral("local-file-unverified")}, {QStringLiteral("fileName"), QFileInfo(inputPath).fileName()},
+                    {QStringLiteral("source"), source}, {QStringLiteral("sourceUrl"), sourceUrl}, {QStringLiteral("fileName"), fileName},
                     {QStringLiteral("count"), QString::number(count)}};
                 for (auto it = values.begin(); it != values.end(); ++it) {
                     meta.bindValue(0, it.key()); meta.bindValue(1, it.value());
@@ -157,7 +168,10 @@ bool validMetadata(const QVariantMap& data)
     return QDate::fromString(data.value(QStringLiteral("version")).toString(), Qt::ISODate).isValid() &&
         data.value(QStringLiteral("count")).toInt() > 0 &&
         QRegularExpression(QStringLiteral("^[0-9a-f]{64}$")).match(data.value(QStringLiteral("sha256")).toString()).hasMatch() &&
-        data.value(QStringLiteral("source")).toString() == QLatin1String("local-file-unverified");
+        (data.value(QStringLiteral("source")).toString() == QLatin1String("local-file-unverified") ||
+         data.value(QStringLiteral("source")).toString() == QLatin1String("network-unverified") ||
+         (data.value(QStringLiteral("source")).toString() == QLatin1String("official-https") &&
+          officialUrl(QUrl(data.value(QStringLiteral("sourceUrl")).toString()))));
 }
 QVariantMap read(const QString& path, const QString& reference, const QDate& date, bool onlyInfo)
 {
@@ -238,24 +252,113 @@ QVariantMap SotaCatalogue::lookupBatch(const QString& path, const QVariantList& 
     return result;
 }
 
-SotaCatalogue::SotaCatalogue(const QString& path, QObject* parent) : QObject(parent), m_path(path) { m_pool.setMaxThreadCount(1); }
-SotaCatalogue::~SotaCatalogue() { if (m_cancel) m_cancel->store(true); m_pool.waitForDone(); }
+SotaCatalogue::SotaCatalogue(const QString& path, QObject* parent) : QObject(parent), m_path(path), m_network(new QNetworkAccessManager(this)) { m_pool.setMaxThreadCount(1); }
+SotaCatalogue::~SotaCatalogue() { if (m_cancel) m_cancel->store(true); if (m_reply) { m_reply->disconnect(this); m_reply->abort(); } m_pool.waitForDone(); }
 QVariantMap SotaCatalogue::info() const { return read(m_path, {}, {}, true); }
 QVariantMap SotaCatalogue::lookup(const QString& reference, const QDate& date) const { return read(m_path, reference, date, false); }
 QVariantMap SotaCatalogue::lookupIso(const QString& reference, const QString& date) const { return lookup(reference, QDate::fromString(date, Qt::ISODate)); }
+void SotaCatalogue::launchBuild(const QString& input, const QString& source, const QString& sourceUrl, const QString& fileName)
+{
+    const QString path = m_path; const auto cancelled = m_cancel; QPointer<SotaCatalogue> self(this);
+    m_pool.start([self, input, path, source, sourceUrl, fileName, cancelled] {
+        const QString error = build(input, path, cancelled, source, sourceUrl, fileName);
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(), [self, error] {
+            if (!self) return;
+            self->m_download.reset(); self->m_busy = false; self->m_cancel.reset(); emit self->changed(); emit self->finished(error.isEmpty(), error);
+        }, Qt::QueuedConnection);
+    });
+}
+
 bool SotaCatalogue::importFile(const QUrl& source)
 {
     if (m_busy || !source.isLocalFile() || source.toLocalFile().isEmpty() || m_path.isEmpty()) return false;
     const QFileInfo from(source.toLocalFile()), to(m_path);
     if (from.absoluteFilePath() == to.absoluteFilePath() || (!from.canonicalFilePath().isEmpty() && from.canonicalFilePath() == to.canonicalFilePath())) return false;
-    m_cancel = std::make_shared<std::atomic_bool>(false); const auto cancelled = m_cancel;
-    const QString input = source.toLocalFile(), path = m_path; m_busy = true; emit changed(); QPointer<SotaCatalogue> self(this);
-    m_pool.start([self, input, path, cancelled] {
-        const QString error = build(input, path, cancelled);
-        if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, error] { if (!self) return; self->m_busy = false; self->m_cancel.reset(); emit self->changed(); emit self->finished(error.isEmpty(), error); }, Qt::QueuedConnection);
-    });
+    m_cancel = std::make_shared<std::atomic_bool>(false); m_busy = true; emit changed();
+    launchBuild(source.toLocalFile(), QStringLiteral("local-file-unverified"), QStringLiteral(""), from.fileName());
     return true;
 }
-void SotaCatalogue::cancel() { if (m_cancel) m_cancel->store(true); }
+
+bool SotaCatalogue::allowedUrl(const QUrl& url) const
+{
+    if (!url.isValid() || !url.userInfo().isEmpty() || url.hasFragment()) return false;
+    if (m_testLoopback) return url.scheme() == QLatin1String("http") && url.host() == QLatin1String("127.0.0.1") && url.port() == m_initialUrl.port();
+    return officialUrl(url);
+}
+
+bool SotaCatalogue::updateFromOfficial()
+{
+    return startDownload(QUrl(QStringLiteral("https://www.sotadata.org.uk/summitslist.csv")), false);
+}
+
+bool SotaCatalogue::updateFromLoopbackForTest(const QUrl& source)
+{
+    return startDownload(source, true);
+}
+
+bool SotaCatalogue::startDownload(const QUrl& url, bool testLoopback)
+{
+    if (m_busy || m_path.isEmpty()) return false;
+    m_initialUrl = url; m_testLoopback = testLoopback;
+    if (!allowedUrl(url) || (testLoopback && url.port() <= 0)) return false;
+    m_download = std::make_unique<QTemporaryFile>();
+    if (!m_download->open()) { m_download.reset(); return false; }
+    m_cancel = std::make_shared<std::atomic_bool>(false); m_downloadBytes = 0; m_redirects = 0; m_downloadError.clear();
+    m_busy = true; emit changed(); issueRequest(url); return true;
+}
+
+void SotaCatalogue::finishDownload(const QString& error)
+{
+    m_reply = nullptr; m_download.reset(); m_cancel.reset(); m_busy = false;
+    emit changed(); emit finished(false, error);
+}
+
+void SotaCatalogue::issueRequest(const QUrl& url)
+{
+    QNetworkRequest request(url);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    request.setTransferTimeout(30000);
+    request.setRawHeader("Accept-Encoding", "identity");
+    request.setRawHeader("User-Agent", "DecoDXLog/SOTA-catalogue");
+    QNetworkReply* reply = m_network->get(request); m_reply = reply;
+    connect(reply, &QNetworkReply::metaDataChanged, this, [this, reply] {
+        const QVariant size = reply->header(QNetworkRequest::ContentLengthHeader);
+        if (size.isValid() && size.toLongLong() > kMaxInput) { m_downloadError = tr("The download exceeds the size limit."); reply->abort(); }
+    });
+    connect(reply, &QIODevice::readyRead, this, [this, reply] {
+        while (reply->bytesAvailable() > 0 && m_downloadError.isEmpty()) {
+            const QByteArray block = reply->read(64 * 1024); m_downloadBytes += block.size();
+            if (block.isEmpty() || m_downloadBytes > kMaxInput || !m_download || m_download->write(block) != block.size()) {
+                m_downloadError = tr("The download is too large or cannot be saved."); reply->abort(); return;
+            }
+        }
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const QUrl redirect = reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+        const auto networkError = reply->error(); const QUrl currentUrl = reply->url();
+        m_reply = nullptr; reply->deleteLater();
+        if (m_cancel && m_cancel->load()) { finishDownload(tr("Catalogue update cancelled.")); return; }
+        if (!m_downloadError.isEmpty()) { finishDownload(m_downloadError); return; }
+        if (httpStatus >= 300 && httpStatus < 400 && redirect.isValid() && !redirect.isEmpty()) {
+            const QUrl next = currentUrl.resolved(redirect);
+            if (++m_redirects > 5 || !allowedUrl(next)) { finishDownload(tr("The catalogue redirect is not permitted.")); return; }
+            if (!m_download || !m_download->resize(0) || !m_download->seek(0)) { finishDownload(tr("Cannot reset the download file.")); return; }
+            m_downloadBytes = 0; issueRequest(next); return;
+        }
+        if (networkError != QNetworkReply::NoError || httpStatus != 200 || m_downloadBytes <= 0 || !m_download || !m_download->flush()) {
+            finishDownload(tr("The catalogue download failed or was incomplete.")); return;
+        }
+        const QString path = m_download->fileName(); m_download->close();
+        launchBuild(path, m_testLoopback ? QStringLiteral("network-unverified") : QStringLiteral("official-https"),
+                    currentUrl.toString(QUrl::FullyEncoded), QStringLiteral("summitslist.csv"));
+    });
+}
+
+void SotaCatalogue::cancel()
+{
+    if (m_cancel) m_cancel->store(true);
+    if (m_reply) m_reply->abort();
+}
 } // namespace decolog::core

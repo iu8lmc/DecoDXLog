@@ -31,6 +31,7 @@ DialogFrame {
     property var sotaLookup: ({})
     property bool probeSotaMode: false
     property bool probeSotaGroup: false
+    property bool probeSotaOnline: false
 
     // `kind` apre gia' sul tipo giusto: "contest" quando si arriva dal contest.
     function openDialog(kind) {
@@ -57,6 +58,11 @@ DialogFrame {
         if (String(value).trim().length) programs[key] = value
         else delete programs[key]
         root.set("programs", programs)
+    }
+    function probeSotaUpdate() {
+        root.openDialog("pota")
+        root.probeSotaOnline = true
+        sotaUpdateButton.clicked()
     }
     function probeSotaCatalogue() {
         root.openDialog("pota")
@@ -243,8 +249,13 @@ DialogFrame {
     Connections {
         target: root.act.sotaCatalogue
         function onFinished(success, message) {
-            root.sotaMessage = success ? qsTr("SOTA catalogue imported. File origin was not independently verified.") : message
+            const official = root.act.sotaCatalogue.info.source === "official-https"
+            root.sotaMessage = success ? (official ? qsTr("SOTA catalogue downloaded over HTTPS and installed. The list is not signed.") : qsTr("SOTA catalogue imported. File origin was not independently verified.")) : message
             root.sotaLookup = ({})
+            if (root.probeSotaOnline) {
+                root.probeSotaOnline = false
+                console.warn("PROBE sotaOnline success=" + success + " source=" + root.act.sotaCatalogue.info.source + " count=" + root.act.sotaCatalogue.info.count + " error=" + message)
+            }
             if (root.probeSotaMode) {
                 root.probeSotaMode = false
                 sotaSearchRef.text = "I/LM-001"; sotaSearchDate.text = "2026-11-23"
@@ -572,13 +583,15 @@ DialogFrame {
         Rectangle { Layout.fillWidth: true; implicitHeight: 1; color: Theme.borderSoft }
         Note {
             text: root.act.sotaCatalogue.info.status === "available"
-                ? qsTr("Offline SOTA catalogue · list date %1 · %2 summits · imported %3 · file %4 · SHA-256 %5. Local file origin is unverified.")
+                ? qsTr("Offline SOTA catalogue · list date %1 · %2 summits · installed %3 · file %4 · SHA-256 %5. %6")
                     .arg(root.act.sotaCatalogue.info.version).arg(root.act.sotaCatalogue.info.count)
                     .arg(root.act.sotaCatalogue.info.importedAt).arg(root.act.sotaCatalogue.info.fileName).arg(root.act.sotaCatalogue.info.sha256)
+                    .arg(root.act.sotaCatalogue.info.source === "official-https" ? qsTr("HTTPS source: %1; list is not signed.").arg(root.act.sotaCatalogue.info.sourceUrl) : qsTr("File origin is unverified."))
                 : qsTr("No offline SOTA catalogue installed. Download the official list, then import the CSV.")
         }
         RowLayout {
-            GlassButton { text: qsTr("Open SOTA list source"); onClicked: Qt.openUrlExternally("https://www.sotadata.org.uk/summitslist.csv") }
+            GlassButton { id: sotaUpdateButton; text: qsTr("Update SOTA list online"); enabled: !root.act.sotaCatalogue.busy;
+                onClicked: { root.sotaMessage = ""; if (!root.act.sotaCatalogue.updateFromOfficial()) root.sotaMessage = qsTr("Cannot start SOTA update.") } }
             GlassButton { text: root.act.sotaCatalogue.busy ? qsTr("Cancel SOTA import") : qsTr("Import SOTA CSV…");
                 onClicked: { if (root.act.sotaCatalogue.busy) root.act.sotaCatalogue.cancel(); else sotaImportDialog.open() } }
         }
@@ -677,8 +690,9 @@ DialogFrame {
             visible: root.previewShown && !!root.partitionPreview.sotaCatalogue
             color: Theme.warningColor
             text: root.partitionPreview.sotaCatalogue && root.partitionPreview.sotaCatalogue.status === "available"
-                ? qsTr("SOTA group checks use imported list %1 (SHA-256 %2); file origin is unverified. A listed date is not activation eligibility.")
+                ? qsTr("SOTA group checks use list %1 (SHA-256 %2). %3 A listed date is not activation eligibility.")
                     .arg(root.partitionPreview.sotaCatalogue.version).arg(root.partitionPreview.sotaCatalogue.sha256)
+                    .arg(root.partitionPreview.sotaCatalogue.source === "official-https" ? qsTr("Downloaded over HTTPS; the list is not signed.") : qsTr("File origin is unverified."))
                 : qsTr("SOTA catalogue unavailable; references could not be checked against a list.")
         }
         Note {
