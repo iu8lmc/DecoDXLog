@@ -44,6 +44,8 @@ class NetController : public QObject {
     Q_PROPERTY(bool qsoComparisonBusy READ qsoComparisonBusy NOTIFY qsoComparisonChanged)
     Q_PROPERTY(QVariantMap qsoComparisonSummary READ qsoComparisonSummary NOTIFY qsoComparisonChanged)
     Q_PROPERTY(QVariantList qsoComparisonRows READ qsoComparisonRows NOTIFY qsoComparisonChanged)
+    Q_PROPERTY(bool qsoReviewBusy READ qsoReviewBusy NOTIFY qsoReviewChanged)
+    Q_PROPERTY(QVariantMap qsoReview READ qsoReview NOTIFY qsoReviewChanged)
 
 public:
     struct Context {
@@ -101,6 +103,9 @@ public:
     QString durableSerialStatus() const { return m_durableStatus; }
     Q_INVOKABLE bool startQsoComparison(const QUrl& remoteFile);
     Q_INVOKABLE void cancelQsoComparison();
+    Q_INVOKABLE bool reviewQsoComparison(const QString& uuid);
+    bool qsoReviewBusy() const { return m_qsoReviewBusy; }
+    QVariantMap qsoReview() const { return m_qsoReview; }
     bool qsoComparisonBusy() const { return m_qsoComparisonBusy; }
     QVariantMap qsoComparisonSummary() const { return m_qsoComparisonSummary; }
     QVariantList qsoComparisonRows() const { return m_qsoComparisonRows; }
@@ -129,6 +134,7 @@ signals:
     void durableSerialRequestSent(const QJsonObject& request);
     void durableSerialStatusChanged();
     void qsoComparisonChanged();
+    void qsoReviewChanged();
 
 private:
     void restart();
@@ -194,6 +200,10 @@ private:
     std::shared_ptr<std::atomic_bool> m_qsoComparisonCancel;
     quint64 m_qsoComparisonGeneration{0};
     bool m_qsoComparisonBusy{false};
+    quint64 m_qsoReviewGeneration{0};
+    bool m_qsoReviewBusy{false};
+    QVariantMap m_qsoReview;
+    bool qsoComparisonCurrent() const;
     QVariantMap m_qsoComparisonSummary;
     QVariantList m_qsoComparisonRows;
     QString m_qsoComparisonPath, m_qsoComparisonIdentity, m_qsoComparisonStamp, m_qsoComparisonRemotePath;

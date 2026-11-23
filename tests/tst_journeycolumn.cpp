@@ -85,6 +85,7 @@ private slots:
         QByteArray output; QVERIFY2(launch(dir,"netcompareprobe:"+remotePath,output,4500),output.constData());
         QVERIFY2(output.contains("PROBE netcompare") && output.contains("\"visible\":true") && output.contains(expectedTitle) && output.contains("\"contentConflict\":1") && output.contains("\"rows\":1") && output.contains("\"firstFields\":1"),output.constData());
         QVERIFY2(output.contains(expectedField),output.constData());
+        QVERIFY2(output.contains("PROBE netreview") && output.contains("\"ok\":true") && output.contains("\"fields\":") && !output.contains("TypeError"),output.constData());
     }
     void contestSerialEntryUsesSelectedGrant_data()
     {

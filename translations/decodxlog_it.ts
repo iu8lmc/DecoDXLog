@@ -2273,6 +2273,11 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Inspect all fields…</source><translation>Esamina tutti i campi…</translation></message>
+    <message><source>A log changed; compare again.</source><translation>Un log è cambiato; ripeti il confronto.</translation></message>
+    <message><source>Inspect QSO fields</source><translation>Esamina i campi del QSO</translation></message>
+    <message><source>Fields are shown up to 2048 characters. Long values are marked; attachments and local metadata are not shown.</source><translation>I campi sono mostrati fino a 2048 caratteri. I valori più lunghi sono indicati; allegati e metadati locali non sono mostrati.</translation></message>
+    <message><source>Reading QSO snapshots…</source><translation>Lettura delle istantanee dei QSO…</translation></message>
     <message>
         <source>Station network</source>
         <translation>Rete di stazione</translation>

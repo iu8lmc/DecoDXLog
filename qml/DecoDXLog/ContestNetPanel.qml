@@ -12,6 +12,8 @@ GlassPanel {
 
     readonly property var net: decolog.net
     function probeComparison(url) { qsoComparisonDialog.open(); return root.net.startQsoComparison(url) }
+    function probeReview() { const rows=root.net.qsoComparisonRows; if (!rows.length || !root.net.reviewQsoComparison(rows[0].uuid)) return false; qsoDetailsDialog.open(); return true }
+    function probeReviewState() { return {visible:qsoDetailsDialog.visible,title:qsoDetailsDialog.title,fields:(root.net.qsoReview.fields || []).length,ok:root.net.qsoReview.ok || false} }
     function probeComparisonState() { const rows=root.net.qsoComparisonRows, first=qsoComparisonList.itemAtIndex(0); return {visible:qsoComparisonDialog.visible,title:qsoComparisonDialog.title,summary:root.net.qsoComparisonSummary,rows:rows.length,firstFields:rows.length ? (rows[0].fields || []).length : 0,fieldShown:first ? first.fieldTextAt(0) : ""} }
 
     title: qsTr("Station network")
@@ -275,6 +277,14 @@ GlassPanel {
                                  qsTr("Current: %1 %2 %3 %4 · rev %5").arg(parent.modelData.localCall || "—").arg(parent.modelData.localDate || "").arg(parent.modelData.localBand || "").arg(parent.modelData.localMode || "").arg(parent.modelData.localRevision === null || parent.modelData.localRevision === undefined ? "—" : parent.modelData.localRevision) + "\n" +
                                  qsTr("Selected: %1 %2 %3 %4 · rev %5").arg(parent.modelData.remoteCall || "—").arg(parent.modelData.remoteDate || "").arg(parent.modelData.remoteBand || "").arg(parent.modelData.remoteMode || "").arg(parent.modelData.remoteRevision === null || parent.modelData.remoteRevision === undefined ? "—" : parent.modelData.remoteRevision)
                         }
+                        GlassButton {
+                            text:qsTr("Inspect all fields…")
+                            enabled:!root.net.qsoReviewBusy && !root.net.qsoComparisonSummary.stale
+                            onClicked: {
+                                if (root.net.reviewQsoComparison(differenceRow.modelData.uuid)) qsoDetailsDialog.open()
+                                else qsoComparisonDialog.localError=qsTr("A log changed; compare again.")
+                            }
+                        }
                         Repeater {
                             id:fieldRepeater
                             model:parent.modelData.fields || []
@@ -294,4 +304,35 @@ GlassPanel {
             GlassButton { text:qsTr("Close"); onClicked:qsoComparisonDialog.close() }
         }
     }
+    DialogFrame {
+        id:qsoDetailsDialog
+        transientParent:root.Window.window
+        title:qsTr("Inspect QSO fields")
+        info:qsTr("Read-only snapshot · no changes applied")
+        width:820; height:600
+        body:ColumnLayout {
+            spacing:8
+            Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap
+                text:qsTr("Fields are shown up to 2048 characters. Long values are marked; attachments and local metadata are not shown.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; textFormat:Text.PlainText; color:Theme.warningColor
+                text:root.net.qsoReviewBusy ? qsTr("Reading QSO snapshots…") : root.net.qsoReview.error || (root.net.qsoComparisonSummary.stale ? qsTr("A log changed; compare again.") : "") }
+            Rectangle {
+                Layout.fillWidth:true; Layout.fillHeight:true; color:Theme.bgDeep; radius:4; border.color:Theme.borderSoft
+                ListView {
+                    anchors.fill:parent; anchors.margins:6; clip:true; spacing:8; model:root.net.qsoReview.fields || []
+                    ScrollBar.vertical:PanelScrollBar {}
+                    delegate:Text {
+                        required property var modelData
+                        width:ListView.view.width-12; color:Theme.textPrimary; wrapMode:Text.WrapAnywhere; textFormat:Text.PlainText
+                        function preview(value) { const t=value || ""; return t.length>2048 ? t.slice(0,2048)+"…" : t }
+                        text:qsTr("%1: current %2 · selected %3").arg(modelData.name)
+                            .arg(modelData.localPresent ? preview(modelData.local) : qsTr("not present"))
+                            .arg(modelData.remotePresent ? preview(modelData.remote) : qsTr("not present"))
+                    }
+                }
+            }
+            GlassButton { text:qsTr("Close"); onClicked:qsoDetailsDialog.close() }
+        }
+    }
+
 }

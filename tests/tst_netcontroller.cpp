@@ -43,6 +43,22 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(net.qsoComparisonSummary().value("stale").toBool(),4000); QVERIFY(changes.size()>0);
         net.cancelQsoComparison(); QVERIFY(net.qsoComparisonSummary().isEmpty()); QVERIFY(net.qsoComparisonRows().isEmpty());
     }
+    void offlineQsoComparisonReviewsOneRecordWithoutChangingLogs()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("DecoComparisonTest"); QCoreApplication::setApplicationName("RecordReview"); QSettings().setValue("net/enabled",false);
+        const auto localPath=dir.filePath("local.sqlite"), remotePath=dir.filePath("remote.sqlite"); LogDatabase local,remote; QVERIFY(local.open(localPath)); QVERIFY(remote.open(remotePath));
+        AdifRecord record{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT",QString(400,'a')}};
+        const auto a=local.insertQso(record,"fixture"); QVERIFY(a.id>0); record.set("COMMENT",QString(400,'b')); const auto b=remote.insertQso(record,"fixture"); QVERIFY(b.id>0);
+        QVERIFY(local.adoptUuid(a.id,"shared")); QVERIFY(remote.adoptUuid(b.id,"shared")); NetController::Context ctx; ctx.db=&local; NetController net(ctx);
+        QVERIFY(!net.reviewQsoComparison("shared")); QVERIFY(net.startQsoComparison(QUrl::fromLocalFile(remotePath))); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoComparisonBusy(),10000);
+        QVERIFY(net.reviewQsoComparison("shared")); QTRY_VERIFY_WITH_TIMEOUT(!net.qsoReviewBusy(),10000); const auto review=net.qsoReview(); QVERIFY2(review.value("ok").toBool(),qPrintable(review.value("error").toString()));
+        bool found=false; for (const auto& item:review.value("fields").toList()) { const auto field=item.toMap(); if (field.value("name")=="COMMENT") { QCOMPARE(field.value("local").toString(),QString(400,'a')); QCOMPARE(field.value("remote").toString(),QString(400,'b')); found=true; } } QVERIFY(found);
+        QCOMPARE(local.record(a.id)->value("COMMENT"),QString(400,'a')); QCOMPARE(remote.record(b.id)->value("COMMENT"),QString(400,'b'));
+        record.set("COMMENT","remote changed"); QVERIFY(remote.updateQso(b.id,record).status==InsertResult::Status::Inserted);
+        QVERIFY(!net.reviewQsoComparison("shared"));
+    }
     void offlineQsoComparisonCancelsWithoutPublishingPartialRows()
     {
         using namespace decolog::core; using decolog::app::NetController;

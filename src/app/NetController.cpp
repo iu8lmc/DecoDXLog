@@ -39,7 +39,8 @@ NetController::NetController(Context context, QObject* parent)
             fileidentity::read(m_qsoComparisonRemotePath)!=m_qsoComparisonRemoteFileIdentity ||
             !m_qsoComparisonRemoteWatcher || !m_qsoComparisonRemoteWatcher->fileIdentityMatchesOpen() ||
             m_qsoComparisonRemoteWatcher->dataVersion()!=m_qsoComparisonRemoteVersion) {
-            m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true); emit qsoComparisonChanged();
+            m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.insert(QStringLiteral("stale"),true);
+            ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); emit qsoReviewChanged(); emit qsoComparisonChanged();
         }
     });
     m_durableRetry.setInterval(2000);
@@ -99,6 +100,7 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
 {
     if (m_qsoComparisonBusy || !remoteFile.isLocalFile() || remoteFile.toLocalFile().isEmpty() || !m_ctx.db ||
         !m_ctx.db->isOpen() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) return false;
+    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); emit qsoReviewChanged();
     const QString localPath=m_ctx.db->path(), remotePath=remoteFile.toLocalFile(), identity=m_ctx.db->identity(), stamp=m_ctx.db->changeStamp();
     const QByteArray localFileIdentity=m_ctx.db->openFileIdentity(), remoteFileIdentity=fileidentity::read(remotePath);
     if (identity.isEmpty() || stamp.isEmpty() || remoteFileIdentity.isEmpty()) return false;
@@ -145,9 +147,11 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
                             {QStringLiteral("localCall"),difference.local.call},{QStringLiteral("localBand"),difference.local.band},
                             {QStringLiteral("localMode"),difference.local.mode},{QStringLiteral("localDate"),difference.local.date},
                             {QStringLiteral("localRevision"),difference.local.present?QVariant(difference.local.revision):QVariant()},
+                            {QStringLiteral("localDeleted"),difference.local.deleted}, {QStringLiteral("localHash"),QString::fromLatin1(difference.local.contentHash.toHex())},
                             {QStringLiteral("remoteCall"),difference.remote.call},{QStringLiteral("remoteBand"),difference.remote.band},
                             {QStringLiteral("remoteMode"),difference.remote.mode},{QStringLiteral("remoteDate"),difference.remote.date},
                             {QStringLiteral("remoteRevision"),difference.remote.present?QVariant(difference.remote.revision):QVariant()},
+                            {QStringLiteral("remoteDeleted"),difference.remote.deleted}, {QStringLiteral("remoteHash"),QString::fromLatin1(difference.remote.contentHash.toHex())},
                             {QStringLiteral("fields"),fields},{QStringLiteral("fieldsOmitted"),difference.fieldsOmitted}});
                     }
                 }
@@ -193,11 +197,82 @@ bool NetController::startQsoComparison(const QUrl& remoteFile)
 
 void NetController::cancelQsoComparison()
 {
+    ++m_qsoReviewGeneration; m_qsoReviewBusy=false; m_qsoReview.clear(); emit qsoReviewChanged();
     if (m_qsoComparisonCancel) m_qsoComparisonCancel->store(true);
     if (!m_qsoComparisonBusy) {
         m_qsoComparisonTimer.stop(); m_qsoComparisonRemoteWatcher.reset(); m_qsoComparisonSummary.clear(); m_qsoComparisonRows.clear();
         emit qsoComparisonChanged();
     }
+}
+
+bool NetController::qsoComparisonCurrent() const
+{
+    return !m_qsoComparisonBusy && m_ctx.db && m_ctx.db->isOpen() && !m_qsoComparisonSummary.isEmpty()
+        && !m_qsoComparisonSummary.value(QStringLiteral("stale")).toBool() && m_ctx.db->path()==m_qsoComparisonPath
+        && m_ctx.db->identity()==m_qsoComparisonIdentity && m_ctx.db->openGeneration()==m_qsoComparisonOpenGeneration
+        && m_ctx.db->openFileIdentity()==m_qsoComparisonFileIdentity && m_ctx.db->fileIdentityMatchesOpen()
+        && m_ctx.db->changeStamp()==m_qsoComparisonStamp && fileidentity::read(m_qsoComparisonRemotePath)==m_qsoComparisonRemoteFileIdentity
+        && m_qsoComparisonRemoteWatcher && m_qsoComparisonRemoteWatcher->fileIdentityMatchesOpen()
+        && m_qsoComparisonRemoteWatcher->dataVersion()==m_qsoComparisonRemoteVersion;
+}
+bool NetController::reviewQsoComparison(const QString& uuid)
+{
+    if (m_qsoReviewBusy || uuid.isEmpty() || !qsoComparisonCurrent()) return false;
+    QVariantMap selected;
+    for (const auto& value:m_qsoComparisonRows) if (value.toMap().value(QStringLiteral("uuid")).toString()==uuid) { selected=value.toMap(); break; }
+    if (selected.isEmpty()) return false;
+    const QString local=m_qsoComparisonPath, remote=m_qsoComparisonRemotePath, localId=m_qsoComparisonIdentity;
+    const QString remoteId=m_qsoComparisonSummary.value(QStringLiteral("remoteIdentity")).toString();
+    const QByteArray localFile=m_qsoComparisonFileIdentity, remoteFile=m_qsoComparisonRemoteFileIdentity;
+    const quint64 generation=++m_qsoReviewGeneration; m_qsoReviewBusy=true; m_qsoReview.clear(); emit qsoReviewChanged();
+    QPointer<NetController> self(this);
+    m_qsoComparisonPool.start([self,local,remote,localId,remoteId,localFile,remoteFile,selected,uuid,generation] {
+        QVariantMap output; QString error; ContestNetInventory a,b;
+        if (!a.begin(local) || !b.begin(remote)) error=QStringLiteral("Cannot open a log snapshot");
+        else if (a.logIdentity()!=localId || b.logIdentity()!=remoteId || a.fileIdentity()!=localFile || b.fileIdentity()!=remoteFile) error=QStringLiteral("A log file changed");
+        else {
+            const auto left=a.findUuid(uuid,4*1024*1024), right=b.findUuid(uuid,4*1024*1024);
+            if (!left.ok || !right.ok) error=!left.ok?left.error:right.error;
+            else {
+                auto matches=[&](const ContestNetInventoryPage& page,const char* hashKey,const char* revKey,const char* deletedKey) {
+                    const auto expected=selected.value(QLatin1String(hashKey)).toString();
+                    if (expected.isEmpty()) return page.rows.isEmpty();
+                    if (page.rows.size()!=1) return false;
+                    const auto& row=page.rows.first();
+                    return QString::fromLatin1(row.contentHash.toHex())==expected && row.revision==selected.value(QLatin1String(revKey)).toInt()
+                        && row.deleted==selected.value(QLatin1String(deletedKey)).toBool();
+                };
+                if (!matches(left,"localHash","localRevision","localDeleted") || !matches(right,"remoteHash","remoteRevision","remoteDeleted")) error=QStringLiteral("A QSO changed; compare again");
+                else {
+                    QMap<QString,QString> localFields,remoteFields;
+                    auto fill=[](const ContestNetInventoryPage& page,QMap<QString,QString>& fields) {
+                        if (page.rows.isEmpty()) return;
+                        const auto document=adif::parse(page.rows.first().adifPayload);
+                        if (document.records.size()==1) for (const auto& f:document.records.first().fields()) fields.insert(f.name,f.value);
+                    };
+                    fill(left,localFields); fill(right,remoteFields); QSet<QString> names(localFields.keyBegin(),localFields.keyEnd());
+                    for (auto it=remoteFields.cbegin();it!=remoteFields.cend();++it) names.insert(it.key());
+                    QStringList ordered=names.values(); ordered.sort(Qt::CaseSensitive); QVariantList fields;
+                    for (const auto& name:ordered) fields.append(QVariantMap{{QStringLiteral("name"),name},{QStringLiteral("local"),localFields.value(name)},
+                        {QStringLiteral("remote"),remoteFields.value(name)},{QStringLiteral("localPresent"),localFields.contains(name)},{QStringLiteral("remotePresent"),remoteFields.contains(name)}});
+                    output={{QStringLiteral("ok"),true},{QStringLiteral("uuid"),uuid},{QStringLiteral("kind"),selected.value(QStringLiteral("kind"))},
+                            {QStringLiteral("localDeleted"),selected.value(QStringLiteral("localDeleted"))},{QStringLiteral("remoteDeleted"),selected.value(QStringLiteral("remoteDeleted"))},
+                            {QStringLiteral("fields"),fields}};
+                    if (!a.fileIdentityCurrent() || !b.fileIdentityCurrent()) { output.clear(); error=QStringLiteral("A log file changed"); }
+                }
+            }
+        }
+        if (!self) return;
+        QMetaObject::invokeMethod(self,[self,generation,output,error] {
+            if (!self || self->m_qsoReviewGeneration!=generation) return;
+            self->m_qsoReviewBusy=false;
+            if (!self->qsoComparisonCurrent()) self->m_qsoReview={{QStringLiteral("error"),self->tr("A log changed; compare again.")}};
+            else if (!error.isEmpty()) self->m_qsoReview={{QStringLiteral("error"),error}};
+            else self->m_qsoReview=output;
+            emit self->qsoReviewChanged();
+        },Qt::QueuedConnection);
+    });
+    return true;
 }
 
 QString NetController::configureDurableSerialAuthority(const QString& scope, const QString& authority)

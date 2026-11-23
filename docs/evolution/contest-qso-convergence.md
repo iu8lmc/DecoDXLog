@@ -27,3 +27,5 @@ An experimental `applyMissing` operation can transactionally insert a fully reas
 A separate experimental review token can guard a caller-selected edit or soft deletion of an existing local QSO. It compares the local revision, deleted state and ADIF fingerprint and the received payload again inside the write transaction; local revisions continue independently. This is a primitive for a future operator review, not an automatic conflict policy. The review also guards QSO columns, service metadata, enrichment rows and attachment metadata/link state; it does not hash attachment binary data. It is not connected to UI or networking.
 
 A pinned inventory can also fetch an individual UUID without advancing its page cursor. The lookup returns the same snapshot content and uses the same payload and file-identity guards as pagination; it does not itself authorize or apply a change.
+
+The offline comparison UI can inspect all ADIF fields of a displayed difference using direct UUID lookup in fresh pinned snapshots, guarded against observed log changes. This remains read-only; long values are visually truncated and attachments/local-only metadata are not displayed.
