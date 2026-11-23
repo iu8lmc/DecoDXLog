@@ -22,6 +22,18 @@
 #include <algorithm>
 
 namespace decolog::core::activityreport {
+bool beginVerifiedSnapshot(QSqlDatabase& db,const QString& expectedIdentity,QString* error)
+{
+    if (error) error->clear();
+    if (!db.isOpen() || expectedIdentity.isEmpty()) { if (error) *error=QStringLiteral("Invalid log identity"); return false; }
+    if (!db.transaction()) { if (error) *error=db.lastError().text(); return false; }
+    QSqlQuery q(db);
+    if (!q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) || !q.next() || q.value(0).toString()!=expectedIdentity) {
+        if (error) *error=QStringLiteral("The log identity changed; run the report again.");
+        db.rollback(); return false;
+    }
+    return true;
+}
 namespace {
 const QString reportPrefix=QStringLiteral("saved_report.");
 bool definitionFailure(QString* error,const QString& message) { if (error) *error=message; return false; }

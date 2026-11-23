@@ -9,6 +9,23 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void reportSnapshotRejectsAnotherLogAndPinsData()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase first, other;
+        QVERIFY(first.open(dir.filePath("first.sqlite"))); QVERIFY(other.open(dir.filePath("other.sqlite")));
+        QVERIFY(first.identity()!=other.identity());
+        QVERIFY(first.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QString error; QSqlDatabase wrong=other.connection();
+        QVERIFY(!activityreport::beginVerifiedSnapshot(wrong,first.identity(),&error)); QVERIFY(!error.isEmpty());
+        QSqlDatabase snapshot=first.connection(); error.clear(); QVERIFY2(activityreport::beginVerifiedSnapshot(snapshot,first.identity(),&error),qPrintable(error));
+        LogDatabase writer; QVERIFY(writer.open(dir.filePath("first.sqlite")));
+        QVERIFY(writer.insertQso(AdifRecord{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        auto result=activityreport::run(snapshot,2026,"20m"); QVERIFY(result.error.isEmpty()); QCOMPARE(result.rows.first().toMap().value("count").toInt(),1);
+        QVERIFY(snapshot.rollback());
+        auto refreshed=activityreport::run(first.connection(),2026,"20m"); QVERIFY(refreshed.error.isEmpty()); QCOMPARE(refreshed.rows.first().toMap().value("count").toInt(),2);
+        QVERIFY(!activityreport::beginVerifiedSnapshot(snapshot,QString(),&error));
+        QCOMPARE(first.qsoCount(),qint64(2)); QCOMPARE(other.qsoCount(),qint64(0));
+    }
     void savedDefinitionsAreIndependentAndRejectStaleChanges()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("reports.sqlite");
