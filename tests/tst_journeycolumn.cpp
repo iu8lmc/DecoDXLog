@@ -148,6 +148,17 @@ private slots:
         QVERIFY2(launch(dir,QStringLiteral("contestaudiodevicesprobe"),restored,3000),restored.constData());
         QVERIFY2(restored.contains("PROBE contestDevices input=BlackHole 2ch output=BlackHole 2ch") && !restored.contains("TypeError"),restored.constData());
     }
+    void contestAudioDiscoversAndRecoversPartialThroughApp()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        decolog::core::ContestAudioFile writer; QVERIFY(writer.start(dir.path(),64,QDateTime::currentDateTimeUtc()));
+        QCOMPARE(writer.append(QByteArray::fromHex("01020304")).written,qint64(4)); const QString partial=writer.partialPath(); writer.abandon();
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("contestaudiopartialsprobe:")+dir.path(),output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE contestPartials count=1 recovered=true") && !output.contains("TypeError"),output.constData());
+        QVERIFY(!QFile::exists(partial)); QFile wav(partial.left(partial.size()-5)); QVERIFY(wav.open(QIODevice::ReadOnly));
+        QCOMPARE(wav.readAll().mid(44),QByteArray::fromHex("01020304"));
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void contestReportFindsCandidateInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");

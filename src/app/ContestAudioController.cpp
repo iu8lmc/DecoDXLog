@@ -144,6 +144,25 @@ void ContestAudioController::stopPlayback()
     m_playbackBaseMs=0; m_playbackDurationMs=0; m_playbackRate=0; m_activeOutputId.clear();
     emit changed();
 }
+bool ContestAudioController::findPartials(const QUrl &folder)
+{
+    if (m_partialSearchBusy || !folder.isLocalFile()) return false;
+    m_partialSearchBusy=true; emit changed(); QPointer<ContestAudioController> self(this);
+    m_searchPool.start([self,folder] {
+        const auto found=core::ContestAudioFile::findPartials(folder.toLocalFile()); QVariantList files;
+        for (const auto &item:found.files)
+            files << QVariantMap{{QStringLiteral("url"),QUrl::fromLocalFile(item.path)}, {QStringLiteral("name"),QFileInfo(item.path).fileName()},
+                {QStringLiteral("bytes"),item.bytes}, {QStringLiteral("valid"),item.valid}, {QStringLiteral("error"),item.error}};
+        const QVariantMap result{{QStringLiteral("folder"),folder},{QStringLiteral("files"),files},
+            {QStringLiteral("inspected"),found.inspected},{QStringLiteral("truncated"),found.truncated},{QStringLiteral("error"),found.error}};
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,result] {
+            if (!self) return;
+            self->m_partialSearchBusy=false; emit self->changed(); emit self->partialsFound(result);
+        },Qt::QueuedConnection);
+    });
+    return true;
+}
 bool ContestAudioController::findRecordings(const QUrl &folder, const QString &qsoUtc)
 {
     const QDateTime when=QDateTime::fromString(qsoUtc,Qt::ISODateWithMs);

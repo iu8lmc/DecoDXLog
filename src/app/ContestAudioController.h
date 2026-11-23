@@ -30,6 +30,7 @@ class ContestAudioController : public QObject {
     Q_PROPERTY(qint64 playbackPositionMs READ playbackPositionMs NOTIFY changed)
     Q_PROPERTY(qint64 playbackDurationMs READ playbackDurationMs NOTIFY changed)
     Q_PROPERTY(bool searchBusy READ searchBusy NOTIFY changed)
+    Q_PROPERTY(bool partialSearchBusy READ partialSearchBusy NOTIFY changed)
   public:
     explicit ContestAudioController(QObject *parent=nullptr);
     ~ContestAudioController() override;
@@ -40,6 +41,7 @@ class ContestAudioController : public QObject {
     qint64 playbackPositionMs() const;
     qint64 playbackDurationMs() const { return m_playbackDurationMs; }
     bool searchBusy() const { return m_searchBusy; }
+    bool partialSearchBusy() const { return m_partialSearchBusy; }
     int inputIndex() const;
     bool recording() const { return m_recording; }
     qint64 bytesWritten() const { return m_file.bytesWritten(); }
@@ -51,6 +53,7 @@ class ContestAudioController : public QObject {
     Q_INVOKABLE void stopPlayback();
     Q_INVOKABLE bool seekPlayback(int seconds);
     Q_INVOKABLE bool recoverFile(const QUrl &partial);
+    Q_INVOKABLE bool findPartials(const QUrl &folder);
     Q_INVOKABLE bool findRecordings(const QUrl &folder, const QString &qsoUtc);
     // Reconcile the active streams against a fresh backend device inventory.
     void reconcileInputDevices(const QList<QByteArray> &ids);
@@ -65,6 +68,7 @@ class ContestAudioController : public QObject {
     void devicesChanged();
     void finished(bool success, const QString &path, const QString &message);
     void recordingsFound(const QVariantMap &result);
+    void partialsFound(const QVariantMap &result);
   private:
     void drain();
     void finish(bool success, const QString &reason);
@@ -80,7 +84,7 @@ class ContestAudioController : public QObject {
     bool m_seeking{false};
     QThreadPool m_searchPool;
     std::unique_ptr<QLockFile> m_directoryLock;
-    bool m_searchBusy{false};
+    bool m_searchBusy{false}, m_partialSearchBusy{false};
     QByteArray m_inputId, m_outputId, m_activeInputId, m_activeOutputId, m_inputPending;
     QAudioFormat m_inputFormat;
     bool m_defaultOutput{true};

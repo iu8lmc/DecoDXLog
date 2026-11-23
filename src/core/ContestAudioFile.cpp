@@ -144,6 +144,30 @@ ContestAudioFile::Location ContestAudioFile::locate(const QString &path, const Q
     return result;
 }
 
+ContestAudioFile::PartialSearch ContestAudioFile::findPartials(const QString &directory, int maxFiles, int maxResults)
+{
+    PartialSearch result; const QFileInfo folder(directory);
+    if (!folder.isDir() || !folder.isReadable() || maxFiles<1 || maxFiles>1000 || maxResults<1 || maxResults>50) {
+        result.error=QStringLiteral("Invalid audio folder or scan limit"); return result;
+    }
+    static const QRegularExpression name(QStringLiteral("^contest-audio-[0-9]{8}T[0-9]{9}Z-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.wav\\.part$"));
+    QDirIterator it(directory,{QStringLiteral("contest-audio-*.wav.part")},QDir::Files | QDir::NoSymLinks | QDir::Hidden | QDir::System);
+    while (it.hasNext()) {
+        if (result.inspected==maxFiles) { result.truncated=true; break; }
+        const QString path=it.next(); ++result.inspected;
+        if (result.files.size()==maxResults) { result.truncated=true; continue; }
+        const QFileInfo info=it.fileInfo(); Partial entry; entry.path=path; entry.bytes=info.size();
+        QFile f(path);
+        if (!name.match(info.fileName()).hasMatch()) entry.error=QStringLiteral("Unrecognised filename");
+        else if (!f.open(QIODevice::ReadOnly)) entry.error=f.errorString();
+        else if (entry.bytes<44 || entry.bytes-44>maximumDataBytes || (entry.bytes-44)%2 || !validatedRate(f.read(44)))
+            entry.error=QStringLiteral("Incomplete or invalid PCM WAV");
+        else entry.valid=true;
+        result.files.append(entry);
+    }
+    std::sort(result.files.begin(),result.files.end(),[](const Partial &a,const Partial &b) { return a.path<b.path; });
+    return result;
+}
 ContestAudioFile::FolderBudget ContestAudioFile::folderBudget(const QString &directory, qint64 limitBytes, int maxFiles)
 {
     FolderBudget result; const QFileInfo folder(directory);

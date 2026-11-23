@@ -147,6 +147,18 @@ class TestContestAudioController : public QObject {
         QCOMPARE(qFromLittleEndian<qint16>(bytes.constData()+44),qint16(16384));
         QCOMPARE(qFromLittleEndian<qint16>(bytes.constData()+46),qint16(-16384));
     }
+    void asynchronouslyDiscoversPartialsWithoutRecoveringThem()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::core::ContestAudioFile writer;
+        QVERIFY(writer.start(dir.path(),64,QDateTime::currentDateTimeUtc())); QCOMPARE(writer.append(QByteArray::fromHex("0102")).written,qint64(2));
+        const QString path=writer.partialPath(); writer.abandon(); decolog::app::ContestAudioController controller;
+        QSignalSpy done(&controller,&decolog::app::ContestAudioController::partialsFound);
+        QVERIFY(controller.findPartials(QUrl::fromLocalFile(dir.path()))); QVERIFY(!controller.findPartials(QUrl::fromLocalFile(dir.path())));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,3000); const auto result=done.first().at(0).toMap();
+        QVERIFY(result.value("error").toString().isEmpty()); const auto rows=result.value("files").toList(); QCOMPARE(rows.size(),1);
+        QVERIFY(rows.first().toMap().value("valid").toBool()); QCOMPARE(rows.first().toMap().value("url").toUrl(),QUrl::fromLocalFile(path));
+        QVERIFY(QFile::exists(path)); QVERIFY(!QFile::exists(path.left(path.size()-5)));
+    }
     void asynchronouslyFindsRecordingsWithoutChangingFiles()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); decolog::core::ContestAudioFile writer;

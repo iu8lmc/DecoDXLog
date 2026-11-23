@@ -68,6 +68,18 @@ class TestContestAudio : public QObject {
         QFile altered(path); QVERIFY(altered.open(QIODevice::ReadWrite)); QVERIFY(altered.seek(40)); altered.write("bad!"); altered.close();
         QVERIFY(!ContestAudioFile::locate(path,start).error.isEmpty());
     }
+    void discoversValidAndDamagedPartialsWithoutChangingThem()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile first,second; const auto now=QDateTime::currentDateTimeUtc();
+        QVERIFY(first.start(dir.path(),100,now)); QCOMPARE(first.append(QByteArray(4,'x')).written,qint64(4)); const QString valid=first.partialPath(); first.abandon();
+        QVERIFY(second.start(dir.path(),100,now)); const QString broken=second.partialPath(); second.abandon();
+        QFile damaged(broken); QVERIFY(damaged.open(QIODevice::WriteOnly|QIODevice::Truncate)); QCOMPARE(damaged.write("bad"),qint64(3)); damaged.close();
+        const auto result=ContestAudioFile::findPartials(dir.path(),1000,50); QVERIFY(result.error.isEmpty()); QCOMPARE(result.files.size(),2);
+        for (const auto &item:result.files) { if (item.path==valid) QVERIFY(item.valid); else if (item.path==broken) QVERIFY(!item.valid); else QFAIL("unexpected file"); }
+        const auto limited=ContestAudioFile::findPartials(dir.path(),1,50); QCOMPARE(limited.inspected,1); QVERIFY(limited.truncated);
+        const auto resultLimit=ContestAudioFile::findPartials(dir.path(),1000,1); QCOMPARE(resultLimit.files.size(),1); QVERIFY(resultLimit.truncated);
+        QCOMPARE(QFileInfo(broken).size(),qint64(3)); QVERIFY(QFile::exists(valid));
+    }
     void folderBudgetIncludesWavAndPartialsWithoutDeletingFiles()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile first,second; const auto now=QDateTime::currentDateTimeUtc();

@@ -55,6 +55,11 @@ RoundedWindow {
         console.warn("PROBE contestAudio restored=" + (String(contestAudioDialog.folder).length>0))
         openAudioForQso({utc:"2026-11-23T12:00:01Z",call:"K1ABC"})
     }
+    function probeContestAudioPartials(folder) {
+        contestAudioDialog.folder=folder
+        contestAudioDialog.probingPartials=true
+        contestAudioDialog.open()
+    }
     function probeContestAudioRecovery(path) {
         contestAudioDialog.open()
         contestAudioDialog.recoverPartial(path)
@@ -924,9 +929,9 @@ RoundedWindow {
     }
 
     // Invio e Esc valgono ovunque nella finestra.
-    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
-    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
+    Shortcut { sequence: "Return"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Enter"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.logQso() }
+    Shortcut { sequence: "Esc"; enabled: !contestAudioDialog.visible && !contestAudioFolder.visible && !contestAudioPlaybackFile.visible && !contestAudioRecoveryFile.visible && !partialAudioDialog.visible && !reportReview.visible && !reportHistory.visible && !contestReportFile.visible && !contestReportExportFile.visible; onActivated: root.clearEntry() }
 
     FileDialog {
         id: contestReportExportFile
@@ -1068,10 +1073,29 @@ RoundedWindow {
         property var foundRecordings: []
         property string findMessage: ""
         property bool probingFind: false
-        onFolderChanged: { foundRecordings=[]; findMessage="" }
+        property bool probingPartials: false
+        property var partials: []
+        property string partialMessage: ""
+        function scanPartials() { if (String(folder).length && !decolog.contestAudio.partialSearchBusy) decolog.contestAudio.findPartials(folder) }
+        onOpened: scanPartials()
+        onFolderChanged: { foundRecordings=[]; findMessage=""; partials=[]; partialMessage=""; if (visible) scanPartials() }
         onQsoUtcChanged: { foundRecordings=[]; findMessage="" }
         Connections {
             target:decolog.contestAudio
+            function onPartialsFound(result) {
+                if (String(result.folder)!==String(contestAudioDialog.folder)) { if (contestAudioDialog.visible) Qt.callLater(() => contestAudioDialog.scanPartials()); return }
+                contestAudioDialog.partials=result.files || []
+                contestAudioDialog.partialMessage=result.error ? result.error : qsTr("%1 interrupted recordings%2").arg(contestAudioDialog.partials.length).arg(result.truncated ? qsTr(" · scan limited") : "")
+                if (contestAudioDialog.probingPartials) {
+                    contestAudioDialog.probingPartials=false
+                    partialAudioDialog.open()
+                    Qt.callLater(() => {
+                        const row=partialAudioRows.itemAtIndex(0)
+                        if (row) row.recoverFromList()
+                        console.warn("PROBE contestPartials count=" + contestAudioDialog.partials.length + " recovered=" + (decolog.contestAudio.lastPath.length>0))
+                    })
+                }
+            }
             function onRecordingsFound(result) {
                 if (String(result.folder)!==String(contestAudioDialog.folder) || result.qsoUtc!==contestAudioDialog.qsoUtc) {
                     if (contestAudioDialog.visible && contestAudioDialog.qsoUtc.length && String(contestAudioDialog.folder).length)
@@ -1116,7 +1140,9 @@ RoundedWindow {
                 text:decolog.contestAudio.message + (decolog.contestAudio.recording ? qsTr(" · %1 bytes").arg(decolog.contestAudio.bytesWritten) : "") }
             RowLayout {
                 Layout.fillWidth:true
-                GlassButton { text:qsTr("Recover partial recording…"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing; onClicked:contestAudioRecoveryFile.open() }
+                GlassButton { text:qsTr("Interrupted recordings…"); enabled:String(contestAudioDialog.folder).length>0; onClicked: { contestAudioDialog.scanPartials(); partialAudioDialog.open() } }
+                GlassButton { text:qsTr("Choose partial…"); enabled:!decolog.contestAudio.recording && !decolog.contestAudio.playing; onClicked:contestAudioRecoveryFile.open() }
+                Text { color:Theme.warningColor; text:contestAudioDialog.partialMessage; wrapMode:Text.Wrap }
                 Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:decolog.contestAudio.lastPath }
             }
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
@@ -1166,6 +1192,29 @@ RoundedWindow {
                 Text { Layout.fillWidth:true; color:Theme.textSecondary
                     text:qsTr("Approx. %1 s / %2 s").arg((decolog.contestAudio.playbackPositionMs/1000).toFixed(1)).arg((decolog.contestAudio.playbackDurationMs/1000).toFixed(1)) }
             }
+        }
+    }
+    DialogFrame {
+        id:partialAudioDialog; dialogKey:"contestAudioPartials"; width:680; height:400
+        title:qsTr("Interrupted contest recordings"); dotColor:Theme.warningColor
+        ColumnLayout {
+            anchors.fill:parent; spacing:8
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Review partial files before recovery. A file being recorded by another instance cannot be recovered. No file is recovered automatically.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:contestAudioDialog.partialMessage }
+            ListView {
+                id:partialAudioRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:contestAudioDialog.partials
+                ScrollBar.vertical:PanelScrollBar {}
+                delegate:RowLayout { required property var modelData; width:partialAudioRows.width
+                    function recoverFromList() { recoverPartialButton.clicked() }
+                    Text { Layout.fillWidth:true; wrapMode:Text.WrapAnywhere; color:modelData.valid ? Theme.textPrimary : Theme.warningColor
+                        text:modelData.name + " · " + modelData.bytes + " B" + (modelData.valid ? "" : " · " + modelData.error) }
+                    GlassButton { id:recoverPartialButton; text:qsTr("Recover"); enabled:modelData.valid && !decolog.contestAudio.recording && !decolog.contestAudio.playing
+                        onClicked: { if (decolog.contestAudio.recoverFile(modelData.url)) contestAudioDialog.scanPartials() } }
+                }
+            }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary; text:decolog.contestAudio.message }
+            GlassButton { Layout.alignment:Qt.AlignRight; text:qsTr("Close"); onClicked:partialAudioDialog.close() }
         }
     }
     FileDialog { id:contestAudioRecoveryFile; title:qsTr("Choose interrupted contest recording"); fileMode:FileDialog.OpenFile; nameFilters:[qsTr("Partial contest audio (*.wav.part)")]; onAccepted:contestAudioDialog.recoverPartial(selectedFile) }
