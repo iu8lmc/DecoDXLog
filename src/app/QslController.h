@@ -12,6 +12,8 @@
 #include <QDir>
 #include <QHash>
 #include <QObject>
+#include <QLockFile>
+#include <memory>
 #include <QQueue>
 #include <QSet>
 #include <QStringList>
@@ -40,6 +42,7 @@ class QslController : public QObject {
     Q_PROPERTY(QString tqslLocation READ tqslLocation WRITE setTqslLocation NOTIFY changed)
     Q_PROPERTY(bool tqslReady READ tqslReady NOTIFY changed)
     Q_PROPERTY(QString clubLogApiKey READ clubLogApiKey WRITE setClubLogApiKey NOTIFY changed)
+    Q_PROPERTY(QVariantMap lotwPendingInfo READ lotwPendingInfo NOTIFY changed)
     Q_PROPERTY(QString clubLogPendingState READ clubLogPendingState NOTIFY changed)
     Q_PROPERTY(QVariantMap clubLogPendingInfo READ clubLogPendingInfo NOTIFY changed)
     Q_PROPERTY(QVariantList clubLogOqrsRequests READ clubLogOqrsRequests NOTIFY changed)
@@ -86,6 +89,8 @@ public:
     bool tqslReady() const;
     QString clubLogApiKey() const { return m_clubLogApiKey; }
     void setClubLogApiKey(const QString& key);
+    QVariantMap lotwPendingInfo() const;
+    Q_INVOKABLE bool acknowledgeLotwPending(const QString& nonce);
     QString clubLogPendingState() const;
     QVariantMap clubLogPendingInfo() const;
     Q_INVOKABLE void resumeClubLogPendingUpload();
@@ -159,6 +164,8 @@ private:
     void readSecret(const QString& service, std::function<void(const QString&, const QString&)> done);
 
     Context m_ctx;
+    // Declared before the uploader so its subprocess is destroyed before the lock.
+    std::unique_ptr<QLockFile> m_lotwFlightLock;
     core::TqslUploader m_tqsl;
     core::WebQslUploader m_web;
     core::ClubLogOqrsClient m_oqrs;
@@ -200,6 +207,10 @@ private:
     QHash<QString, QString> m_lastResult;
     QHash<QString, bool> m_auto;
     QString m_adifFile;             // file temporaneo di TQSL
+    QString m_lotwCheckpointNonce, m_lotwLogIdentity, m_lotwLogPath;
+    QByteArray m_lotwFileIdentity;
+    quint64 m_lotwOpenGeneration{0};
+    QHash<qint64, QPair<QString, int>> m_lotwQsoVersions;
     int m_accepted{0};
     int m_duplicates{0};
     int m_rejected{0};

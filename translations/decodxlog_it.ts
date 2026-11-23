@@ -9681,6 +9681,22 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
         <source>Each profile stores the CAT link, radio model, serial parameters, PTT/keyer ports and decoder audio device. Changes are saved automatically. The selected profile is restored when DecoDXLog starts again.</source>
         <translation>Ogni profilo salva il collegamento CAT, il modello della radio, i parametri seriali, le porte PTT/keyer e il dispositivo audio del decoder. Le modifiche vengono salvate automaticamente. Il profilo selezionato viene ripristinato al riavvio di DecoDXLog.</translation>
     </message>
+    <message>
+        <source>Review LoTW batch</source>
+        <translation>Verifica lotto LoTW</translation>
+    </message>
+    <message>
+        <source>After an application crash, TQSL may still be running; wait until it stops. Clear this checkpoint only after checking the original batch in LoTW and correcting local QSO statuses. Clearing does not mark any QSO as sent and can allow another upload.</source>
+        <translation>Dopo un arresto anomalo dell’applicazione, TQSL potrebbe essere ancora in esecuzione: attendi che termini. Rimuovi questo checkpoint solo dopo aver verificato il lotto originale su LoTW e corretto gli stati locali dei QSO. La rimozione non marca alcun QSO come inviato e può consentire un nuovo invio.</translation>
+    </message>
+    <message>
+        <source>LoTW batch awaiting review: %1 contacts, location %2, log %3. No new LoTW upload can start until reviewed.</source>
+        <translation>Lotto LoTW da verificare: %1 contatti, posizione %2, log %3. Non è possibile avviare un nuovo invio LoTW prima della verifica.</translation>
+    </message>
+    <message>
+        <source>Acknowledge reviewed LoTW batch…</source>
+        <translation>Conferma verifica del lotto LoTW…</translation>
+    </message>
 </context>
 <context>
     <name>SpotDialog</name>
@@ -13476,6 +13492,54 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
     <message>
         <source>LoTW upload cancelled after launch; check the original batch in LoTW before retrying</source>
         <translation>Invio LoTW annullato dopo l’avvio; controlla il lotto originale su LoTW prima di riprovare</translation>
+    </message>
+    <message>
+        <source>LoTW: an earlier batch needs review before another upload</source>
+        <translation>LoTW: un lotto precedente deve essere verificato prima di un nuovo invio</translation>
+    </message>
+    <message>
+        <source>LoTW: cannot clear the checkpoint; open its original log and review the batch</source>
+        <translation>LoTW: impossibile rimuovere il checkpoint; apri il log originale e verifica il lotto</translation>
+    </message>
+    <message>
+        <source>LoTW: checkpoint cleared after operator review; QSO statuses were not changed</source>
+        <translation>LoTW: checkpoint rimosso dopo la verifica dell’operatore; gli stati dei QSO non sono stati modificati</translation>
+    </message>
+    <message>
+        <source>LoTW automatic upload paused: review the previous batch before retrying</source>
+        <translation>Invio automatico LoTW sospeso: verifica il lotto precedente prima di riprovare</translation>
+    </message>
+    <message>
+        <source>LoTW: cannot verify the open log</source>
+        <translation>LoTW: impossibile verificare il log aperto</translation>
+    </message>
+    <message>
+        <source>LoTW: cannot prepare the batch</source>
+        <translation>LoTW: impossibile preparare il lotto</translation>
+    </message>
+    <message>
+        <source>LoTW: cannot save the batch checkpoint; no upload started</source>
+        <translation>LoTW: impossibile salvare il checkpoint del lotto; nessun invio avviato</translation>
+    </message>
+    <message>
+        <source>LoTW: cannot write the temporary ADIF</source>
+        <translation>LoTW: impossibile scrivere l’ADIF temporaneo</translation>
+    </message>
+    <message>
+        <source>LoTW: checkpoint could not be cleared; review the batch before retrying</source>
+        <translation>LoTW: impossibile rimuovere il checkpoint; verifica il lotto prima di riprovare</translation>
+    </message>
+    <message>
+        <source>LoTW: an upload is still running; review it after it stops</source>
+        <translation>LoTW: un invio è ancora in corso; verificalo dopo l’arresto</translation>
+    </message>
+    <message>
+        <source>LoTW: cannot lock the upload checkpoint; no upload started</source>
+        <translation>LoTW: impossibile bloccare il checkpoint; nessun invio avviato</translation>
+    </message>
+    <message>
+        <source>LoTW: another upload or review is in progress</source>
+        <translation>LoTW: è già in corso un altro invio o una verifica</translation>
     </message>
 </context>
 <context>

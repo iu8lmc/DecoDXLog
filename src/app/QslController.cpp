@@ -6,6 +6,11 @@
 #include "core/ClubLogAccessGuard.h"
 #include "core/ClubLogUploadJournal.h"
 #include "core/LogDatabase.h"
+#include "core/Adif.h"
+#include "core/LotwUploadJournal.h"
+#include <QJsonArray>
+#include <QDateTime>
+#include <QUuid>
 
 #include <QCoreApplication>
 #include <QNetworkAccessManager>
@@ -56,12 +61,6 @@ constexpr int kClubLogBatch = 1000;
 bool isBatchService(const QString& service)
 {
     return service == QLatin1String("lotw") || service == QLatin1String("clublog");
-}
-
-QString tempAdifPath()
-{
-    return QDir(QStandardPaths::writableLocation(QStandardPaths::TempLocation))
-        .filePath(QStringLiteral("decolog-lotw-upload.adi"));
 }
 
 } // namespace
@@ -164,6 +163,11 @@ QslController::QslController(Context context, QObject* parent)
     });
     for (const auto& info : kServices)
         m_auto.insert(QLatin1String(info.id), s.value(QStringLiteral("qsl/auto/") + QLatin1String(info.id), false).toBool());
+    if (LotwUploadJournal(s).pending() && m_auto.value(QStringLiteral("lotw"))) {
+        m_auto.insert(QStringLiteral("lotw"),false);
+        s.setValue(QStringLiteral("qsl/auto/lotw"),false); s.sync();
+        note(tr("LoTW automatic upload paused: review the previous batch before retrying"),QStringLiteral("warning"));
+    }
     m_tqsl.setProgram(m_tqslPath);
 
     connect(&m_tqsl, &TqslUploader::finished, this, &QslController::finishBatch);
@@ -761,6 +765,13 @@ void QslController::setTqslLocation(const QString& location)
 
 void QslController::setAutoUpload(const QString& service, bool automatic)
 {
+    if (service == QLatin1String("lotw") && automatic) {
+        QSettings settings; LotwUploadJournal journal(settings);
+        if (journal.pending() || settings.status()!=QSettings::NoError) {
+            note(tr("LoTW: an earlier batch needs review before another upload"), QStringLiteral("warning"));
+            return;
+        }
+    }
     if (m_auto.value(service) == automatic)
         return;
     m_auto.insert(service, automatic);
@@ -858,6 +869,34 @@ void QslController::qsoEdited(qint64 id)
     }
     if (scheduled)
         m_autoDelay.start();
+}
+
+QVariantMap QslController::lotwPendingInfo() const
+{
+    QSettings settings; LotwUploadJournal journal(settings);
+    if (!journal.pending()) return {};
+    const QJsonObject obj=journal.info();
+    return {{QStringLiteral("pending"),true},{QStringLiteral("nonce"),obj.value(QStringLiteral("nonce")).toString()},
+            {QStringLiteral("logIdentity"),obj.value(QStringLiteral("logIdentity")).toString()},
+            {QStringLiteral("logPath"),obj.value(QStringLiteral("logPath")).toString()},
+            {QStringLiteral("location"),obj.value(QStringLiteral("location")).toString()},
+            {QStringLiteral("createdAt"),obj.value(QStringLiteral("createdAt")).toString()},
+            {QStringLiteral("sha256"),obj.value(QStringLiteral("sha256")).toString()},
+            {QStringLiteral("contacts"),obj.value(QStringLiteral("contacts")).toArray().toVariantList()},
+            {QStringLiteral("count"),obj.value(QStringLiteral("contacts")).toArray().size()}};
+}
+bool QslController::acknowledgeLotwPending(const QString& nonce)
+{
+    QSettings settings; LotwUploadJournal journal(settings); const QJsonObject obj=journal.info();
+    QLockFile flight(settings.fileName()+QStringLiteral(".lotw-flight.lock"));
+    if (!flight.tryLock(0)) { note(tr("LoTW: an upload is still running; review it after it stops"),QStringLiteral("warning")); return false; }
+    if (busy() || !m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen() ||
+        obj.value(QStringLiteral("logIdentity")).toString().isEmpty() || obj.value(QStringLiteral("logIdentity")).toString()!=m_ctx.db->identity() ||
+        obj.value(QStringLiteral("logPath")).toString()!=m_ctx.db->path() || !journal.clear(nonce)) {
+        note(tr("LoTW: cannot clear the checkpoint; open its original log and review the batch"), QStringLiteral("warning")); return false;
+    }
+    note(tr("LoTW: checkpoint cleared after operator review; QSO statuses were not changed"), QStringLiteral("warning"));
+    emit changed(); return true;
 }
 
 void QslController::uploadQso(qint64 id, const QString& service)
@@ -963,21 +1002,71 @@ void QslController::startNext()
     emit changed();
 
     if (m_busyService == QLatin1String("lotw")) {
-        const QString path = tempAdifPath();
-        QFile file(path);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            QslUploadResult failed;
-            failed.message = tr("Cannot write %1").arg(path);
-            finishBatch(failed);
-            return;
+        QSettings settings; LotwUploadJournal journal(settings);
+        if (journal.pending() || settings.status()!=QSettings::NoError) {
+            QslUploadResult failed; failed.requiresReconciliation=true;
+            failed.message=tr("LoTW: an earlier batch needs review before another upload"); finishBatch(failed); return;
         }
-        file.write(m_ctx.db->exportAdif(m_batch, QCoreApplication::applicationVersion()));
-        file.close();
-        m_adifFile = path;
-        const QString location = m_tqslLocation.isEmpty() && m_ctx.stationLocation ? m_ctx.stationLocation()
-                                                                                   : m_tqslLocation;
+        if (settings.fileName().isEmpty() || !QDir().mkpath(QFileInfo(settings.fileName()).absolutePath())) {
+            QslUploadResult failed; failed.requiresReconciliation=true; failed.message=tr("LoTW: cannot lock the upload checkpoint; no upload started"); finishBatch(failed); return;
+        }
+        m_lotwFlightLock=std::make_unique<QLockFile>(settings.fileName()+QStringLiteral(".lotw-flight.lock"));
+        if (!m_lotwFlightLock->tryLock(0)) {
+            m_lotwFlightLock.reset(); QslUploadResult failed; failed.requiresReconciliation=true;
+            failed.message=tr("LoTW: another upload or review is in progress"); finishBatch(failed); return;
+        }
+        settings.sync();
+        if (journal.pending() || settings.status()!=QSettings::NoError) {
+            QslUploadResult failed; failed.requiresReconciliation=true; failed.message=tr("LoTW: an earlier batch needs review before another upload"); finishBatch(failed); return;
+        }
+        if (!m_ctx.db->fileIdentityMatchesOpen() || m_ctx.db->identity().isEmpty()) {
+            QslUploadResult failed; failed.message=tr("LoTW: cannot verify the open log"); finishBatch(failed); return;
+        }
+        QSqlDatabase snapshotDb=m_ctx.db->connection();
+        if (!snapshotDb.transaction()) {
+            QslUploadResult failed; failed.message=tr("LoTW: cannot prepare the batch"); finishBatch(failed); return;
+        }
+        const QByteArray adif=m_ctx.db->exportAdif(m_batch,QCoreApplication::applicationVersion());
+        const AdifDocument document=adif::parse(adif);
+        QJsonArray contacts; QHash<qint64,QPair<QString,int>> versions;
+        bool snapshotOk=!adif.isEmpty() && !m_batch.isEmpty() && document.records.size()==m_batch.size();
+        for (qsizetype i=0; snapshotOk && i<m_batch.size(); ++i) {
+            const qint64 id=m_batch.at(i); const auto meta=m_ctx.db->meta(id);
+            if (!meta || meta->deleted || meta->uuid.isEmpty()) { snapshotOk=false; break; }
+            const auto& record=document.records.at(i);
+            versions.insert(id,qMakePair(meta->uuid,meta->revision));
+            contacts.append(QJsonObject{{QStringLiteral("id"),QString::number(id)},{QStringLiteral("uuid"),meta->uuid},{QStringLiteral("revision"),meta->revision},
+                {QStringLiteral("call"),record.value(QStringLiteral("CALL"))},{QStringLiteral("date"),record.value(QStringLiteral("QSO_DATE"))},
+                {QStringLiteral("time"),record.value(QStringLiteral("TIME_ON"))},{QStringLiteral("band"),record.value(QStringLiteral("BAND"))},
+                {QStringLiteral("mode"),record.value(QStringLiteral("MODE"))},{QStringLiteral("submode"),record.value(QStringLiteral("SUBMODE"))}});
+        }
+        if (!snapshotOk || contacts.isEmpty()) {
+            snapshotDb.rollback(); QslUploadResult failed; failed.message=tr("LoTW: cannot prepare the batch"); finishBatch(failed); return;
+        }
+        if (!snapshotDb.commit()) {
+            snapshotDb.rollback(); QslUploadResult failed; failed.message=tr("LoTW: cannot prepare the batch"); finishBatch(failed); return;
+        }
+        const QString location=m_tqslLocation.isEmpty() && m_ctx.stationLocation ? m_ctx.stationLocation() : m_tqslLocation;
+        const QString nonce=QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QJsonObject checkpoint{{QStringLiteral("version"),1},{QStringLiteral("nonce"),nonce},
+            {QStringLiteral("logIdentity"),m_ctx.db->identity()},{QStringLiteral("logPath"),m_ctx.db->path()},
+            {QStringLiteral("location"),location},{QStringLiteral("createdAt"),QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+            {QStringLiteral("sha256"),QString::fromLatin1(QCryptographicHash::hash(adif,QCryptographicHash::Sha256).toHex())},
+            {QStringLiteral("contacts"),contacts}};
+        if (!journal.begin(checkpoint)) {
+            QslUploadResult failed; failed.requiresReconciliation=true; failed.message=tr("LoTW: cannot save the batch checkpoint; no upload started"); finishBatch(failed); return;
+        }
+        m_lotwCheckpointNonce=nonce; m_lotwLogIdentity=m_ctx.db->identity(); m_lotwLogPath=m_ctx.db->path();
+        m_lotwFileIdentity=m_ctx.db->openFileIdentity(); m_lotwOpenGeneration=m_ctx.db->openGeneration(); m_lotwQsoVersions=versions;
+        emit changed();
+        QTemporaryFile file(QDir::tempPath()+QStringLiteral("/decolog-lotw-XXXXXX.adi")); file.setAutoRemove(false);
+        if (!file.open() || file.write(adif)!=adif.size() || !file.flush()) {
+            const QString path=file.fileName(); file.close(); if (!path.isEmpty()) QFile::remove(path);
+            QslUploadResult failed; failed.message=tr("LoTW: cannot write the temporary ADIF"); finishBatch(failed); return;
+        }
+        m_adifFile=file.fileName(); file.close();
         note(tr("LoTW: sending %n QSO with TQSL…", nullptr, static_cast<int>(m_batch.size())), QStringLiteral("info"));
-        m_tqsl.upload(path, location, static_cast<int>(m_batch.size()));
+        m_tqsl.upload(m_adifFile,location,static_cast<int>(m_batch.size()));
         return;
     }
 
@@ -1365,7 +1454,8 @@ bool QslController::saveBatchStates(const QString& service, const QslUploadResul
 {
     decolog::StartupSpan trace("QSL save batch upload statuses");
     if (m_batch.isEmpty()) return true;
-    if (m_batch.size() == 1) return markSent(m_batch.first(), service, state);
+    const bool guardedLotw=service==QLatin1String("lotw") && !m_lotwCheckpointNonce.isEmpty();
+    if (m_batch.size() == 1 && !guardedLotw) return markSent(m_batch.first(), service, state);
 
     // Group local status writes after a single remote batch response, avoiding
     // a separate durable commit for every contact in a LoTW or Club Log batch.
@@ -1374,8 +1464,15 @@ bool QslController::saveBatchStates(const QString& service, const QslUploadResul
     const int accepted = m_accepted, duplicates = m_duplicates, rejected = m_rejected;
     const auto previousChanges = m_uploadChanges;
     bool saved = true;
+    if (guardedLotw) {
+        if (m_lotwQsoVersions.size()!=m_batch.size()) saved=false;
+        for (qint64 id : std::as_const(m_batch)) {
+            const auto meta=m_ctx.db->meta(id); const auto expected=m_lotwQsoVersions.value(id);
+            if (!meta || meta->deleted || meta->uuid!=expected.first || meta->revision!=expected.second) { saved=false; break; }
+        }
+    }
     for (qint64 id : std::as_const(m_batch)) {
-        if (!markSent(id, service, state)) {
+        if (!saved || !markSent(id, service, state)) {
             saved = false;
             break;
         }
@@ -1420,6 +1517,11 @@ void QslController::finishBatch(const QslUploadResult& result)
                 clubLogStatePersisted = markSent(m_batch.first(), service, result);
                 batchStateSaved = clubLogStatePersisted;
             }
+        } else if (result.ok && service == QLatin1String("lotw") && !m_lotwCheckpointNonce.isEmpty() &&
+                   (!m_ctx.db || !m_ctx.db->isOpen() || !m_ctx.db->fileIdentityMatchesOpen() ||
+                    m_ctx.db->path()!=m_lotwLogPath || m_ctx.db->identity()!=m_lotwLogIdentity ||
+                    m_ctx.db->openFileIdentity()!=m_lotwFileIdentity || m_ctx.db->openGeneration()!=m_lotwOpenGeneration)) {
+            batchStateSaved=false;
         } else if (result.ok) {
             QslUploadResult state;
             state.ok = true;
@@ -1442,6 +1544,18 @@ void QslController::finishBatch(const QslUploadResult& result)
     if (!batchStateSaved && m_auto.value(service))
         setAutoUpload(service, false);
 
+    if (service == QLatin1String("lotw") && !m_lotwCheckpointNonce.isEmpty()) {
+        if ((!result.ok && !result.requiresReconciliation) || (result.ok && batchStateSaved)) {
+            QSettings settings; LotwUploadJournal journal(settings);
+            if (!journal.clear(m_lotwCheckpointNonce)) {
+                batchStateSaved=false;
+                if (m_auto.value(service)) setAutoUpload(service,false);
+                note(tr("LoTW: checkpoint could not be cleared; review the batch before retrying"), QStringLiteral("warning"));
+            }
+        }
+        m_lotwCheckpointNonce.clear(); m_lotwLogIdentity.clear(); m_lotwLogPath.clear(); m_lotwFileIdentity.clear(); m_lotwQsoVersions.clear();
+    }
+
     if (m_clubLogRestJournalThisRun) {
         if (!result.requiresReconciliation && (!result.ok || clubLogStatePersisted)) {
             QSettings settings;
@@ -1453,6 +1567,7 @@ void QslController::finishBatch(const QslUploadResult& result)
             note(tr("Club Log: remote result received but local save failed; checkpoint retained for reconciliation"), QStringLiteral("warning"));
         m_clubLogRestJournalThisRun = false;
     }
+    if (service == QLatin1String("lotw")) m_lotwFlightLock.reset();
     m_clubLogRestStage.clear();
     m_clubLogRestCall.clear();
     m_clubLogJournalNonce.clear();

@@ -31,6 +31,30 @@ DialogFrame {
                                   qsTr("Sync & Cloud"), qsTr("QSL services"), qsTr("Callbook"),
                                   qsTr("Radio (CAT)"), qsTr("Rotor"), qsTr("Backup"), qsTr("Callsign lists")]
 
+    MessageDialog {
+        id: lotwCheckpointReview
+        property string nonce: ""
+        title: qsTr("Review LoTW batch")
+        text: qsTr("After an application crash, TQSL may still be running; wait until it stops. Clear this checkpoint only after checking the original batch in LoTW and correcting local QSO statuses. Clearing does not mark any QSO as sent and can allow another upload.")
+        buttons: MessageDialog.Yes | MessageDialog.No
+        onButtonClicked: function(button, role) { if (button === MessageDialog.Yes) decolog.qsl.acknowledgeLotwPending(nonce) }
+    }
+
+    function probeLotwCheckpoint(viewOnly) {
+        const flick=pageScroll.contentItem
+        root.scrollTo(lotwCheckpointNote.mapToItem(flick,0,0).y + flick.contentY - 80)
+        if (viewOnly) return
+        console.warn("PROBE lotwCheckpoint shown=" + lotwCheckpointNote.visible + " count=" + decolog.qsl.lotwPendingInfo.count
+                     + " call=" + lotwCheckpointList.text.includes("K1ABC") + " action=" + lotwCheckpointButton.visible)
+        lotwCheckpointButton.clicked()
+        console.warn("PROBE lotwCheckpoint confirm=" + lotwCheckpointReview.visible)
+        lotwCheckpointReview.close()
+        console.warn("PROBE lotwCheckpoint cancelled=" + !!decolog.qsl.lotwPendingInfo.pending)
+        lotwCheckpointButton.clicked()
+        lotwCheckpointReview.buttonClicked(MessageDialog.Yes, 0)
+        console.warn("PROBE lotwCheckpoint cleared=" + !decolog.qsl.lotwPendingInfo.pending)
+    }
+
     // Per le prove: la meta' di sotto di una pagina lunga si vede solo
     // scorrendo, e una prova non ha un dito da passare sulla rotella.
     function scrollToBottom() {
@@ -1586,6 +1610,32 @@ DialogFrame {
                         text: qsTr("The certificate stays in TQSL: DecoDXLog writes a temporary ADIF, TQSL signs it and sends it. "
                                    + "Duplicates are not an error, LoTW simply keeps the one it already has. Sending, automatic sending "
                                    + "and the counters are in the QSL tab at the bottom.")
+                    }
+                    Note {
+                        id: lotwCheckpointNote
+                        visible: !!decolog.qsl.lotwPendingInfo.pending
+                        color: Theme.warningColor
+                        text: qsTr("LoTW batch awaiting review: %1 contacts, location %2, log %3. No new LoTW upload can start until reviewed.")
+                              .arg(decolog.qsl.lotwPendingInfo.count || 0).arg(decolog.qsl.lotwPendingInfo.location || "—").arg(decolog.qsl.lotwPendingInfo.logPath || "—")
+                    }
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 130
+                        visible: !!decolog.qsl.lotwPendingInfo.pending
+                        clip: true
+                        TextArea {
+                            id: lotwCheckpointList
+                            readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; color: Theme.textPrimary
+                            text: (decolog.qsl.lotwPendingInfo.contacts || []).map(c =>
+                                "#" + c.id + " · " + c.call + " · " + c.date + " " + c.time + " UTC · " + c.band + " · " + (c.submode || c.mode) + " · " + c.uuid + " / r" + c.revision).join("\n")
+                        }
+                    }
+                    GlassButton {
+                        id: lotwCheckpointButton
+                        visible: !!decolog.qsl.lotwPendingInfo.pending
+                        enabled: !decolog.qsl.busy && !!decolog.qsl.lotwPendingInfo.nonce
+                        text: qsTr("Acknowledge reviewed LoTW batch…")
+                        onClicked: { lotwCheckpointReview.nonce=decolog.qsl.lotwPendingInfo.nonce; lotwCheckpointReview.open() }
                     }
                     SectionTitle { text: "Club Log" }
                     RowLayout {

@@ -9,7 +9,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLockFile>
 #include <QPointer>
+#include <QProcess>
+#include <QProcessEnvironment>
 #include <QFile>
 #include <QDir>
 #include <QSettings>
@@ -560,6 +563,139 @@ private slots:
             QCOMPARE(repeated.duplicates, 1);
             QVERIFY(db.qsosToUpload("clublog", 0).isEmpty());
         }
+    }
+
+    void lotwInterruptedProcessChild()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("POSIX fake process fixture");
+#endif
+        const QString root=qEnvironmentVariable("DECOLOG_LOTW_CHILD_ROOT"); if (root.isEmpty()) QSKIP("Child fixture only");
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,root); QSettings().clear();
+        LogDatabase db; QVERIFY(db.open(QDir(root).filePath("log.sqlite"))); QVERIFY(db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QslController controller(ctx);
+        controller.m_tqsl.setProgram(QDir(root).filePath("fake-tqsl")); controller.setAutoUpload("lotw",true); controller.uploadPending("lotw",0);
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(QDir(root).filePath("started")),5000);
+        std::fprintf(stdout,"LOTW_CHILD_READY\n"); std::fflush(stdout);
+        for (;;) QTest::qWait(1000);
+    }
+    void lotwCheckpointSurvivesAbruptControllerProcessExit()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString root=dir.path(), script=dir.filePath("fake-tqsl"), started=dir.filePath("started"), ended=dir.filePath("ended");
+        QFile f(script); QVERIFY(f.open(QIODevice::WriteOnly)); f.write("#!/bin/sh\necho start >> "+QFile::encodeName(started)+"\nread ignored || true\ntouch "+QFile::encodeName(ended)+"\n"); f.close(); QVERIFY(f.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        QProcess child; auto env=QProcessEnvironment::systemEnvironment(); env.insert("DECOLOG_LOTW_CHILD_ROOT",root); child.setProcessEnvironment(env); child.setProcessChannelMode(QProcess::MergedChannels);
+        child.start(QCoreApplication::applicationFilePath(),{"lotwInterruptedProcessChild"}); QVERIFY(child.waitForStarted(5000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("LOTW_CHILD_READY") && timer.elapsed()<10000 && child.state()!=QProcess::NotRunning) { child.waitForReadyRead(100); output+=child.readAll(); }
+        const bool ready=output.contains("LOTW_CHILD_READY"); if (!ready) { child.kill(); child.waitForFinished(5000); } QVERIFY2(ready,output.constData());
+        struct RestoreSettingsPath { QString path; ~RestoreSettingsPath() { QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,path); } } restore{m_dir.path()};
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,root); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; };
+        { QslController concurrent(ctx); const auto pending=concurrent.lotwPendingInfo(); QVERIFY(pending.value("pending").toBool());
+          QVERIFY(!concurrent.acknowledgeLotwPending(pending.value("nonce").toString())); QVERIFY(concurrent.lotwPendingInfo().value("pending").toBool()); }
+        child.kill(); QVERIFY(child.waitForFinished(5000)); QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ended),5000);
+        QslController restarted(ctx); restarted.m_tqsl.setProgram(script);
+        const auto checkpoint=restarted.lotwPendingInfo(); QVERIFY(checkpoint.value("pending").toBool()); QCOMPARE(checkpoint.value("count").toInt(),1); QVERIFY(!restarted.autoUpload("lotw"));
+        restarted.setAutoUpload("lotw",true); QVERIFY(!restarted.autoUpload("lotw")); restarted.uploadPending("lotw",0); QTest::qWait(200);
+        QFile starts(started); QVERIFY(starts.open(QIODevice::ReadOnly)); QCOMPARE(starts.readAll().count("start"),1);
+        QVERIFY(!restarted.acknowledgeLotwPending("wrong")); QVERIFY(restarted.acknowledgeLotwPending(checkpoint.value("nonce").toString())); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+    }
+
+    void lotwSuccessfulProcessDoesNotMarkEditedQsoSent()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), ready=dir.filePath("ready"), release=dir.filePath("release");
+        QFile file(script); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\nwhile [ ! -e "+QFile::encodeName(release)+" ]; do sleep 0.05; done\nexit 0\n"); file.close(); QVERIFY(file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        const QString path=dir.filePath("log.sqlite"); LogDatabase db,other; QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.setAutoUpload("lotw",true); controller.uploadPending("lotw",0);
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ready),5000); auto changed=other.record(qso.id); QVERIFY(changed); changed->set("COMMENT","edited after export"); QVERIFY(other.updateQso(qso.id,*changed).status==InsertResult::Status::Inserted);
+        QFile gate(release); QVERIFY(gate.open(QIODevice::WriteOnly)); gate.close(); QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(),5000);
+        QVERIFY(controller.lotwPendingInfo().value("pending").toBool()); QVERIFY(!controller.autoUpload("lotw")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1); QCOMPARE(db.record(qso.id)->value("COMMENT"),QString("edited after export"));
+    }
+
+    void lotwSuccessAfterLogSwitchDoesNotTouchNewLog()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), ready=dir.filePath("ready"), release=dir.filePath("release");
+        QFile file(script); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\nwhile [ ! -e "+QFile::encodeName(release)+" ]; do sleep 0.05; done\nexit 0\n"); file.close(); QVERIFY(file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        const QString first=dir.filePath("first.sqlite"), second=dir.filePath("second.sqlite"); LogDatabase db; QVERIFY(db.open(first));
+        const auto one=db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(one.id>0);
+        { LogDatabase other; QVERIFY(other.open(second)); QVERIFY(other.insertQso({{"CALL","K1BBB"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0); }
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.uploadPending("lotw",0);
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ready),5000); const auto checkpoint=controller.lotwPendingInfo(); db.close(); QVERIFY(db.open(second));
+        QFile gate(release); QVERIFY(gate.open(QIODevice::WriteOnly)); gate.close(); QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(),5000);
+        QVERIFY(controller.lotwPendingInfo().value("pending").toBool()); QCOMPARE(db.record(1)->value("CALL"),QString("K1BBB")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+        QVERIFY(!controller.acknowledgeLotwPending(checkpoint.value("nonce").toString())); db.close(); QVERIFY(db.open(first)); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+        QVERIFY(controller.acknowledgeLotwPending(checkpoint.value("nonce").toString()));
+    }
+    void malformedLotwCheckpointFailsClosed()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        QVERIFY(db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QSettings settings; settings.setValue("lotwPendingUpload/checkpoint",QByteArray("not-json")); settings.setValue("qsl/auto/lotw",true); settings.sync();
+        QslController::Context ctx; ctx.db=&db; QslController controller(ctx); QVERIFY(!controller.autoUpload("lotw")); QVERIFY(controller.lotwPendingInfo().value("pending").toBool());
+        controller.uploadPending("lotw",0); QVERIFY(!controller.busy()); QVERIFY(!controller.acknowledgeLotwPending("anything")); QVERIFY(QSettings().contains("lotwPendingUpload/checkpoint")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+    }
+
+    void lotwCheckpointLockFailurePreventsLaunch()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), ready=dir.filePath("ready"); QFile f(script);
+        QVERIFY(f.open(QIODevice::WriteOnly)); f.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\n"); f.close(); QVERIFY(f.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QVERIFY(db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.setAutoUpload("lotw",true);
+        QSettings settings; QLockFile lock(settings.fileName()+QStringLiteral(".lotw-submit.lock")); QVERIFY(lock.tryLock(0)); controller.uploadPending("lotw",0);
+        QVERIFY(!controller.busy()); QVERIFY(!controller.autoUpload("lotw")); QVERIFY(!QFile::exists(ready)); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+    }
+
+    void lotwCheckpointTracksSuccessAndUncertainBatch()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), ready=dir.filePath("ready");
+        QFile executable(script); QVERIFY(executable.open(QIODevice::WriteOnly)); executable.write("#!/bin/sh\ntouch "+QFile::encodeName(ready)+"\nexec sleep 30\n"); executable.close(); QVERIFY(executable.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"COMMENT","DO_NOT_LOG_PRIVATE_DATA"}},"fixture"); QVERIFY(qso.id>0);
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; ctx.stationLocation=[] { return QStringLiteral("synthetic station"); };
+        { QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.setAutoUpload("lotw",true); controller.uploadPending("lotw",0);
+          QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(ready),5000); const QVariantMap pending=controller.lotwPendingInfo(); QVERIFY(!QSettings().value("lotwPendingUpload/checkpoint").toByteArray().contains("DO_NOT_LOG_PRIVATE_DATA")); QVERIFY(pending.value("pending").toBool()); QCOMPARE(pending.value("count").toInt(),1);
+          QCOMPARE(pending.value("logIdentity").toString(),db.identity()); QCOMPARE(pending.value("location").toString(),QString("synthetic station"));
+          { LogDatabase secondDb; QVERIFY(secondDb.open(db.path())); QslController::Context secondCtx; secondCtx.db=&secondDb; QslController secondController(secondCtx);
+            QVERIFY(!secondController.acknowledgeLotwPending(pending.value("nonce").toString())); QVERIFY(secondController.lotwPendingInfo().value("pending").toBool()); }
+          QFile transmitted(controller.m_adifFile); QVERIFY(transmitted.open(QIODevice::ReadOnly));
+          QCOMPARE(QString::fromLatin1(QCryptographicHash::hash(transmitted.readAll(),QCryptographicHash::Sha256).toHex()),pending.value("sha256").toString()); transmitted.close();
+          const auto contacts=pending.value("contacts").toList(); QCOMPARE(contacts.size(),1); QCOMPARE(contacts.first().toMap().value("call").toString(),QString("K1ABC")); QCOMPARE(contacts.first().toMap().value("band").toString(),QString("20m")); QVERIFY(!controller.acknowledgeLotwPending(pending.value("nonce").toString()));
+          controller.cancel(); QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(),5000); QVERIFY(controller.lotwPendingInfo().value("pending").toBool()); QVERIFY(!controller.autoUpload("lotw")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1); }
+        { QslController restarted(ctx); const auto pending=restarted.lotwPendingInfo(); QVERIFY(pending.value("pending").toBool()); QVERIFY(!restarted.acknowledgeLotwPending("wrong"));
+          QVERIFY(restarted.acknowledgeLotwPending(pending.value("nonce").toString())); QVERIFY(!restarted.lotwPendingInfo().value("pending").toBool()); QCOMPARE(db.qsosToUpload("lotw",0).size(),1); }
+        QVERIFY(executable.open(QIODevice::WriteOnly|QIODevice::Truncate)); executable.write("#!/bin/sh\nexit 0\n"); executable.close();
+        { QslController controller(ctx); controller.m_tqsl.setProgram(script); controller.uploadPending("lotw",0); QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(),5000);
+          QVERIFY(!controller.lotwPendingInfo().value("pending").toBool()); QVERIFY(db.qsosToUpload("lotw",0).isEmpty()); }
+    }
+
+    void lotwPendingCheckpointBlocksAutomaticAndManualSends()
+    {
+#ifdef Q_OS_WIN
+        QSKIP("POSIX fake process fixture");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString script=dir.filePath("fake-tqsl"), started=dir.filePath("started");
+        QFile file(script); QVERIFY(file.open(QIODevice::WriteOnly)); file.write("#!/bin/sh\ntouch "+QFile::encodeName(started)+"\nexec sleep 30\n"); file.close(); QVERIFY(file.setPermissions(QFileDevice::ReadOwner|QFileDevice::WriteOwner|QFileDevice::ExeOwner));
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        QJsonObject checkpoint{{"version",1},{"nonce","synthetic-nonce"},{"logIdentity",db.identity()},{"logPath",db.path()},{"location","test"},{"sha256",QString(64,'a')},{"contacts",QJsonArray{QJsonObject{{"id",QString::number(qso.id)},{"uuid",db.meta(qso.id)->uuid},{"revision",1}}}}};
+        QSettings settings; settings.setValue("lotwPendingUpload/checkpoint",QString::fromUtf8(QJsonDocument(checkpoint).toJson(QJsonDocument::Compact))); settings.setValue("qsl/auto/lotw",true); settings.sync();
+        QslController::Context ctx; ctx.db=&db; ctx.tqslCertificateCheck=[] { return true; }; QslController controller(ctx); controller.m_tqsl.setProgram(script); QVERIFY(!controller.autoUpload("lotw")); controller.setAutoUpload("lotw",true);
+        controller.uploadPending("lotw",0); QTest::qWait(400); const bool launched=QFile::exists(started); if (controller.m_tqsl.busy()) { controller.cancel(); QTRY_VERIFY_WITH_TIMEOUT(!controller.m_tqsl.busy(),5000); }
+        QVERIFY2(!launched,"An unresolved LoTW checkpoint must prevent another send"); QVERIFY(!controller.autoUpload("lotw")); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+        QSettings after; QVERIFY(!after.value("lotwPendingUpload/checkpoint").toString().isEmpty());
     }
 
     void tqslCrashPausesAutomaticUploadAndPersistsPause()

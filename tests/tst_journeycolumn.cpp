@@ -491,6 +491,21 @@ private slots:
         QVERIFY2(output.contains("PROBE vuccReview open=true row=EM11") && output.contains("local confirmation: card") && output.contains("other recorded: eqsl") && output.contains("unsupported confirmation sources: eqsl") && !output.contains("TypeError"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }
+    void lotwCheckpointReviewRequiresExplicitConfirmation()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString identity,uuid;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto qso=db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0); identity=db.identity(); uuid=db.meta(qso.id)->uuid; }
+        QJsonObject checkpoint{{"version",1},{"nonce","synthetic-nonce"},{"logIdentity",identity},{"logPath",dir.filePath("test.sqlite")},{"location","test"},{"sha256",QString(64,'a')},
+            {"contacts",QJsonArray{QJsonObject{{"id","1"},{"uuid",uuid},{"revision",1},{"call","K1ABC"},{"date","20261101"},{"time","1200"},{"band","20m"},{"mode","CW"},{"submode",""}}}}};
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("lotwPendingUpload/checkpoint",QJsonDocument(checkpoint).toJson(QJsonDocument::Compact)); settings.sync(); }
+        const QString capture=qEnvironmentVariable("DECOLOG_LOTW_UI_CAPTURE");
+        if (!capture.isEmpty()) { QByteArray visual; QVERIFY2(launch(dir,"lotwcheckpointview",visual,3000),visual.constData());
+            const QString source=dir.filePath("screen-2.png"); QVERIFY2(QFile::copy(source,capture),qPrintable(source)); }
+        QByteArray output; QVERIFY2(launch(dir,"lotwcheckpointprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE lotwCheckpoint shown=true count=1 call=true action=true") && output.contains("PROBE lotwCheckpoint confirm=true") && output.contains("PROBE lotwCheckpoint cancelled=true") && output.contains("PROBE lotwCheckpoint cleared=true") && !output.contains("TypeError"),output.constData());
+        QSettings verify(iniPath(dir),QSettings::IniFormat); QVERIFY(!verify.contains("lotwPendingUpload/checkpoint")); LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsosToUpload("lotw",0).size(),1);
+    }
+
     void importPreviewCanCancelAndRestart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto path=dir.filePath("source.adi"); QFile input(path);
