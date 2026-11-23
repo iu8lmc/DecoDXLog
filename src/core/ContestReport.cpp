@@ -89,7 +89,7 @@ Report parseCqWw(const QByteArray& bytes)
     const QRegularExpression contestRx(QStringLiteral(R"(^Contest:\s*(\d{4}\s+CQ\s+WORLD\s+WIDE\s+.*CONTEST)\s*$)"), QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression callRx(QStringLiteral(R"(^Call:\s*([A-Z0-9/]+)\s*$)"), QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression headingRx(QStringLiteral(R"(^\s*\*{3,}\s*(.*?)\s*\*{3,}\s*$)"));
-    const QRegularExpression rowRx(QStringLiteral(R"(^\s*(\d{3,6}(?:\.\d+)?)\s+(\S+)\s+(\d{4}-\d{2}-\d{2})\s+(\d{4})\s+([A-Z0-9/]+)\s+(\S+)\s+([A-Z0-9/]+)\s+(\S+)(?:\s+correct\s+(\S+))?\s*$)"), QRegularExpression::CaseInsensitiveOption);
+    const QRegularExpression rowRx(QStringLiteral(R"(^\s*(\d{3,6}(?:\.\d+)?)\s+(\S+)\s+(\d{4}-\d{2}-\d{2})\s+(\d{4})\s+([A-Z0-9/]+)\s+(\S+)\s+([A-Z0-9/]+)\s+(\S+)(?:\s+(?:correct\s+(\S+)|(incorrect\s+call)))?\s*$)"), QRegularExpression::CaseInsensitiveOption);
     for (const QString& line : report.lines) {
         const auto contest = contestRx.match(line.trimmed());
         const auto call = callRx.match(line.trimmed());
@@ -116,10 +116,11 @@ Report parseCqWw(const QByteArray& bytes)
         }
         if (section.isEmpty() || line.trimmed().isEmpty()) continue;
         const auto row=rowRx.match(line.trimmed());
-        const bool correctionRequired = section != QLatin1String("not_in_log");
+        const bool uncorrectedCall = section == QLatin1String("incorrect_call") && !row.captured(10).isEmpty();
+        const bool correctionRequired = section != QLatin1String("not_in_log") && !uncorrectedCall;
         if (!row.hasMatch() || row.captured(5).compare(report.ownCall,Qt::CaseInsensitive)!=0 ||
             !QDate::fromString(row.captured(3),Qt::ISODate).isValid() || !QTime::fromString(row.captured(4),QStringLiteral("HHmm")).isValid() ||
-            (correctionRequired != !row.captured(9).isEmpty())) {
+            (!row.captured(10).isEmpty() && !uncorrectedCall) || (correctionRequired != !row.captured(9).isEmpty())) {
             report.unrecognizedLines.append(int(i));
             continue;
         }

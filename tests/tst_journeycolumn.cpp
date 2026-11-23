@@ -71,11 +71,11 @@ private slots:
     void selectedContestFindingsInActualApp()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
-        const QByteArray a="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1AAA 14\nunknown line\n";
+        const QByteArray a="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1AAA 14\nunknown line\n****** Incorrect Call ******\n7020 CW 2024-11-23 1202 K1ABC 05 DL1BAD 14 incorrect call\n";
         const QByteArray b="Contest: 2025 CQ WORLD WIDE CW DX CONTEST\nCall: K2ABC\n****** Incorrect Call ******\n7020 CW 2025-11-22 1202 K2ABC 05 DL2BAD 14 correct DL2GOOD\n";
         QFile fa(dir.filePath("a.rpt")), fb(dir.filePath("b.rpt")); QVERIFY(fa.open(QIODevice::WriteOnly)); QCOMPARE(fa.write(a),a.size()); fa.close(); QVERIFY(fb.open(QIODevice::WriteOnly)); QCOMPARE(fb.write(b),b.size()); fb.close();
         QByteArray output; QVERIFY2(launch(dir,"contestfindingsprobe:"+dir.path(),output,4500),output.constData());
-        QVERIFY2(output.contains("PROBE contestFindings nilA=1 callB=1 unknownA=1 error=") && !output.contains("TypeError"),output.constData());
+        QVERIFY2(output.contains("PROBE contestFindings nilA=1 callA=1 callB=1 unknownA=1 error=") && !output.contains("TypeError"),output.constData());
         QByteArray stale; QVERIFY2(launch(dir,"contestfindingsstaleprobe:"+dir.path(),stale,4500),stale.constData());
         QVERIFY2(stale.contains("PROBE contestFindings stale=true") && !stale.contains("TypeError"),stale.constData());
         QVERIFY(fa.open(QIODevice::ReadOnly)); QCOMPARE(fa.readAll(),a); QVERIFY(fb.open(QIODevice::ReadOnly)); QCOMPARE(fb.readAll(),b);

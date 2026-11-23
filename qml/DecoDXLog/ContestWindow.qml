@@ -1222,7 +1222,7 @@ RoundedWindow {
                     comparisonFindings.result=({}); comparisonFindings.errorText=qsTr("The selection changed; compare again."); if (comparisonFindings.probingStale) console.warn("PROBE contestFindings stale=true"); return
                 }
                 comparisonFindings.result=r.error ? ({}) : r; comparisonFindings.errorText=r.error || ""
-                if (comparisonFindings.probing) console.warn("PROBE contestFindings nilA="+r.nilA+" callB="+r.callB+" unknownA="+r.unknownA+" error="+comparisonFindings.errorText)
+                if (comparisonFindings.probing) console.warn("PROBE contestFindings nilA="+r.nilA+" callA="+r.callA+" callB="+r.callB+" unknownA="+r.unknownA+" error="+comparisonFindings.errorText)
             }
         }
         ColumnLayout { anchors.fill:parent; spacing:10

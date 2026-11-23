@@ -4,10 +4,22 @@
 #include <QTest>
 #include <QSqlQuery>
 #include <QTemporaryDir>
+#include <QFile>
 using namespace decolog::core;
 class TestContestComparison : public QObject {
     Q_OBJECT
   private slots:
+    void publicCqWwEditionsWhenProvided()
+    {
+        const auto pathA=qEnvironmentVariable("CQWW_COMPARE_A"), pathB=qEnvironmentVariable("CQWW_COMPARE_B");
+        if (pathA.isEmpty() || pathB.isEmpty()) QSKIP("Optional public CQ WW comparison reports not provided");
+        QFile a(pathA), b(pathB); QVERIFY(a.open(QIODevice::ReadOnly)); QVERIFY(b.open(QIODevice::ReadOnly));
+        const auto ra=contestreport::parseCqWw(a.readAll()), rb=contestreport::parseCqWw(b.readAll());
+        const auto r=contestcomparison::compareFindings(ra,rb,"CQ-WW-CW",QDate(2022,11,26),QDate(2022,11,27),QDate(2023,11,25),QDate(2023,11,26));
+        QVERIFY2(r.error.isEmpty(),qPrintable(r.error)); QCOMPARE(r.ownCallA,QString("P33W")); QCOMPARE(r.ownCallB,QString("P33W"));
+        QCOMPARE(r.nilA,75); QCOMPARE(r.callA,79); QCOMPARE(r.exchangeA,7); QCOMPARE(r.nilB,83); QCOMPARE(r.callB,100); QCOMPARE(r.exchangeB,11);
+        QCOMPARE(r.unknownA,0); QCOMPARE(r.unknownB,0); QCOMPARE(r.outsideA,0); QCOMPARE(r.outsideB,0);
+    }
     void overlappingPeriodsAndMalformedExtrasAreExplicit()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

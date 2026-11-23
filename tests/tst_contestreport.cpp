@@ -143,6 +143,19 @@ private slots:
         for (const auto& entry : report.entries) { if (entry.kind=="not_in_log") ++nil; else if (entry.kind=="incorrect_call") ++calls; else if (entry.kind=="incorrect_exchange") ++exchange; }
         QCOMPARE(nil,14); QCOMPARE(calls,20); QCOMPARE(exchange,6); QCOMPARE(report.unrecognizedLines.size(),0);
     }
+    void acceptsExplicitIncorrectCallWithoutInventingCorrection()
+    {
+        const QByteArray text="Contest: 2022 CQ WORLD WIDE CW DX CONTEST\nCall: P33W\n"
+            "****** Incorrect Call ******\n7020 CW 2022-11-26 0308 P33W 20 K8LDQ 05 incorrect call\n"
+            "7020 CW 2022-11-26 0309 P33W 20 K8BAD 05 correct K8GOOD\n"
+            "7020 CW 2022-11-26 0310 P33W 20 K8BAD 05 unknown annotation\n"
+            "****** Not In Log ******\n7020 CW 2022-11-26 0311 P33W 20 K8BAD 05 incorrect call\n"
+            "****** Incorrect Exchange Information ******\n7020 CW 2022-11-26 0312 P33W 20 K8BAD 05 incorrect call\n";
+        const auto report=contestreport::parseCqWw(text); QVERIFY2(report.error.isEmpty(),qPrintable(report.error));
+        QCOMPARE(report.entries.size(),2); QCOMPARE(report.entries[0].kind,QString("incorrect_call"));
+        QVERIFY(report.entries[0].correction.isEmpty()); QCOMPARE(report.entries[1].correction,QString("K8GOOD"));
+        QCOMPARE(report.unrecognizedLines.size(),3); QCOMPARE(report.unrecognizedLines[0],5);
+    }
     void refusesUnrelatedAndOversizedInput()
     {
         QVERIFY(!contestreport::parseCqWw("not a CQ WW report\n").error.isEmpty());
