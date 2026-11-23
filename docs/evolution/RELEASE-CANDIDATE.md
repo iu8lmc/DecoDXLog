@@ -5,3 +5,5 @@ Not prepared. Integrated acceptance across all goals, packaging, clean installs,
 A local macOS arm64 ad-hoc test DMG has been mounted and exercised with an isolated synthetic QSO; see `PROGRESS.md`. This is preliminary evidence only and does not prepare or approve a release candidate.
 
 The common release gate passed locally on macOS arm64 (117 CTest groups, with individual opt-in and platform skips); see `PROGRESS.md` for limits. This does not replace clean packaged-platform acceptance.
+
+A local macOS arm64 ad-hoc test DMG also opened a synthetic schema-29-like log and preserved the compared QSO, QSL, attachment and API data through schema 30; see `PROGRESS.md` for the fixture and limits.
