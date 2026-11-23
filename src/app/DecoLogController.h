@@ -1000,6 +1000,7 @@ private:
     QVariantMap m_qslPlan;
     bool m_qslPlanBusy{false};
     quint64 m_qslPlanGeneration{0};
+    QThreadPool m_qslPlanPool;
     core::DecoLinkServer m_decoLink;
     core::DecoPortLogServer m_hamHubLink;
     bool      m_hamHubLinkEnabled{true};

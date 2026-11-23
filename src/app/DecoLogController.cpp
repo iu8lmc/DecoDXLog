@@ -218,9 +218,11 @@ DecoLogController::DecoLogController(QObject* parent)
     : QObject(parent)
 {
     m_activityModel = new ActivityModel(kMaxActivity, this);
+    m_qslPlanPool.setMaxThreadCount(1);
     auto invalidateQslPlan = [this] {
         if (!m_qslPlanBusy && m_qslPlan.isEmpty()) return;
         ++m_qslPlanGeneration;
+        m_qslPlanPool.clear();
         m_qslPlanBusy = false;
         m_qslPlan.insert(QStringLiteral("stale"), true);
         emit qslPlanChanged();
@@ -705,7 +707,8 @@ void DecoLogController::shutdown()
     ++m_statsGeneration;
     ++m_logVersion;
     m_statsLatest->fetch_add(1);
-    for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool,
+    ++m_qslPlanGeneration;
+    for (QThreadPool* pool : {&m_ctyPool, &m_recoveryPool, &m_statsPool, &m_qslPlanPool,
                               &m_countsPool, &m_backupPool, &m_linkPool,
                               &m_statsViewPool, &m_callInfoPool})
         pool->clear();
@@ -715,6 +718,7 @@ void DecoLogController::shutdown()
     if (m_bulkProgress < 0 && m_importProgress < 0)
         m_importPool.clear();
     m_importPool.waitForDone();
+    m_qslPlanPool.waitForDone();
     // ADIF exports use QSaveFile and must also finish once accepted.
     m_exportPool.waitForDone();
 }
@@ -2267,7 +2271,8 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
     const quint64 generation=++m_qslPlanGeneration;
     m_qslPlan.clear(); m_qslPlanBusy=true; emit qslPlanChanged();
     QPointer<DecoLogController> self(this);
-    m_statsPool.start([self,path,filter,goals,calc,generation] {
+    m_qslPlanPool.clear();
+    m_qslPlanPool.start([self,path,filter,goals,calc,generation] {
         LogDatabase db; qslplanner::Plan plan;
         if (!db.open(path)) plan.error=db.lastError();
         else plan=qslplanner::build(db,filter,goals,calc);

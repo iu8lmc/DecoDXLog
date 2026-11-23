@@ -75,8 +75,13 @@ private slots:
         QVERIFY2(output.contains("sent/unconfirmed alternatives: 2"),output.constData());
         QVERIFY2(output.contains("route evidence older than 180 days; verify") && output.contains("route source: fixture"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan paperqueue queue"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan confirmation") && output.contains("\"uniqueBenefits\":1"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan stale true"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan band result") && output.contains("\"uniqueBenefits\":0"),output.constData());
         QVERIFY2(!output.contains("TypeError"),output.constData());
+        QByteArray reopened; QVERIFY2(launch(dir,"qslplanrestoreprobe",reopened,4500),reopened.constData());
+        QVERIFY2(reopened.contains("PROBE qslplan restored [\"dxcc\",\"waz\"]"),reopened.constData());
+        QVERIFY2(reopened.contains("PROBE qslplan restored result") && reopened.contains("\"uniqueBenefits\":0"),reopened.constData());
     }
     void recoveredRecordsUseTheirJournalPeriod()
     {

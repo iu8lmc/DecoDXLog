@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtCore
 import Decodium.UI
 
 DialogFrame {
@@ -47,6 +48,30 @@ DialogFrame {
     property var vuccResult: ({})
     property var plannerGoals: ["dxcc"]
     property bool plannerSelectionDirty: false
+    Settings { id: plannerSettings; category: "qslPlanner"; property string goalsJson: '["dxcc"]' }
+
+    Component.onCompleted: {
+        try {
+            const saved = JSON.parse(plannerSettings.goalsJson)
+            if (Array.isArray(saved) && saved.every(v => typeof v === "string")) plannerGoals = saved
+        } catch (error) { plannerGoals = ["dxcc"] }
+    }
+
+    function schedulePlannerRefresh() {
+        if (qslPlanner.visible && plannerGoals.length > 0) plannerRefresh.restart()
+    }
+    Timer {
+        id: plannerRefresh; interval: 500
+        onTriggered: {
+            if (!qslPlanner.visible || root.plannerGoals.length === 0) return
+            root.plannerSelectionDirty = false
+            decolog.buildQslPlan(root.plannerGoals)
+        }
+    }
+    Connections {
+        target: decolog
+        function onQslPlanChanged() { if (decolog.qslPlan.stale) root.schedulePlannerRefresh() }
+    }
 
     function togglePlannerGoal(id, enabled) {
         let selected = plannerGoals.slice()
@@ -54,10 +79,24 @@ DialogFrame {
         if (enabled && at < 0) selected.push(id)
         if (!enabled && at >= 0) selected.splice(at, 1)
         plannerGoals = selected
+        plannerSettings.goalsJson = JSON.stringify(selected)
         plannerSelectionDirty = true
+        schedulePlannerRefresh()
     }
 
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
+    function probeQslPlanRestore() { openAt("dxcc"); plannerProbeRestore.start() }
+    Timer {
+        id: plannerProbeRestore; interval: 1000
+        onTriggered: { console.warn("PROBE qslplan restored " + JSON.stringify(root.plannerGoals)); openPlannerButton.clicked(); plannerProbeRestoreResult.start() }
+    }
+    Timer {
+        id: plannerProbeRestoreResult; interval: 250; repeat: true; property int tries: 0
+        onTriggered: {
+            if ((!decolog.qslPlan.candidates || decolog.qslPlanBusy || decolog.qslPlan.stale) && ++tries < 20) return
+            stop(); console.warn("PROBE qslplan restored result " + JSON.stringify(decolog.qslPlan))
+        }
+    }
     Timer {
         id: plannerProbeStart; interval: 1000
         onTriggered: { openPlannerButton.clicked(); root.plannerGoals = ["dxcc", "waz"]; root.plannerSelectionDirty = false; buildPlannerButton.clicked(); plannerProbeCheck.start() }
@@ -74,8 +113,27 @@ DialogFrame {
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
             console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
             paperQueueButton.clicked()
+            decolog.cards.markReceived(2, true)
+            plannerProbeConfirm.start()
+        }
+    }
+    Timer {
+        id: plannerProbeConfirm; interval: 200; repeat: true; property int tries: 0
+        onTriggered: {
+            const p = decolog.qslPlan
+            if ((decolog.qslPlanBusy || p.stale || p.uniqueBenefits !== 1) && ++tries < 25) return
+            stop(); console.warn("PROBE qslplan confirmation " + JSON.stringify(p))
             decolog.awardBand = "40m"
             console.warn("PROBE qslplan stale " + decolog.qslPlan.stale)
+            plannerProbeBand.start()
+        }
+    }
+    Timer {
+        id: plannerProbeBand; interval: 200; repeat: true; property int tries: 0
+        onTriggered: {
+            const p = decolog.qslPlan
+            if ((decolog.qslPlanBusy || p.stale || p.uniqueBenefits !== 0) && ++tries < 20) return
+            stop(); console.warn("PROBE qslplan band result " + JSON.stringify(p))
         }
     }
 
@@ -86,12 +144,13 @@ DialogFrame {
         title: qsTr("Potential QSL plan")
         info: qsTr("Review before requesting; no messages are sent")
         dialogKey: "qslPlanner"
+        onVisibleChanged: if (visible) root.schedulePlannerRefresh()
         width: 960; height: 650
         body: ColumnLayout {
             spacing: 8
             Text {
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                text: qsTr("Uses the current award filters and locally configured rules. Benefits are estimates, not official credits. Rebuild after changes.")
+                text: qsTr("Uses the current award filters and locally configured rules. Benefits are estimates, not official credits. Updates after in-app changes.")
             }
             RowLayout {
                 Layout.fillWidth: true
@@ -114,15 +173,21 @@ DialogFrame {
                     objectName: "buildQslPlanButton"
                     text: decolog.qslPlanBusy ? qsTr("Calculating…") : qsTr("Build plan")
                     enabled: !decolog.qslPlanBusy && root.plannerGoals.length > 0
-                    onClicked: { root.plannerSelectionDirty = false; decolog.buildQslPlan(root.plannerGoals) }
+                    onClicked: { plannerSettings.goalsJson = JSON.stringify(root.plannerGoals); root.plannerSelectionDirty = false; decolog.buildQslPlan(root.plannerGoals) }
+                }
+                GlassButton {
+                    text: qsTr("Clear")
+                    enabled: root.plannerGoals.length > 0
+                    onClicked: { root.plannerGoals = []; plannerSettings.goalsJson = "[]"; root.plannerSelectionDirty = true; plannerRefresh.stop() }
                 }
             }
             Text {
                 id: qslPlanStatus
                 objectName: "qslPlanStatus"
                 Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                text: decolog.qslPlanBusy ? qsTr("Calculating from a log snapshot…")
-                      : (decolog.qslPlan.stale || root.plannerSelectionDirty) ? qsTr("The log or award settings changed. Rebuild the plan.")
+                text: root.plannerGoals.length === 0 ? qsTr("Select at least one award.")
+                      : decolog.qslPlanBusy ? qsTr("Calculating from a log snapshot…")
+                      : (decolog.qslPlan.stale || root.plannerSelectionDirty) ? qsTr("The log or award settings changed. Updating the plan…")
                       : decolog.qslPlan.error ? decolog.qslPlan.error
                       : decolog.qslPlan.candidates ? qsTr("%1 potential benefits · %2 candidate QSO")
                           .arg(decolog.qslPlan.uniqueBenefits).arg(decolog.qslPlan.candidates.length)
