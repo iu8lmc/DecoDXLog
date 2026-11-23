@@ -37,6 +37,7 @@
 #include "core/QslOcrAcquisition.h"
 #include "core/PredictTracker.h"
 #include "core/PredictPassPlanner.h"
+#include "core/PredictPassSchedule.h"
 #include "core/QslPlanner.h"
 #include "core/DxCampaign.h"
 #include "core/Callbook.h"
@@ -116,6 +117,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QObject* qslOcrAcquisition READ qslOcrAcquisition CONSTANT)
     Q_PROPERTY(QObject* predictTracker READ predictTracker CONSTANT)
     Q_PROPERTY(QObject* predictPassPlanner READ predictPassPlanner CONSTANT)
+    Q_PROPERTY(QObject* predictPassSchedule READ predictPassSchedule CONSTANT)
     // I log della stazione: quello aperto e gli altri, per i contest.
     Q_PROPERTY(QObject* logs READ logs CONSTANT)
 
@@ -345,6 +347,7 @@ public:
     QObject* qslOcrAcquisition() const { return m_qslOcrAcquisition; }
     QObject* predictTracker() const { return m_predictTracker; }
     QObject* predictPassPlanner() const { return m_predictPassPlanner; }
+    QObject* predictPassSchedule() const { return m_predictPassSchedule; }
     QObject* credentials() const { return m_credentials; }
     QObject* cluster() const { return m_cluster; }
     QObject* qsl() const { return m_qsl; }
@@ -1205,6 +1208,7 @@ private:
     core::QslOcrAcquisition* m_qslOcrAcquisition{nullptr};
     core::PredictTracker* m_predictTracker{nullptr};
     core::PredictPassPlanner* m_predictPassPlanner{nullptr};
+    core::PredictPassSchedule* m_predictPassSchedule{nullptr};
     LogLibrary* m_logs{nullptr};
 
     int       m_udpPort{2237};

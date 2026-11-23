@@ -1,4 +1,5 @@
 #include "core/PredictPassPlanner.h"
+#include "core/PredictPassSchedule.h"
 #include <QDateTime>
 #include <QSignalSpy>
 #include <QTest>
@@ -74,6 +75,73 @@ class TestPredictPass : public QObject {
         QCOMPARE(planner.pass().value("los").toLongLong(), qint64(1800000120));
         QCOMPARE(planner.pass().value("maxElevation").toInt(), 30);
         QCOMPARE(commands, QStringList({"GET_TLE OSCAR-7", "PREDICT \"OSCAR-7\" 1800000000", "GET_TLE OSCAR-7"}));
+    }
+    void schedulesConsecutivePassesAndCancels()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost, 0));
+        QStringList commands;
+        connect(&server, &QUdpSocket::readyRead, &server, [&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray cmd(int(server.pendingDatagramSize()), Qt::Uninitialized);
+                QHostAddress from; quint16 port;
+                server.readDatagram(cmd.data(), cmd.size(), &from, &port);
+                commands << QString::fromLatin1(cmd).trimmed();
+                if (cmd.startsWith("GET_TLE"))
+                    server.writeDatagram("OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n", from, port);
+                else {
+                    const qint64 start = cmd.trimmed().split(' ').last().toLongLong();
+                    const qint64 base = start <= 1800000000 ? 1800000000 : 1800000600;
+                    QByteArray response = QByteArray::number(base) + " Fri 15Jan27 08:00:00 0 183\n" +
+                        QByteArray::number(base + 60) + " Fri 15Jan27 08:01:00 30 174\n" +
+                        QByteArray::number(base + 120) + " Fri 15Jan27 08:02:00 0 160\n\x1a\n";
+                    server.writeDatagram(response, from, port);
+                }
+            }
+        });
+        PredictPassSchedule schedule; QSignalSpy done(&schedule, &PredictPassSchedule::finished);
+        QVERIFY(!schedule.request("127.0.0.1", server.localPort(), "OSCAR-7", 1800000000, 11));
+        QVERIFY(schedule.request("127.0.0.1", server.localPort(), "OSCAR-7", 1800000000, 2));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 4000);
+        QVERIFY2(done.first().at(0).toBool(), qPrintable(done.first().at(1).toString()));
+        QCOMPARE(schedule.passes().size(), 2);
+        QCOMPARE(schedule.passes().at(1).toMap().value("aos").toLongLong(), qint64(1800000600));
+        QCOMPARE(commands, QStringList({"GET_TLE OSCAR-7", "PREDICT \"OSCAR-7\" 1800000000", "GET_TLE OSCAR-7", "GET_TLE OSCAR-7", "PREDICT \"OSCAR-7\" 1800000121", "GET_TLE OSCAR-7"}));
+        done.clear();
+        QVERIFY(schedule.request("127.0.0.1", server.localPort(), "OSCAR-7", 1800000000, 2));
+        schedule.cancel();
+        QCOMPARE(done.size(), 1); QVERIFY(!done.first().at(0).toBool()); QVERIFY(!schedule.busy());
+    }
+    void scheduleStopsWhenTleChangesBetweenPasses()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost, 0));
+        int tleRequests = 0;
+        QByteArray firstLine = "1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999";
+        QByteArray changed = firstLine; changed[25] = '2';
+        int sum = 0; for (int i = 0; i < 68; ++i) { const char c = changed[i]; if (c >= '0' && c <= '9') sum += c - '0'; else if (c == '-') ++sum; }
+        changed[68] = char('0' + sum % 10);
+        connect(&server, &QUdpSocket::readyRead, &server, [&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray cmd(int(server.pendingDatagramSize()), Qt::Uninitialized);
+                QHostAddress from; quint16 port; server.readDatagram(cmd.data(), cmd.size(), &from, &port);
+                if (cmd.startsWith("GET_TLE")) {
+                    ++tleRequests;
+                    server.writeDatagram(QByteArray("OSCAR-7\n") + (tleRequests <= 2 ? firstLine : changed) +
+                        "\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n", from, port);
+                } else {
+                    const qint64 start = cmd.trimmed().split(' ').last().toLongLong();
+                    const qint64 base = start <= 1800000000 ? 1800000000 : 1800000600;
+                    server.writeDatagram(QByteArray::number(base) + " Fri 15Jan27 08:00:00 0 183\n" +
+                        QByteArray::number(base + 60) + " Fri 15Jan27 08:01:00 30 174\n" +
+                        QByteArray::number(base + 120) + " Fri 15Jan27 08:02:00 0 160\n\x1a\n", from, port);
+                }
+            }
+        });
+        PredictPassSchedule schedule; QSignalSpy done(&schedule, &PredictPassSchedule::finished);
+        QVERIFY(schedule.request("127.0.0.1", server.localPort(), "OSCAR-7", 1800000000, 2));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(), 1, 4000);
+        QVERIFY(!done.first().at(0).toBool());
+        QCOMPARE(done.first().at(1).toString(), QStringLiteral("Orbital data changed between passes"));
+        QCOMPARE(schedule.passes().size(), 1);
     }
     void rejectsPassEndingBeforeRequestedTime()
     {

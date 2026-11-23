@@ -1,6 +1,7 @@
 #include "core/PredictPassPlanner.h"
 #include "core/Tle.h"
 #include <QDateTime>
+#include <QCryptographicHash>
 #include <QRegularExpression>
 #include <QTimeZone>
 #include <QUdpSocket>
@@ -101,6 +102,7 @@ void PredictPassPlanner::receive()
                 }
                 m_pass.insert(QStringLiteral("tleEpoch"),checked.epoch);
                 m_pass.insert(QStringLiteral("tleCatalogue"),checked.catalogue);
+                m_pass.insert(QStringLiteral("tleFingerprint"), QString::fromLatin1(QCryptographicHash::hash(raw.trimmed(), QCryptographicHash::Sha256).toHex()));
                 m_tle = raw.trimmed();
             } else if (raw.trimmed() != m_tle) {
                 fail(QStringLiteral("Orbital data changed during prediction"));

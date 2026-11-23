@@ -34,11 +34,13 @@ class Fixture(socketserver.BaseRequestHandler):
             now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
             epoch = f'{now.year % 100:02}{now.timetuple().tm_yday:03}.00000000' if getattr(self.server, 'fresh', False) else '18126.90857181'
             first = checksummed(f'1 07530U 74089B   {epoch} -.00000043  00000-0  11708-4 0  9999')
+            if getattr(self.server, 'change_tle', False) and self.server.commands.count('GET_TLE OSCAR-7') > 2:
+                first = checksummed(first[:25] + ('2' if first[25] != '2' else '3') + first[26:])
             second = checksummed('2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425')
             reply = f'OSCAR-7\n{first}\n{second}\n'
         elif command.startswith('PREDICT "OSCAR-7" '):
             start = int(command.rsplit(' ', 1)[1])
-            base = 1800000180 if start >= 1800000180 else 1800000000
+            base = (1800000000 if start <= 1800000000 else 1800000600 if start <= 1800000600 else 1800001200) if getattr(self.server, 'schedule', False) else (1800000180 if start >= 1800000180 else 1800000000)
             for part in (f'{base} Fri 15Jan27 08:00:00 0 183 240 22 75 2135 38914 *\n'.encode(),
                          f'{base + 60} Fri 15Jan27 08:01:00 30 174 243 25 72'.encode(),
                          b' 1794 38914 *\n', f'{base + 120} Fri 15Jan27 08:02:00 0 160 246 28 69 1517 38914 *\n'.encode(), b'\x1a\n'):
@@ -155,6 +157,35 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
             assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
         server.shutdown()
         print(f'PASS pass: {server.commands}')
+
+for change_tle in (False, True):
+    with tempfile.TemporaryDirectory(prefix='decolog-predict-schedule-') as tmp:
+        root = pathlib.Path(tmp)
+        with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
+            server.commands = []
+            server.stopped = False
+            server.schedule = True
+            server.change_tle = change_tle
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            env = os.environ.copy()
+            env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
+                       DECODXLOG_DATA_ROOT=str(root/'data'), DECODXLOG_GRAB_MS='2800')
+            command = [sys.argv[1], '--software-renderer', '--settings', str(root/'settings'),
+                       '--db', str(root/'test.sqlite'), '--port', '0', '--show',
+                       f'predictschedule:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
+            result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
+            output = result.stdout + result.stderr
+            expected = ('PROBE predictSchedule success=false count=1 rendered=1 old=true' if change_tle
+                        else 'PROBE predictSchedule success=true count=3 rendered=3 old=true')
+            if result.returncode or expected not in output:
+                raise SystemExit(f'FAIL schedule change_tle={change_tle}: {output}; requests={server.commands}')
+            count = 2 if change_tle else 3
+            if len(server.commands) != count * 3 or any(not c.startswith(('GET_TLE OSCAR-7', 'PREDICT "OSCAR-7" ')) for c in server.commands):
+                raise SystemExit(f'Unexpected schedule commands: {server.commands}')
+            with sqlite3.connect(root/'test.sqlite') as db:
+                assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
+            server.shutdown()
+            print(f'PASS schedule change_tle={change_tle}: {server.commands}')
 
 for fresh, save_mode, mapping in ((False, '', ''), (True, '', ''), (True, 'CW', ''), (True, 'FM', ''),
                                   (True, 'CW', 'inverting'), (True, 'CW', 'noninverting')):

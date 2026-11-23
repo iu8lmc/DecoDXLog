@@ -13,6 +13,9 @@ DialogFrame {
     info: qsTr("Read-only: the tracker controls neither radio nor rotor")
     readonly property var tracker: decolog.predictTracker
     readonly property var planner: decolog.predictPassPlanner
+    readonly property var schedule: decolog.predictPassSchedule
+    property bool scheduleVisible: false
+    property bool probingSchedule: false
     readonly property var sample: tracker.snapshot
     property var correction: ({})
     property bool probing: false
@@ -70,6 +73,14 @@ DialogFrame {
         portField.text = String(port)
         satelliteField.text = name
         firstPassButton.clicked()
+    }
+    function probeSchedule(host, port, name) {
+        probingSchedule = true
+        hostField.text = host
+        portField.text = String(port)
+        satelliteField.text = name
+        scheduleCount.value = 3
+        scheduleButton.clicked()
     }
     function probeDraft(host, port, name, save, mode, mapping) {
         probingDraft = true
@@ -139,6 +150,8 @@ DialogFrame {
         root.resultValid = false
         root.discardPending = true
         root.planner.cancel()
+        root.schedule.cancel()
+        root.scheduleVisible = false
         root.passValid = false
     }
     Timer {
@@ -157,6 +170,18 @@ DialogFrame {
         }
     }
     NewQsoDialog { id: satelliteQso; profileDialogKey: "predict-satellite-qso" }
+    Connections {
+        target: root.schedule
+        function onFinished(success, error) {
+            scheduleStatus.text = success ? qsTr("Requested passes received") : qsTr("Incomplete schedule: %1").arg(error)
+            if (root.probingSchedule) {
+                console.warn("PROBE predictSchedule success=" + success + " count=" + root.schedule.passes.length
+                             + " rendered=" + scheduleRepeater.count + " old=" + (root.schedule.passes.length > 0 &&
+                             (Date.now() - new Date(root.schedule.passes[0].tleEpoch).getTime()) / 86400000 > 14))
+                root.probingSchedule = false
+            }
+        }
+    }
     Connections {
         target: root.planner
         function onFinished(success, error) {
@@ -245,13 +270,13 @@ DialogFrame {
         Text { text: qsTr("PREDICT UDP server"); color: Theme.textPrimary; font.bold: true }
         RowLayout {
             Layout.fillWidth: true
-            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.invalidateSample(); root.passValid = false } }
-            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.invalidateSample(); root.passValid = false } }
-            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked; onTextChanged: { root.invalidateSample(); root.passValid = false } }
+            StyledTextField { id: hostField; text: "127.0.0.1"; placeholderText: qsTr("IP address"); Accessible.name: qsTr("Tracker IP address"); Layout.fillWidth: true; enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.invalidateSample(); root.passValid = false; root.scheduleVisible = false } }
+            StyledTextField { id: portField; text: "1210"; placeholderText: qsTr("Port"); Accessible.name: qsTr("Tracker port"); validator: IntValidator { bottom: 1; top: 65535 } Layout.preferredWidth: 90; enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && !autoRefresh.checked; onTextChanged: { root.listValid = false; root.invalidateSample(); root.passValid = false; root.scheduleVisible = false } }
+            StyledTextField { id: satelliteField; placeholderText: qsTr("Exact satellite name"); Accessible.name: qsTr("Exact satellite name"); Layout.fillWidth: true; enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && !autoRefresh.checked; onTextChanged: { root.invalidateSample(); root.passValid = false; root.scheduleVisible = false } }
             GlassButton {
                 id: requestButton
                 text: qsTr("Read snapshot")
-                enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked && portField.acceptableInput
+                enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && !autoRefresh.checked && portField.acceptableInput
                 onClicked: root.refreshSnapshot()
             }
         }
@@ -260,7 +285,7 @@ DialogFrame {
             GlassButton {
                 id: listButton
                 text: qsTr("Load satellites")
-                enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked && portField.acceptableInput
+                enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && !autoRefresh.checked && portField.acceptableInput
                 onClicked: {
                     root.listValid = false
                     satelliteField.text = ""
@@ -277,7 +302,7 @@ DialogFrame {
                 id: satelliteChoices
                 Layout.fillWidth: true
                 Accessible.name: qsTr("Available tracked satellites")
-                enabled: !root.tracker.busy && !root.planner.busy && !autoRefresh.checked
+                enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && !autoRefresh.checked
                 model: root.listValid ? root.tracker.satellites : []
                 onActivated: if (currentIndex >= 0) satelliteField.text = currentText
             }
@@ -285,7 +310,7 @@ DialogFrame {
         CheckBox {
             id: autoRefresh
             text: qsTr("Refresh automatically (2.5 s after each reading)")
-            enabled: root.visible && !root.planner.busy && (!root.tracker.busy || checked) && portField.acceptableInput
+            enabled: root.visible && !root.planner.busy && !root.schedule.busy && (!root.tracker.busy || checked) && portField.acceptableInput
             onToggled: {
                 if (checked) root.refreshSnapshot()
                 else refreshTimer.stop()
@@ -315,9 +340,48 @@ DialogFrame {
         Text { id: correctionStatus; Layout.fillWidth: true; color: Theme.textSecondary; wrapMode: Text.Wrap }
         RowLayout {
             Layout.fillWidth: true
-            GlassButton { id: firstPassButton; text: qsTr("Predict next pass"); enabled: !root.tracker.busy && !root.planner.busy && portField.acceptableInput; onClicked: root.requestPass(Math.floor(Date.now() / 1000)) }
-            GlassButton { id: nextPassButton; text: qsTr("Following pass"); enabled: root.passValid && !root.tracker.busy && !root.planner.busy; onClicked: root.requestPass(Number(root.plannedPass.los) + 60) }
+            GlassButton { id: firstPassButton; text: qsTr("Predict next pass"); enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && portField.acceptableInput; onClicked: root.requestPass(Math.floor(Date.now() / 1000)) }
+            GlassButton { id: nextPassButton; text: qsTr("Following pass"); enabled: root.passValid && !root.tracker.busy && !root.planner.busy && !root.schedule.busy; onClicked: root.requestPass(Number(root.plannedPass.los) + 60) }
             GlassButton { text: qsTr("Cancel prediction"); visible: root.planner.busy; onClicked: root.planner.cancel() }
+        }
+        RowLayout {
+            Layout.fillWidth: true
+            Text { text: qsTr("Number of passes"); color: Theme.textSecondary }
+            SpinBox { id: scheduleCount; from: 1; to: 10; value: 3; editable: true; enabled: !root.schedule.busy; Accessible.name: qsTr("Number of predicted passes") }
+            GlassButton {
+                id: scheduleButton
+                text: qsTr("Plan passes")
+                enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && portField.acceptableInput
+                onClicked: {
+                    autoRefresh.checked = false
+                    refreshTimer.stop()
+                    root.scheduleVisible = true
+                    scheduleStatus.text = qsTr("Predicting passes…")
+                    if (!root.schedule.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim(), Math.floor(Date.now() / 1000), scheduleCount.value)) {
+                        root.scheduleVisible = false
+                        status.text = qsTr("Enter a valid server and satellite name.")
+                    }
+                }
+            }
+            GlassButton { text: qsTr("Cancel plan"); visible: root.schedule.busy; onClicked: root.schedule.cancel() }
+        }
+        Text { id: scheduleStatus; Layout.fillWidth: true; visible: root.scheduleVisible && !root.schedule.busy; color: Theme.textSecondary; wrapMode: Text.Wrap }
+        Text { Layout.fillWidth: true; visible: root.scheduleVisible && root.schedule.busy; color: Theme.textSecondary; wrapMode: Text.Wrap
+            text: qsTr("Predicting pass %1 of %2…").arg(root.schedule.passes.length + 1).arg(scheduleCount.value) }
+        Text { Layout.fillWidth: true; visible: root.scheduleVisible && root.schedule.passes.length > 0; color: Theme.warningColor; wrapMode: Text.Wrap
+            text: qsTr("Predictions use sampled elevations and the same TLE. Check the TLE epoch and current operating conditions before use.") }
+        Repeater {
+            id: scheduleRepeater
+            model: root.scheduleVisible ? root.schedule.passes : []
+            Text {
+                required property var modelData
+                Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
+                text: qsTr("UTC %1 – %2 · maximum sampled elevation %3° · TLE epoch %4")
+                    .arg(new Date(Number(modelData.aos) * 1000).toISOString())
+                    .arg(new Date(Number(modelData.los) * 1000).toISOString())
+                    .arg(modelData.maxElevation)
+                    .arg(new Date(modelData.tleEpoch).toISOString())
+            }
         }
         Text {
             id: passSummary

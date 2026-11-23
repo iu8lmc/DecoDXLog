@@ -1246,6 +1246,7 @@ bool DecoLogController::openDatabase(const QString& path)
     connect(m_qslOcrAcquisition, &core::QslOcrAcquisition::finished, this, [this](bool success) { if (success) emit logChanged(); });
     m_predictTracker = new core::PredictTracker(this);
     m_predictPassPlanner = new core::PredictPassPlanner(this);
+    m_predictPassSchedule = new core::PredictPassSchedule(this);
     m_radioNet->load();
     // Un QSO corretto, cancellato o importato cambia il punteggio della gara:
     // quello in memoria non vale piu'. Collegato qui, prima delle finestre,

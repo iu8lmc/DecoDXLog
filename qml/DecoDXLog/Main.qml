@@ -1300,6 +1300,7 @@ RoundedWindow {
         else if (what[0] === "predictprobe") { predictDialog.open(); Qt.callLater(() => predictDialog.probe(what[1], what[2], what[3])) }
         else if (what[0] === "predictlist") { predictDialog.open(); Qt.callLater(() => predictDialog.probeList(what[1], what[2])) }
         else if (what[0] === "predictlive") { predictDialog.open(); Qt.callLater(() => predictDialog.probeLive(what[1], what[2], what[3])) }
+        else if (what[0] === "predictschedule") { predictDialog.open(); Qt.callLater(() => predictDialog.probeSchedule(what[1], what[2], what[3])) }
         else if (what[0] === "predictpass") { predictDialog.open(); Qt.callLater(() => predictDialog.probePass(what[1], what[2], what[3])) }
         else if (what[0] === "predictdraft") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3])) }
         else if (what[0] === "predictdraftsave") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3], true)) }
