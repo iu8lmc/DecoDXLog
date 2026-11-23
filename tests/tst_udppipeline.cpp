@@ -249,6 +249,7 @@ private slots:
 
         QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
         env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
+        env.insert(QStringLiteral("DECODXLOG_DATA_ROOT"), m_dir.filePath(QStringLiteral("app-data")));
         env.insert(QStringLiteral("DECODXLOG_TRACE_ACTIVITY"), QStringLiteral("1"));
         // --grab chiude il programma da solo anche se la prova si pianta.
         env.insert(QStringLiteral("DECODXLOG_GRAB_MS"), QStringLiteral("240000"));

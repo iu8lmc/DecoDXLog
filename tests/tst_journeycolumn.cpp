@@ -11,6 +11,10 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include "core/LogDatabase.h"
+#include "core/Activation.h"
+#include "core/WsjtxProtocol.h"
+#include <QUdpSocket>
+#include <QElapsedTimer>
 #include "core/RadioNet.h"
 #include "core/TesseractOcr.h"
 #include "core/QslOcrAcquisition.h"
@@ -55,6 +59,91 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void udpActivationUsesSessionProfileWithoutOverwritingSourceFields()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path = dir.filePath("test.sqlite");
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            StationProfile profile; profile.name="UDP fixture"; profile.stationCallsign="9H1AA"; profile.operatorCall="9H1AA"; profile.myGridsquare="JN71DC"; profile.myRig="Fixture rig"; profile.myAntenna="Fixture antenna"; profile.defaultTxPwr=100; profile.isDefault=true;
+            const qint64 profileId=db.saveStationProfile(profile); QVERIFY(profileId>0);
+            Activation session; session.active=true; session.kind=Activation::Kind::Pota; session.reference="IT-0001";
+            session.myGrid="JM75"; session.stationProfileId=profileId; session.startedAt=QDateTime::currentDateTimeUtc().addSecs(-60); session.sessionUuid="udp-session-fixture";
+            const QString state=QString::fromUtf8(QJsonDocument(QJsonObject::fromVariantMap(session.toMap())).toJson(QJsonDocument::Compact));
+            db.setSetting("activation.session", state); QSqlQuery q(db.connection());
+            q.prepare("INSERT INTO activation_run(uuid,started_at,initial_json,last_json) VALUES(?,?,?,?)");
+            q.addBindValue(session.sessionUuid); q.addBindValue(session.startedAt.toString(Qt::ISODate)); q.addBindValue(state); q.addBindValue(state); QVERIFY(q.exec());
+        }
+        quint16 port=0; { QUdpSocket probe; QVERIFY(probe.bind(QHostAddress::LocalHost, 0)); port=probe.localPort(); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM", "offscreen");
+        env.insert("QT_QUICK_BACKEND", "software"); env.insert("DECODXLOG_DATA_ROOT", dir.filePath("data"));
+        env.insert("DECODXLOG_TRACE_ACTIVITY", "1"); env.insert("DECODXLOG_GRAB_MS", "9000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP), {"--software-renderer", "--settings", dir.filePath("settings"), "--db", path,
+                                                "--port", QString::number(port), "--grab", dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("[activity] UDP|info|") && timer.elapsed()<20000) { app.waitForReadyRead(100); output += app.readAll(); }
+        QVERIFY2(output.contains("[activity] UDP|info|"), output.constData());
+        const auto makeRecord = [](const QString& call, bool explicitFields) {
+            const QDateTime now=QDateTime::currentDateTimeUtc();
+            AdifRecord record{{"CALL",call},{"QSO_DATE",now.toString("yyyyMMdd")},{"TIME_ON",now.toString("HHmmss")},{"BAND","20m"},{"MODE","CW"}};
+            if (explicitFields) { record.set("STATION_CALLSIGN","9H5ZZ"); record.set("OPERATOR","9H5ZZ"); record.set("MY_GRIDSQUARE","JN95"); record.set("TX_PWR", "25"); record.set("MY_RIG", "Sender rig"); }
+            return (QStringLiteral("<EOH>\n") + adif::writeRecord(record)).toUtf8();
+        };
+        QUdpSocket clientA, clientB;
+        const QByteArray a=wsjtx::buildLoggedAdif("Decodium-A", makeRecord("K1UAA",false));
+        const QByteArray b=wsjtx::buildLoggedAdif("Decodium-B", makeRecord("K1UBB",true));
+        AdifRecord conflict = adif::parse(makeRecord("K1UCC", false)).records.first();
+        conflict.set("STATION_CALLSIGN", "9H5ZZ");
+        const QByteArray c=wsjtx::buildLoggedAdif("Decodium-B", (QStringLiteral("<EOH>\n") + adif::writeRecord(conflict)).toUtf8());
+        QCOMPARE(clientA.writeDatagram(a,QHostAddress::LocalHost,port), qint64(a.size()));
+        QCOMPARE(clientB.writeDatagram(b,QHostAddress::LocalHost,port), qint64(b.size()));
+        QCOMPARE(clientB.writeDatagram(c,QHostAddress::LocalHost,port), qint64(c.size()));
+        wsjtx::QsoLogged structured; structured.dxCall="K1UDD"; structured.timeOn=QDateTime::currentDateTimeUtc(); structured.timeOff=structured.timeOn;
+        structured.txFrequencyHz=14000000; structured.mode="CW"; structured.myCall="9H1AA"; structured.myGrid="JN80";
+        const QByteArray d=wsjtx::buildQsoLogged("Decodium-A", structured);
+        QCOMPARE(clientA.writeDatagram(d,QHostAddress::LocalHost,port), qint64(d.size()));
+        QVERIFY2(app.waitForFinished(15000), app.errorString().toUtf8().constData()); output += app.readAll();
+        QVERIFY2(app.exitStatus()==QProcess::NormalExit && app.exitCode()==0, output.constData());
+        QVERIFY2(output.contains("profile is unassigned"), output.constData());
+        LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,call,IFNULL(station_profile_id,0) FROM qso WHERE call IN ('K1UAA','K1UBB','K1UCC','K1UDD') ORDER BY call"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1UAA")); const auto first=db.record(q.value(0).toLongLong()); QVERIFY(first.has_value());
+        QCOMPARE(first->value("MY_GRIDSQUARE"), QString("JM75")); QCOMPARE(first->value("STATION_CALLSIGN"), QString("9H1AA")); QCOMPARE(first->value("OPERATOR"), QString("9H1AA")); QVERIFY(q.value(2).toLongLong()>0);
+        QVERIFY(first->value("TX_PWR").isEmpty()); QVERIFY(first->value("MY_RIG").isEmpty()); QVERIFY(first->value("MY_ANTENNA").isEmpty());
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1UBB")); const auto second=db.record(q.value(0).toLongLong()); QVERIFY(second.has_value());
+        QCOMPARE(second->value("MY_GRIDSQUARE"), QString("JN95")); QCOMPARE(second->value("STATION_CALLSIGN"), QString("9H5ZZ")); QCOMPARE(second->value("OPERATOR"), QString("9H5ZZ")); QCOMPARE(q.value(2).toLongLong(), qint64(0));
+        QCOMPARE(second->value("TX_PWR"), QString("25")); QCOMPARE(second->value("MY_RIG"), QString("Sender rig"));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1UCC")); const auto third=db.record(q.value(0).toLongLong()); QVERIFY(third.has_value());
+        QCOMPARE(third->value("STATION_CALLSIGN"), QString("9H5ZZ")); QVERIFY(third->value("OPERATOR").isEmpty()); QCOMPARE(q.value(2).toLongLong(), qint64(0));
+        QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), QString("K1UDD")); const auto fourth=db.record(q.value(0).toLongLong()); QVERIFY(fourth.has_value());
+        QCOMPARE(fourth->value("MY_GRIDSQUARE"), QString("JN80")); QCOMPARE(fourth->value("STATION_CALLSIGN"), QString("9H1AA"));
+        QCOMPARE(fourth->value("OPERATOR"), QString("9H1AA")); QVERIFY(q.value(2).toLongLong()>0);
+        QVERIFY(!q.next());
+    }
+    void activationSiteOverridesProfileButPreservesExplicitGrid()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); qint64 firstProfile=0, secondProfile=0;
+        {
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            StationProfile a; a.name="Fixture A"; a.stationCallsign="9H1AA"; a.operatorCall="9H1AA"; a.myGridsquare="JN71DC"; a.isDefault=true;
+            StationProfile b; b.name="Fixture B"; b.stationCallsign="9H2BB"; b.operatorCall="9H2BB"; b.myGridsquare="JN72AA";
+            firstProfile=db.saveStationProfile(a); secondProfile=db.saveStationProfile(b); QVERIFY(firstProfile>0); QVERIFY(secondProfile>0);
+        }
+        QByteArray output; QVERIFY2(launch(dir, QStringLiteral("activationprofileprobe"), output), output.constData());
+        QVERIFY2(output.contains("start= update= errors=,,"), output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(), 3);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT id,call,station_profile_id FROM qso WHERE deleted=0 ORDER BY id"));
+        const QStringList calls{"K1SAA", "K1SBB", "K1SCC"}, grids{"JM75", "JN70", "JM76"}, operators{"9H1AA", "9H1AA", "9H2BB"};
+        QString sessionUuid;
+        for (int i=0; i<3; ++i) { QVERIFY(q.next()); QCOMPARE(q.value(1).toString(), calls.at(i));
+            QCOMPARE(q.value(2).toLongLong(), i<2 ? firstProfile : secondProfile);
+            const auto record = db.record(q.value(0).toLongLong()); QVERIFY(record.has_value());
+            QCOMPARE(record->value("MY_GRIDSQUARE"), grids.at(i)); QCOMPARE(record->value("OPERATOR"), operators.at(i));
+            QCOMPARE(record->value("MY_POTA_REF"), QString("IT-0001"));
+            if (i==0) sessionUuid=record->value("APP_DECOLOG_ACTIVATION_UUID");
+            QVERIFY(!sessionUuid.isEmpty()); QCOMPARE(record->value("APP_DECOLOG_ACTIVATION_UUID"), sessionUuid); }
+    }
     void potaSnapshotCanBeImportedAndReviewedInDesktop()
     {
         using namespace decolog::core;

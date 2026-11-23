@@ -63,6 +63,24 @@ DialogFrame {
         else delete programs[key]
         root.set("programs", programs)
     }
+    function probeSiteProfiles() {
+        root.openDialog("pota")
+        let first = 0, second = 0
+        for (let i = 0; i < decolog.stationProfiles.count; ++i) {
+            const p = decolog.stationProfiles.get(i)
+            if (p.name === "Fixture A") first = p.id
+            if (p.name === "Fixture B") second = p.id
+        }
+        const startError = root.act.start({kind: "pota", reference: "IT-0001", myGrid: "JM75", stationProfileId: first})
+        const now = decolog.utcNow()
+        const a = decolog.logManualQso({call: "K1SAA", date: decolog.showDate(now.date), time: now.time, band: "20m", mode: "CW"})
+        const b = decolog.logManualQso({call: "K1SBB", date: decolog.showDate(now.date), time: now.time, band: "20m", mode: "CW", my_gridsquare: "JN70"})
+        const change = Object.assign({}, root.act.state, {myGrid: "JM76", stationProfileId: second})
+        const updateError = root.act.update(change)
+        const c = decolog.logManualQso({call: "K1SCC", date: decolog.showDate(now.date), time: now.time, band: "20m", mode: "CW"})
+        console.warn("PROBE siteProfiles first=" + first + " second=" + second + " start=" + startError + " update=" + updateError + " errors=" + a + "," + b + "," + c)
+        root.act.stop()
+    }
     function probePotaCatalogue() {
         root.openDialog("pota")
         root.probePotaMode = true

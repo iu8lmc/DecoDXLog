@@ -3213,6 +3213,31 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
     m_activation->applyTo(enriched);
     if (m_activation->active() && m_activation->session().stationProfileId > 0)
         profileId = m_activation->session().stationProfileId;
+    // Fill the selected profile only when every identity supplied by the
+    // sender agrees with it. Otherwise a missing operator could be falsely
+    // attributed to a different station; keep the sender's data and warn.
+    if (m_activation->active() && profileId > 0 && m_profiles) {
+        const QVariantMap profile = m_profiles->byId(profileId);
+        const auto compatible = [](const QString& reported, const QString& expected) {
+            return reported.isEmpty() || (!expected.trimmed().isEmpty() && reported.compare(expected.trimmed(), Qt::CaseInsensitive) == 0);
+        };
+        const bool agrees = !profile.isEmpty() &&
+            compatible(stationCall, profile.value(QStringLiteral("stationCallsign")).toString()) &&
+            compatible(operatorCall, profile.value(QStringLiteral("operatorCall")).toString());
+        if (agrees) {
+            const auto fill = [&enriched](const char* field, const QString& value) {
+                if (enriched.value(QLatin1String(field)).isEmpty() && !value.isEmpty())
+                    enriched.set(QLatin1String(field), value);
+            };
+            fill("STATION_CALLSIGN", profile.value(QStringLiteral("stationCallsign")).toString());
+            fill("OPERATOR", profile.value(QStringLiteral("operatorCall")).toString());
+            fill("MY_GRIDSQUARE", profile.value(QStringLiteral("myGridsquare")).toString());
+        } else if (!stationCall.isEmpty() || !operatorCall.isEmpty()) {
+            profileId = 0;
+            addActivity(QStringLiteral("ACT"), tr("Incoming QSO %1 has an identity conflicting with the activation profile; profile fields were not filled and the profile is unassigned.")
+                            .arg(input.value(QStringLiteral("CALL")).toUpper()), QStringLiteral("warning"));
+        }
+    }
     AdifRecord normalizedForDupe = enriched;
     adif::normalizeMode(normalizedForDupe);
     const QString dupeMode = normalizedForDupe.value(QStringLiteral("SUBMODE")).isEmpty()
@@ -3845,11 +3870,13 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
             return roverError.isEmpty() ? tr("The rover locator is unavailable") : roverError;
         r.set(QStringLiteral("MY_GRIDSQUARE"), roverGrid);
     }
-    applyProfile(r, profileId);
     if (!historical) {
         applyEntity(r);
+        // Explicit QSO/rover fields remain first; the activation supplies its
+        // site before the station profile fills any remaining blanks.
         m_activation->applyTo(r);
     }
+    applyProfile(r, profileId);
     // A mano non si rifiuta nessun QSO per doppione: chi scrive sa cosa ha gia' nel log, e
     // ripassare la stessa stazione (in un'attivazione, o un'altra volta) e' normale.
     // Il controllo dei doppioni resta per Decodium e per i QSO che arrivano via UDP.
