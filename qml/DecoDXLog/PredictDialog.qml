@@ -25,6 +25,7 @@ DialogFrame {
     property bool probingLive: false
     property bool probingPass: false
     property bool probingDraft: false
+    property bool probingRigDraft: false
     property bool probingDraftSave: false
     property string probingDraftMode: "CW"
     property string probingDraftMapping: "independent"
@@ -98,6 +99,10 @@ DialogFrame {
         uplinkField.text = "146.000000"
         downlinkField.text = "435.000000"
         requestButton.clicked()
+    }
+    function probeRigDraft(host, port, name) {
+        probingRigDraft = true
+        probeDraft(host, port, name, false)
     }
     function calculateCorrection() {
         if (!root.resultValid || root.sample.satellite !== satelliteField.text.trim()) {
@@ -269,6 +274,10 @@ DialogFrame {
                     prepareDraftButton.clicked()
                     console.warn("PROBE predictDraft visible=" + satelliteQso.visible + " tx=" + satelliteQso.initialTxForProbe
                                  + " rx=" + satelliteQso.initialRxForProbe + " sat=" + satelliteQso.initialSatelliteForProbe)
+                    if (root.probingRigDraft && satelliteQso.visible) {
+                        satelliteQso.probeTrackerSelections()
+                        root.probingRigDraft = false
+                    }
                     prepareDraftButton.clicked()
                     console.warn("PROBE predictDraftPreserved=" + satelliteQso.visible + " notice=" + (correctionStatus.text.length > 0))
                     if (root.probingDraftSave && satelliteQso.visible) {

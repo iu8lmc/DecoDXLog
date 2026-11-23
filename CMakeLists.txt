@@ -872,6 +872,9 @@ if(DECODXLOG_BUILD_TESTS)
         add_test(NAME rig_split_manual COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/rig_split_manual_probe.py $<TARGET_FILE:decolog>)
         set_tests_properties(rig_split_manual PROPERTIES TIMEOUT 30)
+        add_test(NAME tracker_rig COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/tools/tracker_rig_probe.py $<TARGET_FILE:decolog>)
+        set_tests_properties(tracker_rig PROPERTIES TIMEOUT 30)
         add_test(NAME historical_rig COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/historical_rig_probe.py $<TARGET_FILE:decolog>)
         set_tests_properties(historical_rig PROPERTIES TIMEOUT 30)

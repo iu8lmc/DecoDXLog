@@ -203,6 +203,12 @@ DialogFrame {
         root.submit(false)
         console.warn("PROBE rigSplitSaved=" + !root.visible + " error=" + errorText.text)
     }
+    function probeTrackerSelections() {
+        modeBox.currentIndex = modeBox.find("CW")
+        modeBox.activated(modeBox.currentIndex)
+        root.qsyTo("20m", "CW", true)
+        console.warn("PROBE trackerRig selections=true tracker=" + root.trackerPrepared + " connected=" + decolog.rig.connected)
+    }
     function probeTrackerDraftSave(mode) {
         callField.text = ""
         root.submit(false)
