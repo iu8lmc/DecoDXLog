@@ -27,20 +27,31 @@ bool RoverSession::fail(const QString &message)
 }
 QVariantMap RoverSession::session() const
 {
-    if (!m_db || !m_db->isOpen())
-        return {};
+    QVariantMap result; readSession(&result); return result;
+}
+bool RoverSession::readSession(QVariantMap *result, QString *error) const
+{
+    if (error) error->clear();
+    if (!result) { if (error) *error=tr("Cannot read rover session"); return false; }
+    result->clear();
+    if (!m_db || !m_db->isOpen()) { if (error) *error=tr("Log is not open"); return false; }
     QSqlQuery q(m_db->connection());
     if (!q.exec(QStringLiteral(
             "SELECT s.id,s.title,s.station_profile_id,s.started_at, "
             "(SELECT gridsquare FROM rover_position p WHERE p.session_id=s.id ORDER BY p.id DESC LIMIT 1) "
-            "FROM rover_session s WHERE s.ended_at IS NULL LIMIT 1")) ||
-        !q.next())
-        return {};
-    return {{QStringLiteral("id"), q.value(0)},
+            "FROM rover_session s WHERE s.ended_at IS NULL LIMIT 1"))) {
+        if (error) *error=q.lastError().text(); return false;
+    }
+    if (!q.next()) {
+        if (q.lastError().isValid()) { if (error) *error=q.lastError().text(); return false; }
+        return true;
+    }
+    *result = {{QStringLiteral("id"), q.value(0)},
             {QStringLiteral("title"), q.value(1)},
             {QStringLiteral("profileId"), q.value(2)},
             {QStringLiteral("startedAt"), q.value(3)},
             {QStringLiteral("grid"), q.value(4)}};
+    return true;
 }
 QVariantList RoverSession::positions() const
 {
@@ -143,7 +154,8 @@ bool RoverSession::setPosition(const QString &grid)
     auto db = m_db->connection();
     if (!db.transaction())
         return fail(db.lastError().text());
-    const auto current = session();
+    QVariantMap current; QString readError;
+    if (!readSession(&current,&readError)) { db.rollback(); return fail(readError); }
     const qint64 id = current.value(QStringLiteral("id")).toLongLong();
     if (!id) {
         db.rollback();
@@ -198,7 +210,9 @@ bool RoverSession::close()
 }
 QString RoverSession::gridAt(const QDateTime &when, QString *error) const
 {
-    const auto current = session();
+    if (error) error->clear();
+    QVariantMap current;
+    if (!readSession(&current,error)) return {};
     const qint64 id = current.value(QStringLiteral("id")).toLongLong();
     auto reject = [error](const QString &message) {
         if (error)

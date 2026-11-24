@@ -1386,6 +1386,11 @@ RoundedWindow {
         else if (what[0] === "predictdraftlinear") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3], true, "CW", "inverting")) }
         else if (what[0] === "predictdraftnoninvert") { predictDialog.open(); Qt.callLater(() => predictDialog.probeDraft(what[1], what[2], what[3], true, "CW", "noninverting")) }
         else if (what[0] === "roverprobe") { roverDialog.open(); Qt.callLater(() => roverDialog.probe()) }
+        else if (what[0] === "roverreaderrorprobe") {
+            const now=decolog.utcNow()
+            const error=decolog.logManualQso({call:"K1AAA",date:decolog.showDate(now.date),time:now.time,band:"20m",mode:"CW",freq:"14.050000"})
+            console.warn("PROBE rover read error=" + error + " count=" + decolog.currentLogInfo().qsos)
+        }
         else if (what[0] === "vuccboundary") Qt.callLater(() => console.warn("PROBE vuccBoundary " + JSON.stringify(decolog.vuccPreview("6m", "", "", 100))))
         else if (what[0] === "vuccreviewprobe" || what[0] === "vuccsatelliteprobe") Qt.callLater(() => awardsDialog.probeVuccReview(what[0] === "vuccsatelliteprobe"))
         else if (what[0] === "vuccthresholdprobe") Qt.callLater(() => awardsDialog.probeVuccThreshold())

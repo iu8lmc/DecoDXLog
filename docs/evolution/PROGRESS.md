@@ -3219,3 +3219,11 @@ POTA partition preview now flags a QSO with `SIG=POTA`, no `POTA_REF` and a miss
 A/B on macOS arm64 / Qt 6.11.2: an expanded synthetic fixture previously reported four review QSO and missed two incomplete/invalid standalone SIG cases; it now reports six, leaves a valid seventh case unflagged and preserves all eight records and original fields in the exported ADIF. App and test targets built; CTest activation and qmlpopups passed 2/2; git diff --check passed.
 
 The validation is local syntax, not catalogue or official POTA acceptance. The new review reasons were checked through the controller fixture, not the visible desktop row or a real uploader. The pre-existing unbounded in-memory review list, physical UI, Windows/Linux and full G06/G13 acceptance remain open.
+
+## 2026-11-24 — G09 reject implicit rover location on session read failure
+
+Rover session reads now have a checked form that distinguishes no active session from a database failure. When a normal manual QSO has no explicitly entered own locator, the controller uses that checked read and refuses to infer a profile locator if the rover session cannot be inspected. Rover position updates and time lookup also use the checked session read. An explicit locator and historical entry retain their existing paths; no radio control is involved. Italian errors were added.
+
+A/B on macOS arm64 / Qt 6.11.2: with an active synthetic rover and its position table removed, the previous desktop controller saved a QSO with no error; the new controller reports the read failure and saves none. The checked-read core test distinguishes no session, an active session and a missing table. The ordinary offscreen rover fixture still passes history, ambiguous-minute and explicit-override cases. App and targets built; CTest roversession and qmlpopups passed 2/2; translation XML and git diff --check passed.
+
+The failure is deliberately injected in an isolated log; explicit locator and historical paths do not perform the new guard. Session read and later QSO insertion are not one atomic transaction, so concurrent external session changes still need separate analysis. The test uses programmatic offscreen interaction, without actual radio/RF, two Decodium sessions, Windows/Linux or full G09/G13 acceptance.

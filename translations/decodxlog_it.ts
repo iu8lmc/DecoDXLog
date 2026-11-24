@@ -11737,6 +11737,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Cannot read rover session: %1</source><translation>Impossibile leggere la sessione rover: %1</translation></message>
     <message><source>Cannot load campaigns: %1</source><translation>Impossibile caricare le campagne: %1</translation></message>
     <message><source>%1 campaign(s) could not be read and are not shown or watched.</source><translation>%1 campagne non possono essere lette e non sono visualizzate né monitorate.</translation></message>
     <message><source>LoTW grid observation added or linked after import</source><translation>Osservazione locator LoTW aggiunta o collegata dopo l'importazione</translation></message>
@@ -15897,6 +15898,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::core::RoverSession</name>
+    <message><source>Cannot read rover session</source><translation>Impossibile leggere la sessione rover</translation></message>
     <message>
         <source>Log is not open</source>
         <translation>Il log non è aperto</translation>

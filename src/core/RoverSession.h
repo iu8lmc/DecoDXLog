@@ -16,6 +16,7 @@ class RoverSession : public QObject {
   public:
     explicit RoverSession(LogDatabase *db, QObject *parent = nullptr);
     QVariantMap session() const;
+    bool readSession(QVariantMap *session, QString *error = nullptr) const;
     QVariantList positions() const;
     QVariantList sessions() const;
     qint64 selectedId() const { return m_selectedId; }

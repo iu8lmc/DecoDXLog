@@ -27,6 +27,7 @@
 #include <QUdpSocket>
 #include <QElapsedTimer>
 #include "core/RadioNet.h"
+#include "core/RoverSession.h"
 #include "core/TesseractOcr.h"
 #include "core/QslOcrAcquisition.h"
 #include <QCryptographicHash>
@@ -1359,6 +1360,15 @@ private slots:
         QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(campaigns.size(),1); QCOMPARE(campaigns.first().calls.size(),2);
         QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,4); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched); QVERIFY(campaigns.first().watchGoalsOnly);
         QCOMPARE(campaigns.first().goals.size(),1); QCOMPARE(campaigns.first().goals.first().target,QString("confirmed"));
+    }
+    void roverReadFailurePreventsImplicitLocator()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); RoverSession rover(&db); QVERIFY(rover.start("Trip","JN71"));
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE rover_position")); }
+        QByteArray output; QVERIFY2(launch(dir,"roverreaderrorprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE rover read error=Cannot read rover session:") && output.contains("count=0"),output.constData());
     }
     void qslImportExposesAmbiguousConfirmations()
     {

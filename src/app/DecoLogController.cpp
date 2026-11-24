@@ -4720,10 +4720,15 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_SESSION"), radio.value(0).toString());
         r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_CALL"), radio.value(1).toString());
     }
-    if (!historical && m_rover && !m_rover->session().isEmpty() && explicitMyGrid.isEmpty()) {
+    QVariantMap roverSession;
+    if (!historical && m_rover && explicitMyGrid.isEmpty()) {
+        QString roverReadError;
+        if (!m_rover->readSession(&roverSession,&roverReadError)) return tr("Cannot read rover session: %1").arg(roverReadError);
+    }
+    if (!roverSession.isEmpty()) {
         if (m_activation->active())
             return tr("Enter the station locator explicitly when rover and activation are both active.");
-        const qint64 roverProfile = m_rover->session().value(QStringLiteral("profileId")).toLongLong();
+        const qint64 roverProfile = roverSession.value(QStringLiteral("profileId")).toLongLong();
         if (roverProfile != profileId)
             return tr("The rover session uses a different station profile; enter the locator explicitly.");
         QString roverError;

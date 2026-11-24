@@ -7,6 +7,15 @@ using namespace decolog::core;
 class TestRoverSession : public QObject {
     Q_OBJECT
   private slots:
+    void failedSessionReadIsNotAnInactiveSession()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); RoverSession rover(&db);
+        QVariantMap active; QString error;
+        QVERIFY(rover.readSession(&active,&error)); QVERIFY(active.isEmpty()); QVERIFY(error.isEmpty());
+        QVERIFY(rover.start("Trip","JN71")); QVERIFY(rover.readSession(&active,&error)); QVERIFY(!active.isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE rover_position"));
+        QVERIFY(!rover.readSession(&active,&error)); QVERIFY(active.isEmpty()); QVERIFY(!error.isEmpty());
+    }
     void persistsHistoryAndRejectsAmbiguousMinutes()
     {
         QTemporaryDir dir;
