@@ -3291,3 +3291,11 @@ Updated the desktop capability matrix to cover all eleven active product streams
 A/B is a documentation comparison against the existing code paths and recorded tests: before, the matrix contained stale capability descriptions and only a few streams; afterwards it includes the G01 foundation and all eleven G02–G12 product streams with their limitations. No new functionality or runtime proof is claimed by the matrix itself. git diff --check passed. The full CTest run remained active on an earlier app binary while this document was updated.
 
 This is a concise status snapshot, not a requirement-by-requirement completion audit. The remaining real-service, hardware, physical UI, cross-platform and integrated G13 evidence is not supplied by this documentation change.
+
+## 2026-11-24 — G00/G13 align the working plan with current evidence
+
+Refreshed the working plan's stale initial descriptions of the baseline, import undo, multi-program activation, contest serials and integrated acceptance. In particular, persistent experimental serial grants are connected to network and explicit QSO entry, while multiplier handoff/skeds, fencing, real LAN/SO2R and full contest coverage remain open. POTA/SOTA catalogues and programme partitions are recorded as implemented slices, not proof of official eligibility. G13 remains incomplete despite the published version.
+
+A/B is a comparison of the old plan with current source and dated progress evidence, not a runtime test. The old plan described several completed slices as absent; the updated plan retains explicit open work and links to the detailed evidence. A draft of the update briefly listed handoff/skeds as implemented; source inspection did not support that and it was corrected before commit. git diff --check passed. The full CTest run remained active on the earlier app binary.
+
+The plan is an index, not a completion audit. The contest handoff/sked implementation, broader platform/service and hardware verification, and integrated acceptance remain outstanding.
