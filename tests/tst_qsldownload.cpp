@@ -5,6 +5,7 @@
 #include "core/QslDownload.h"
 
 #include <QSignalSpy>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -119,6 +120,33 @@ private slots:
         QVERIFY(!confirmations::mayAdvanceCursor(true,0));
         QVERIFY(!confirmations::mayAdvanceCursor(false,1));
         QVERIFY(!confirmations::mayAdvanceCursor(true,3));
+    }
+
+    void changedLogRejectsDownloadedConfirmations()
+    {
+        for (const QString service : {QStringLiteral("eqsl"),QStringLiteral("qrz")}) {
+            QTemporaryDir dir; QVERIFY(dir.isValid()); FakeServer server;
+            server.answer = [](const FakeServer::Request& r) -> QByteArray {
+                if (r.path == "/api") return "RESULT=OK&COUNT=1&ADIF=" + qrzRecord(7,"K1ABC","C");
+                return r.path.endsWith(".adi") ? kEqslAdif : kEqslPage;
+            };
+            LogDatabase db; QVERIFY(db.open(dir.filePath("one.sqlite"))); const auto origin=db.sessionToken(); QVERIFY(origin);
+            ConfirmationDownloader downloader; downloader.setEndpoints(server.url("/qslcard/DownloadInBox.cfm"),server.url("/api"));
+            QSignalSpy done(&downloader,&ConfirmationDownloader::finished);
+            if (service=="eqsl") downloader.downloadEqsl("fixture","fixture"); else downloader.downloadQrz("fixture");
+            QVERIFY(done.wait(5000)); const auto report=done.first().first().value<confirmations::Report>(); QVERIFY2(report.ok,qPrintable(report.error));
+            QVERIFY(db.matchesSessionToken(*origin)); QVERIFY(db.open(dir.filePath("two.sqlite")));
+            const qint64 id=db.insertQso(qso("K1ABC","20m","FT8","","20260910","1203"),"fixture").id; QVERIFY(id>0);
+            QVERIFY(!db.matchesSessionToken(*origin));
+            QVERIFY(db.connection().transaction());
+            QCOMPARE(db.applyConfirmation(service,report.confirmations.first()).status,ConfirmationResult::Status::Confirmed);
+            QVERIFY(db.connection().rollback());
+            if (db.matchesSessionToken(*origin)) db.applyConfirmation(service,report.confirmations.first());
+            const QString field=service=="eqsl" ? QStringLiteral("EQSL_QSL_RCVD") : QStringLiteral("QRZCOM_QSO_UPLOAD_STATUS");
+            if (service=="eqsl") QVERIFY(db.record(id)->value(field).isEmpty());
+            QSqlQuery q(db.connection()); q.prepare("SELECT COUNT(*) FROM qsl_status WHERE qso_id=? AND service=? AND rcvd='Y'"); q.addBindValue(id); q.addBindValue(service);
+            QVERIFY(q.exec()); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        }
     }
     void missingCredentialsNeverOpenConnection()
     {

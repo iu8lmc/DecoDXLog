@@ -1121,6 +1121,7 @@ private:
     bool m_lotwRange{false};
     bool      m_lotwStarting{false};
     core::ConfirmationDownloader m_confirmDownloader;
+    std::optional<core::LogSessionToken> m_confirmOrigin;
     QString m_confirmStarting;     // il servizio mentre si legge la password
     QString m_confirmService;      // quello che sta scaricando
     QString m_confirmStatus;
@@ -1132,6 +1133,7 @@ private:
     QDate m_confirmFrom;
     QDate m_confirmTo;
     void startConfirmations(const QString& service, bool full, const QDate& from, const QDate& to);
+    void abortConfirmationsForChangedLog();
     bool m_confirmFailed{false};   // l'ultimo stato e' un errore
     bool m_recoveryEnabled{true};
     QString m_decodiumLogPath;     // scelto a mano; vuoto = quello di Decodium

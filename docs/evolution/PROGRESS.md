@@ -2881,3 +2881,11 @@ LoTW synchronization now captures the open log's path, persistent identity, nati
 A/B on macOS arm64 / Qt 6.11.2: the new session-token test initially failed to compile because no shared origin token existed. It now accepts the original open session, rejects reopening the same file and rejects replacement of the file at its path. A synthetic HTTP LoTW test compared applying a received report to its original log against the guarded path after opening a different log; the latter received no confirmation or observation. App and test targets built; CTest lotw, qsldownload, vucc, database, migration and qmlpopups passed 6/6.
 
 The HTTP fixture exercises the token and matching flow directly, not the full desktop controller's asynchronous credential/result callbacks. Checks are point-in-time and do not make live SQLite file replacement safe; no actual LoTW account, physical UI or Windows/Linux was tested. eQSL/QRZ origin guards and full G02/G05/G13 acceptance remain open.
+
+## 2026-11-24 — G05 bind eQSL/QRZ confirmation queue to its log
+
+The eQSL/QRZ confirmation queue now captures the same log session token used by LoTW. It verifies the origin before each account, after asynchronous credential retrieval and before processing each response. If the log changed, the remaining queue is cleared and the operator sees a warning; no further confirmations, cursors or import summaries are written to the new log. Earlier accounts that completed against the original log remain committed. Italian messages were added.
+
+A/B on macOS arm64 / Qt 6.11.2: fake HTTP eQSL and QRZ downloads were reconciled against a second synthetic log inside a transaction and would have confirmed its matching QSO if unchecked; after rollback, the origin guard rejects the changed session and the second log remains unconfirmed. The fixture exercises the token and database flow directly, not the actual controller queue or credential callbacks. App and test targets built; CTest lotw, qsldownload, vucc, database, migration and qmlpopups passed 6/6.
+
+The check is point-in-time and cannot make live SQLite replacement safe. A multi-account desktop scenario, the asynchronous secret and cancellation interleavings, real services, physical UI and Windows/Linux remain untested. Matching and VUCC provenance limitations remain; full G02/G05/G13 acceptance is open.

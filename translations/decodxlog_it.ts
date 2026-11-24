@@ -11702,6 +11702,8 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Confirmations: cannot verify the open log; reopen it before syncing</source><translation>Conferme: impossibile verificare il log aperto; riaprilo prima della sincronizzazione</translation></message>
+    <message><source>Confirmations: the log changed during download; no further confirmations were applied</source><translation>Conferme: il log è cambiato durante il download; non sono state applicate ulteriori conferme</translation></message>
     <message><source>LoTW: cannot verify the open log; reopen it before syncing</source><translation>LoTW: impossibile verificare il log aperto; riaprilo prima della sincronizzazione</translation></message>
     <message><source>LoTW: the log changed during download; no confirmations were applied</source><translation>LoTW: il log è cambiato durante il download; nessuna conferma è stata applicata</translation></message>
     <message><source>; %1 database error(s), download cursor not advanced</source><translation>; %1 errori del database, cursore di download non aggiornato</translation></message>

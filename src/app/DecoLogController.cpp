@@ -7366,8 +7366,15 @@ void DecoLogController::startConfirmations(const QString& service, bool full, co
         return;
     if (service != QLatin1String("eqsl") && service != QLatin1String("qrz"))
         return;
+    m_confirmOrigin = m_db.sessionToken();
+    if (!m_confirmOrigin) {
+        m_confirmFailed=true; m_confirmAuto=false;
+        m_confirmStatus=tr("Confirmations: cannot verify the open log; reopen it before syncing");
+        emit confirmChanged(); return;
+    }
     const QList<ConfirmAccount> accounts = confirmAccounts(service);
     if (accounts.isEmpty()) {
+        m_confirmOrigin.reset();
         m_confirmFailed = true;
         m_confirmStatus = service == QLatin1String("qrz")
                               ? tr("QRZ: add the logbook API key in Setup → QSL services")
@@ -7388,11 +7395,23 @@ void DecoLogController::startConfirmations(const QString& service, bool full, co
     startNextConfirmAccount();
 }
 
+void DecoLogController::abortConfirmationsForChangedLog()
+{
+    m_confirmQueue.clear(); m_confirmOrigin.reset(); m_confirmStarting.clear(); m_confirmService.clear();
+    m_confirmFrom=QDate(); m_confirmTo=QDate(); m_confirmAuto=false; m_confirmFailed=true;
+    m_confirmStatus=tr("Confirmations: the log changed during download; no further confirmations were applied");
+    emit confirmChanged();
+}
+
 void DecoLogController::startNextConfirmAccount()
 {
+    if (!m_confirmOrigin || !m_db.matchesSessionToken(*m_confirmOrigin)) {
+        abortConfirmationsForChangedLog(); return;
+    }
     if (m_confirmAuto && m_confirmService == QLatin1String("qrz") && !m_confirmQrzAuto)
         m_confirmQueue.clear();
     if (m_confirmQueue.isEmpty()) {
+        m_confirmOrigin.reset();
         m_confirmService.clear();
         // Un periodo vale per questo scarico soltanto.
         m_confirmFrom = QDate();
@@ -7427,6 +7446,9 @@ void DecoLogController::startNextConfirmAccount()
     const QString account = m_credentials->account(a.credential);
     m_credentials->readSecret(a.credential, [this, a, account, since, from, to](const QString& secret, const QString& error) {
         m_confirmStarting.clear();
+        if (!m_confirmOrigin || !m_db.matchesSessionToken(*m_confirmOrigin)) {
+            abortConfirmationsForChangedLog(); return;
+        }
         if (m_confirmAuto && a.service == QLatin1String("qrz") && !m_confirmQrzAuto) {
             startNextConfirmAccount();
             return;
@@ -7977,6 +7999,9 @@ void DecoLogController::checkConfirmSchedule()
 
 void DecoLogController::onConfirmationReport(const confirmations::Report& report)
 {
+    if (!m_confirmOrigin || !m_db.matchesSessionToken(*m_confirmOrigin)) {
+        abortConfirmationsForChangedLog(); return;
+    }
     const QString category = confirmLabel(report.service).toUpper();
     const ConfirmAccount a = m_confirmAccount;
     if (!report.ok) {
