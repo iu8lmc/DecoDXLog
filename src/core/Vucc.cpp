@@ -305,6 +305,25 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             if (!grid.isUndefined()) entry.grid=grid.toString();
             entry.myGrids = myGrids.toString();
             entry.myGrid = myGrid.toString();
+            for (const auto* name : {"BAND", "PROP_MODE", "SAT_NAME", "BAND_RX", "QSO_DATE", "TIME_ON"}) {
+                const auto value=object.value(QLatin1String(name));
+                if (!value.isUndefined() && !value.isString()) {
+                    if (error) *error=QStringLiteral("QSO %1: invalid VUCC field type").arg(entry.qsoId);
+                    return {};
+                }
+            }
+            const auto overrideValue=[&object](const char* name,QString& value) {
+                const auto v=object.value(QLatin1String(name)); if (!v.isUndefined()) value=v.toString();
+            };
+            overrideValue("BAND",entry.band); overrideValue("PROP_MODE",entry.propMode);
+            overrideValue("SAT_NAME",entry.satName); overrideValue("BAND_RX",entry.rxBand);
+            if (object.contains(QStringLiteral("QSO_DATE")) || object.contains(QStringLiteral("TIME_ON"))) {
+                const auto original=logtime::fromStoredQso(entry.qsoUtc);
+                QString date=original.isValid() ? original.toString(QStringLiteral("yyyyMMdd")) : QString();
+                QString time=original.isValid() ? original.toString(QStringLiteral("HHmmss")) : QString();
+                overrideValue("QSO_DATE",date); overrideValue("TIME_ON",time);
+                entry.qsoUtc=LogDatabase::isoFromAdif(date,time);
+            }
         }
         if (entry.grid.trimmed().isEmpty() && entry.grids.trimmed().isEmpty())
             continue;

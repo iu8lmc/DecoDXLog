@@ -11,6 +11,27 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void respectsEffectiveAdifPropagationBandAndDate()
+    {
+        using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto* call : {"K1AAA","K1BBB","K1CCC","K1DDD"}) {
+            AdifRecord r{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","6m"},{"MODE","CW"},{"GRIDSQUARE","EM10"},{"QSL_RCVD","Y"}};
+            QVERIFY(db.insertQso(r,"fixture",{},true,0,false).id>0);
+        }
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("UPDATE qso SET gridsquare=CASE call WHEN 'K1AAA' THEN 'EM11' WHEN 'K1BBB' THEN 'EM12' WHEN 'K1CCC' THEN 'EM13' ELSE 'EM14' END"));
+        QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(COALESCE(adif_extra,'{}'),'$.PROP_MODE','SAT','$.SAT_NAME','AO-91','$.BAND_RX','70cm') WHERE call='K1AAA'"));
+        QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(COALESCE(adif_extra,'{}'),'$.BAND','2m') WHERE call='K1BBB'"));
+        QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(COALESCE(adif_extra,'{}'),'$.QSO_DATE','19820101') WHERE call='K1CCC'"));
+        QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(COALESCE(adif_extra,'{}'),'$.TIME_ON','invalid') WHERE call='K1DDD'"));
+        QString error; const auto entries=loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error));
+        const auto terrestrial=select(entries,Rules{{},{},"6m",100,"terrestrial"}); QVERIFY(terrestrial.eligible.isEmpty());
+        const auto satellite=select(entries,Rules{{},{},"",100,"satellite"}); QCOMPARE(satellite.eligible.size(),1); QCOMPARE(satellite.eligible.first().grid,QString("EM11"));
+        QCOMPARE(db.record(1)->value("PROP_MODE"),QString("SAT")); QCOMPARE(db.record(2)->value("BAND"),QString("2m"));
+        QCOMPARE(db.record(3)->value("QSO_DATE"),QString("19820101")); QCOMPARE(db.record(4)->value("TIME_ON"),QString("invalid"));
+        QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(adif_extra,'$.BAND',17) WHERE call='K1BBB'"));
+        QVERIFY(loadEntries(db,&error).isEmpty()); QVERIFY(error.contains("field type"));
+    }
     void usesEffectiveAdifGridWhenExtraOverridesColumn()
     {
         using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:"));

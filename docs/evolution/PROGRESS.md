@@ -3251,3 +3251,11 @@ VUCC loading now considers an explicit `GRIDSQUARE` in ADIF extra data, includin
 A/B on macOS arm64 / Qt 6.11.2: a synthetic legacy-style log with three extra-field overrides previously omitted the record whose structured grid was empty and used the structured value for the others. After the change, preview selects EM12 and EM14, excludes an invalid override and agrees with the effective QSO records. A non-string override fails closed. App and targets built; CTest awards, vucc and qmlpopups passed 3/3; the final type/error assertion passed separately. git diff --check passed.
 
 The fixture injects extra fields directly; it is not a real import, physical desktop or ARRL verification. Other standard fields overridden by ADIF extra data have not been comprehensively aligned in the VUCC loader. The existing text prefilter assumes normally encoded JSON field names; unusual escaped field names and large-log cost remain unverified. Windows/Linux and full G02/G13 acceptance remain open.
+
+## 2026-11-24 — G02 use effective ADIF propagation, band and time in VUCC
+
+VUCC candidate loading now also applies explicit ADIF-extra overrides for band, RX band, propagation, satellite name, QSO date and time, matching effective QSO-record precedence. Invalid date/time remains excluded by the existing timestamp rule; non-string override values fail closed. This does not change confirmations or establish official credit.
+
+A/B on macOS arm64 / Qt 6.11.2: in a synthetic legacy-style log, the previous preview admitted terrestrial candidates despite satellite, different-band, pre-1983 and invalid-time overrides. The revised preview excludes them from the 6 m terrestrial selection and includes the satellite candidate in satellite scope; the effective QSO records show the same overrides. App and targets built; CTest awards, vucc and qmlpopups passed 3/3; the final non-string type assertion passed separately. git diff --check passed.
+
+The test injects extra fields directly and does not establish official VUCC eligibility, real ADIF import behavior or physical desktop operation. Confirmation evidence still comes from structured QSL status. Unusual JSON key spellings/encodings, other standard fields, large logs and Windows/Linux remain unverified; G02/G13 acceptance is open.
