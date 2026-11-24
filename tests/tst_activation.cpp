@@ -662,6 +662,27 @@ private slots:
         QVERIFY(!act.previewResult().value("error").toString().isEmpty());
         QVERIFY(act.previewResult().value("groups").toList().isEmpty());
     }
+    void partitionExportUsesUtcDayForOffsetRecords()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord a{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(a); const auto first=db.insertQso(a,"fixture",{},true,0,false); QVERIFY(first.id>0);
+        a.set("CALL","K1BBB"); const auto second=db.insertQso(a,"fixture",{},true,0,false); QVERIFY(second.id>0);
+        QSqlQuery update(db.connection()); update.prepare("UPDATE qso SET qso_datetime_on='2027-01-02T00:30:00+02:00' WHERE id=?"); update.addBindValue(second.id); QVERIFY(update.exec());
+        QSignalSpy previewed(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
+        QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY2(previewed.first().first().toBool(),qPrintable(act.previewResult().value("error").toString()));
+        const auto groups=act.previewResult().value("groups").toList(); QCOMPARE(groups.size(),1);
+        const auto group=groups.first().toMap(); QCOMPARE(group.value("day").toString(),QString("2027-01-01")); QCOMPARE(group.value("count").toInt(),2);
+        const QString path=dir.filePath("partition.adi"); QSignalSpy done(&act,&ActivationController::partitionExportFinished);
+        QVERIFY(act.startPartitionExport(group,QUrl::fromLocalFile(path))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        QVERIFY2(done.first().first().toBool(),qPrintable(done.first().at(1).toString()));
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const auto rows=adif::parse(file.readAll()).records; QCOMPARE(rows.size(),2);
+        for (const auto& row : rows) { QCOMPARE(row.value("QSO_DATE"),QString("20270101")); QCOMPARE(row.value("TIME_ON"),QString("223000")); QCOMPARE(row.value("MY_POTA_REF"),QString("IT-0001")); }
+        QCOMPARE(db.qsoCount(),qint64(2));
+    }
+
     void partitionExportIsIsolatedAndRejectsStalePreview()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
