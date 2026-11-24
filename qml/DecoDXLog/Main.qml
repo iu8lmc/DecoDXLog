@@ -1396,6 +1396,11 @@ RoundedWindow {
         else if (what[0] === "qslocrreview") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrReview()) }
         else if (what[0] === "qslocrrevisions") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrRevisions()) }
         else if (what[0] === "qslocrhistory") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.showOcrHistory()) }
+        else if (what[0] === "radionetbackgroundprobe") {
+            decolog.radioNet.start("Reminder probe", 0)
+            decolog.radioNet.setReminder(1)
+            netReminderProbe.start()
+        }
         else if (what[0] === "radionet") {
             radioNetDialog.open()
             Qt.callLater(function () { radioNetDialog.probe(what[1] === "seed" || what[1] === "qso" || what[1] === "save" || what[1] === "reminder", what[1] === "qso" || what[1] === "save", what[1] === "save", what[1] === "history", what[1] === "reminder", what[1] === "qsohistory") })
@@ -2032,11 +2037,47 @@ RoundedWindow {
                 dxToast.show(title, text, spotKey)
         }
     }
+    // Keep the radio-net reminder visible when its management dialog is closed.
+    Timer {
+        interval: 250; repeat: true
+        running: !!decolog.radioNet.reminder.scheduled
+        onTriggered: netReminder.clock = Date.now()
+    }
+    Rectangle {
+        id: netReminder
+        property double clock: Date.now()
+        readonly property var reminder: decolog.radioNet.reminder
+        readonly property double deadline: Date.parse(reminder.deadline || "")
+        visible: !!reminder.scheduled && isFinite(deadline) && deadline <= clock && !radioNetDialog.visible
+        anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: 52; z: 999
+        width: netReminderButton.implicitWidth + 20; height: netReminderButton.implicitHeight + 12
+        radius: 8; color: Theme.panelColor; border.color: Theme.warningColor; border.width: 2
+        Button {
+            id: netReminderButton
+            anchors.centerIn: parent
+            text: qsTr("Radio net reminder due — open Net Manager")
+            onClicked: radioNetDialog.open()
+        }
+    }
     ActivationDialog { id: activationDialog; onOpenQsoRequested: (id) => { window.openQso(id); if (startupShow === "activationopenexcludedprobe") console.warn("PROBE activation open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)) } }
     RadioNetDialog { id: radioNetDialog }
     RoverDialog { id: roverDialog }
     PredictDialog { id: predictDialog }
     ContestSubmitDialog { id: submitDialog }
+    Timer {
+        id: netReminderProbe
+        interval: 1800
+        onTriggered: {
+            console.warn("PROBE net background due=" + netReminder.visible + " dialog=" + radioNetDialog.visible)
+            netReminderButton.clicked()
+            Qt.callLater(function() {
+                console.warn("PROBE net background opened=" + radioNetDialog.visible)
+                decolog.radioNet.clearReminder()
+                Qt.callLater(() => console.warn("PROBE net background cleared=" + !netReminder.visible))
+            })
+        }
+    }
     Timer {
         id: benchTimer
         property int left: 0

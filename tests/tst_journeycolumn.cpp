@@ -1922,6 +1922,17 @@ private slots:
         QVERIFY(adif.contains("<band_rx:4>70cm"));
     }
 
+    void radioNetReminderVisibleWithDialogClosed()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionetbackgroundprobe"), output, 4500), output.constData());
+        QVERIFY2(output.contains("PROBE net background due=true dialog=false"), output.constData());
+        QVERIFY2(output.contains("PROBE net background opened=true"), output.constData());
+        QVERIFY2(output.contains("PROBE net background cleared=true"), output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), qint64(0));
+    }
+
     void radioNetReminderShowsWhenDue()
     {
         QTemporaryDir dir;
