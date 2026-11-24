@@ -93,8 +93,22 @@ Report parseCqWw(const QByteArray& bytes)
     for (const QString& line : report.lines) {
         const auto contest = contestRx.match(line.trimmed());
         const auto call = callRx.match(line.trimmed());
-        if (contest.hasMatch() && report.contest.isEmpty()) report.contest = contest.captured(1);
-        if (call.hasMatch() && report.ownCall.isEmpty()) report.ownCall = call.captured(1).toUpper();
+        if (contest.hasMatch()) {
+            const QString value = contest.captured(1).simplified();
+            if (!report.contest.isEmpty() && report.contest.compare(value, Qt::CaseInsensitive) != 0) {
+                report.error = QStringLiteral("Conflicting CQ WW contest headers");
+                return report;
+            }
+            report.contest = value;
+        }
+        if (call.hasMatch()) {
+            const QString value = call.captured(1).toUpper();
+            if (!report.ownCall.isEmpty() && report.ownCall != value) {
+                report.error = QStringLiteral("Conflicting CQ WW callsign headers");
+                return report;
+            }
+            report.ownCall = value;
+        }
     }
     if (report.contest.isEmpty() || report.ownCall.isEmpty()) {
         report.error = QStringLiteral("Not a supported CQ WW text report");

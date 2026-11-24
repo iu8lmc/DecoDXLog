@@ -156,6 +156,17 @@ private slots:
         QVERIFY(report.entries[0].correction.isEmpty()); QCOMPARE(report.entries[1].correction,QString("K8GOOD"));
         QCOMPARE(report.unrecognizedLines.size(),3); QCOMPARE(report.unrecognizedLines[0],5);
     }
+    void rejectsConflictingReportIdentity()
+    {
+        const QByteArray row="****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1ABC 14\n";
+        const QByteArray contest="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\n";
+        const QByteArray call="Call: K1ABC\n";
+        QVERIFY(contestreport::parseCqWw(contest+call+row).error.isEmpty());
+        QVERIFY(!contestreport::parseCqWw(contest+call+"Call: K2XYZ\n"+row).error.isEmpty());
+        QVERIFY(!contestreport::parseCqWw(contest+"Contest: 2023 CQ WORLD WIDE CW DX CONTEST\n"+call+row).error.isEmpty());
+        QVERIFY(contestreport::parseCqWw(contest+contest+call+"Call: k1abc\n"+row).error.isEmpty());
+    }
+
     void refusesUnrelatedAndOversizedInput()
     {
         QVERIFY(!contestreport::parseCqWw("not a CQ WW report\n").error.isEmpty());

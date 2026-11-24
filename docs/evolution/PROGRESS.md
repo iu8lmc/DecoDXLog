@@ -2759,3 +2759,11 @@ The asynchronous radio-net export completion now checks the original open genera
 A/B on macOS arm64 / Qt 6.11.2: the test waited for an actual JSON export to appear without processing its queued completion, opened a different temporary log and then delivered the callback. Previously success had no indication of origin; now it reports the original log and the JSON contains the original session. Normal export also passed. App and test targets built; CTest radionet, database, migration and qmlpopups passed 4/4.
 
 The fixture exercises a log switch after writing, not a session-only switch or every failure ordering; the message branch for session change is not separately tested. The UI success-message binding was built but not observed in physical UI. The result does not make filesystem replacement safe. Windows/Linux, real radio operations and full G08/G13 acceptance remain open.
+
+## 2026-11-24 — G10 reject conflicting CQ WW report identities
+
+The CQ WW report reader now rejects conflicting recognized contest or own-callsign headers instead of silently choosing the first. Equivalent repeated headers remain accepted, comparing contest names case-insensitively after whitespace normalization and callsigns case-insensitively. This prevents ambiguous reports from entering the existing review and candidate-search workflow; report data is not modified.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic report with two different callsign headers was previously accepted and is now rejected; a conflicting contest header is also rejected, while identical repeated headers and the existing supported-row/unknown-line fixture pass. App and test targets built; CTest contestreport, database, activation and qmlpopups passed 4/4.
+
+The guard only compares headers recognized by the existing CQ WW parser; it is not a general LCR/UBN parser or an authenticity check. Synthetic reports were used; no additional official report, physical UI, Windows/Linux or real contest was exercised. G10/G13 acceptance remains open.
