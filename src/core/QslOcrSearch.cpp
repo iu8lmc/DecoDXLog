@@ -47,7 +47,11 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
     if (similar) {
         const QString alphabet = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
         for (qsizetype i=0; i<call.size(); ++i) {
-            if (call.at(i)==QLatin1Char('/')) continue;
+            if (call.at(i)==QLatin1Char('/')) {
+                QString shorter=call; shorter.remove(i,1);
+                if (valid.match(shorter).hasMatch()) variants.insert(shorter);
+                continue;
+            }
             for (const QChar ch : alphabet) { QString v=call; v[i]=ch; if (valid.match(v).hasMatch()) variants.insert(v); }
             if (i+1<call.size() && call.at(i+1)!=QLatin1Char('/')) {
                 QString v=call; v[i]=call.at(i+1); v[i+1]=call.at(i);
@@ -58,6 +62,8 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
         }
         if (call.size() < 15) {
             for (qsizetype i=0; i<=call.size(); ++i) {
+                QString slash=call; slash.insert(i,QLatin1Char('/'));
+                if (valid.match(slash).hasMatch()) variants.insert(slash);
                 for (const QChar ch : alphabet) {
                     QString longer=call; longer.insert(i,ch);
                     if (valid.match(longer).hasMatch()) variants.insert(longer);

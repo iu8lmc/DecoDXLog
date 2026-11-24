@@ -222,6 +222,22 @@ class TestTesseractOcr : public QObject {
         QCOMPARE(db.qsoCount(),qint64(106));
     }
 
+    void similarSearchSuggestsMissingOrAddedSlash()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("slash.sqlite")));
+        for (const auto* call : {"K1ABC/P","K1ABCP","K1ABC","K1XYZ/P"})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(search.startFiltered("K1ABCP","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        QCOMPARE(search.matches().size(),1); QVERIFY(!search.matches().first().toMap().value("similar").toBool());
+        QVERIFY(search.startSimilar("K1ABCP","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QVERIFY(done.last().first().toBool());
+        QSet<QString> calls; for (const auto &row : search.matches()) calls.insert(row.toMap().value("call").toString());
+        QVERIFY(calls.contains("K1ABC/P")); QVERIFY(!calls.contains("K1XYZ/P"));
+        QVERIFY(search.startSimilar("K1ABC/P","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),3,5000); QVERIFY(done.last().first().toBool());
+        calls.clear(); for (const auto &row : search.matches()) calls.insert(row.toMap().value("call").toString());
+        QVERIFY(calls.contains("K1ABCP")); QVERIFY(!calls.contains("K1XYZ/P")); QCOMPARE(db.qsoCount(),qint64(4));
+    }
+
     void similarSearchHandlesSingleInsertionAndDeletion()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("edits.sqlite")));

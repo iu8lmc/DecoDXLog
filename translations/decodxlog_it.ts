@@ -15953,8 +15953,8 @@ Referenze aggiuntive: %7</translation></message>
         <translation>Includi nominativi simili (un carattere aggiunto, rimosso, sostituito o due adiacenti scambiati)</translation>
     </message>
     <message>
-        <source>Similar matches are suggestions only; verify each callsign on the image. Slash changes are not searched.</source>
-        <translation>Le corrispondenze simili sono solo suggerimenti; verifica ogni nominativo sull’immagine. Non vengono cercate variazioni della barra.</translation>
+        <source>Similar matches are suggestions only; verify each callsign on the image, including any slash.</source>
+        <translation>Le corrispondenze simili sono solo suggerimenti; verifica ogni nominativo sull'immagine, compresa l'eventuale barra.</translation>
     </message>
     <message>
         <source>similar calls</source>

@@ -3155,3 +3155,11 @@ New installations and identical reinstalls now record the manifest SHA-256 along
 A/B on macOS arm64: after changing an installed synthetic manifest's declared permissions, the previous manager listed it as valid and the new test failed; the updated manager lists it invalid, refuses to run it and still permits removal. Another test reads a legacy pointer and confirms reinstall adds the hash. Python extension manager/harness tests passed 13/13; CTest extension_harness, extension_manager and localapi passed 3/3; git diff --check passed.
 
 This is accidental-change detection, not a signature or sandbox: an actor able to alter the pointer can replace the hash, and concurrent file mutation between checks and execution is not eliminated. The shared read-only API token remains the permission boundary. Existing legacy pointers are not automatically upgraded; Windows/Linux and full G11/G13 acceptance remain open.
+
+## 2026-11-24 — G12 suggest OCR calls with a missing or added slash
+
+Optional similar-call search now proposes valid calls differing by one slash insertion or deletion, alongside the existing one-edit alternatives. Exact search remains exact; similar matches remain labelled and require explicit operator review. The warning and OCR guide now ask the operator to check the slash on the image. No QSO or attachment is modified by searching.
+
+A/B on macOS arm64 / Qt 6.11.2: before the change, searching synthetic `K1ABCP` did not find `K1ABC/P` and the new test failed. Afterwards both slash insertion and deletion find the corresponding candidate, unrelated calls are excluded, and exact-only mode remains exact. CTest database, tesseractocr and qmlpopups passed 3/3; the final exact-mode assertion passed separately. App and tests built; translation XML and git diff --check passed.
+
+Suggestions are not evidence that two calls identify the same station. Removing both a slash and its suffix requires two edits and is not included; results remain bounded to 100 with exact results first. The new case was tested in the search core rather than the running OCR dialog, with synthetic records rather than a real card. Large-log cost for the expanded alternatives, physical UI, Windows/Linux and full G12/G13 acceptance remain open.

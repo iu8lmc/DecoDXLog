@@ -206,7 +206,7 @@ DialogFrame {
         }
         Text {
             Layout.fillWidth: true; visible: similarCall.checked; color: Theme.warningColor; wrapMode: Text.Wrap
-            text: qsTr("Similar matches are suggestions only; verify each callsign on the image. Slash changes are not searched.")
+            text: qsTr("Similar matches are suggestions only; verify each callsign on the image, including any slash.")
         }
         RowLayout {
             Layout.fillWidth: true
