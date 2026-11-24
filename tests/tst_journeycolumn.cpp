@@ -1360,6 +1360,15 @@ private slots:
         QCOMPARE(campaigns.first().source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(campaigns.first().revision,4); QVERIFY(!campaigns.first().archived); QVERIFY(campaigns.first().watched); QVERIFY(campaigns.first().watchGoalsOnly);
         QCOMPARE(campaigns.first().goals.size(),1); QCOMPARE(campaigns.first().goals.first().target,QString("confirmed"));
     }
+    void qslImportExposesAmbiguousConfirmations()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          db.setSetting("qsl.import_summary",R"({"runs":[{"label":"LoTW","when":"2026-01-01","confirmed":0,"already":0,"notFound":0,"ambiguous":1,"invalid":0,"databaseErrors":0}],"rows":[{"kind":"ambiguous","label":"LoTW","service":"lotw","call":"K1ABC","band":"20m","mode":"CW","utc":"2026-01-01","reason":"Multiple candidates","candidateIds":[1,2]}]})"); }
+        QByteArray output; QVERIFY2(launch(dir,"qslimportambiguousprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE qsl import ambiguous count=1 label=ambiguous") && output.contains("1 ambiguous") && output.contains("QSO IDs: 1, 2"),output.constData());
+    }
     void qslAlternativesDesktopPagesAndInvalidates()
     {
         using namespace decolog::core;

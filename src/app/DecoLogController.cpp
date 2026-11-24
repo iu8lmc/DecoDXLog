@@ -7262,9 +7262,13 @@ DecoLogController::ConfirmTally DecoLogController::applyConfirmations(const QStr
         case ConfirmationResult::Status::AlreadyConfirmed: ++t.already; break;
         case ConfirmationResult::Status::Ambiguous: {
             ++t.ambiguous;
-            const QVariantMap m = row(c, QStringLiteral("ambiguous"), r.message, 0);
-            if (!m.isEmpty())
+            QVariantMap m = row(c, QStringLiteral("ambiguous"), r.message, 0);
+            if (!m.isEmpty()) {
+                QVariantList ids; for (const qint64 id : r.candidates) { if (ids.size()>=50) break; ids << id; }
+                m.insert(QStringLiteral("candidateIds"),ids);
+                m.insert(QStringLiteral("candidateCount"),r.candidates.size());
                 t.rows << m;
+            }
             break;
         }
         case ConfirmationResult::Status::NotFound: {

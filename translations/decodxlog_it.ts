@@ -6787,6 +6787,11 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>QslImportDialog</name>
+    <message><source>ambiguous</source><translation>ambiguo</translation></message>
+    <message><source>Ambiguous</source><translation>Ambigui</translation></message>
+    <message><source>QSO IDs: %1</source><translation>ID QSO: %1</translation></message>
+    <message><source>Candidates are from the saved download summary; recheck the current log before acting.</source><translation>I candidati provengono dal riepilogo salvato dello scaricamento; ricontrolla il log attuale prima di agire.</translation></message>
+    <message><source>%1 (%2): %3 new, %4 already marked, %5 not matched, %6 errors, %7 ambiguous</source><translation>%1 (%2): %3 nuove, %4 già segnate, %5 non abbinate, %6 errori, %7 ambigue</translation></message>
     <message>
         <source>new</source>
         <translation>nuova</translation>

@@ -32,6 +32,10 @@ DialogFrame {
                                          || String(r.country || "").toUpperCase().indexOf(f) >= 0))
     }
     property var selected: null
+    function probeAmbiguous() {
+        root.kindFilter = "ambiguous"
+        console.warn("PROBE qsl import ambiguous count=" + root.shown.length + " label=" + root.kindLabel("ambiguous") + " text=" + root.asText())
+    }
 
     // La cartolina della riga scelta.
     property string cardKey: ""
@@ -60,10 +64,15 @@ DialogFrame {
     }
 
     function kindLabel(kind) {
-        return kind === "new" ? qsTr("new") : kind === "notfound" ? qsTr("not matched") : qsTr("error")
+        return kind === "new" ? qsTr("new") : kind === "notfound" ? qsTr("not matched") : kind === "ambiguous" ? qsTr("ambiguous") : qsTr("error")
     }
     function kindTone(kind) {
-        return kind === "new" ? Theme.accentColor : kind === "notfound" ? Theme.warningColor : Theme.errorColor
+        return kind === "new" ? Theme.accentColor : (kind === "notfound" || kind === "ambiguous") ? Theme.warningColor : Theme.errorColor
+    }
+    function candidateText(row) {
+        if (!row || row.kind !== "ambiguous" || !(row.candidateIds || []).length) return ""
+        const ids = row.candidateIds.join(", ")
+        return qsTr("QSO IDs: %1").arg(ids) + ((row.candidateCount || row.candidateIds.length) > row.candidateIds.length ? " …" : "")
     }
     // Il riepilogo come testo, per copiarlo dove serve.
     function asText() {
@@ -71,15 +80,15 @@ DialogFrame {
         for (const run of root.runs)
             out.push((run.error || "").length > 0
                      ? "%1 (%2): %3".arg(run.label).arg(run.whenText || run.when).arg(run.error)
-                     : qsTr("%1 (%2): %3 new, %4 already marked, %5 not matched, %6 errors")
+                     : qsTr("%1 (%2): %3 new, %4 already marked, %5 not matched, %6 errors, %7 ambiguous")
                        .arg(run.label).arg(run.whenText || run.when).arg(run.confirmed).arg(run.already)
-                       .arg(run.notFound).arg(run.invalid))
+                       .arg(run.notFound).arg(run.invalid).arg(run.ambiguous || 0))
         out.push("")
         for (const r of root.shown)
             out.push("%1; %2; %3; %4; %5; %6%7".arg(r.utc).arg(r.call).arg(r.band).arg(r.mode).arg(r.label)
                      .arg(root.kindLabel(r.kind))
                      .arg(r.kind === "new" ? (r.country ? "; " + r.country + (r.newDxcc ? " — " + qsTr("new DXCC") : "") : "")
-                                           : (r.reason ? "; " + r.reason : "")))
+                                           : (r.reason ? "; " + r.reason : "")) + (root.candidateText(r) ? "; " + root.candidateText(r) : ""))
         return out.join("\n")
     }
 
@@ -129,12 +138,12 @@ DialogFrame {
                         text: (modelData.error || "").length > 0
                               ? "<b>%1</b> · %2<br><font color=\"%3\">%4</font>".arg(modelData.label)
                                     .arg(modelData.whenText || "").arg(Theme.errorColor).arg(modelData.error)
-                              : "<b>%1</b> · %2<br>%3 <font color=\"%4\">%5</font> · %6 %7 · %8 <font color=\"%9\">%10</font> · %11 %12"
+                              : "<b>%1</b> · %2<br>%3 <font color=\"%4\">%5</font> · %6 %7 · %8 <font color=\"%9\">%10</font> · %11 %12 · %13 %14"
                               .arg(modelData.label).arg(modelData.whenText || "")
                               .arg(qsTr("new ones")).arg(Theme.accentColor).arg(modelData.confirmed)
                               .arg(qsTr("already marked")).arg(modelData.already)
                               .arg(qsTr("not matched")).arg(Theme.warningColor).arg(modelData.notFound)
-                              .arg(qsTr("errors")).arg(modelData.invalid)
+                              .arg(qsTr("errors")).arg(modelData.invalid).arg(qsTr("ambiguous")).arg(modelData.ambiguous || 0)
                         color: Theme.textPrimary
                         font.pixelSize: 12
                     }
@@ -166,8 +175,8 @@ DialogFrame {
             }
             StyledComboBox {
                 Layout.preferredWidth: 170
-                readonly property var kinds: ["new", "notfound", "invalid", ""]
-                model: [qsTr("New confirmations"), qsTr("Not matched"), qsTr("Errors"), qsTr("Everything")]
+                readonly property var kinds: ["new", "notfound", "ambiguous", "invalid", ""]
+                model: [qsTr("New confirmations"), qsTr("Not matched"), qsTr("Ambiguous"), qsTr("Errors"), qsTr("Everything")]
                 currentIndex: Math.max(0, kinds.indexOf(root.kindFilter))
                 onActivated: root.kindFilter = kinds[currentIndex]
             }
@@ -301,6 +310,11 @@ DialogFrame {
                         font.pixelSize: 13
                         font.bold: true
                         elide: Text.ElideRight
+                    }
+                    Text {
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                        visible: !!root.candidateText(root.selected)
+                        text: root.candidateText(root.selected) + "\n" + qsTr("Candidates are from the saved download summary; recheck the current log before acting.")
                     }
                     Item {
                         Layout.fillWidth: true
