@@ -16,6 +16,7 @@
 
 #include <QSqlQuery>
 #include <QJsonObject>
+#include <QJsonDocument>
 #include <QLockFile>
 #include <QSqlDriver>
 #include <QLibrary>
