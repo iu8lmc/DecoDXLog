@@ -1569,6 +1569,16 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
                         record.set(program == QLatin1String("POTA") ? QStringLiteral("MY_POTA_REF") : QStringLiteral("MY_WWFF_REF"), ref);
                         record.set(QStringLiteral("MY_SIG"), program);
                         record.set(QStringLiteral("MY_SIG_INFO"), program == QLatin1String("POTA") ? ref.section(QLatin1Char('@'), 0, 0) : ref);
+                        if (program == QLatin1String("POTA") && record.value(QStringLiteral("SIG")).trimmed().isEmpty()
+                            && record.value(QStringLiteral("SIG_INFO")).trimmed().isEmpty()) {
+                            const QString other = record.value(QStringLiteral("POTA_REF")).trimmed().toUpper();
+                            QVariantMap normalized;
+                            if (!other.contains(QLatin1Char(',')) && !other.isEmpty()
+                                && Activation::normalizePrograms({{QStringLiteral("pota"), other}}, &normalized)) {
+                                record.set(QStringLiteral("SIG"), QStringLiteral("POTA"));
+                                record.set(QStringLiteral("SIG_INFO"), other.section(QLatin1Char('@'), 0, 0));
+                            }
+                        }
                     } else {
                         record.set(program == QLatin1String("SOTA") ? QStringLiteral("MY_SOTA_REF") : QStringLiteral("MY_IOTA"), ref);
                     }

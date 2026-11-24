@@ -721,6 +721,35 @@ private slots:
         QVERIFY(!act.previewResult().value("error").toString().isEmpty());
         QVERIFY(act.previewResult().value("groups").toList().isEmpty());
     }
+    void potaExportPreservesExplicitAndAmbiguousCorrespondentFields()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        const QList<AdifRecord> inputs{
+            {{"CALL","K1AAA"},{"POTA_REF","US-0001@US-CA"}},
+            {{"CALL","K1BBB"},{"POTA_REF","US-0002"},{"SIG","WWFF"},{"SIG_INFO","KFF-1234"}},
+            {{"CALL","K1CCC"},{"POTA_REF","US-0003,US-0004"}},
+            {{"CALL","K1DDD"},{"POTA_REF","bad-reference"}}};
+        for (auto record : inputs) {
+            record.set("QSO_DATE","20261124"); record.set("TIME_ON","1200"); record.set("BAND","20m"); record.set("MODE","CW");
+            act.applyTo(record); QVERIFY(db.insertQso(record,"fixture",{},true,0,false).id>0);
+        }
+        QSignalSpy previewed(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
+        QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY(previewed.first().first().toBool());
+        const auto groups=act.previewResult().value("groups").toList(); QCOMPARE(groups.size(),1);
+        const QString output=dir.filePath("pota.adi"); QSignalSpy done(&act,&ActivationController::partitionExportFinished);
+        QVERIFY(act.startPartitionExport(groups.first().toMap(),QUrl::fromLocalFile(output)));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY2(done.first().first().toBool(),qPrintable(done.first().at(1).toString()));
+        QFile file(output); QVERIFY(file.open(QIODevice::ReadOnly)); const auto rows=adif::parse(file.readAll()).records;
+        QCOMPARE(rows.size(),4); QMap<QString,AdifRecord> byCall; for (const auto& row : rows) byCall.insert(row.value("CALL"),row);
+        QCOMPARE(byCall["K1AAA"].value("SIG"),QString("POTA")); QCOMPARE(byCall["K1AAA"].value("SIG_INFO"),QString("US-0001"));
+        QCOMPARE(byCall["K1AAA"].value("POTA_REF"),QString("US-0001@US-CA"));
+        QCOMPARE(byCall["K1BBB"].value("SIG"),QString("WWFF")); QCOMPARE(byCall["K1BBB"].value("SIG_INFO"),QString("KFF-1234"));
+        QVERIFY(byCall["K1CCC"].value("SIG").isEmpty()); QVERIFY(byCall["K1DDD"].value("SIG").isEmpty());
+        QCOMPARE(db.qsoCount(),qint64(4));
+    }
+
     void partitionExportUsesUtcDayForOffsetRecords()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
@@ -869,6 +898,9 @@ private slots:
         QCOMPARE(records.at(0).value("MY_SIG"), QString("POTA"));
         QCOMPARE(records.at(0).value("MY_SIG_INFO"), QString("IT-0001"));
         QCOMPARE(records.at(0).value("POTA_REF"), QString("US-1234"));
+        QCOMPARE(records.at(0).value("SIG"), QString("POTA"));
+        QCOMPARE(records.at(0).value("SIG_INFO"), QString("US-1234"));
+        QVERIFY(db.record(inserted.id)->value("SIG").isEmpty());
         QCOMPARE(db.record(inserted.id)->value("MY_POTA_REF"), QString("IT-0001,IT-0002"));
         exported.clear(); const QString wwffPath = dir.filePath("wwff.adi");
         QVERIFY(act.startPartitionExport(wwff, QUrl::fromLocalFile(wwffPath)));
