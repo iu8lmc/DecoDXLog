@@ -683,6 +683,38 @@ private slots:
         QCOMPARE(db.qsoCount(),qint64(2));
     }
 
+    void partitionExportRejectsUnversionedTimeChange()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(rec); const auto qso=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(qso.id>0);
+        QSignalSpy previewed(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview()); QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY(previewed.first().first().toBool());
+        const auto group=act.previewResult().value("groups").toList().first().toMap();
+        const QString path=dir.filePath("partition.adi"); { QFile f(path); QVERIFY(f.open(QIODevice::WriteOnly)); QCOMPARE(f.write("protected"),qint64(9)); }
+        QSqlQuery update(db.connection()); update.prepare("UPDATE qso SET qso_datetime_on='2027-01-01T22:45:00Z' WHERE id=?"); update.addBindValue(qso.id); QVERIFY(update.exec());
+        QSignalSpy done(&act,&ActivationController::partitionExportFinished); QVERIFY(act.startPartitionExport(group,QUrl::fromLocalFile(path)));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.first().first().toBool());
+        QFile f(path); QVERIFY(f.open(QIODevice::ReadOnly)); QCOMPARE(f.readAll(),QByteArray("protected"));
+    }
+
+    void partitionExportRejectsUnversionedCallAndExtraChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(rec); const auto qso=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(qso.id>0);
+        QSignalSpy previewed(&act,&ActivationController::previewFinished), done(&act,&ActivationController::partitionExportFinished);
+        const QString path=dir.filePath("partition.adi");
+        for (const QString& sql : {QString("UPDATE qso SET call='K1AAB' WHERE id=?"), QString("UPDATE qso SET adif_extra=json_set(adif_extra,'$.APP_TEST','changed') WHERE id=?")}) {
+            previewed.clear(); QVERIFY(act.startPartitionPreview()); QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY(previewed.first().first().toBool());
+            const auto group=act.previewResult().value("groups").toList().first().toMap(); QSqlQuery update(db.connection()); update.prepare(sql); update.addBindValue(qso.id); QVERIFY(update.exec());
+            done.clear(); QVERIFY(act.startPartitionExport(group,QUrl::fromLocalFile(path))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.first().first().toBool()); QVERIFY(!QFile::exists(path));
+        }
+    }
+
     void partitionExportIsIsolatedAndRejectsStalePreview()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

@@ -864,7 +864,10 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (stationCall.isEmpty()) groups[key][QStringLiteral("missingStationCall")] = groups[key].value(QStringLiteral("missingStationCall")).toInt() + 1;
                 if (op.isEmpty()) groups[key][QStringLiteral("missingOperator")] = groups[key].value(QStringLiteral("missingOperator")).toInt() + 1;
                 if (stationCall.isEmpty() && op.isEmpty()) groups[key][QStringLiteral("missingCallIdentity")] = groups[key].value(QStringLiteral("missingCallIdentity")).toInt() + 1;
-                const QByteArray identity = QJsonDocument(QJsonArray{q.value(3).toString(), QString::number(q.value(4).toLongLong())}).toJson(QJsonDocument::Compact);
+                // Include the source fields used by grouping even if another writer
+                // changes them without updating the QSO revision.
+                const QByteArray identity = QJsonDocument(QJsonArray{q.value(3).toString(), QString::number(q.value(4).toLongLong()),
+                    q.value(0).toString(), q.value(1).toString(), q.value(5).toString()}).toJson(QJsonDocument::Compact);
                 hashes[key] = QCryptographicHash::hash(hashes.value(key) + identity, QCryptographicHash::Sha256);
                 if (selectedIds && key == selectedKey) selectedIds->append(q.value(2).toLongLong());
             }
