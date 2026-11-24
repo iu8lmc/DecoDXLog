@@ -826,6 +826,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         "(CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
     q.addBindValue(uuid);
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
+    const int columnCount=q.record().count();
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
     QVariantList excluded, potaCorrespondentRows;
@@ -838,7 +839,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
             ++excludedTotal;
             QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_0);
             stream << reason;
-            for (int column=6; column<q.record().count(); ++column) stream << q.value(column);
+            for (int column=6; column<columnCount; ++column) stream << q.value(column);
             if (stream.status()!=QDataStream::Ok) return false;
             excludedFingerprint=QCryptographicHash::hash(excludedFingerprint + QCryptographicHash::hash(bytes,QCryptographicHash::Sha256),QCryptographicHash::Sha256);
             if (collectExcluded && q.value(2).toLongLong()>excludedAfterId) {
@@ -878,7 +879,6 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         QByteArray recordBytes;
         QDataStream stream(&recordBytes, QIODevice::WriteOnly);
         stream.setVersion(QDataStream::Qt_6_0);
-        const int columnCount=q.record().count();
         for (int column=6; column<columnCount; ++column) stream << q.value(column);
         if (stream.status()!=QDataStream::Ok)
             return fail(tr("Cannot fingerprint the session QSO."));

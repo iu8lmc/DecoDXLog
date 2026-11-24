@@ -775,7 +775,9 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
         ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
         QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
-        const QString session=act.state().value("sessionUuid").toString();
+        const QString session=QStringLiteral("fixed-exclusion-benchmark");
+        QSqlQuery addSession(db.connection());
+        QVERIFY(addSession.exec("INSERT INTO activation_run(uuid,started_at,initial_json,last_json) VALUES('fixed-exclusion-benchmark','2027-01-01T00:00:00Z','{}','{}')"));
         const QString json=QString::fromUtf8(QJsonDocument(QJsonObject{{"APP_DECOLOG_ACTIVATION_UUID",session},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}}).toJson(QJsonDocument::Compact));
         QSqlQuery seed(db.connection()); QVERIFY(seed.prepare("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<20000) "
             "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at,adif_extra) "
@@ -789,6 +791,7 @@ private slots:
         QCOMPARE(result.value("excluded").toList().size(),paged ? 100 : 20000);
         QCOMPARE(result.value("excludedHasMore").toBool(),paged);
         qInfo("ACTIVATION_EXCLUSIONS_BENCH qso=20000 paged=%d elapsed_ms=%lld",paged,static_cast<long long>(timer.elapsed()));
+        qInfo().noquote() << "ACTIVATION_EXCLUSIONS_FINGERPRINT" << result.value("excludedFingerprint").toString();
     }
 
     void asynchronousPreviewCanCompleteCancelAndInvalidate()
