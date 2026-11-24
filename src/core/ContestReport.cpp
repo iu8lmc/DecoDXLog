@@ -49,15 +49,21 @@ CandidateResult findCandidates(const LogDatabase& db, const Entry& entry, int to
         "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(NULLIF(json_extract(q.adif_extra,'$.SRX_STRING'),''),json_extract(q.adif_extra,'$.SRX'),'') ELSE '' END,"
         "CASE WHEN json_valid(q.adif_extra) THEN COALESCE(json_extract(q.adif_extra,'$.CONTEST_ID'),'') ELSE '' END, q.call "
         "FROM qso q LEFT JOIN station_profile p ON p.id=q.station_profile_id "
-        "WHERE q.deleted=0 AND q.call IN (?,?) AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? AND q.mode IN ")
-        + modeClause + QStringLiteral(" ORDER BY CASE WHEN q.qso_datetime_on>=? AND q.qso_datetime_on<? THEN 0 ELSE 1 END, "
-          "COALESCE(CASE WHEN q.qso_datetime_on<? THEN julianday(?)-julianday(q.qso_datetime_on) "
-          "WHEN q.qso_datetime_on>=? THEN julianday(q.qso_datetime_on)-julianday(?) ELSE 0 END, 999999), "
-          "CASE WHEN q.call=? THEN 0 ELSE 1 END,q.qso_datetime_on,q.id LIMIT 6"));
+        "WHERE q.deleted=0 AND q.call IN (?,?) AND q.band=? AND q.qso_datetime_on>=? AND q.qso_datetime_on<? "
+        "AND julianday(q.qso_datetime_on)>=julianday(?) AND julianday(q.qso_datetime_on)<julianday(?) AND q.mode IN ")
+        + modeClause + QStringLiteral(" ORDER BY CASE WHEN julianday(q.qso_datetime_on)>=julianday(?) AND julianday(q.qso_datetime_on)<julianday(?) THEN 0 ELSE 1 END, "
+          "COALESCE(CASE WHEN julianday(q.qso_datetime_on)<julianday(?) THEN julianday(?)-julianday(q.qso_datetime_on) "
+          "WHEN julianday(q.qso_datetime_on)>=julianday(?) THEN julianday(q.qso_datetime_on)-julianday(?) ELSE 0 END, 999999), "
+          "CASE WHEN q.call=? THEN 0 ELSE 1 END,julianday(q.qso_datetime_on),q.id LIMIT 6"));
     const QString minuteStart=start.toString(Qt::ISODate), minuteEnd=start.addSecs(60).toString(Qt::ISODate);
     q.addBindValue(reportedCall); q.addBindValue(correctedCall); q.addBindValue(band);
-    q.addBindValue(start.addSecs(-60*toleranceMinutes).toString(Qt::ISODate));
-    q.addBindValue(start.addSecs(60*(toleranceMinutes+1)).toString(Qt::ISODate));
+    const QDateTime lower=start.addSecs(-60*toleranceMinutes), upper=start.addSecs(60*(toleranceMinutes+1));
+    // Keep a bounded indexed text range, widened for ISO timezone offsets;
+    // the julianday predicates below enforce the actual UTC interval.
+    const QDateTime broadLower=lower.addDays(-1), broadUpper=upper.addDays(1);
+    q.addBindValue(broadLower.isValid() ? broadLower.toString(Qt::ISODate) : QString());
+    q.addBindValue(broadUpper.isValid() ? broadUpper.toString(Qt::ISODate) : QString(QChar(0xffff)));
+    q.addBindValue(lower.toString(Qt::ISODate)); q.addBindValue(upper.toString(Qt::ISODate));
     q.addBindValue(minuteStart); q.addBindValue(minuteEnd);
     q.addBindValue(minuteStart); q.addBindValue(minuteStart); q.addBindValue(minuteEnd); q.addBindValue(minuteEnd);
     q.addBindValue(reportedCall);

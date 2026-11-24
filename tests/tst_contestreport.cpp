@@ -1,5 +1,6 @@
 #include "core/ContestReport.h"
 #include "core/LogDatabase.h"
+#include <QSqlQuery>
 #include <QTest>
 #include <QFile>
 using namespace decolog::core;
@@ -85,6 +86,16 @@ private slots:
         QCOMPARE(widened.candidates[0].id,same); QCOMPARE(widened.candidates[1].id,after); QCOMPARE(widened.candidates[2].id,before);
         QVERIFY(!contestreport::findCandidates(db,row,-1).error.isEmpty()); QVERIFY(!contestreport::findCandidates(db,row,6).error.isEmpty());
         QCOMPARE(db.qsoCount(),qint64(3));
+    }
+
+    void candidateSearchUsesUtcForOffsetAndLegacyTimes()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (int i=0;i<4;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL","W1ABC"},{"QSO_DATE","20250101"},{"TIME_ON",QString("00000%1").arg(i)},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE id WHEN 1 THEN '2025-01-01T01:00:30+01:00' WHEN 2 THEN '2025-01-01T00:00:40' WHEN 3 THEN '2025-01-01T00:00:20+01:00' ELSE '2024-12-31T12:00:50-12:00' END"));
+        contestreport::Entry row; row.call="W1ABC"; row.date="2025-01-01"; row.time="0000"; row.frequencyKhz="14020"; row.mode="CW";
+        const auto found=contestreport::findCandidates(db,row,0); QVERIFY2(found.error.isEmpty(),qPrintable(found.error));
+        QCOMPARE(found.candidates.size(),3); QCOMPARE(found.candidates[0].id,qint64(1)); QCOMPARE(found.candidates[1].id,qint64(2)); QCOMPARE(found.candidates[2].id,qint64(4));
     }
     void closestMinuteWinsWhenCandidateListIsTruncated()
     {

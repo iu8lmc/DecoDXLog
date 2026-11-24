@@ -796,7 +796,8 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto log=dir.filePath("test.sqlite");
         { decolog::core::LogDatabase db; QVERIFY(db.open(log));
           QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","DL1ABC"},{"QSO_DATE","20241123"},{"TIME_ON","120145"},
-            {"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","K1ABC"}},"fixture",{},true).id>0); }
+            {"BAND","20m"},{"MODE","CW"},{"STATION_CALLSIGN","K1ABC"}},"fixture",{},true).id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2024-11-23T13:01:45+01:00'")); }
         const QString path=dir.filePath("report.rpt"); QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
         file.write("Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n14020 CW 2024-11-23 1201 K1ABC 05 DL1ABC 14\n"); file.close();
         QByteArray output; QVERIFY2(launch(dir,QStringLiteral("cqwwopenprobe:")+path,output,5000),output.constData());
