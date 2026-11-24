@@ -3835,6 +3835,26 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
 </context>
 <context>
     <name>DxCalendarPanel</name>
+    <message><source>Campaign history</source><translation>Storico della spedizione</translation></message>
+    <message><source>Previous saved revisions</source><translation>Revisioni precedenti salvate</translation></message>
+    <message><source>Only changes saved after history was introduced are available. Older revisions cannot be recovered here.</source><translation>Sono disponibili solo le modifiche salvate dopo l'introduzione dello storico. Le revisioni precedenti non sono recuperabili qui.</translation></message>
+    <message><source>Older revisions</source><translation>Revisioni meno recenti</translation></message>
+    <message><source>History</source><translation>Storico</translation></message>
+    <message><source>Close</source><translation>Chiudi</translation></message>
+    <message>
+        <source>Revision %1 · %2
+Calls: %3 · %4 → %5
+Source: %6 · observed: %7
+Bands: %8 · modes: %9
+Profile: %10 · archived: %11 · watched: %12
+Goals: %13</source>
+        <translation>Revisione %1 · %2
+Nominativi: %3 · %4 → %5
+Fonte: %6 · verificata: %7
+Bande: %8 · modi: %9
+Profilo: %10 · archiviata: %11 · osservata: %12
+Obiettivi: %13</translation>
+    </message>
     <message>
         <source>DXpedition calendar</source>
         <translation>Calendario DX-Pedition</translation>

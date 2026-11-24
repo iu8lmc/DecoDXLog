@@ -1530,8 +1530,12 @@ private slots:
           c.title="History"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
           c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; QString error;
           QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); c.calls << "ZZ1BBB"; c.end=QDate(2026,1,10); QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
-        QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistoryprobe",output,5000),output.constData());
-        QVERIFY2(output.contains("PROBE dxhistory") && output.contains("\"visible\":true") && output.contains("2026-01-07") && output.contains("ZZ1AAA") && !output.contains("\"rendered\":\"\"") && !output.contains("TypeError"),output.constData());
+        for (const char* language : {"en", "it"}) {
+            { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
+            QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistoryprobe",output,5000),output.constData());
+            QVERIFY2(output.contains("PROBE dxhistory") && output.contains("\"visible\":true") && output.contains("2026-01-07") && output.contains("ZZ1AAA") && !output.contains("\"rendered\":\"\"") && !output.contains("TypeError"),output.constData());
+            QVERIFY2(output.contains(QByteArray(language)=="it" ? "Revisione 1" : "Revision 1"),output.constData());
+        }
     }
     void dxCampaignCalendarCreatesEditablePersistentMatrix()
     {
