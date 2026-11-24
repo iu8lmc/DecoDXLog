@@ -860,6 +860,14 @@ private slots:
         QCOMPARE(second.value("potaCorrespondentRows").toList(),rows.mid(100,100));
         QVERIFY(second.value("excluded").toList().isEmpty());
         QCOMPARE(second.value("uncertainPeriod").toInt(),300);
+        QSqlQuery changedExclusion(db.connection());
+        QVERIFY(changedExclusion.exec("UPDATE qso SET comment='changed exclusion' WHERE call='N0000'"));
+        QVERIFY(act.requestPotaReviewPage(firstCursor));
+        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
+        const auto rejectedExclusion=pageDone.takeFirst().first().toMap();
+        QVERIFY(!rejectedExclusion.value("error").toString().isEmpty());
+        QVERIFY(rejectedExclusion.value("potaCorrespondentRows").toList().isEmpty());
+        QVERIFY(changedExclusion.exec("UPDATE qso SET comment=NULL WHERE call='N0000'"));
         QSqlQuery changed(db.connection());
         QVERIFY(changed.exec("UPDATE qso SET comment='changed after preview' WHERE call='K0200'"));
         const auto stale=act.partitionPreviewPage(cursor,100);

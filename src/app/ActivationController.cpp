@@ -830,10 +830,19 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     QVariantList excluded, potaCorrespondentRows;
     qint64 potaCorrespondentTotal = 0;
     bool potaCorrespondentHasMore = false;
+    QByteArray excludedFingerprint;
     const auto exclude = [&](const QString& reason) {
-        if (!selectedIds && collectExcluded) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
-            {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
-            {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
+        if (!selectedIds) {
+            QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_0);
+            stream << reason;
+            for (int column=6; column<q.record().count(); ++column) stream << q.value(column);
+            if (stream.status()!=QDataStream::Ok) return false;
+            excludedFingerprint=QCryptographicHash::hash(excludedFingerprint + QCryptographicHash::hash(bytes,QCryptographicHash::Sha256),QCryptographicHash::Sha256);
+            if (collectExcluded) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
+                {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
+                {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
+        }
+        return true;
     };
     int count = 0, missingDate = 0, missingReference = 0, uncertainPeriod = 0;
     const QList<QPair<QString, QString>> fields{{QStringLiteral("POTA"), QStringLiteral("MY_POTA_REF")},
@@ -844,7 +853,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         ++count;
         const auto extra = QJsonDocument::fromJson(q.value(1).toString().toUtf8()).object();
         if (extra.value(QStringLiteral("APP_DECOLOG_ACTIVATION_REVIEW")).toString() == QLatin1String("PERIOD_UNCERTAIN")) {
-            ++uncertainPeriod; exclude(QStringLiteral("uncertainPeriod")); continue;
+            ++uncertainPeriod; if (!exclude(QStringLiteral("uncertainPeriod"))) return fail(tr("Cannot fingerprint the session QSO.")); continue;
         }
         QDateTime timestamp = QDateTime::fromString(q.value(0).toString(), Qt::ISODate);
         if (timestamp.isValid()) {
@@ -854,7 +863,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         }
         QDate date = timestamp.date();
         if (extra.contains(QStringLiteral("QSO_DATE"))) date = QDate::fromString(extra.value(QStringLiteral("QSO_DATE")).toString(), QStringLiteral("yyyyMMdd"));
-        if (!date.isValid()) { ++missingDate; exclude(QStringLiteral("missingDate")); continue; }
+        if (!date.isValid()) { ++missingDate; if (!exclude(QStringLiteral("missingDate"))) return fail(tr("Cannot fingerprint the session QSO.")); continue; }
         const QString day = date.toString(Qt::ISODate);
         const QString op = extra.value(QStringLiteral("OPERATOR")).toString().trimmed().toUpper();
         const QString stationCall = extra.value(QStringLiteral("STATION_CALLSIGN")).toString().trimmed();
@@ -922,7 +931,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (selectedIds && key == selectedKey) selectedIds->append(q.value(2).toLongLong());
             }
         }
-        if (!found) { ++missingReference; exclude(QStringLiteral("missingReference")); }
+        if (!found) { ++missingReference; if (!exclude(QStringLiteral("missingReference"))) return fail(tr("Cannot fingerprint the session QSO.")); }
     }
     if (q.lastError().isValid()) return fail(tr("Cannot read the session QSO."));
     if (cancelled && cancelled->load()) return fail(tr("Preview cancelled."));
@@ -979,6 +988,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
     result[QStringLiteral("uncertainPeriod")] = uncertainPeriod;
     result[QStringLiteral("excluded")] = excluded;
+    result[QStringLiteral("excludedFingerprint")] = QString::fromLatin1(excludedFingerprint.toHex());
     result[QStringLiteral("potaCorrespondentRows")] = potaCorrespondentRows;
     result[QStringLiteral("potaCorrespondentTotal")] = potaCorrespondentTotal;
     result[QStringLiteral("potaCorrespondentHasMore")] = potaCorrespondentHasMore;
@@ -1611,11 +1621,12 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
     const QByteArray fileIdentity=m_previewFileIdentity;
     const quint64 generation=m_previewGeneration, logGeneration=m_previewLogGeneration;
     const QVariantList expected=signature(m_previewResult);
+    const QString expectedExcluded=m_previewResult.value(QStringLiteral("excludedFingerprint")).toString();
     const qint64 expectedTotal=m_previewResult.value(QStringLiteral("potaCorrespondentTotal")).toLongLong();
     m_potaPageCancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_potaPageCancel;
     m_potaPageBusy=true; emit potaPageBusyChanged();
     QPointer<ActivationController> self(this);
-    m_potaPagePool.start([self,path,identity,uuid,fileIdentity,generation,logGeneration,afterId,dataVersion,expected,expectedTotal,cancelled,signature] {
+    m_potaPagePool.start([self,path,identity,uuid,fileIdentity,generation,logGeneration,afterId,dataVersion,expected,expectedExcluded,expectedTotal,cancelled,signature] {
         QVariantMap result;
         const QString connection=QStringLiteral("activation-pota-page-")+QUuid::createUuid().toString();
         {
@@ -1626,7 +1637,7 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
             else {
                 result=scanPartitionPreview(db,uuid,cancelled,true,{},nullptr,{},{},afterId,100,false);
                 if (!matches() || (result.value(QStringLiteral("error")).toString().isEmpty() &&
-                    (signature(result)!=expected || result.value(QStringLiteral("potaCorrespondentTotal")).toLongLong()!=expectedTotal)))
+                    (signature(result)!=expected || result.value(QStringLiteral("excludedFingerprint")).toString()!=expectedExcluded || result.value(QStringLiteral("potaCorrespondentTotal")).toLongLong()!=expectedTotal)))
                     result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
             }
             db.close();

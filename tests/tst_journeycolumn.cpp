@@ -1984,6 +1984,9 @@ private slots:
                     {"POTA_REF","US-0003,US-0004"},{"APP_DECOLOG_ACTIVATION_UUID","pota-fixture"}};
                 QVERIFY(db.insertQso(record,"fixture",{},true,0,false).id>0);
             }
+            AdifRecord excluded{{"CALL","N0000"},{"QSO_DATE","20200101"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"},
+                {"MY_POTA_REF","US-0015"},{"APP_DECOLOG_ACTIVATION_UUID","pota-fixture"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}};
+            QVERIFY(db.insertQso(excluded,"fixture",{},true,0,false).id>0);
         }
         auto env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
         env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000");
@@ -1994,7 +1997,7 @@ private slots:
         QVERIFY2(output.contains("PROBE potaReview ready for external change"),output.constData());
         {
             LogDatabase external; QVERIFY(external.openExistingReadWrite(dir.filePath("test.sqlite"))); QSqlQuery q(external.connection());
-            QVERIFY2(q.exec("UPDATE qso SET comment='external change' WHERE call='K0100'"),qPrintable(q.lastError().text()));
+            QVERIFY2(q.exec("UPDATE qso SET comment='external change' WHERE call='N0000'"),qPrintable(q.lastError().text()));
             QCOMPARE(q.numRowsAffected(),qint64(1));
         }
         QVERIFY(app.waitForFinished(15000)); output+=app.readAll();
