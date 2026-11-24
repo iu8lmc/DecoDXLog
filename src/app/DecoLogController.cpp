@@ -4225,14 +4225,18 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         if (request.extensionCredential) {
             QJsonArray operations;
             for (const QString& permission : {QStringLiteral("status.read"), QStringLiteral("worked.read"),
-                                              QStringLiteral("qso.read"), QStringLiteral("tracker.read")})
+                                              QStringLiteral("qso.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.events")})
                 if (request.extensionPermissions.contains(permission)) operations.append(permission);
+            const bool eventsAllowed = request.extensionPermissions.contains(QStringLiteral("qso.events"));
+            const QString eventIdentity = eventsAllowed && m_db.fileIdentityMatchesOpen() ? m_db.identity() : QString();
+            if (eventsAllowed && eventIdentity.isEmpty()) return HttpResponse::error(503, QStringLiteral("event log unavailable"));
             return HttpResponse::json(200, QJsonObject{
+                {QStringLiteral("eventLogIdentity"), eventIdentity},
                 {QStringLiteral("apiVersion"), 1},
                 {QStringLiteral("permissionModel"), QStringLiteral("extension-token")},
                 {QStringLiteral("extensionId"), request.extensionId},
                 {QStringLiteral("operations"), operations},
-                {QStringLiteral("events"), false}, {QStringLiteral("txControl"), false},
+                {QStringLiteral("events"), eventsAllowed}, {QStringLiteral("txControl"), false},
                 {QStringLiteral("perExtensionPermissions"), true},
                 {QStringLiteral("durableAtomicIdempotency"), false}});
         }
@@ -4241,12 +4245,42 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
             {QStringLiteral("permissionModel"), request.readOnly ? QStringLiteral("read-only-token") : QStringLiteral("shared-token")},
             {QStringLiteral("operations"), request.readOnly
                 ? QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read")}
-                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.write"), QStringLiteral("idempotency.inspect")}},
-            {QStringLiteral("events"), false},
+                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.write"), QStringLiteral("idempotency.inspect"), QStringLiteral("qso.events")}},
+            {QStringLiteral("eventLogIdentity"), request.readOnly ? QString() : m_db.identity()},
+            {QStringLiteral("events"), !request.readOnly},
             {QStringLiteral("txControl"), false},
             {QStringLiteral("perExtensionPermissions"), false},
             {QStringLiteral("durableAtomicIdempotency"), false},
         });
+    }
+
+    if (path == QLatin1String("/api/v1/events")) {
+        if (request.method != "GET") return HttpResponse::error(405, QStringLiteral("use GET"));
+        const QString expected = request.query.queryItemValue(QStringLiteral("log"));
+        const QString afterText = request.query.queryItemValue(QStringLiteral("after"));
+        const QString limitText = request.query.queryItemValue(QStringLiteral("limit"));
+        static const QRegularExpression digits(QStringLiteral("^[0-9]{1,19}$"));
+        bool afterOk=false, limitOk=false;
+        const qint64 after=afterText.isEmpty() ? 0 : afterText.toLongLong(&afterOk);
+        const int limit=limitText.isEmpty() ? 100 : limitText.toInt(&limitOk);
+        if (expected.isEmpty() || (!afterText.isEmpty() && (!digits.match(afterText).hasMatch() || !afterOk)) ||
+            (!limitText.isEmpty() && (!digits.match(limitText).hasMatch() || !limitOk)) || after<0 || limit<1 || limit>500)
+            return HttpResponse::error(400, QStringLiteral("invalid event cursor, log or limit"));
+        if (!m_db.fileIdentityMatchesOpen() || m_db.identity()!=expected) return HttpResponse::error(409, QStringLiteral("event log changed"));
+        const auto page=m_db.extensionEventsAfter(expected,after,limit);
+        if (!page.ok) return HttpResponse::error(503, QStringLiteral("event journal unavailable or log changed"));
+        QJsonArray events;
+        for (const auto& event : page.events) {
+            QJsonObject row{{QStringLiteral("sequence"),QString::number(event.sequence)},
+                            {QStringLiteral("qsoUuid"),event.qsoUuid}, {QStringLiteral("revision"),event.revision},
+                            {QStringLiteral("kind"),event.kind}, {QStringLiteral("recordedAt"),event.recordedAt}};
+            if (!event.previousQsoUuid.isEmpty()) row.insert(QStringLiteral("previousQsoUuid"),event.previousQsoUuid);
+            if (!event.service.isEmpty()) row.insert(QStringLiteral("service"),event.service);
+            events.append(row);
+        }
+        return HttpResponse::json(200, QJsonObject{{QStringLiteral("log"),expected}, {QStringLiteral("events"),events},
+            {QStringLiteral("hasMore"),page.hasMore},
+            {QStringLiteral("next"),page.events.isEmpty() ? QString::number(after) : QString::number(page.events.last().sequence)}});
     }
 
     if (path == QLatin1String("/api/v1/tracker")) {

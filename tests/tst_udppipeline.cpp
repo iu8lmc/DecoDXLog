@@ -246,7 +246,7 @@ private slots:
             ini.setValue(QStringLiteral("api/port"), m_apiPort);
             ini.setValue(QStringLiteral("api/token"), QStringLiteral("0123456789abcdef0123456789abcdef"));
             ini.setValue(QStringLiteral("api/readOnlyToken"), QStringLiteral("fedcba9876543210fedcba9876543210"));
-            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"org.decodxlog.example.recent-activity","token":"11111111111111111111111111111111","permissions":["qso.read"]}])"));
+            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"org.decodxlog.example.recent-activity","token":"11111111111111111111111111111111","permissions":["qso.read"]},{"id":"test.events","token":"22222222222222222222222222222222","permissions":["qso.events"]}])"));
             ini.setValue(QStringLiteral("watch/files"),
                          QVariantList{QVariantMap{{QStringLiteral("path"), QDir::fromNativeSeparators(fldigiLog)},
                                                   {QStringLiteral("label"), QStringLiteral("fldigi")},
@@ -618,7 +618,7 @@ private slots:
         QCOMPARE(capabilities.second.value("apiVersion").toInt(), 1);
         QCOMPARE(capabilities.second.value("permissionModel").toString(), QString("shared-token"));
         QVERIFY(!capabilities.second.value("txControl").toBool());
-        QVERIFY(!capabilities.second.value("events").toBool());
+        QVERIFY(capabilities.second.value("events").toBool());
         QVERIFY(capabilities.second.value("operations").toArray().contains("qso.read"));
         QVERIFY(capabilities.second.value("operations").toArray().contains("qso.write"));
         QVERIFY(capabilities.second.value("operations").toArray().contains("idempotency.inspect"));
@@ -710,6 +710,45 @@ private slots:
         done.wait(5000);
         QCOMPARE(anonymous->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), 401);
         anonymous->deleteLater();
+    }
+
+    void scopedQsoEventsAreReplayableAndReadOnly()
+    {
+        QNetworkAccessManager net;
+        auto request = [&](const QByteArray& method, const QString& path, const QByteArray& token, const QByteArray& body = QByteArray{}) {
+            QNetworkRequest r(QUrl(QStringLiteral("http://127.0.0.1:%1%2").arg(m_apiPort).arg(path)));
+            r.setRawHeader("X-DecoDXLog-Token", token);
+            QNetworkReply* reply=net.sendCustomRequest(r,method,body); QSignalSpy done(reply,&QNetworkReply::finished); done.wait(5000);
+            const int status=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const QJsonObject json=QJsonDocument::fromJson(reply->readAll()).object(); reply->deleteLater(); return std::pair{status,json};
+        };
+        const QByteArray eventToken("22222222222222222222222222222222");
+        const QByteArray fullToken("0123456789abcdef0123456789abcdef");
+        const auto caps=request("GET",QStringLiteral("/api/v1/capabilities"),eventToken);
+        QCOMPARE(caps.first,200); QVERIFY(caps.second.value("events").toBool());
+        const QString logId=caps.second.value("eventLogIdentity").toString(); QVERIFY(!logId.isEmpty());
+        const auto baseline=request("GET",QStringLiteral("/api/v1/events?log=%1&after=0&limit=500").arg(logId),eventToken);
+        QCOMPARE(baseline.first,200); QVERIFY(!baseline.second.value("hasMore").toBool());
+        const QString baselineCursor=baseline.second.value("next").toString(); QVERIFY(!baselineCursor.isEmpty());
+        const QByteArray qso("<CALL:5>W9EVT<QSO_DATE:8>20260101<TIME_ON:6>120000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(request("POST",QStringLiteral("/api/v1/qso"),fullToken,qso).first,201);
+        const QByteArray qso2("<CALL:5>W8EVT<QSO_DATE:8>20260101<TIME_ON:6>121000<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(request("POST",QStringLiteral("/api/v1/qso"),fullToken,qso2).first,201);
+        const QString path=QStringLiteral("/api/v1/events?log=%1&after=%2&limit=1").arg(logId,baselineCursor);
+        const auto first=request("GET",path,eventToken); QCOMPARE(first.first,200);
+        const auto events=first.second.value("events").toArray(); QCOMPARE(events.size(),1);
+        QCOMPARE(events.at(0).toObject().value("kind").toString(),QStringLiteral("added"));
+        QVERIFY(first.second.value("hasMore").toBool());
+        QCOMPARE(request("GET",path,eventToken).second.value("events").toArray(),events);
+        const QString next=first.second.value("next").toString(); QVERIFY(!next.isEmpty());
+        const auto second=request("GET",QStringLiteral("/api/v1/events?log=%1&after=%2&limit=1").arg(logId,next),eventToken);
+        QCOMPARE(second.first,200); QCOMPARE(second.second.value("events").toArray().size(),1);
+        QVERIFY(second.second.value("events").toArray().at(0).toObject().value("sequence").toString()!=next);
+        QVERIFY(!second.second.value("hasMore").toBool());
+        QCOMPARE(request("GET",QStringLiteral("/api/v1/events?log=wrong&after=0"),eventToken).first,409);
+        QCOMPARE(request("GET",QStringLiteral("/api/v1/events?log=%1&after=-1").arg(logId),eventToken).first,400);
+        QCOMPARE(request("GET",path,QByteArray("fedcba9876543210fedcba9876543210")).first,403);
+        QCOMPARE(request("POST",path,eventToken).first,403);
     }
 
     void scopedExtensionReadsThroughApplication()

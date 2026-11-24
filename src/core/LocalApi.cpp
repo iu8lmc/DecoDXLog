@@ -148,7 +148,7 @@ bool LocalApiServer::parseExtensionCredentials(const QByteArray& json, QHash<QSt
     static const QRegularExpression idPattern(QStringLiteral("^[a-z0-9]+(?:[.-][a-z0-9]+)+$"));
     static const QRegularExpression tokenPattern(QStringLiteral("^[0-9a-f]{32}$"));
     const QSet<QString> allowed{QStringLiteral("qso.read"), QStringLiteral("status.read"),
-                                QStringLiteral("worked.read"), QStringLiteral("tracker.read")};
+                                QStringLiteral("worked.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.events")};
     QHash<QString, ExtensionCredential> parsed;
     QSet<QString> identities;
     for (const auto& item : document.array()) {
@@ -273,6 +273,7 @@ void LocalApiServer::readFrom(QTcpSocket* socket)
         else if (path == QLatin1String("/api/v1/worked")) permission = QStringLiteral("worked.read");
         else if (path == QLatin1String("/api/v1/qsos")) permission = QStringLiteral("qso.read");
         else if (path == QLatin1String("/api/v1/tracker")) permission = QStringLiteral("tracker.read");
+        else if (path == QLatin1String("/api/v1/events")) permission = QStringLiteral("qso.events");
         const bool capabilities = path == QLatin1String("/api/v1/capabilities");
         if (request.method != "GET" || (!capabilities && (permission.isEmpty() || !request.extensionPermissions.contains(permission)))) {
             answer(socket, HttpResponse::error(403, QStringLiteral("extension permission denied")));

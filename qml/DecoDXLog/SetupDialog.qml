@@ -947,6 +947,7 @@ DialogFrame {
                                 if (extTracker.checked) permissions.push("tracker.read")
                                 if (extWorked.checked) permissions.push("worked.read")
                                 if (extStatus.checked) permissions.push("status.read")
+                                if (extEvents.checked) permissions.push("qso.events")
                                 extensionError.text = decolog.createApiExtensionCredential(extensionId.text, permissions)
                                 if (!extensionError.text.length) extensionId.text = ""
                             }
@@ -958,6 +959,7 @@ DialogFrame {
                         ToggleSwitch { id: extTracker; text: qsTr("Tracker") }
                         ToggleSwitch { id: extWorked; text: qsTr("Worked status") }
                         ToggleSwitch { id: extStatus; text: qsTr("App status") }
+                        ToggleSwitch { id: extEvents; text: qsTr("QSO events") }
                     }
                     Note { id: extensionError; visible: text.length > 0; color: Theme.errorColor }
                     Repeater {

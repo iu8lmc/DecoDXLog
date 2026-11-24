@@ -13,7 +13,7 @@ import time
 
 MAX_MANIFEST = 16 * 1024
 MAX_OUTPUT = 1024 * 1024
-ALLOWED_PERMISSIONS = frozenset({"qso.read", "status.read", "worked.read", "tracker.read"})
+ALLOWED_PERMISSIONS = frozenset({"qso.read", "status.read", "worked.read", "tracker.read", "qso.events"})
 REQUIRED = frozenset({"schemaVersion", "apiVersion", "id", "version", "entrypoint", "permissions"})
 
 
