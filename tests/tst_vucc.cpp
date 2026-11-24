@@ -122,6 +122,22 @@ private slots:
         check("JN52GZ", "", 0); // valid first four characters, invalid subsquare
     }
 
+    void rejectsInvalidOwnLocatorClaims()
+    {
+        Entry entry{1,"EM98","6m",{},{},true,"lotw"}; entry.qsoUtc="2026-01-01T12:00:00Z";
+        const Rules rules{{},{},"6m",100};
+        entry.myGrid="JN52"; entry.myGrids="JN52,JN53"; QCOMPARE(select({entry},rules).eligible.size(),1);
+        entry.myGrids="JN52,JN54"; const auto disjoint=select({entry},rules); QVERIFY(disjoint.eligible.isEmpty()); QVERIFY(disjoint.exclusions.join('\n').contains("operating locator"));
+        entry.myGrids="JN53,JN54"; QVERIFY(select({entry},rules).eligible.isEmpty());
+        entry.myGrids.clear(); entry.myGrid="BAD"; QVERIFY(select({entry},rules).eligible.isEmpty());
+        entry.myGrid.clear(); QCOMPARE(select({entry},rules).eligible.size(),1);
+        decolog::core::LogDatabase db; QVERIFY(db.open(":memory:"));
+        QCOMPARE(db.importAdif("<CALL:5>K1ABC<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM98<QSL_RCVD:1>Y<MY_GRIDSQUARE:4>JN52<MY_VUCC_GRIDS:9>JN52,JN54<EOR>").inserted,1);
+        const auto imported=select(loadEntries(db),rules); QVERIFY(imported.eligible.isEmpty());
+        QVERIFY(imported.exclusions.join('\n').contains("operating locator"));
+        QCOMPARE(decolog::core::adif::parse(db.exportAdif()).records.first().value("MY_VUCC_GRIDS"),QString("JN52,JN54"));
+    }
+
     void preservesOwnBoundaryLocatorThroughImportExport()
     {
         QTemporaryDir temp;

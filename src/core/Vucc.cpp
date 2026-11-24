@@ -148,6 +148,11 @@ Result select(const QList<Entry>& entries, const Rules& rules)
         return a.qsoId < b.qsoId;
     });
     for (const Entry& entry : sorted) {
+        if ((!entry.myGrid.trimmed().isEmpty() && !validLocator(entry.myGrid)) ||
+            (!entry.myGrids.trimmed().isEmpty() && boundaryGrids(entry.myGrids, entry.myGrid).isEmpty())) {
+            result.exclusions << QStringLiteral("QSO %1: invalid or inconsistent operating locator data").arg(entry.qsoId);
+            continue;
+        }
         const QStringList candidates = entry.grids.trimmed().isEmpty()
             ? (validLocator(entry.grid) ? QStringList{norm(entry.grid).left(4)} : QStringList{})
             : boundaryGrids(entry.grids, entry.grid);
