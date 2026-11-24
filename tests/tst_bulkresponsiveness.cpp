@@ -106,7 +106,7 @@ class TestBulkResponsiveness : public QObject {
         output+=app.readAll(); wallMs=timer.elapsed();
         const QString text=QString::fromUtf8(output);
         const auto match=QRegularExpression(QStringLiteral("\\[activity\\] UDP\\|(success|highlight)\\|[^\\n]*K1NEW")).match(text);
-        const int finish=text.indexOf(mode==QLatin1String("tag") ? QStringLiteral("PROBE bulkcheck mode=tag") : QStringLiteral("PROBE bulk result"));
+        const int finish=text.indexOf(mode==QLatin1String("paperqsl") ? QStringLiteral("PROBE bulk result") : QStringLiteral("PROBE bulkcheck mode=")+mode);
         return sent && match.hasMatch() && finish>match.capturedStart() && app.exitStatus()==QProcess::NormalExit && app.exitCode()==0;
     }
 
@@ -237,6 +237,25 @@ private slots:
         const auto metrics=QRegularExpression(QStringLiteral("PROBE bulkcheck mode=tag rows=20000 maxgap=(\\d+) elapsed=(\\d+)")).match(QString::fromUtf8(output));
         QVERIFY2(metrics.hasMatch(),output.constData());
         qInfo() << "TAG_UDP qso=20000 udp=1 total_wall_ms=" << wall << "max_gap_ms=" << metrics.captured(1).toLongLong() << "bulk_elapsed_ms=" << metrics.captured(2).toLongLong();
+    }
+
+    void deleteBulkConcurrentUdp()
+    {
+        if (!qEnvironmentVariableIsSet("DECODXLOG_BENCH_BULK_DELETE_UDP")) QSKIP("opt-in 20k delete and concurrent UDP comparison");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection());
+          QVERIFY(q.prepare("INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) VALUES(?,?,'2026-02-28T00:00:00Z','20m','CW','2026-02-28T00:00:00Z','2026-02-28T00:00:00Z')"));
+          for (int i=0;i<20000;++i) { q.bindValue(0,QStringLiteral("fixture-%1").arg(i)); q.bindValue(1,QStringLiteral("K%1AAA").arg(i)); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); }
+          QVERIFY(db.connection().commit()); }
+        QByteArray output; qint64 wall=0; QVERIFY2(runMutationWithUdp(dir,"delete",output,wall),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM qso WHERE deleted=1")); QVERIFY(q.next()); QVERIFY2(q.value(0).toInt()==20000,output.constData());
+        QCOMPARE(db.qsoCount(),qint64(1)); const auto received=db.latestIds("K1NEW",2); QCOMPARE(received.size(),1);
+        const auto meta=db.meta(received.first()); QVERIFY(meta); QVERIFY(!meta->deleted);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event e JOIN qso q ON q.uuid=e.qso_uuid WHERE q.deleted=1 AND e.kind='deleted'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),20000);
+        const auto metrics=QRegularExpression(QStringLiteral("PROBE bulkcheck mode=delete rows=20000 maxgap=(\\d+) elapsed=(\\d+)")).match(QString::fromUtf8(output));
+        QVERIFY2(metrics.hasMatch(),output.constData());
+        qInfo() << "DELETE_UDP qso=20000 udp=1 total_wall_ms=" << wall << "max_gap_ms=" << metrics.captured(1).toLongLong() << "bulk_elapsed_ms=" << metrics.captured(2).toLongLong();
     }
 
     void deepScrollSingleBulkAndNoop()

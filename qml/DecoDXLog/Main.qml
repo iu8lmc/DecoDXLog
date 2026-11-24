@@ -693,7 +693,7 @@ RoundedWindow {
         target: decolog
         function onBulkChanged() {
             if (bulkCheckHeartbeat.running && decolog.bulkProgress >= 0) {
-                if (!bulkCheckHeartbeat.sawRunning && (bulkCheckHeartbeat.mode === "paperqsl" || bulkCheckHeartbeat.mode === "tag"))
+                if (!bulkCheckHeartbeat.sawRunning && (bulkCheckHeartbeat.mode === "paperqsl" || bulkCheckHeartbeat.mode === "tag" || bulkCheckHeartbeat.mode === "delete"))
                     console.warn("PROBE " + bulkCheckHeartbeat.mode + " running")
                 bulkCheckHeartbeat.sawRunning = true
             }

@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G01 bulk deletion with concurrent incoming UDP
+
+An opt-in offscreen app fixture (`DECODXLOG_BENCH_BULK_DELETE_UDP=1`) selects 20,000 synthetic QSO for deletion and sends one WSJT-X LoggedADIF only after the operation starts. It verifies that the packet is logged before the operation finishes, all 20,000 selected records are soft-deleted, the incoming QSO remains active, and 20,000 deletion events exist.
+
+A/B on macOS arm64 / Qt 6.11.2: with the shared mutation engine and controller restored to their pre-fix `4fc6655` versions, the same fixture saved the incoming QSO but reported only 19,900 deleted and 100 failed. With the integrated `1161ab0e` fix, both runs deleted all 20,000, preserved the incoming QSO and passed the event checks; the second run measured 5,483 ms total and a 59 ms maximum timer gap. The tag-plus-UDP test also passed again after the probe helper was extended; git diff --check passed. A and B use the same test-only probe, but scheduling is uncontrolled beyond sending after the start signal.
+
+The observed baseline does not establish that every deletion attempt fails without the fix. The test sends one synthetic packet, uses no physical radio, and does not verify other platforms, sustained traffic, long-held locks or slow storage. The full suite was not rerun for this test-only increment.
+
 ## 2026-11-24 — G01 incoming QSO during bulk tag and delete
 
 An offscreen 20,000-QSO tag operation with a synthetic WSJT-X LoggedADIF packet exposed a separate contention failure: before the change the incoming QSO was saved but 200 tag changes failed with `database is locked` (19,800 applied). The shared mutation batch engine now reserves the SQLite writer with `BEGIN IMMEDIATE` before its reads; the background tag/delete worker also yields between committed batches while the application's incoming-QSO insert is active. The reservation applies to other users of the shared engine, but their priority behaviour has not been separately tested.
