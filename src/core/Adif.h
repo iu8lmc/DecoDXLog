@@ -39,6 +39,8 @@ private:
 struct AdifDocument {
     AdifRecord        header;
     QList<AdifRecord> records;
+    bool              unterminatedRecord{false};
+    bool              unterminatedTag{false};
 };
 
 namespace adif {

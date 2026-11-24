@@ -2913,3 +2913,11 @@ When LoTW provides a numeric APP_LoTW_NUMREC, the report parser now checks it ag
 A/B on macOS arm64 / Qt 6.11.2: a report truncated before its three declared records was previously accepted; the new test failed on that baseline and now rejects it. The intact three-record fixture and the same fixture with a standalone EOF marker pass; a deliberately inflated count fails. App and test targets built and CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6.
 
 This is a count consistency check, not a complete ADIF integrity check: the general parser accepts a final record without EOR, and missing or nonnumeric counts cannot verify completeness. A truncation inside the last declared record may therefore still pass. No actual LoTW service or full desktop failure flow was tested; source account, match distance and signed evidence remain unrecorded. G02/G05/G13 acceptance remains open.
+
+## 2026-11-24 — G05 reject unterminated LoTW records
+
+The general ADIF parser now reports an unterminated trailing record or tag while retaining its existing permissive parsed records for its other consumers. The LoTW report parser uses these indicators to reject an incomplete final record or tag before reconciliation; the standalone deprecated LoTW EOF marker remains accepted. The new error has an Italian translation.
+
+A/B on macOS arm64 / Qt 6.11.2: removing the final EOR from a three-record report previously passed the record-count check; the new test failed on that baseline and now rejects it. It also rejects a trailing incomplete tag, accepts the complete fixture and standalone EOF marker, and confirms generic ADIF parsing still returns the unterminated record. App and tests built; CTest adif, database, lotw, qsldownload, migration, vucc and qmlpopups passed 7/7.
+
+This checks record and tag termination, not every form of malformed ADIF or missing/non-numeric count; a syntactically complete but semantically truncated or incorrect report can still pass. The full controller failure path, real LoTW, physical UI and Windows/Linux remain untested. G02/G05/G13 acceptance remains open.

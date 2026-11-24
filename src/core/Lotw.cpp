@@ -27,6 +27,13 @@ Report parseReport(const QByteArray& data)
     }
 
     const AdifDocument doc = adif::parse(data);
+    const bool trailingEof = doc.unterminatedRecord && !doc.records.isEmpty()
+        && doc.records.last().fields().size() == 1
+        && doc.records.last().contains(QStringLiteral("APP_LOTW_EOF"));
+    if (doc.unterminatedTag || (doc.unterminatedRecord && !trailingEof)) {
+        report.error = QCoreApplication::translate("Lotw", "LoTW: incomplete report (unterminated record or tag)");
+        return report;
+    }
     report.lastQsl = doc.header.value(QStringLiteral("APP_LOTW_LASTQSL")).trimmed();
     bool ok = false;
     const int declared = doc.header.value(QStringLiteral("APP_LOTW_NUMREC")).trimmed().toInt(&ok);

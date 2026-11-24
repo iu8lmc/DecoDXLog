@@ -4946,6 +4946,10 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 <context>
     <name>Lotw</name>
     <message>
+        <source>LoTW: incomplete report (unterminated record or tag)</source>
+        <translation>LoTW: rapporto incompleto (record o campo non terminato)</translation>
+    </message>
+    <message>
         <source>LoTW: incomplete report (expected %1 records, received %2)</source>
         <translation>LoTW: rapporto incompleto (record attesi: %1, ricevuti: %2)</translation>
     </message>

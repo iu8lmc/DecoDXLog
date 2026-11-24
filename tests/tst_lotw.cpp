@@ -175,6 +175,21 @@ private slots:
         QVERIFY(!lotw::parseReport(wrongCount).ok);
     }
 
+    void rejectsIncompleteFinalRecord()
+    {
+        QByteArray partial=kReport;
+        const auto lastEor=partial.lastIndexOf("<eor>"); QVERIFY(lastEor>0);
+        partial.truncate(lastEor);
+        const auto permissive=adif::parse(partial);
+        QCOMPARE(permissive.records.size(),3);
+        QVERIFY(permissive.unterminatedRecord);
+        QVERIFY(!lotw::parseReport(partial).ok);
+        QByteArray brokenTag=kReport+"\n<CALL:5";
+        QVERIFY(!lotw::parseReport(brokenTag).ok);
+        QVERIFY(lotw::parseReport(kReport).ok);
+        QVERIFY(lotw::parseReport(kReport+"\n<APP_LoTW_EOF:1>Y").ok);
+    }
+
     void parseMixedCaseHeaderAndPreserveConfirmationGrid()
     {
         QByteArray mixed=kReport; mixed.replace("<eoh>","<eOh>");

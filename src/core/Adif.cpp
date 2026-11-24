@@ -144,8 +144,10 @@ AdifDocument parse(const QByteArray& data)
         if (open < 0)
             break;
         const qsizetype close = text.indexOf(QLatin1Char('>'), open + 1);
-        if (close < 0)
+        if (close < 0) {
+            doc.unterminatedTag = true;
             break;
+        }
 
         const QString tag = text.mid(open + 1, close - open - 1);
         pos = close + 1;
@@ -199,8 +201,10 @@ AdifDocument parse(const QByteArray& data)
     if (!current.isEmpty()) {
         if (inHeader)
             doc.header = current;
-        else
+        else {
+            doc.unterminatedRecord = true;
             doc.records.append(current);
+        }
     }
     return doc;
 }
