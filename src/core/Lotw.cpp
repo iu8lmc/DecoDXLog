@@ -89,8 +89,9 @@ void LotwClient::download(const QString& user, const QString& password, const QS
     q.addQueryItem(QStringLiteral("qso_qsl"), QStringLiteral("yes"));
     q.addQueryItem(QStringLiteral("qso_qsldetail"), QStringLiteral("yes"));
     q.addQueryItem(QStringLiteral("qso_withown"), QStringLiteral("yes"));
-    if (!since.trimmed().isEmpty())
-        q.addQueryItem(QStringLiteral("qso_qslsince"), since.trimmed());
+    // Missing qso_qslsince asks LoTW for its server-side last download, not all.
+    q.addQueryItem(QStringLiteral("qso_qslsince"), since.trimmed().isEmpty()
+                       ? QStringLiteral("1900-01-01") : since.trimmed());
     // Il periodo dei QSO (non delle conferme): qso_startdate e qso_enddate.
     if (from.isValid())
         q.addQueryItem(QStringLiteral("qso_startdate"), from.toString(Qt::ISODate));

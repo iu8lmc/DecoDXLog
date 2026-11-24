@@ -120,6 +120,11 @@ private slots:
         QVERIFY(!confirmations::mayAdvanceCursor(true,0));
         QVERIFY(!confirmations::mayAdvanceCursor(false,1));
         QVERIFY(!confirmations::mayAdvanceCursor(true,3));
+        QVERIFY(confirmations::mayAdvanceLotwCursor(false,0,0,0));
+        QVERIFY(!confirmations::mayAdvanceLotwCursor(false,0,1,0));
+        QVERIFY(!confirmations::mayAdvanceLotwCursor(false,0,0,1));
+        QVERIFY(!confirmations::mayAdvanceLotwCursor(false,1,0,0));
+        QVERIFY(!confirmations::mayAdvanceLotwCursor(true,0,0,0));
     }
 
     void changedLogRejectsDownloadedConfirmations()

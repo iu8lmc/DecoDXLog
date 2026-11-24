@@ -7064,7 +7064,7 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     // Il segno dell'ultimo scarico si sposta solo con lo scarico di tutto: uno
     // scarico per periodo lo porterebbe avanti e il prossimo "solo le nuove"
     // salterebbe le conferme degli altri QSO arrivate nel frattempo.
-    if (!report.lastQsl.isEmpty() && confirmations::mayAdvanceCursor(ranged, tally.errors))
+    if (!report.lastQsl.isEmpty() && confirmations::mayAdvanceLotwCursor(ranged, tally.errors, tally.ambiguous, tally.invalid))
         m_db.setSetting(QStringLiteral("lotw.last_qsl"), report.lastQsl);
     m_db.setSetting(QStringLiteral("lotw.last_sync_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
 
@@ -7072,8 +7072,10 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
                        .arg(confirmed).arg(already).arg(notFound);
     if (tally.errors > 0)
         m_lotwStatus += tr("; %1 database error(s), download cursor not advanced").arg(tally.errors);
+    if (tally.ambiguous > 0 || tally.invalid > 0)
+        m_lotwStatus += tr("; %1 ambiguous and %2 invalid records, download cursor not advanced").arg(tally.ambiguous).arg(tally.invalid);
     m_db.setSetting(QStringLiteral("lotw.last_result"), m_lotwStatus);
-    addActivity(QStringLiteral("LOTW"), m_lotwStatus, tally.errors > 0 ? QStringLiteral("error") : confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
+    addActivity(QStringLiteral("LOTW"), m_lotwStatus, tally.errors > 0 ? QStringLiteral("error") : (tally.ambiguous > 0 || tally.invalid > 0) ? QStringLiteral("warning") : confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     for (const QString& m : missing)
         addActivity(QStringLiteral("LOTW"), tr("  not in the log: %1").arg(m), QStringLiteral("warning"));
     if (invalid > 0)

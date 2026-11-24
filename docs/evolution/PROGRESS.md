@@ -2953,3 +2953,13 @@ The VUCC desktop history probe now checks the rendered text of an actual observa
 A/B on macOS arm64 / Qt 6.11.2: the new offscreen desktop assertion initially failed because the probe did not capture the history delegate; after adding the probe it observes a synthetic 60-second match and both 50/5 pages. The index migration fixture initially failed before the index existed; after migration from simulated schema 32, SQLite's query plan uses the new index without a temporary B-tree. App and targets built; CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6, and the focused desktop journey passed separately.
 
 The desktop run is an automated offscreen synthetic fixture, not manual interaction or a real LoTW service. The query plan is not a large-log performance benchmark. Older applications may not understand schema 33; the context, matching and official-credit limitations from the preceding entry remain. G02/G05/G13 acceptance remains open.
+
+## 2026-11-24 — G05 LoTW full download and unresolved cursor
+
+An empty local LoTW cursor or explicit full download now sends `qso_qslsince=1900-01-01` instead of omitting the parameter. The [ARRL query documentation](https://lotw.arrl.org/lotw-help/developer-query-qsos-qsls/) describes omission as a server-side last-download default, so omission did not guarantee the complete history expected by the app. Date-limited QSO queries also send the explicit start of confirmation history. Existing nonempty cursors are unchanged.
+
+The LoTW full-sync cursor now remains unchanged when reconciliation has ambiguous or invalid records, as well as database errors; the status reports the counts and warns the operator. The other service cursor policy is unchanged. Records absent from the local log do not hold the cursor, since one LoTW account may include contacts from other logs.
+
+A/B on macOS arm64 / Qt 6.11.2: a fake HTTP period download previously omitted `qso_qslsince` and failed the new assertion; it now sends the explicit date, and a non-ranged fake download verifies the same. The policy fixture initially failed to build without the new LoTW policy; it now covers normal, ranged, error, ambiguous and invalid cases. App and test targets built; CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6.
+
+Persistent ambiguous or invalid input will cause repeated downloads from the retained cursor until addressed. Not-found records can still be missed on a later import into this log unless the user requests a full sync; the latest summary is not a durable reconciliation queue. The policy and fake HTTP request were tested, not failure injection through the full desktop controller or real LoTW. Windows/Linux and G02/G05/G13 acceptance remain open.

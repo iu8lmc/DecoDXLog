@@ -273,6 +273,7 @@ private slots:
         LotwClient client; client.setEndpoint(server.url()); QSignalSpy done(&client,&LotwClient::finished);
         client.download("fixture","fixture",{}); QVERIFY(done.wait(5000));
         const auto report=done.first().first().value<lotw::Report>(); QVERIFY(report.ok); QVERIFY(db.matchesSessionToken(*origin));
+        QCOMPARE(server.requests.first().queryItemValue("qso_qslsince"),QString("1900-01-01"));
         const auto applyIfSame=[&] { if (!db.matchesSessionToken(*origin)) return false;
             return db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true).status==ConfirmationResult::Status::Confirmed; };
         QVERIFY(applyIfSame());
@@ -459,7 +460,7 @@ private slots:
         const QUrlQuery q = server.requests.first();
         QCOMPARE(q.queryItemValue("qso_startdate"), QString("2026-01-01"));
         QCOMPARE(q.queryItemValue("qso_enddate"), QString("2026-03-31"));
-        QVERIFY(!q.hasQueryItem("qso_qslsince"));
+        QCOMPARE(q.queryItemValue("qso_qslsince"),QString("1900-01-01"));
 
         // Solo l'inizio: fino a oggi.
         client.download("IU8LMC", "pw", {}, QDate(2025, 6, 1), {});

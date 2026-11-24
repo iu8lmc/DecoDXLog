@@ -183,6 +183,11 @@ bool mayAdvanceCursor(bool ranged, int databaseErrors)
     return !ranged && databaseErrors == 0;
 }
 
+bool mayAdvanceLotwCursor(bool ranged, int databaseErrors, int ambiguous, int invalid)
+{
+    return mayAdvanceCursor(ranged, databaseErrors) && ambiguous == 0 && invalid == 0;
+}
+
 QDateTime downloadSince(const QDateTime& lastSuccess, bool everything)
 {
     if (everything || !lastSuccess.isValid())
