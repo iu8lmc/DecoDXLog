@@ -1096,6 +1096,8 @@ private:
     QSet<QString> m_dxWatchPending;
     QList<core::dxcampaign::Campaign> m_dxWatchedCampaigns;
     QString m_dxWatchPath;
+    qint64 m_dxWatchDataVersion{-1};
+    quint64 m_dxWatchGeneration{0};
     QHash<QString,QDateTime> m_dxWatchRecent;
     QVariantMap m_qslPlan;
     std::shared_ptr<const core::qslplanner::Plan> m_qslPlanSnapshot;

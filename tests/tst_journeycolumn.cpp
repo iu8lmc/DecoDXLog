@@ -1056,6 +1056,38 @@ private slots:
         QSettings settings(iniPath(dir),QSettings::IniFormat); const auto defs=decolog::core::newqso::decodeCustomFields(settings.value("ui/newQso/customFields").toString());
         QVERIFY(std::any_of(defs.cbegin(),defs.cend(),[](const QVariant& v) { const auto d=v.toMap(); return d.value("name")=="APP_TYPED_DOUBLE" && d.value("formula")=="{APP_TYPED_POWER} * 2"; }));
     }
+    void externalCampaignAppearsWithoutRestart_data()
+    {
+        QTest::addColumn<bool>("editExisting"); QTest::newRow("created") << false; QTest::newRow("changed-callsign") << true;
+    }
+    void externalCampaignAppearsWithoutRestart()
+    {
+        QFETCH(bool,editExisting);
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("test.sqlite");
+        QString campaignId;
+        { LogDatabase db; QVERIFY(db.open(path)); if (editExisting) { const auto now=QDateTime::currentDateTimeUtc(); dxcampaign::Campaign c;
+          c.title="External watch"; c.calls={"3Y0P"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="fixture"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; c.watched=true;
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); campaignId=c.id; } }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen");
+        env.insert("QT_QUICK_BACKEND","software"); env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data"));
+        env.insert("DECODXLOG_GRAB_MS","6500"); env.insert("DECODXLOG_TRACE_ACTIVITY","1");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","dxexternalwatchprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE dxexternal ready") && timer.elapsed()<15000) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE dxexternal ready"),output.constData());
+        { LogDatabase db; QVERIFY(db.open(path)); const auto now=QDateTime::currentDateTimeUtc(); dxcampaign::Campaign c;
+          if (editExisting) { const auto saved=dxcampaign::load(db,campaignId); QVERIFY(saved); c=*saved; }
+          else { c.title="External watch"; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+            c.source="fixture"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; c.watched=true; }
+          c.calls={"3Y0J"};
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains("PROBE dxexternal sent") && output.contains("External watch: 3Y0J"),output.constData());
+    }
+
     void externalWriteDiscardsPendingGoalAlertInActualApp_data()
     {
         QTest::addColumn<bool>("satisfiesGoal");

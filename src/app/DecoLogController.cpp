@@ -2417,9 +2417,16 @@ void DecoLogController::reloadDxCampaignWatches()
 {
     if (m_dxWatchPath!=m_db.path()) m_dxWatchRecent.clear();
     m_dxWatchPath=m_db.path(); m_dxWatchedCampaigns.clear();
+    m_dxWatchDataVersion=-1;
+    m_dxWatchGeneration=m_db.openGeneration();
     if (!m_db.isOpen()) return;
+    const qint64 before=m_db.dataVersion();
+    if (before<0) return;
     QString error;
     for (const auto& c : dxcampaign::list(m_db,&error)) if (c.watched && !c.archived) m_dxWatchedCampaigns << c;
+    const qint64 after=m_db.dataVersion();
+    if (!error.isEmpty() || before!=after || after<0) m_dxWatchedCampaigns.clear();
+    else m_dxWatchDataVersion=after;
     if (!error.isEmpty()) addActivity(QStringLiteral("DXCAMPAIGN"),tr("Cannot load campaign watchlist: %1").arg(error),QStringLiteral("warning"));
 }
 
@@ -2430,7 +2437,11 @@ void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)
 
 void DecoLogController::noteDxCampaignSpotImpl(const EnrichedSpot& spot, const QString& onlyCampaign, bool retried)
 {
-    if (m_shuttingDown || m_dxWatchPath!=m_db.path() || m_dxWatchedCampaigns.isEmpty()) return;
+    if (m_shuttingDown || m_dxWatchPath!=m_db.path() || !m_db.isOpen()) return;
+    const qint64 currentVersion=m_db.dataVersion();
+    if (currentVersion<0) return;
+    if (currentVersion!=m_dxWatchDataVersion || m_dxWatchGeneration!=m_db.openGeneration()) reloadDxCampaignWatches();
+    if (m_dxWatchDataVersion<0 || m_dxWatchedCampaigns.isEmpty()) return;
     const QDateTime now=QDateTime::currentDateTimeUtc();
     const qint64 profile=m_profiles ? m_profiles->activeProfileId() : 0;
     for (const auto& campaign : std::as_const(m_dxWatchedCampaigns)) {

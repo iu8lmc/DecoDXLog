@@ -2971,3 +2971,11 @@ For a full, non-ranged LoTW reconciliation with ambiguous records, invalid recor
 A/B on macOS arm64 / Qt 6.11.2: the new cursor-policy test initially failed to build because the policy did not exist. It now checks full versus incremental and ranged runs, ambiguous and invalid records, database errors, successful advancement and absent timestamps. App and tests built; CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6.
 
 This is a policy test and controller integration build, not a full desktop fault-injection or real-service test. Repeated unresolved records can force repeated full downloads; no durable per-record reconciliation queue exists. Not-found behavior and remaining G02/G05/G13 limitations remain as above. Windows/Linux are untested.
+
+## 2026-11-24 — G04 refresh externally changed campaign watchlists
+
+Before evaluating a cluster spot, the campaign watchlist now detects SQLite data-version changes from another connection and changes of the open-log generation, then reloads the watchlist even if it was previously empty. A version change while reading discards that snapshot; the next spot retries. This lets externally created or edited watched campaigns participate without restarting and preserves the existing per-campaign revision and asynchronous goal checks.
+
+A/B on macOS arm64 / Qt 6.11.2: in an offscreen app with a separate writer, a watched campaign created after startup produced no alert on the original code; the test now observes its matching alert. The extended fixture also passes when the writer changes an existing campaign callsign. Existing two-process pending-goal race cases and the goal-only watch passed; the first combined command had an additional misspelled test name, then the correctly named filter/profile/restart fixture passed separately. CTest dxcampaign passed 1/1; the app and targets built.
+
+The fixture uses synthetic spot injection and a second local SQLite connection, not a live cluster or physical UI. External writes can trigger watchlist reloads even when unrelated; the reload cost under a large or heavily updated log has not been measured. A write after a snapshot can still race a non-goal alert. Windows/Linux and full G04/G13 acceptance remain open.
