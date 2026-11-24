@@ -64,7 +64,7 @@ private:
         env.insert(QStringLiteral("DECODXLOG_DATA_ROOT"), dir.filePath(QStringLiteral("data")));
         env.insert(QStringLiteral("DECODXLOG_GRAB_MS"), QString::number(grabMs));
         if (traceActivity) env.insert(QStringLiteral("DECODXLOG_TRACE_ACTIVITY"),QStringLiteral("1"));
-        if (probe.startsWith(QStringLiteral("netreceive"))) env.insert(QStringLiteral("DECODXLOG_TEST_LOOPBACK"),QStringLiteral("1"));
+        if (probe.startsWith(QStringLiteral("netreceive")) || probe==QLatin1String("nethandoffprobe")) env.insert(QStringLiteral("DECODXLOG_TEST_LOOPBACK"),QStringLiteral("1"));
         QProcess app;
         app.setProcessEnvironment(env);
         app.setProcessChannelMode(QProcess::MergedChannels);
@@ -139,15 +139,18 @@ private slots:
         { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.setValue("net/id","receiver"); settings.sync(); }
         { using namespace decolog::core; LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","test-event","sender","receiver","K1AAA",14025000,"2026-11-24T12:00:00Z"};
-          QVERIFY(contesthandoff::receiveOffer(db,"test-event","receiver","sender",contesthandoff::offerFrame(offer)).ok); }
-        QVERIFY2(launch(dir,"nethandoffprobe",output,3500),output.constData());
+          QVERIFY(contesthandoff::receiveOffer(db,"test-event","receiver","sender",contesthandoff::offerFrame(offer)).ok);
+          offer.id="8f3b7450-8e62-4dbd-8671-001122334456"; offer.call="K2BBB"; offer.scheduledUtc=QDateTime::currentDateTimeUtc().addSecs(120).toString(Qt::ISODate);
+          QVERIFY(contesthandoff::receiveOffer(db,"test-event","receiver","sender",contesthandoff::offerFrame(offer)).ok);
+          QVERIFY(contesthandoff::setIncomingState(db,"test-event","receiver",offer.id,"accepted").ok); }
+        QVERIFY2(launch(dir,"nethandoffprobe",output,3500,true),output.constData());
         QVERIFY2(output.contains("PROBE nethandoff") && output.contains("\"visible\":true") && output.contains("\"scope\":\"test-event\"") &&
                  output.contains("\"offers\":2") && output.contains("\"scheduled\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
                  output.contains("\"error\":\"\"") && output.contains("\"before\":\"pending\"") && output.contains("\"after\":\"accepted\"") &&
                  output.contains("\"stateError\":\"\"") && output.contains("\"stale\":true") && output.contains("\"staleEnabled\":false") &&
-                 output.contains("\"staleRows\":0") && !output.contains("TypeError"),output.constData());
+                 output.contains("\"staleRows\":0") && output.contains("[activity] SKED|warning|") && output.contains("K2BBB") && !output.contains("TypeError"),output.constData());
         { using namespace decolog::core; LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
-          const auto offers=contesthandoff::incomingOffers(db,"test-event","receiver"); QCOMPARE(offers.size(),1); QCOMPARE(offers.first().state,QString("accepted")); }
+          const auto offers=contesthandoff::incomingOffers(db,"test-event","receiver"); QCOMPARE(offers.size(),2); QCOMPARE(offers.first().state,QString("accepted")); }
     }
     void stationNetworkExperimentalQsoDialog_data()
     {

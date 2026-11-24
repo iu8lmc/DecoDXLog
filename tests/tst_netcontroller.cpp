@@ -1,6 +1,7 @@
 #include "app/NetController.h"
 #include "core/ContestSerialProtocol.h"
 #include "core/ContestNetSecure.h"
+#include "core/ContestHandoff.h"
 #include "core/LogDatabase.h"
 
 #include <QTest>
@@ -17,6 +18,24 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void skedReminderFiresOnceAndSurvivesReopen()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("SkedReminderTest"); QCoreApplication::setApplicationName("Reminders"); QSettings().setValue("net/enabled",false);
+        LogDatabase db; const auto path=dir.filePath("sked.sqlite"); QVERIFY(db.open(path));
+        contesthandoff::Offer o{"8f3b7450-8e62-4dbd-8671-001122334455","event","sender","receiver","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        o.scheduledUtc="2026-11-25T18:30:00Z"; QVERIFY(contesthandoff::receiveOffer(db,"event","receiver","sender",contesthandoff::offerFrame(o)).ok);
+        QStringList messages; NetController::Context ctx; ctx.db=&db; ctx.activity=[&](const QString& cat,const QString& message,const QString&) { if(cat=="SKED") messages << message; };
+        NetController net(ctx); net.setIdForTests("receiver"); QVERIFY(net.configureHandoffScope("event").isEmpty());
+        const auto scheduled=QDateTime::fromString(o.scheduledUtc,Qt::ISODate);
+        net.checkSkedReminders(scheduled); QVERIFY(messages.isEmpty());
+        QVERIFY(net.setHandoffState(o.id,"accepted").isEmpty()); net.checkSkedReminders(scheduled.addSecs(-301)); QVERIFY(messages.isEmpty());
+        net.checkSkedReminders(scheduled.addSecs(-300)); QCOMPARE(messages.size(),1); QVERIFY(messages.first().contains("K1ABC"));
+        net.checkSkedReminders(scheduled); QCOMPARE(messages.size(),1);
+        db.close(); QVERIFY(db.open(path)); QVERIFY(net.configureHandoffScope("event").isEmpty()); net.checkSkedReminders(scheduled); QCOMPARE(messages.size(),1);
+        QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void addressedHandoffTravelsBetweenControllersAndPersists()
     {
         using namespace decolog::core; using decolog::app::NetController;

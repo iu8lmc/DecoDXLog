@@ -21,6 +21,23 @@ class TestContestNet : public QObject {
     Q_OBJECT
 
 private slots:
+    void skedReminderIsDueAcceptedAndPersistent()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("reminders.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","event","sender","receiver","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        offer.scheduledUtc="2026-11-25T18:30:00Z"; const auto frame=contesthandoff::offerFrame(offer);
+        QVERIFY(contesthandoff::receiveOffer(db,"event","receiver","sender",frame).ok);
+        const auto scheduled=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
+        QVERIFY(!contesthandoff::claimSkedReminder(db,"event","receiver",offer.id,scheduled).ok);
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",offer.id,"accepted").ok);
+        QVERIFY(!contesthandoff::claimSkedReminder(db,"event","receiver",offer.id,scheduled.addSecs(-301)).ok);
+        QVERIFY(!contesthandoff::claimSkedReminder(db,"event","receiver",offer.id,scheduled.addSecs(601)).ok);
+        QVERIFY(!contesthandoff::claimSkedReminder(db,"wrong","receiver",offer.id,scheduled).ok);
+        const auto claimed=contesthandoff::claimSkedReminder(db,"event","receiver",offer.id,scheduled.addSecs(-300)); QVERIFY2(claimed.ok,qPrintable(claimed.error)); QVERIFY(!claimed.replayed);
+        QVERIFY(contesthandoff::claimSkedReminder(db,"event","receiver",offer.id,scheduled).replayed);
+        db.close(); QVERIFY(db.open(path)); QVERIFY(contesthandoff::claimSkedReminder(db,"event","receiver",offer.id,scheduled).replayed);
+        QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void skedPreservesUtcAndOfferCompatibility()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase a,b; QVERIFY(a.open(dir.filePath("a.sqlite"))); QVERIFY(b.open(dir.filePath("b.sqlite")));

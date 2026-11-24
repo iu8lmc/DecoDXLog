@@ -39,6 +39,9 @@ NetController::NetController(Context context, QObject* parent)
         }
     });
     m_handoffWatch.start();
+    m_skedReminderTimer.setInterval(30000);
+    connect(&m_skedReminderTimer,&QTimer::timeout,this,[this] { checkSkedReminders(QDateTime::currentDateTimeUtc()); });
+    m_skedReminderTimer.start();
     m_durablePool.setMaxThreadCount(1);
     m_qsoWirePool.setMaxThreadCount(1);
     m_qsoWireExpiry.setSingleShot(true); m_qsoWireExpiry.setInterval(300000);
@@ -1098,11 +1101,14 @@ QString NetController::configureHandoffScope(const QString& scope)
         return tr("Enter a valid contest scope with an open file-backed log.");
     m_handoffScope=clean;
     m_handoffInvalidated=false;
+    m_remindedSkeds.clear();
     m_handoffPath=clean.isEmpty()?QString():m_ctx.db->path(); m_handoffIdentity=clean.isEmpty()?QString():m_ctx.db->identity();
     m_handoffGroup=clean.isEmpty()?QString():m_group;
     m_handoffFileIdentity=clean.isEmpty()?QByteArray():m_ctx.db->openFileIdentity(); m_handoffGeneration=clean.isEmpty()?0:m_ctx.db->openGeneration();
     m_handoffStatus=clean.isEmpty()?QString():tr("Handoff offers are unauthenticated; delivery is not confirmed.");
-    emit handoffChanged(); return {};
+    emit handoffChanged();
+    if (!clean.isEmpty()) QTimer::singleShot(0,this,[this] { checkSkedReminders(QDateTime::currentDateTimeUtc()); });
+    return {};
 }
 static QVariantList handoffRows(const QList<contesthandoff::Offer>& offers)
 {
@@ -1197,6 +1203,25 @@ QString NetController::sendHandoffStatus(const QString& id)
         m_handoffStatus=tr("Status transmission attempted; delivery and station identity are not confirmed."); emit handoffChanged(); return {};
     }
     return tr("Handoff offer not found in this log and scope.");
+}
+void NetController::checkSkedReminders(const QDateTime& nowUtc)
+{
+    if (!m_ctx.activity || !handoffLogCurrent() || !nowUtc.isValid() || nowUtc.timeSpec()!=Qt::UTC) return;
+    QString error; const auto offers=contesthandoff::incomingOffers(*m_ctx.db,m_handoffScope,m_id,&error);
+    if (!error.isEmpty()) return;
+    int attempts=0;
+    for (const auto& offer:offers) {
+        if (!handoffLogCurrent()) return;
+        if (offer.state!=QLatin1String("accepted") || offer.scheduledUtc.isEmpty() || m_remindedSkeds.contains(offer.id)) continue;
+        const auto when=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
+        const auto elapsed=when.secsTo(nowUtc);
+        if (!when.isValid() || elapsed < -300 || elapsed > 600) continue;
+        if (++attempts>64) break;
+        const auto claimed=contesthandoff::claimSkedReminder(*m_ctx.db,m_handoffScope,m_id,offer.id,nowUtc);
+        if (!claimed.ok) continue;
+        m_remindedSkeds.insert(offer.id);
+        if (!claimed.replayed) m_ctx.activity(QStringLiteral("SKED"),tr("Sked %1 at %2 UTC on %3 Hz from %4").arg(offer.call,offer.scheduledUtc,QString::number(offer.frequencyHz),offer.sender),QStringLiteral("warning"));
+    }
 }
 
 void NetController::requestSync()

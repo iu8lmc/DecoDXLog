@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QJsonObject>
+#include <QDateTime>
 #include <QList>
 #include <QString>
 
@@ -20,6 +21,7 @@ Result receiveOffer(LogDatabase& db,const QString& scope,const QString& recipien
 Result storeOutgoing(LogDatabase& db,const Offer& offer);
 Result setIncomingState(LogDatabase& db,const QString& scope,const QString& recipient,const QString& id,const QString& state);
 Result receiveRemoteState(LogDatabase& db,const QString& scope,const QString& sender,const QString& envelopeSender,const QJsonObject& frame,const QString& state);
+Result claimSkedReminder(LogDatabase& db,const QString& scope,const QString& recipient,const QString& id,const QDateTime& nowUtc);
 QList<Offer> incomingOffers(const LogDatabase& db,const QString& scope,const QString& recipient,QString* error = nullptr);
 QList<Offer> outgoingOffers(const LogDatabase& db,const QString& scope,const QString& sender,QString* error = nullptr);
 }
