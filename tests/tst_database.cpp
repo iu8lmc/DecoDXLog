@@ -34,7 +34,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 32;
+constexpr int kSchemaVersion = 33;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -1876,6 +1876,21 @@ private slots:
         LogDatabase db; QVERIFY2(db.open(path),qPrintable(db.lastError())); QCOMPARE(db.schemaVersion(),kSchemaVersion);
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT grid FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(),QString("FN42"));
         QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_match_context")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+    }
+
+    void lotwContextHistoryIndexMigration()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("schema32.sqlite");
+        {
+            LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection());
+            QVERIFY(q.exec("DROP INDEX idx_lotw_grid_match_latest"));
+            QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=33"));
+        }
+        LogDatabase db; QVERIFY2(db.open(path),qPrintable(db.lastError())); QCOMPARE(db.schemaVersion(),kSchemaVersion);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("EXPLAIN QUERY PLAN SELECT distance_seconds FROM lotw_grid_match_context WHERE observation_id=1 ORDER BY id DESC LIMIT 1"));
+        QStringList plan; while (q.next()) plan << q.value(3).toString();
+        QVERIFY2(plan.join(' ').contains("idx_lotw_grid_match_latest"),qPrintable(plan.join(' ')));
+        QVERIFY(!plan.join(' ').contains("TEMP B-TREE"));
     }
 
     void apiIdempotencyMigrationPreservesLegacyAndRequestContext()

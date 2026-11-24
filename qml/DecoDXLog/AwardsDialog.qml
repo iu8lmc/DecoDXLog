@@ -808,7 +808,7 @@ DialogFrame {
     function probeVuccReview(satellite) {
         openAt("dxcc"); vuccBand=satellite ? "2m" : "6m"; vuccScopePicker.currentIndex=satellite ? 1 : 0; refreshVucc(); vuccReview.open()
         Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")+" gridEvidence="+((root.vuccResult.eligible || [])[0] || {}).gridEvidence+" notice="+vuccGridEvidenceNotice.text)
-            if (row && row.modelData.lotwGridObservationCount > 50) { row.probeHistory(); console.warn("PROBE vuccHistory first="+(vuccHistory.result.rows || []).length+" next="+vuccHistory.result.hasMore); vuccHistoryNext.clicked(); console.warn("PROBE vuccHistory second="+(vuccHistory.result.rows || []).length+" next="+vuccHistory.result.hasMore) } })
+            if (row && row.modelData.lotwGridObservationCount > 50) { row.probeHistory(); console.warn("PROBE vuccHistory first="+(vuccHistory.result.rows || []).length+" next="+vuccHistory.result.hasMore); Qt.callLater(function() { const item=vuccHistoryRows.itemAtIndex(0); console.warn("PROBE vuccHistoryContext "+(item ? item.text : "missing")); vuccHistoryNext.clicked(); console.warn("PROBE vuccHistory second="+(vuccHistory.result.rows || []).length+" next="+vuccHistory.result.hasMore) }) } })
     }
     function probeVuccThreshold() {
         openAt("dxcc"); vuccScopePicker.currentIndex=0; vuccBand="70cm"; vuccTarget=125
@@ -853,7 +853,7 @@ DialogFrame {
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:qsTr("Stored observations are based on a local heuristic match and are not proof of award credit.") }
             Text { Layout.fillWidth:true; visible:!!vuccHistory.result.error; wrapMode:Text.Wrap; color:Theme.warningColor; text:vuccHistory.result.error || "" }
-            ListView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:vuccHistory.result.rows || []; ScrollBar.vertical:PanelScrollBar {}
+            ListView { id:vuccHistoryRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:vuccHistory.result.rows || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:ListView.view.width; wrapMode:Text.Wrap; color:Theme.textSecondary
                     text:qsTr("%1 · grid %2 · boundary grids %3").arg(modelData.observedAt).arg(modelData.grid || "—").arg(modelData.vuccGrids || "—")
                         + (modelData.contextCount > 0 ? qsTr(" · latest match: %1 seconds apart, station %2, LoTW update %3 (%4 contexts)")

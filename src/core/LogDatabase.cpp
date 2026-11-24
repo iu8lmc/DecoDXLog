@@ -570,6 +570,7 @@ bool LogDatabase::migrate()
               "distance_seconds INTEGER NOT NULL CHECK(distance_seconds>=0), station_call TEXT NOT NULL, "
               "source_qso_time TEXT NOT NULL, rxqsl TEXT NOT NULL, recorded_at TEXT NOT NULL, "
               "UNIQUE(observation_id,distance_seconds,station_call,source_qso_time,rxqsl))")}, nullptr},
+        {33, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_lotw_grid_match_latest ON lotw_grid_match_context(observation_id,id DESC)")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
