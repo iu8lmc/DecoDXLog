@@ -15,6 +15,7 @@ GlassPanel {
         root.net.setLoopbackForProbe(); root.net.enabled=true; handoffDialog.open()
         handoffScope.text="test-event"; handoffDialog.configure()
         handoffRecipient.text="other"; handoffCall.text="K1ABC"; handoffFrequency.text="14025000"; handoffDialog.sendOffer()
+        handoffSkedTime.text="2026-11-25T18:30:00Z"; handoffDialog.sendOffer()
         const incoming=root.net.handoffInbox; const before=incoming.length ? incoming[0].state : "missing"
         const stateError=incoming.length ? root.net.setHandoffState(incoming[0].id,"accepted") : "missing"
         const group=root.net.group; root.net.group=group + "-TEST"; root.net.group=group
@@ -23,7 +24,8 @@ GlassPanel {
         return {visible:handoffDialog.visible,scope:root.net.handoffScope,offers:root.net.handoffOutbox.length,
             call:root.net.handoffOutbox.length ? root.net.handoffOutbox[0].call : "",warning:handoffWarning.text,error:handoffDialog.result,
             before:before,after:root.net.handoffInbox.length ? root.net.handoffInbox[0].state : "missing",stateError:stateError,
-            stale:staleError.length>0,staleEnabled:staleEnabled,staleRows:staleRows}
+            stale:staleError.length>0,staleEnabled:staleEnabled,staleRows:staleRows,
+            scheduled:root.net.handoffOutbox.filter(o => o.scheduledUtc === "2026-11-25T18:30:00Z").length}
     }
     function probeNetworkReviewStart(secure) {
         root.net.setLoopbackForProbe(); root.net.enabled=true; qsoWireDialog.open(); wireKey.text=secure ? "a".repeat(64) : ""
@@ -225,7 +227,9 @@ GlassPanel {
         function sendOffer() {
             const value = handoffFrequency.text.trim()
             if (!/^[0-9]{1,13}$/.test(value)) { result = qsTr("Enter a frequency in whole hertz."); return }
-            result = root.net.sendHandoffOffer(handoffRecipient.text, handoffCall.text, Number(value))
+            result = handoffSkedTime.text.trim().length
+                    ? root.net.sendSkedOffer(handoffRecipient.text, handoffCall.text, Number(value), handoffSkedTime.text)
+                    : root.net.sendHandoffOffer(handoffRecipient.text, handoffCall.text, Number(value))
         }
         body: ColumnLayout {
             spacing: 7
@@ -252,6 +256,13 @@ GlassPanel {
                 GlassButton { id: handoffSendButton; Layout.alignment: Qt.AlignBottom; text: qsTr("Send offer"); enabled: root.net.running && root.net.handoffAvailable
                     onClicked: handoffDialog.sendOffer() }
             }
+            RowLayout {
+                Layout.fillWidth: true
+                LabeledField { label: qsTr("Sked time UTC (optional)"); Layout.fillWidth: true
+                    StyledTextField { id: handoffSkedTime; Layout.fillWidth: true; placeholderText: "2026-11-25T18:30:00Z" } }
+                Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                    text: qsTr("Skeds require a station version that supports them.") }
+            }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
                 text: root.net.handoffError || handoffDialog.result || root.net.handoffStatus }
             Text { text: qsTr("Received offers"); color: Theme.textPrimary; font.bold: true }
@@ -261,7 +272,8 @@ GlassPanel {
                 delegate: RowLayout { required property var modelData; width: handoffInboxList.width
                     Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
                         text: qsTr("%1 · %2 Hz · from %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.sender).arg(modelData.createdUtc) + " · " +
-                              (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : qsTr("Completed")) }
+                              (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : qsTr("Completed")) +
+                              (modelData.scheduledUtc ? " · " + qsTr("Sked: %1").arg(modelData.scheduledUtc) : "") }
                     GlassButton { text: qsTr("Accept"); visible: modelData.state === "pending"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"accepted") }
                     GlassButton { text: qsTr("Decline"); visible: modelData.state === "pending"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"declined") }
                     GlassButton { text: qsTr("Complete"); visible: modelData.state === "accepted"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"completed") }
@@ -275,7 +287,8 @@ GlassPanel {
                 delegate: RowLayout { required property var modelData; width: handoffOutboxList.width
                     Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
                         text: qsTr("%1 · %2 Hz · to %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.recipient).arg(modelData.createdUtc) + " · " +
-                              (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : modelData.state === "completed" ? qsTr("Completed") : qsTr("No status received")) }
+                              (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : modelData.state === "completed" ? qsTr("Completed") : qsTr("No status received")) +
+                              (modelData.scheduledUtc ? " · " + qsTr("Sked: %1").arg(modelData.scheduledUtc) : "") }
                     GlassButton { text: qsTr("Retry"); enabled: root.net.running && root.net.handoffAvailable
                         onClicked: handoffDialog.result = root.net.retryHandoffOffer(modelData.id) }
                 }

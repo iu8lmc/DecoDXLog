@@ -63,10 +63,17 @@ private slots:
         QVERIFY(deliverStatus(completedIndex,3)>0); QTRY_COMPARE_WITH_TIMEOUT(a.handoffOutbox().first().toMap().value("state").toString(),QString("completed"),3000);
         QVERIFY(deliverStatus(1,4)>0); QTest::qWait(100); QCOMPARE(a.handoffOutbox().first().toMap().value("state").toString(),QString("completed"));
         QVERIFY(deliver(3)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
+        QVERIFY(!a.sendSkedOffer("receiver","K2ABC",14026000,"2026-11-25T18:30:00+01:00").isEmpty());
+        QVERIFY(a.sendSkedOffer("receiver","K2ABC",14026000,"2026-11-25T18:30:00Z").isEmpty());
+        body=sent.last().first().toJsonObject(); QCOMPARE(body.value("version").toInt(),2);
+        QVERIFY(deliver(4)>0); QTRY_COMPARE_WITH_TIMEOUT(b.handoffInbox().size(),2,3000);
+        bool foundSked=false; for (const auto& item:b.handoffInbox()) if (item.toMap().value("call").toString()=="K2ABC")
+            foundSked=item.toMap().value("scheduledUtc").toString()=="2026-11-25T18:30:00Z";
+        QVERIFY(foundSked); QCOMPARE(source.qsoCount(),qint64(0)); QCOMPARE(target.qsoCount(),qint64(0));
         QSignalSpy changed(&a,&NetController::handoffChanged); a.setGroup("OTHER"); QVERIFY(!changed.isEmpty());
         QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty()); QVERIFY(!a.retryHandoffOffer(offerId).isEmpty());
         a.setGroup("FIELD"); QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty());
-        QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QCOMPARE(a.handoffOutbox().size(),1);
+        QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QCOMPARE(a.handoffOutbox().size(),2);
         changed.clear(); source.close(); QVERIFY(source.open(dir.filePath("source.sqlite")));
         QTRY_VERIFY_WITH_TIMEOUT(!changed.isEmpty(),3000); QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty());
         a.setEnabled(false); b.setEnabled(false);

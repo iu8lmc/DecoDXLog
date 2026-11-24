@@ -1109,7 +1109,8 @@ static QVariantList handoffRows(const QList<contesthandoff::Offer>& offers)
     QVariantList rows;
     for (const auto& o : offers) rows << QVariantMap{{QStringLiteral("id"),o.id},{QStringLiteral("scope"),o.scope},
         {QStringLiteral("sender"),o.sender},{QStringLiteral("recipient"),o.recipient},{QStringLiteral("call"),o.call},
-        {QStringLiteral("frequencyHz"),o.frequencyHz},{QStringLiteral("createdUtc"),o.createdUtc},{QStringLiteral("state"),o.state}};
+        {QStringLiteral("frequencyHz"),o.frequencyHz},{QStringLiteral("createdUtc"),o.createdUtc},{QStringLiteral("state"),o.state},
+        {QStringLiteral("scheduledUtc"),o.scheduledUtc}};
     return rows;
 }
 QVariantList NetController::handoffInbox() const
@@ -1131,12 +1132,20 @@ QString NetController::handoffError() const
     return error.isEmpty()?QString():tr("Cannot read handoff offers: %1").arg(error);
 }
 QString NetController::sendHandoffOffer(const QString& recipient,const QString& call,qint64 frequencyHz)
+{ return sendHandoffOfferImpl(recipient,call,frequencyHz,{}); }
+QString NetController::sendSkedOffer(const QString& recipient,const QString& call,qint64 frequencyHz,const QString& scheduledUtc)
+{
+    if (scheduledUtc.trimmed().isEmpty()) return tr("Enter the sked time in UTC.");
+    return sendHandoffOfferImpl(recipient,call,frequencyHz,scheduledUtc.trimmed());
+}
+QString NetController::sendHandoffOfferImpl(const QString& recipient,const QString& call,qint64 frequencyHz,const QString& scheduledUtc)
 {
     if (!m_net.running() || !handoffLogCurrent()) return tr("Configure a running network and the current log's handoff scope first.");
     contesthandoff::Offer offer{QUuid::createUuid().toString(QUuid::WithoutBraces),m_handoffScope,m_id,recipient.trimmed(),
         call.trimmed().toUpper(),frequencyHz,QDateTime::currentDateTimeUtc().toString(Qt::ISODate)};
+    offer.scheduledUtc=scheduledUtc;
     const auto frame=contesthandoff::offerFrame(offer);
-    if (frame.isEmpty()) return tr("Enter a valid recipient, callsign and frequency.");
+    if (frame.isEmpty()) return tr("Enter a valid recipient, callsign, frequency and UTC sked time.");
     QJsonObject body{{QStringLiteral("offer"),frame}}; auto sizeProbe=body;
     sizeProbe.insert(QStringLiteral("seq"),std::numeric_limits<qint64>::max()); sizeProbe.insert(QStringLiteral("session"),m_sessionId);
     sizeProbe.insert(QStringLiteral("protocol"),2); sizeProbe.insert(QStringLiteral("name"),m_name);

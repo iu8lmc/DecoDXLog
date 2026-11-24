@@ -151,6 +151,7 @@ public:
     QVariantList handoffOutbox() const;
     Q_INVOKABLE QString configureHandoffScope(const QString& scope);
     Q_INVOKABLE QString sendHandoffOffer(const QString& recipient,const QString& call,qint64 frequencyHz);
+    Q_INVOKABLE QString sendSkedOffer(const QString& recipient,const QString& call,qint64 frequencyHz,const QString& scheduledUtc);
     Q_INVOKABLE QString retryHandoffOffer(const QString& id);
     Q_INVOKABLE QString setHandoffState(const QString& id,const QString& state);
     Q_INVOKABLE QString sendHandoffStatus(const QString& id);
@@ -185,6 +186,7 @@ private:
     void send(const QString& type, QJsonObject body);
     void onReceived(const QString& from, const QString& type, const QJsonObject& body);
     bool handoffLogCurrent() const;
+    QString sendHandoffOfferImpl(const QString& recipient,const QString& call,qint64 frequencyHz,const QString& scheduledUtc);
     QString requestExperimentalQsoMissingImpl(bool extendExpiry);
     bool sendExperimentalWireFrame(const QString& type, const QJsonObject& body);
     void handleExperimentalWireFrame(const QString& from, const QString& type, const QJsonObject& body);

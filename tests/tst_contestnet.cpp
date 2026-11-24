@@ -21,6 +21,25 @@ class TestContestNet : public QObject {
     Q_OBJECT
 
 private slots:
+    void skedPreservesUtcAndOfferCompatibility()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase a,b; QVERIFY(a.open(dir.filePath("a.sqlite"))); QVERIFY(b.open(dir.filePath("b.sqlite")));
+        contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","contest-2026","node-a","node-b","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        QCOMPARE(contesthandoff::offerFrame(offer).value("version").toInt(),1);
+        offer.scheduledUtc="2026-11-25T18:30:00Z"; const auto frame=contesthandoff::offerFrame(offer);
+        QCOMPARE(frame.value("version").toInt(),2); QCOMPARE(frame.value("scheduledUtc").toString(),offer.scheduledUtc);
+        QVERIFY(contesthandoff::storeOutgoing(a,offer).ok); QVERIFY(contesthandoff::receiveOffer(b,"contest-2026","node-b","node-a",frame).ok);
+        QVERIFY(contesthandoff::receiveOffer(b,"contest-2026","node-b","node-a",frame).replayed);
+        auto wrong=frame; wrong.insert("scheduledUtc","2026-11-25T18:31:00Z"); QVERIFY(!contesthandoff::receiveOffer(b,"contest-2026","node-b","node-a",wrong).ok);
+        QVERIFY(contesthandoff::setIncomingState(b,"contest-2026","node-b",offer.id,"accepted").ok);
+        QVERIFY(contesthandoff::receiveRemoteState(a,"contest-2026","node-a","node-b",frame,"accepted").ok);
+        a.close(); b.close(); QVERIFY(a.open(dir.filePath("a.sqlite"))); QVERIFY(b.open(dir.filePath("b.sqlite")));
+        QCOMPARE(contesthandoff::incomingOffers(b,"contest-2026","node-b").first().scheduledUtc,offer.scheduledUtc);
+        QCOMPARE(contesthandoff::outgoingOffers(a,"contest-2026","node-a").first().state,QString("accepted"));
+        offer.scheduledUtc="2026-11-25T18:30:00+01:00"; QVERIFY(contesthandoff::offerFrame(offer).isEmpty());
+        offer.scheduledUtc="not-a-date"; QVERIFY(contesthandoff::offerFrame(offer).isEmpty());
+        QCOMPARE(a.qsoCount(),qint64(0)); QCOMPARE(b.qsoCount(),qint64(0));
+    }
     void handoffRemoteStateRejectsWrongPeerAndReordering()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("sender.sqlite"); LogDatabase sender; QVERIFY(sender.open(path));

@@ -2389,6 +2389,9 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Sked time UTC (optional)</source><translation>Orario sked UTC (facoltativo)</translation></message>
+    <message><source>Skeds require a station version that supports them.</source><translation>Gli sked richiedono una versione che li supporti su entrambe le stazioni.</translation></message>
+    <message><source>Sked: %1</source><translation>Sked: %1</translation></message>
     <message><source>Status messages can be lost and station identities can be impersonated. Retry or verify status with the other operator.</source><translation>I messaggi di stato possono andare persi e le identità delle stazioni possono essere falsificate. Riprova o verifica lo stato con l'altro operatore.</translation></message>
     <message><source>Resend status</source><translation>Reinvia stato</translation></message>
     <message><source>Sent offers — reported status is unauthenticated</source><translation>Proposte inviate — lo stato ricevuto non è autenticato</translation></message>
@@ -13061,6 +13064,8 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::NetController</name>
+    <message><source>Enter the sked time in UTC.</source><translation>Inserisci l'orario dello sked in UTC.</translation></message>
+    <message><source>Enter a valid recipient, callsign, frequency and UTC sked time.</source><translation>Inserisci destinatario, nominativo, frequenza e orario UTC dello sked validi.</translation></message>
     <message><source>Handoff state saved locally, but the datagram is too large.</source><translation>Stato salvato localmente, ma il datagramma è troppo grande.</translation></message>
     <message><source>Status transmission attempted; delivery and station identity are not confirmed.</source><translation>Invio dello stato tentato; consegna e identità della stazione non sono confermate.</translation></message>
     <message><source>Remote handoff status received; station identity is not authenticated.</source><translation>Stato remoto ricevuto; l'identità della stazione non è autenticata.</translation></message>

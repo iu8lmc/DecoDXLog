@@ -142,7 +142,7 @@ private slots:
           QVERIFY(contesthandoff::receiveOffer(db,"test-event","receiver","sender",contesthandoff::offerFrame(offer)).ok); }
         QVERIFY2(launch(dir,"nethandoffprobe",output,3500),output.constData());
         QVERIFY2(output.contains("PROBE nethandoff") && output.contains("\"visible\":true") && output.contains("\"scope\":\"test-event\"") &&
-                 output.contains("\"offers\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
+                 output.contains("\"offers\":2") && output.contains("\"scheduled\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
                  output.contains("\"error\":\"\"") && output.contains("\"before\":\"pending\"") && output.contains("\"after\":\"accepted\"") &&
                  output.contains("\"stateError\":\"\"") && output.contains("\"stale\":true") && output.contains("\"staleEnabled\":false") &&
                  output.contains("\"staleRows\":0") && !output.contains("TypeError"),output.constData());

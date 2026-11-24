@@ -19,22 +19,28 @@ bool valid(const Offer& o) {
     static const QRegularExpression uuid(QStringLiteral("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"));
     static const QRegularExpression call(QStringLiteral("^(?=.{3,24}$)(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]+(?:/[A-Z0-9]+)*$"));
     const auto when=QDateTime::fromString(o.createdUtc,Qt::ISODate);
+    const auto scheduled=QDateTime::fromString(o.scheduledUtc,Qt::ISODate);
     return uuid.match(o.id).hasMatch() && identifier(o.scope) && identifier(o.sender) && identifier(o.recipient) && o.sender!=o.recipient
         && call.match(o.call).hasMatch() && o.frequencyHz>=1000 && o.frequencyHz<=1000000000000LL
-        && when.isValid() && when.timeSpec()==Qt::UTC && when.toUTC().toString(Qt::ISODate)==o.createdUtc;
+        && when.isValid() && when.timeSpec()==Qt::UTC && when.toUTC().toString(Qt::ISODate)==o.createdUtc
+        && (o.scheduledUtc.isEmpty() || (scheduled.isValid() && scheduled.timeSpec()==Qt::UTC && scheduled.toUTC().toString(Qt::ISODate)==o.scheduledUtc));
 }
 std::optional<Offer> parse(const QJsonObject& o) {
-    if (o.size()!=8 || o.value("version")!=QJsonValue(1) || !o.value("frequencyHz").isDouble()) return {};
+    const bool sked=o.value("version")==QJsonValue(2);
+    if ((!sked && (o.size()!=8 || o.value("version")!=QJsonValue(1))) || (sked && (o.size()!=9 || !o.value("scheduledUtc").isString() || o.value("scheduledUtc").toString().isEmpty())) || !o.value("frequencyHz").isDouble()) return {};
     const double f=o.value("frequencyHz").toDouble(); if (!std::isfinite(f) || f!=std::floor(f) || f<1000 || f>1000000000000.0) return {};
     Offer a{o.value("id").toString(),o.value("scope").toString(),o.value("sender").toString(),o.value("recipient").toString(),
             o.value("call").toString(),qint64(f),o.value("createdUtc").toString()};
+    if (sked) a.scheduledUtc=o.value("scheduledUtc").toString();
     return valid(a) ? std::optional<Offer>(a) : std::nullopt;
 }
 }
 QJsonObject offerFrame(const Offer& o) {
     if (!valid(o)) return {};
-    return {{"version",1},{"id",o.id},{"scope",o.scope},{"sender",o.sender},{"recipient",o.recipient},
+    QJsonObject frame{{"version",o.scheduledUtc.isEmpty()?1:2},{"id",o.id},{"scope",o.scope},{"sender",o.sender},{"recipient",o.recipient},
             {"call",o.call},{"frequencyHz",double(o.frequencyHz)},{"createdUtc",o.createdUtc}};
+    if (!o.scheduledUtc.isEmpty()) frame.insert("scheduledUtc",o.scheduledUtc);
+    return frame;
 }
 static Result store(LogDatabase& db,const QString& prefix,const Offer& offer) {
     if (!db.isOpen() || !valid(offer)) return {false,false,QStringLiteral("Invalid handoff offer")};

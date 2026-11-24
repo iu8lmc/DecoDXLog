@@ -12,6 +12,7 @@ struct Offer {
     qint64 frequencyHz{0};
     QString createdUtc;
     QString state{};
+    QString scheduledUtc{};
 };
 struct Result { bool ok{false}; bool replayed{false}; QString error; };
 QJsonObject offerFrame(const Offer& offer);
