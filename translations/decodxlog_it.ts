@@ -15449,6 +15449,7 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>decolog::core::RadioNet</name>
+    <message><source>The log file changed; reopen it before exporting</source><translation>Il file del log è cambiato; riaprilo prima di esportare</translation></message>
     <message>
         <source>Log is not open</source>
         <translation>Il log non è aperto</translation>

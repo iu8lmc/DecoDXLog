@@ -2743,3 +2743,11 @@ Radio-net JSON export now checks native file identity as well as resolved paths 
 A/B on macOS arm64 / Qt 6.11.2: a temporary hard link to the test log was accepted as an export target before the change and rejected afterwards. A separate normal export still produced the complete 207-event history. An initial combined fixture created and removed the hard link while the SQLite connection remained open and subsequently observed a disk I/O error; separating the hard-link fixture from the normal-export fixture avoided that interaction, whose cause was not determined. App and test targets built; CTest radionet, database, migration and qmlpopups passed 4/4.
 
 The hard-link test is Unix-only and does not demonstrate every alias or race ordering. The worker's existing source-log replacement and session-identity behavior was not changed or tested here. Physical UI, Windows/Linux, real radio nets and full G08/G13 acceptance remain open.
+
+## 2026-11-24 — G08 bind Net Manager export to its source log
+
+Radio-net export now captures the open file identity, persistent log identity and selected session UUID before scheduling. It refuses an already replaced log, opens its worker connection read-only, verifies both log identities and the session ID/UUID, and rechecks the file identity before committing the export. The existing snapshot and destination protections remain. An Italian error message was added.
+
+A/B on macOS arm64 / Qt 6.11.2: in a temporary fixture, replacing the log path with a different database before scheduling previously allowed export to start; it now rejects the operation without producing an output. Normal history export and hard-link rejection also passed; app and test targets built, and CTest radionet, database, migration and qmlpopups passed 4/4.
+
+The replacement fixture changes the path before scheduling, not between worker checkpoints. These point-in-time checks cannot make live SQLite file replacement safe or remove every race; an already-open snapshot and a later filesystem swap need separate testing. Physical UI, Windows/Linux, actual radio operations and full G08/G13 acceptance remain open.

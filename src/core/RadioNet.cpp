@@ -551,6 +551,17 @@ bool RadioNet::exportSession(const QUrl &file)
     const QString source = m_db->path();
     if (source.isEmpty() || source == QLatin1String(":memory:"))
         return fail(tr("A file-backed log is required for export"));
+    const QByteArray sourceFile = m_db->openFileIdentity();
+    const QString sourceIdentity = m_db->identity();
+    if (sourceFile.isEmpty() || sourceIdentity.isEmpty() || !m_db->fileIdentityMatchesOpen())
+        return fail(tr("The log file changed; reopen it before exporting"));
+    QSqlQuery selected(m_db->connection());
+    selected.prepare(QStringLiteral("SELECT uuid FROM radio_net_session WHERE id=?"));
+    selected.addBindValue(m_sessionId);
+    if (!selected.exec() || !selected.next() || selected.value(0).toString().isEmpty())
+        return fail(tr("Radio net session not found"));
+    const QString sessionUuid = selected.value(0).toString();
+    selected.finish();
     const QString destination = file.toLocalFile();
     if (!safeNetExportDestination(destination, source))
         return fail(tr("Choose a file outside the open log database"));
@@ -562,15 +573,17 @@ bool RadioNet::exportSession(const QUrl &file)
     emit changed();
     emit exportChanged();
     QPointer<RadioNet> self(this);
-    m_exportPool.start([self, source, destination, sessionId, cancel] {
+    m_exportPool.start([self, source, sourceFile, sourceIdentity, sessionUuid, destination, sessionId, cancel] {
         QString error;
         bool success = false;
         {
             LogDatabase db;
             if (cancel->load()) {
                 error = tr("Export cancelled");
-            } else if (!db.open(source)) {
+            } else if (!db.openReadOnly(source)) {
                 error = db.lastError();
+            } else if (!db.fileIdentityMatchesOpen() || db.openFileIdentity() != sourceFile || db.identity() != sourceIdentity) {
+                error = tr("The log file changed; reopen it before exporting");
             } else {
                 QSqlDatabase sql = db.connection();
                 if (!sql.transaction()) {
@@ -599,8 +612,9 @@ bool RadioNet::exportSession(const QUrl &file)
                         QSqlQuery q(sql);
                         q.prepare(QStringLiteral(
                             "SELECT id,uuid,title,station_profile_id,started_at,ended_at,current_member_id FROM "
-                            "radio_net_session WHERE id=?"));
+                            "radio_net_session WHERE id=? AND uuid=?"));
                         q.addBindValue(sessionId);
+                        q.addBindValue(sessionUuid);
                         if (!q.exec() || !q.next()) {
                             error = q.lastError().text();
                             if (error.isEmpty())
@@ -666,6 +680,10 @@ bool RadioNet::exportSession(const QUrl &file)
                                 ok = write(QByteArrayLiteral("}\n"));
                             if (ok && !sql.commit()) {
                                 error = sql.lastError().text();
+                                ok = false;
+                            }
+                            if (ok && (!db.fileIdentityMatchesOpen() || db.openFileIdentity() != sourceFile)) {
+                                error = tr("The log file changed; reopen it before exporting");
                                 ok = false;
                             }
                             if (ok && !safeNetExportDestination(destination, source)) {
