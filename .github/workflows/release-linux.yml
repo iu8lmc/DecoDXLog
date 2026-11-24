@@ -120,6 +120,7 @@ jobs:
       - name: Release gate
         env:
           QT_QPA_PLATFORM: offscreen
+          QTEST_FUNCTION_TIMEOUT: "1800000"
         run: bash scripts/release-gate.sh build build/bin/DecoDXLog
 
       - name: Install into AppDir

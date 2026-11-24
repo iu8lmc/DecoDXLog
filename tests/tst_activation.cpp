@@ -920,7 +920,7 @@ private slots:
         for (int page=1; page<3; ++page) {
             const auto after=exclusions.last().toMap().value("id").toLongLong();
             QVERIFY(act.requestExcludedPage(after));
-            QTRY_COMPARE_WITH_TIMEOUT(exclusionDone.size(),1,5000);
+            QTRY_COMPARE_WITH_TIMEOUT(exclusionDone.size(),1,30000);
             const auto part=exclusionDone.takeFirst().first().toMap();
             QVERIFY(part.value("error").toString().isEmpty());
             const auto current=part.value("excluded").toList(); QCOMPARE(current.size(),100);

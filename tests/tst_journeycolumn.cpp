@@ -2914,11 +2914,16 @@ private slots:
         app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","undoimport:hold","--grab",dir.filePath("screen.png")});
         QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
         while (!output.contains("PROBE importUndo hold\n") && timer.elapsed()<15000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
-        QVERIFY2(output.contains("PROBE importUndo hold\n"),output.constData()); QVERIFY(QFile::rename(path,path+".old")); QVERIFY(QFile::rename(clone,path));
+        QVERIFY2(output.contains("PROBE importUndo hold\n"),output.constData());
+        QVERIFY(QFile::rename(path,path+".old"));
+        // The running connection still owns these WAL files. Keep them with
+        // the original database instead of attaching them to its replacement.
+        for (const QString& suffix : {QStringLiteral("-wal"), QStringLiteral("-shm")}) {
+            if (QFile::exists(path+suffix)) QVERIFY(QFile::rename(path+suffix,path+".old"+suffix));
+        }
+        QVERIFY(QFile::rename(clone,path));
         QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
         QVERIFY2(output.contains("PROBE importUndo hold accepted=false"),output.constData());
-        // These belong to the still-open original connection, not the replacement.
-        QFile::remove(path+"-wal"); QFile::remove(path+"-shm");
         LogDatabase copy; QVERIFY2(copy.open(path),qPrintable(copy.lastError())); QCOMPARE(copy.qsoCount(),1); QVERIFY(!copy.meta(1)->deleted);
 #endif
     }

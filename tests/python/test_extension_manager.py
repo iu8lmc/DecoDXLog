@@ -1,3 +1,4 @@
+from contextlib import closing
 import importlib.util
 import json
 import os
@@ -53,7 +54,7 @@ class ManagerTests(unittest.TestCase):
                 data=json.dumps(value).encode(); self.send_response(200); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
         with tempfile.TemporaryDirectory() as temp:
             base=pathlib.Path(temp); root=base/'extensions'; log=base/'log.sqlite'
-            with sqlite3.connect(log) as db: db.execute('CREATE TABLE qso(call TEXT)'); db.execute("INSERT INTO qso VALUES('K1ABC')")
+            with closing(sqlite3.connect(log)) as db, db: db.execute('CREATE TABLE qso(call TEXT)'); db.execute("INSERT INTO qso VALUES('K1ABC')")
             server=ThreadingHTTPServer(('127.0.0.1',0),EventApi); thread=Thread(target=server.serve_forever,daemon=True); thread.start()
             try:
                 manifest=ROOT/'examples/extensions/event_counter.manifest.json'; identity='org.decodxlog.example.event-counter'
@@ -80,7 +81,7 @@ class ManagerTests(unittest.TestCase):
                 recovered=manager.run(root,identity,'read-token',server.server_port,5,accept_gap=True)
                 self.assertFalse(recovered['noRecordedGaps']); self.assertEqual(recovered['gapCount'],1); self.assertEqual(recovered['cursor'],'8')
                 manager.remove(root,identity); self.assertFalse((root/identity).exists())
-                with sqlite3.connect(log) as db: self.assertEqual(db.execute('SELECT call FROM qso').fetchone()[0],'K1ABC')
+                with closing(sqlite3.connect(log)) as db, db: self.assertEqual(db.execute('SELECT call FROM qso').fetchone()[0],'K1ABC')
             finally:
                 server.shutdown(); server.server_close(); thread.join()
 
@@ -203,7 +204,7 @@ class ManagerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             base=pathlib.Path(temp); source=base/'source'; source.mkdir(); root=base/'extensions'
             log=base/'log.sqlite'
-            with sqlite3.connect(log) as db: db.execute('CREATE TABLE qso(call TEXT)'); db.execute("INSERT INTO qso VALUES('K1ABC')")
+            with closing(sqlite3.connect(log)) as db, db: db.execute('CREATE TABLE qso(call TEXT)'); db.execute("INSERT INTO qso VALUES('K1ABC')")
             (source/'demo.py').write_text("print('ok')\n")
             manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.race','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
             path=source/'manifest.json'; path.write_text(json.dumps(manifest))
@@ -228,7 +229,7 @@ class ManagerTests(unittest.TestCase):
             self.assertIsInstance(removal_error,ValueError)
             self.assertEqual(len(outcome),1); self.assertIsInstance(outcome[0],dict)
             self.assertEqual(manager.list_installed(root)[0]['id'],manifest['id'])
-            with sqlite3.connect(log) as db: self.assertEqual(db.execute('SELECT call FROM qso').fetchall(),[('K1ABC',)])
+            with closing(sqlite3.connect(log)) as db, db: self.assertEqual(db.execute('SELECT call FROM qso').fetchall(),[('K1ABC',)])
     def test_installed_manifest_changes_are_detected(self):
         with tempfile.TemporaryDirectory() as temp:
             base=pathlib.Path(temp); src=base/'src'; src.mkdir(); root=base/'installed'

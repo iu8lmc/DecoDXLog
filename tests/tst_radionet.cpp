@@ -609,7 +609,8 @@ class TestRadioNet : public QObject {
         const QString replacement=dir.filePath("replacement.sqlite");
         { LogDatabase other; QVERIFY(other.open(replacement)); RadioNet net(&other); QVERIFY(net.start("Other net")); }
         LogDatabase db; QVERIFY(db.open(path)); RadioNet net(&db); QVERIFY(net.start("Original net"));
-        QVERIFY(QFile::rename(path,dir.filePath("original.sqlite")));
+        if (!QFile::rename(path,dir.filePath("original.sqlite")))
+            QSKIP("Platform does not allow replacing an open SQLite file");
         QVERIFY(QFile::rename(replacement,path));
         const QString output=dir.filePath("export.json");
         QVERIFY(!net.exportSession(QUrl::fromLocalFile(output)));

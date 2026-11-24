@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Count QSO events through the API using a separately chosen client database."""
 import argparse
+from contextlib import closing
 import json
 import os
 import pathlib
@@ -86,7 +87,7 @@ def process_page(state_path, port, token, accept_gap=False):
     log_id = caps.get('eventLogIdentity')
     if not isinstance(log_id, str) or not log_id or len(log_id) > 128:
         raise ValueError('invalid event log identity')
-    with sqlite3.connect(str(path), timeout=5, isolation_level=None) as db:
+    with closing(sqlite3.connect(str(path), timeout=5, isolation_level=None)) as db, db:
         db.execute('BEGIN IMMEDIATE')
         try:
             tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}

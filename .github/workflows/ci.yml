@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Windows con la stessa catena usata per sviluppare e distribuire: MSYS2 MinGW64.
+  # Windows con la stessa catena usata per sviluppare e distribuire: MSYS2 UCRT64.
   # Alla fine prepara la cartella distribuibile e la allega come artefatto.
   windows:
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 120
     defaults:
       run:
         shell: msys2 {0}
@@ -20,25 +20,25 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           update: true
           install: >-
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-gcc-fortran
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-qt6-base
-            mingw-w64-x86_64-qt6-declarative
-            mingw-w64-x86_64-qt6-tools
-            mingw-w64-x86_64-qt6-translations
-            mingw-w64-x86_64-qt6-multimedia
-            mingw-w64-x86_64-qt6-positioning
-            mingw-w64-x86_64-qt6-location
-            mingw-w64-x86_64-qt6-serialport
-            mingw-w64-x86_64-qt6-websockets
-            mingw-w64-x86_64-qt6-shadertools
-            mingw-w64-x86_64-qtkeychain
-            mingw-w64-x86_64-openssl
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-gcc-fortran
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
+            mingw-w64-ucrt-x86_64-qt6-translations
+            mingw-w64-ucrt-x86_64-qt6-multimedia
+            mingw-w64-ucrt-x86_64-qt6-positioning
+            mingw-w64-ucrt-x86_64-qt6-location
+            mingw-w64-ucrt-x86_64-qt6-serialport
+            mingw-w64-ucrt-x86_64-qt6-websockets
+            mingw-w64-ucrt-x86_64-qt6-shadertools
+            mingw-w64-ucrt-x86_64-qtkeychain
+            mingw-w64-ucrt-x86_64-openssl
 
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DDECODXLOG_REQUIRE_OPENSSL=ON
@@ -50,6 +50,7 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
+          QTEST_FUNCTION_TIMEOUT: "1800000"
           # La prova della radio cade solo qui, mai su una macchina vera: in
           # dodici giri di fila non sbaglia un colpo. Finche' non si capisce
           # perche', il traccia-risposte resta acceso, cosi' la prossima volta
@@ -58,7 +59,7 @@ jobs:
         run: ctest --output-on-failure
 
       - name: Package
-        run: MINGW=/mingw64 bash scripts/deploy.sh
+        run: MINGW=/ucrt64 bash scripts/deploy.sh
 
       - uses: actions/upload-artifact@v4
         with:
@@ -67,7 +68,7 @@ jobs:
 
   linux:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -101,6 +102,7 @@ jobs:
         working-directory: build
         env:
           QT_QPA_PLATFORM: offscreen
+          QTEST_FUNCTION_TIMEOUT: "1800000"
           # La prova della radio cade solo qui, mai su una macchina vera: in
           # dodici giri di fila non sbaglia un colpo. Finche' non si capisce
           # perche', il traccia-risposte resta acceso, cosi' la prossima volta

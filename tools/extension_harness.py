@@ -162,7 +162,7 @@ def run_extension(manifest_path, token, port, timeout, state_path=None, accept_g
                 raise ValueError("extension exceeded output limit")
             if process.returncode != 0:
                 err.seek(0)
-                if expected_scope == "event_counts" and err.read(MAX_OUTPUT + 1) == b"Event counter unavailable: EventGap\n":
+                if expected_scope == "event_counts" and err.read(MAX_OUTPUT + 1).replace(b"\r\n", b"\n") == b"Event counter unavailable: EventGap\n":
                     raise ExtensionEventGap("event history was pruned")
                 raise ValueError("extension failed")
             out.seek(0)

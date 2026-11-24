@@ -1,3 +1,4 @@
+from contextlib import closing
 import importlib.util
 import json
 import pathlib
@@ -57,7 +58,7 @@ class EventCounterTests(unittest.TestCase):
         self.assertEqual(second['counts']['added'],1); self.assertEqual(second['cursor'],'1')
         self.server.event_status=410
         with self.assertRaises(counter.EventGap): counter.process_page(self.path,self.server.server_port,'test-token')
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0], '1')
             self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
 
@@ -67,7 +68,7 @@ class EventCounterTests(unittest.TestCase):
         with self.assertRaises(ValueError): counter.process_page(self.path,self.server.server_port,'test-token')
         self.server.log_id='log-1'; self.server.page={'log':'log-1','events':[{'sequence':'1','qsoUuid':'q1','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'1'}
         with self.assertRaises(ValueError): counter.process_page(self.path,self.server.server_port,'test-token')
-        with sqlite3.connect(self.path) as db: self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0],'1')
+        with closing(sqlite3.connect(self.path)) as db, db: self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0],'1')
 
     def test_two_concurrent_consumers_commit_once(self):
         self.server.dynamic=True
@@ -82,7 +83,7 @@ class EventCounterTests(unittest.TestCase):
         for thread in threads: thread.join(10); self.assertFalse(thread.is_alive())
         self.assertFalse(errors); self.assertEqual(len(results),2)
         self.assertEqual([result['counts']['added'] for result in results],[1,1])
-        with sqlite3.connect(self.path) as db: self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
+        with closing(sqlite3.connect(self.path)) as db, db: self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
 
     def test_malformed_page_preserves_counters(self):
         counter.process_page(self.path,self.server.server_port,'test-token')
@@ -90,17 +91,17 @@ class EventCounterTests(unittest.TestCase):
                                                    {'sequence':'2','qsoUuid':'q3','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}],
                           'hasMore':False,'next':'2'}
         with self.assertRaises(ValueError): counter.process_page(self.path,self.server.server_port,'test-token')
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0],'1')
             self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
 
     def test_failure_before_cursor_commit_rolls_back_counts(self):
         counter.process_page(self.path,self.server.server_port,'test-token')
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute("CREATE TRIGGER injected_failure BEFORE UPDATE ON counter_state BEGIN SELECT RAISE(ABORT,'injected'); END")
         self.server.page={'log':'log-1','events':[{'sequence':'2','qsoUuid':'q2','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'2'}
         with self.assertRaises(sqlite3.IntegrityError): counter.process_page(self.path,self.server.server_port,'test-token')
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0],'1')
             self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
             db.execute('DROP TRIGGER injected_failure')
@@ -113,7 +114,7 @@ class EventCounterTests(unittest.TestCase):
         result=counter.process_page(self.path,self.server.server_port,'test-token',accept_gap=True)
         self.assertEqual(result['cursor'],'8'); self.assertFalse(result['noRecordedGaps']); self.assertEqual(result['gapCount'],1)
         self.assertEqual(result['counts']['added'],1)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute('SELECT from_cursor,pruned_through,high_watermark FROM counter_gaps').fetchall(), [('0','7','8')])
         self.server.gap_recovery=False; self.server.page={'log':'log-1','events':[],'hasMore':False,'next':'8'}
         again=counter.process_page(self.path,self.server.server_port,'test-token')
@@ -123,13 +124,13 @@ class EventCounterTests(unittest.TestCase):
         counter.process_page(self.path,self.server.server_port,'test-token')
         self.server.gap_recovery='always'
         with self.assertRaises(counter.EventGap): counter.process_page(self.path,self.server.server_port,'test-token',accept_gap=True)
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0],'1')
             self.assertEqual(db.execute('SELECT COUNT(*) FROM counter_gaps').fetchone()[0],0)
             self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
 
     def test_existing_counter_state_gains_gap_history_without_losing_counts(self):
-        with sqlite3.connect(self.path) as db:
+        with closing(sqlite3.connect(self.path)) as db, db:
             db.execute('PRAGMA application_id=%d' % counter.APP_ID)
             db.execute('CREATE TABLE counter_state(id INTEGER PRIMARY KEY, log_id TEXT NOT NULL, cursor TEXT NOT NULL)')
             db.execute('CREATE TABLE counter_counts(kind TEXT PRIMARY KEY, count INTEGER NOT NULL)')
@@ -141,8 +142,8 @@ class EventCounterTests(unittest.TestCase):
         self.assertTrue(result['noRecordedGaps']); self.assertEqual(result['gapCount'],0)
 
     def test_rejects_unowned_existing_database(self):
-        with sqlite3.connect(self.path) as db: db.execute('CREATE TABLE user_data(value TEXT)'); db.execute("INSERT INTO user_data VALUES ('keep')")
+        with closing(sqlite3.connect(self.path)) as db, db: db.execute('CREATE TABLE user_data(value TEXT)'); db.execute("INSERT INTO user_data VALUES ('keep')")
         with self.assertRaises(ValueError): counter.process_page(self.path,self.server.server_port,'test-token')
-        with sqlite3.connect(self.path) as db: self.assertEqual(db.execute('SELECT value FROM user_data').fetchone()[0],'keep')
+        with closing(sqlite3.connect(self.path)) as db, db: self.assertEqual(db.execute('SELECT value FROM user_data').fetchone()[0],'keep')
 
 if __name__=='__main__': unittest.main()
