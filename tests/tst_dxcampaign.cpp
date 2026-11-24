@@ -13,6 +13,25 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void campaignCountsLegacyUnzonedUtcQso()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;
+        c.title="Legacy UTC"; c.calls={"3Y0J"}; c.start=QDate(2026,1,1); c.end=c.start;
+        c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate);
+        c.bands={"20m"}; c.modes={"CW"}; c.goals={{"20m","CW","worked"}};
+        const auto id=db.insertQso(AdifRecord{{"CALL","3Y0J"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id; QVERIFY(id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2026-01-01T12:00:00'"));
+        QString error; const auto cells=dxcampaign::matrix(db,c,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(cells.size(),1);
+        QCOMPARE(cells.first().worked,1); QVERIFY(!cells.first().needed);
+        EnrichedSpot spot; spot.spot.band="20m"; spot.spot.mode="CW";
+        const auto needed=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY2(needed,qPrintable(error)); QVERIFY(!*needed);
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2025-12-31T23:59:00'"));
+        QCOMPARE(dxcampaign::matrix(db,c,&error).first().worked,0);
+        const auto outside=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY(outside); QVERIFY(*outside);
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='bad timestamp'"));
+        QCOMPARE(dxcampaign::matrix(db,c,&error).first().worked,0);
+        const auto invalid=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY(invalid); QVERIFY(*invalid);
+    }
     void externalWriteInvalidatesPendingGoalAlertSnapshot()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

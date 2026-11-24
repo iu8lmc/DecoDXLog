@@ -7,6 +7,7 @@
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QUuid>
+#include <QTimeZone>
 #include <limits>
 
 namespace decolog::core::dxcampaign {
@@ -17,6 +18,15 @@ QString campaignMode(const QString& text)
     const QString mode=text.trimmed().toUpper();
     if (mode==QLatin1String("USB") || mode==QLatin1String("LSB")) return QStringLiteral("SSB");
     return mode;
+}
+QDateTime loggedQsoUtc(const QString& text)
+{
+    QDateTime time=QDateTime::fromString(text,Qt::ISODate);
+    if (!time.isValid()) return {};
+    // As in LogDatabase::parseIso, legacy unzoned QSO values are UTC wall time.
+    if (time.timeSpec()==Qt::LocalTime) time.setTimeZone(QTimeZone::UTC);
+    else time=time.toUTC();
+    return time;
 }
 // ISO timestamps with numeric offsets can be recorded on an adjacent local day.
 // Widen the indexed text range, then apply the exact UTC-day check below.
@@ -158,7 +168,7 @@ QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)
         const QString band=q.value(0).toString().toLower();
         const QString rawMode=(q.value(2).toString().isEmpty()?q.value(1).toString():q.value(2).toString()).trimmed().toUpper();
         const QString mode=campaignMode(rawMode);
-        const QDateTime time=QDateTime::fromString(q.value(3).toString(),Qt::ISODate); if(!time.isValid() || time.timeSpec()==Qt::LocalTime) continue;
+        const QDateTime time=loggedQsoUtc(q.value(3).toString()); if(!time.isValid()) continue;
         const QDate day=time.toUTC().date(); if(day<c.start || day>c.end) continue;
         for(Cell& cell:out) if(!mode.isEmpty() && cell.band==band &&
             (c.modes.contains(rawMode) ? cell.mode==rawMode : campaignMode(cell.mode)==mode)) { ++cell.worked; if(q.value(4).toBool()) ++cell.confirmed; break; }
@@ -202,8 +212,8 @@ std::optional<bool> goalNeeded(const LogDatabase& db,const Campaign& c,const Enr
     while (q.next()) {
         if (q.value(0).toString().toLower()!=band) continue;
         const QString raw=(q.value(2).toString().isEmpty()?q.value(1).toString():q.value(2).toString()).trimmed().toUpper();
-        const QDateTime at=QDateTime::fromString(q.value(3).toString(),Qt::ISODate);
-        if (at.isValid() && at.timeSpec()!=Qt::LocalTime && at.toUTC().date()>=c.start && at.toUTC().date()<=c.end && matrixMode(c,raw)==mode) {
+        const QDateTime at=loggedQsoUtc(q.value(3).toString());
+        if (at.isValid() && at.date()>=c.start && at.date()<=c.end && matrixMode(c,raw)==mode) {
             if (error) error->clear(); return false;
         }
     }

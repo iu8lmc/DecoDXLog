@@ -2979,3 +2979,11 @@ Before evaluating a cluster spot, the campaign watchlist now detects SQLite data
 A/B on macOS arm64 / Qt 6.11.2: in an offscreen app with a separate writer, a watched campaign created after startup produced no alert on the original code; the test now observes its matching alert. The extended fixture also passes when the writer changes an existing campaign callsign. Existing two-process pending-goal race cases and the goal-only watch passed; the first combined command had an additional misspelled test name, then the correctly named filter/profile/restart fixture passed separately. CTest dxcampaign passed 1/1; the app and targets built.
 
 The fixture uses synthetic spot injection and a second local SQLite connection, not a live cluster or physical UI. External writes can trigger watchlist reloads even when unrelated; the reload cost under a large or heavily updated log has not been measured. A write after a snapshot can still race a non-goal alert. Windows/Linux and full G04/G13 acceptance remain open.
+
+## 2026-11-24 — G04 legacy UTC QSO in campaign objectives
+
+Campaign matrices and focused goal-alert lookups now interpret unzoned legacy QSO timestamps as UTC wall time, consistently with `LogDatabase::parseIso`. Previously they ignored those QSO, potentially presenting a worked campaign cell as open. Zoned timestamps continue to be converted to UTC; invalid and out-of-period timestamps remain excluded. This policy applies to saved QSO timestamps, not to incoming spot timestamps.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic legacy QSO inside the campaign period produced zero worked contacts before the fix; afterwards both the matrix and focused goal lookup recognize it. The fixture also checks an out-of-period unzoned timestamp and an invalid timestamp remain excluded. App and test targets built; CTest activityreport, dxcampaign, qmlpopups and activity_utc_pdf passed 4/4. During investigation an initial proposed report test was discarded after confirming that unzoned legacy QSO are explicitly defined as UTC; no report behavior was changed.
+
+The new case is a core-level synthetic fixture, not a physical desktop or live cluster test. The stored timestamp is interpreted according to the existing legacy convention, which cannot prove the original operator's clock was correct. Windows/Linux and full G04/G13 acceptance remain open.
