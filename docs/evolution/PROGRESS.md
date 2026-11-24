@@ -2783,3 +2783,11 @@ Revalidated the recent CQ WW identity-header guards against the public [2024 CW 
 A/B on macOS arm64 / Qt 6.11.2: the unchanged official sample passes, while synthetic conflicting and malformed callsign headers prepended to the same bytes are rejected. The optional `CQWW_LCR_SAMPLE` test passed on the freshly downloaded file; CTest contestcomparison, contestreport, database and activation passed 4/4. The external report is not stored in the repository and no production behavior changed.
 
 This confirms one public report and two synthetic mutations, not all CQ WW editions, official report variants or other LCR formats. Desktop interaction, Windows/Linux, real contest operations and full G10/G13 acceptance remain open.
+
+## 2026-11-24 — G10 protect linked contest audio files
+
+Finishing or recovering a contest audio partial now verifies that its filesystem link count is exactly one before rewriting the WAV header. A file with multiple hard links, or an unverifiable link count, is left as a partial with an error instead of changing another linked name. This conservative check may prevent finalization on filesystems that cannot report link counts; the original partial remains available for review.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic partial with an additional hard link was previously recovered, rewriting the shared header; it is now rejected and both names retain the original bytes. A separate test confirms active-recording finalization also rejects a hard-linked file; ordinary recovery and recovery after abrupt process exit still pass. App and test targets built; CTest contestaudio, contestaudiocontroller, contestreport, database and qmlpopups passed 5/5.
+
+The hard-link fixtures run on Unix only. This path-based check does not eliminate a filesystem replacement race after validation, and support on Windows, network/removable filesystems, physical audio devices and interrupted power loss remains unverified. G10/G13 acceptance remains open.

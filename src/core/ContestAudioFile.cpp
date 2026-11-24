@@ -8,6 +8,7 @@
 #include <QTimeZone>
 #include <QtEndian>
 #include <limits>
+#include <filesystem>
 
 namespace decolog::core {
 namespace {
@@ -32,6 +33,17 @@ int validatedRate(QByteArray actual)
 }
 bool finalize(QFile &file, const QString &path, QString *output, QString *error)
 {
+    std::error_code linkError;
+#ifdef Q_OS_WIN
+    const std::filesystem::path nativePath(path.toStdWString());
+#else
+    const std::filesystem::path nativePath(QFile::encodeName(path).constData());
+#endif
+    const auto linkCount = std::filesystem::hard_link_count(nativePath, linkError);
+    if (linkError || linkCount != 1) {
+        if (error) *error=QStringLiteral("Recording file has multiple links or its link count cannot be verified");
+        return false;
+    }
     const qint64 size=file.size()-44;
     if (size < 0 || size > maximumDataBytes || size % 2) {
         if (error) *error=QStringLiteral("Invalid or incomplete PCM data size"); return false;

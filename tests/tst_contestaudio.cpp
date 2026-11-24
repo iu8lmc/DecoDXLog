@@ -6,6 +6,7 @@
 #include <QStandardPaths>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <QTest>
 #include <QtEndian>
 using namespace decolog::core;
@@ -32,6 +33,22 @@ class TestContestAudio : public QObject {
         QVERIFY(output.contains("20261123T120000000Z"));
         QVERIFY(!ContestAudioFile::recover(output,&output,&error));
     }
+    void rejectsHardLinkedPartialWithoutModifyingEitherName()
+    {
+#ifdef Q_OS_UNIX
+        QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile file;
+        QVERIFY(file.start(dir.path(),100,QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate)));
+        QCOMPARE(file.append(QByteArray::fromHex("01020304")).written,qint64(4)); const QString partial=file.partialPath(); file.abandon();
+        const QString alias=dir.filePath("other.wav"); std::error_code ec;
+        std::filesystem::create_hard_link(partial.toStdString(),alias.toStdString(),ec); QVERIFY2(!ec,ec.message().c_str());
+        QFile before(alias); QVERIFY(before.open(QIODevice::ReadOnly)); const QByteArray original=before.readAll(); before.close();
+        QString output,error; QVERIFY(!ContestAudioFile::recover(partial,&output,&error));
+        QVERIFY(QFile::exists(partial)); QFile after(alias); QVERIFY(after.open(QIODevice::ReadOnly)); QCOMPARE(after.readAll(),original);
+#else
+        QSKIP("Hard-link fixture requires Unix");
+#endif
+    }
+
     void recoversAfterAbruptProcessExit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
@@ -42,6 +59,21 @@ class TestContestAudio : public QObject {
         QVERIFY2(ContestAudioFile::recover(partial,&recovered,&error),qPrintable(error));
         QFile file(recovered); QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll().mid(44),QByteArray::fromHex("01020304"));
+    }
+    void refusesFinishingHardLinkedRecording()
+    {
+#ifdef Q_OS_UNIX
+        QTemporaryDir dir; QVERIFY(dir.isValid()); ContestAudioFile file;
+        QVERIFY(file.start(dir.path(),100,QDateTime::fromString("2026-11-23T12:00:00Z",Qt::ISODate)));
+        QCOMPARE(file.append(QByteArray::fromHex("0102")).written,qint64(2)); QVERIFY(file.checkpoint());
+        const QString partial=file.partialPath(), alias=dir.filePath("linked.wav"); std::error_code ec;
+        std::filesystem::create_hard_link(partial.toStdString(),alias.toStdString(),ec); QVERIFY(!ec);
+        QFile before(alias); QVERIFY(before.open(QIODevice::ReadOnly)); const auto bytes=before.readAll(); before.close();
+        QString output; QVERIFY(!file.finish(&output)); QFile after(alias); QVERIFY(after.open(QIODevice::ReadOnly)); QCOMPARE(after.readAll(),bytes);
+        QVERIFY(QFile::exists(partial));
+#else
+        QSKIP("Hard-link fixture requires Unix");
+#endif
     }
     void preservesNativeSampleRateAcrossRecoveryAndLookup()
     {
