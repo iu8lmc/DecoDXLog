@@ -7,10 +7,12 @@
 #include "core/PotaCatalogue.h"
 
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QElapsedTimer>
+#include <QTimer>
 
 #include <QFile>
 #include <QDir>
@@ -638,6 +640,28 @@ private slots:
         QCOMPARE(act.previewResult().value("reportedCount").toInt(), 1001);
         QCOMPARE(act.previewResult().value("groups").toList(), result.value("groups").toList());
     }
+    void benchmarkPartitionPreviewWithQslRows()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_ACTIVATION_PARTITIONS")) QSKIP("Opt-in synthetic benchmark");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001,IT-0002"}}).isEmpty());
+        const QString session=act.state().value("sessionUuid").toString(); QVERIFY(!session.isEmpty());
+        const QString json=QString::fromUtf8(QJsonDocument(QJsonObject{{"APP_DECOLOG_ACTIVATION_UUID",session},{"MY_POTA_REF","IT-0001,IT-0002"}}).toJson(QJsonDocument::Compact));
+        QSqlQuery seed(db.connection()); QVERIFY(seed.prepare("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<20000) "
+            "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at,adif_extra) "
+            "SELECT printf('bench-%d',i),'K1ABC','2027-01-01T12:00:00Z','20m','CW','2027-01-01T12:00:00Z','2027-01-01T12:00:00Z',? FROM n"));
+        seed.addBindValue(json); QVERIFY2(seed.exec(),qPrintable(seed.lastError().text()));
+        QVERIFY2(seed.exec("INSERT INTO qsl_status(qso_id,service,sent,rcvd) SELECT id,'lotw','Y','N' FROM qso"),qPrintable(seed.lastError().text()));
+        QElapsedTimer timer; timer.start(); int ticks=0; qint64 last=0, maxGap=0;
+        QTimer heartbeat; heartbeat.setInterval(10); QObject::connect(&heartbeat,&QTimer::timeout,[&] { const qint64 now=timer.elapsed(); maxGap=qMax(maxGap,now-last); last=now; ++ticks; }); heartbeat.start();
+        QSignalSpy done(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
+        QVERIFY(done.wait(30000)); heartbeat.stop(); const qint64 elapsed=timer.elapsed(); QVERIFY(ticks>0); QVERIFY2(done.first().first().toBool(),qPrintable(act.previewResult().value("error").toString()));
+        const auto result=act.previewResult(); QCOMPARE(result.value("reportedCount").toInt(),20000); QCOMPARE(result.value("groups").toList().size(),2);
+        for (const auto& group:result.value("groups").toList()) QCOMPARE(group.toMap().value("count").toInt(),20000);
+        qInfo("ACTIVATION_PARTITION_BENCH qso=20000 qsl=20000 groups=2 elapsed_ms=%lld ticks=%d max_gap_ms=%lld",static_cast<long long>(elapsed),ticks,static_cast<long long>(maxGap));
+    }
+
     void asynchronousPreviewCanCompleteCancelAndInvalidate()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
