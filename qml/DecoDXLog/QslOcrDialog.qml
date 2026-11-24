@@ -78,6 +78,8 @@ DialogFrame {
                 console.warn("PROBE qslMatches success=" + success + " count=" + root.search.matches.length
                              + " first=" + (root.search.matches.length ? root.search.matches[0].call : "")
                              + " noMatchNotice=" + noMatchNotice.visible)
+            if (root.probing && root.probeMatches && success && root.search.matches.length)
+                Qt.callLater(function() { const row=ocrCandidates.itemAtIndex(0); console.warn("PROBE qslCandidate " + (row ? row.probeText : "missing")) })
             if (root.probing && root.probeFiltered && success) {
                 console.warn("PROBE qslFilterResult " + root.searchedCriteria + " " + (root.search.matches.length ? root.search.matches[0].at : "none"))
                 if (!root.probeSecondSearch) { root.probeSecondSearch=true; manualDate.text="2026-09-24"; searchButton.clicked() }
@@ -228,6 +230,7 @@ DialogFrame {
             wrapMode: Text.Wrap
         }
         ListView {
+            id: ocrCandidates
             Layout.fillWidth: true
             Layout.preferredHeight: 85
             clip: true
@@ -235,6 +238,7 @@ DialogFrame {
             ScrollBar.vertical: ScrollBar { }
             delegate: RowLayout {
                 required property var modelData
+                readonly property string probeText: candidateLabel.text
                 width: ListView.view.width
                 CheckBox {
                     Accessible.name: qsTr("Select QSO %1 for attachment").arg(modelData.call)
@@ -243,6 +247,7 @@ DialogFrame {
                     onClicked: root.toggleQso(modelData, checked)
                 }
                 Text {
+                    id: candidateLabel
                     Layout.fillWidth: true
                     text: "#" + modelData.id + " · " + modelData.call + (modelData.similar ? " · " + qsTr("similar — verify") : "") + " · " + modelData.at + " · " + modelData.band + " · " + modelData.mode
                     textFormat: Text.PlainText

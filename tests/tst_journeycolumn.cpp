@@ -1876,6 +1876,17 @@ private slots:
         QVERIFY(db.qslAttachments(1).isEmpty());
         QCOMPARE(db.record(1)->value("CALL"), QString("K1ABC"));
     }
+    void qslOcrCandidateShowsFt4()
+    {
+        decolog::core::TesseractOcr engine; if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("card.png"); QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"),path));
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260923"},{"TIME_ON","143000"},{"BAND","20m"},{"MODE","FT4"}},"fixture").id>0); }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("qslocrmatches:")+path,output,5000),output.constData());
+        QByteArray line; for (const auto& entry:output.split('\n')) if (entry.contains("PROBE qslCandidate")) line=entry;
+        QVERIFY2(line.contains("K1ABC") && line.contains("FT4") && !line.contains("MFSK"),output.constData());
+    }
+
     void qslOcrDialogShowsSimilarCallsOnRequest()
     {
         decolog::core::TesseractOcr engine; if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");

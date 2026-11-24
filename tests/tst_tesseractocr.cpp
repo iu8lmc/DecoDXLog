@@ -247,6 +247,21 @@ class TestTesseractOcr : public QObject {
         QCOMPARE(calls,QSet<QString>({"K1ABC","K1ABD","K1ACB"})); QCOMPARE(db.qsoCount(),qint64(5));
     }
 
+    void candidateSearchShowsRecordedSubmode()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("modes.sqlite")));
+        for (const auto* mode:{"FT8","FT4","CW"})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE",mode}},"fixture",{},true,0,false).id>0);
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","SSB"},{"SUBMODE","USB"}},"fixture",{},true,0,false).id>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(search.startFiltered("K1ABC","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(done.first().first().toBool());
+        QSet<QString> modes; for (const auto& match:search.matches()) modes.insert(match.toMap().value("mode").toString());
+        QCOMPARE(modes,QSet<QString>({"FT8","FT4","CW","SSB"}));
+        for (const auto& match:search.matches()) if (match.toMap().value("mode").toString()=="FT4") {
+            QCOMPARE(match.toMap().value("adifMode").toString(),QString("MFSK")); QCOMPARE(match.toMap().value("adifSubmode").toString(),QString("FT4"));
+        }
+    }
+
     void searchesDateAndTimeBeforeApplyingResultLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("dated.sqlite")));

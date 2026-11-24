@@ -94,7 +94,9 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
                     error = tr("The open log changed");
                 } else {
                     QSqlQuery q(sql);
-                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call IN (SELECT value FROM json_each(?)) AND deleted=0");
+                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band, "
+                        "CASE WHEN IFNULL(submode,'')='' OR mode='SSB' THEN mode ELSE submode END,source,uuid,revision,mode,IFNULL(submode,'') "
+                        "FROM qso WHERE call IN (SELECT value FROM json_each(?)) AND deleted=0");
                     if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
                     if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
                     query+=similar ? QStringLiteral(" ORDER BY CASE WHEN call=? THEN 0 ELSE 1 END,id DESC LIMIT 101")
@@ -113,7 +115,8 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
                                                    {QStringLiteral("similar"), q.value(1).toString() != call},
                                                    {QStringLiteral("at"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
                                                    {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)},
-                                                   {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)}};
+                                                   {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)},
+                                                   {QStringLiteral("adifMode"),q.value(8)}, {QStringLiteral("adifSubmode"),q.value(9)}};
                         }
                         if (q.lastError().isValid()) error = tr("Cannot search the log");
                     }
