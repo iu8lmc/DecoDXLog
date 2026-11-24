@@ -5705,7 +5705,8 @@ bool DecoLogController::startLogMutation(const QVariantList& values, const QStri
     m_bulkProgress = 0;
     emit bulkChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, path, ids, clean, add, deleting] {
+    const auto incomingWrite = m_incomingWriteActive;
+    m_importPool.start([self, incomingWrite, path, ids, clean, add, deleting] {
         LogDatabase db;
         BulkEditResult result;
         if (!db.open(path)) {
@@ -5713,16 +5714,20 @@ bool DecoLogController::startLogMutation(const QVariantList& values, const QStri
             result.errors << db.lastError();
         } else {
             int lastPercent = -1;
-            auto progress = [self, &lastPercent](int done, int total) {
+            auto progress = [self, incomingWrite, &lastPercent](int done, int total) {
                 const int percent = total ? (done * 100 / total) : 100;
-                if (percent == lastPercent) return;
-                lastPercent = percent;
-                if (!self) return;
-                QMetaObject::invokeMethod(self.data(), [self, percent] {
-                    if (!self) return;
-                    self->m_bulkProgress = percent / 100.0;
-                    emit self->bulkChanged();
-                }, Qt::QueuedConnection);
+                if (percent != lastPercent) {
+                    lastPercent = percent;
+                    if (self) QMetaObject::invokeMethod(self.data(), [self, percent] {
+                        if (!self) return;
+                        self->m_bulkProgress = percent / 100.0;
+                        emit self->bulkChanged();
+                    }, Qt::QueuedConnection);
+                }
+                // The batch committed; give an incoming QSO the writer lock
+                // before beginning the next batch, even if progress is unchanged.
+                if (done < total)
+                    while (incomingWrite->load(std::memory_order_acquire)) QThread::msleep(2);
             };
             result = deleting ? db.softDeleteBatch(ids, progress) : db.setTagBatch(ids, clean, add, progress);
         }

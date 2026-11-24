@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G01 incoming QSO during bulk tag and delete
+
+An offscreen 20,000-QSO tag operation with a synthetic WSJT-X LoggedADIF packet exposed a separate contention failure: before the change the incoming QSO was saved but 200 tag changes failed with `database is locked` (19,800 applied). The shared mutation batch engine now reserves the SQLite writer with `BEGIN IMMEDIATE` before its reads; the background tag/delete worker also yields between committed batches while the application's incoming-QSO insert is active. The reservation applies to other users of the shared engine, but their priority behaviour has not been separately tested.
+
+A/B on macOS arm64 / Qt 6.11.2: in a native system SQLite authorizer fixture, a competing writer could commit after the batch read before the change; afterwards it was blocked and the tag succeeded. An external-lock fixture confirmed that a refused tag batch leaves data unchanged and a later retry succeeds. In the actual offscreen application, the fixed tag test saved the one UDP QSO before completion, tagged exactly 20,000 selected QSO, left the incoming QSO untagged and recorded 20,000 update events; a measured run took 6,815 ms total with a 60 ms maximum timer gap. The earlier paper-QSL A/B was also rerun with QSL event triggers disabled/enabled: both saved the incoming QSO and applied 20,000 changes, with measured maximum gaps of 78/106 ms. The four focused SQLite reservation and recovery cases and database, bulkresponsiveness and udppipeline CTest groups passed 3/3; git diff --check passed. The opt-in native authorizer requires macOS system SQLite.
+
+This tests a single synthetic UDP packet at a controlled point, not sustained traffic or physical radio. The marker gives priority only within the application's cooperating workers; external writers and locks beyond SQLite's busy timeout can still prevent writes. Immediate transactions can increase contention with other writers. Cross-platform, slow storage, process termination and other mutation paths need independent evidence. This increment was developed in the detached worktree pending integration.
+
 ## 2026-11-22 — G00 / initial G01 and G02 increments
 
 Starting revision `c8c64a842d47573192032ff866d154be01ad2f4e`, branch `evolution/desktop-roadmap`; no schema migration. Baseline and goals: see BASELINE.md and PLAN.md. G00 remains in progress: the full eleven-stream UI/persistence/test audit, performance dataset and full build result are not yet complete.

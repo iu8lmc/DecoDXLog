@@ -2320,6 +2320,51 @@ private slots:
         QCOMPARE(result.changed,1); QCOMPARE(result.failed,0); QCOMPARE(db.record(qso.id)->value("COMMENT"),QStringLiteral("UPDATED"));
     }
 
+    void tagBatchReservationReturnsBusyAndRecovers()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("tag-busy.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        LogDatabase other; QVERIFY(other.openExistingReadWrite(path)); QSqlQuery holder(other.connection()); QVERIFY(holder.exec("BEGIN IMMEDIATE"));
+        QSqlQuery local(db.connection()); QVERIFY(local.exec("PRAGMA busy_timeout=0"));
+        const auto busy=db.setTagBatch({qso.id},QStringLiteral("checked"),true);
+        QCOMPARE(busy.changed,0); QCOMPARE(busy.failed,1); QVERIFY(!busy.errors.isEmpty());
+        QVERIFY(holder.exec("ROLLBACK")); QCOMPARE(db.record(qso.id)->value("APP_DECOLOG_TAGS"),QString());
+        const auto retry=db.setTagBatch({qso.id},QStringLiteral("checked"),true);
+        QCOMPARE(retry.changed,1); QCOMPARE(retry.failed,0); QCOMPARE(db.record(qso.id)->value("APP_DECOLOG_TAGS"),QStringLiteral("checked"));
+    }
+
+    void tagBatchReservationPreventsSnapshotUpgradeRace()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("Explicit opt-in required for verified system SQLite driver");
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int (*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int (*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); if (!setAuthorizer) QSKIP("SQLite native authorizer unavailable");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("tag-race.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery wal(db.connection()); QVERIFY(wal.exec("PRAGMA journal_mode=WAL")); QVERIFY(wal.next()); QCOMPARE(wal.value(0).toString().toLower(),QString("wal")); wal.finish();
+        const auto qso=db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture"); QVERIFY(qso.id>0);
+        QVariant handle=db.connection().driver()->handle(); if (QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native handle unavailable");
+        void* native=*static_cast<void**>(handle.data()); QVERIFY(native);
+        struct Gate { std::atomic_bool ready{false},entered{false},done{false},wrote{false},timedOut{false}; } gate;
+        const auto hook=+[](void* opaque,int action,const char* table,const char*,const char*,const char*) {
+            auto* g=static_cast<Gate*>(opaque); if (action==18 && table && std::strcmp(table,"qso_history")==0 && !g->entered.exchange(true)) {
+                QElapsedTimer timer; timer.start(); while (!g->done.load() && timer.elapsed()<5000) QThread::msleep(1); if (!g->done.load()) g->timedOut=true;
+            } return 0;
+        };
+        std::thread writer([&] { LogDatabase other; if (other.openExistingReadWrite(path)) { QSqlQuery q(other.connection()); q.exec("PRAGMA busy_timeout=0"); gate.ready=true;
+            QElapsedTimer timer; timer.start(); while (!gate.entered.load() && timer.elapsed()<5000) QThread::msleep(1);
+            if (gate.entered.load()) gate.wrote=q.exec("INSERT INTO app_setting(key,value) VALUES('bulk.race','1')"); } gate.done=true; });
+        QElapsedTimer ready; ready.start(); while (!gate.ready.load() && !gate.done.load() && ready.elapsed()<5000) QThread::msleep(1);
+        if (!gate.ready.load()) { gate.done=true; writer.join(); QFAIL("Competing connection did not open"); }
+        const int installed=setAuthorizer(native,hook,&gate); if (installed!=0) { gate.done=true; writer.join(); QFAIL("Cannot install SQLite authorizer"); }
+        const auto result=db.setTagBatch({qso.id},QStringLiteral("checked"),true);
+        setAuthorizer(native,nullptr,nullptr); writer.join();
+        QVERIFY(gate.entered.load()); QVERIFY(gate.done.load()); QVERIFY(!gate.timedOut.load());
+        QVERIFY2(!gate.wrote.load(),"competing writer committed during the batch read snapshot");
+        QCOMPARE(result.changed,1); QCOMPARE(result.failed,0); QCOMPARE(db.record(qso.id)->value("APP_DECOLOG_TAGS"),QStringLiteral("checked"));
+    }
+
     void failedQslStateReadDoesNotEraseExistingRemoteState()
     {
 #ifndef Q_OS_MACOS

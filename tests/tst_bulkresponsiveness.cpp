@@ -82,7 +82,7 @@ class TestBulkResponsiveness : public QObject {
         return true;
     }
 
-    static bool runPaperWithUdp(const QTemporaryDir& dir, QByteArray& output, qint64& wallMs)
+    static bool runMutationWithUdp(const QTemporaryDir& dir, const QString& mode, QByteArray& output, qint64& wallMs)
     {
         QUdpSocket reservation; if (!reservation.bind(QHostAddress::LocalHost,0)) return false;
         const quint16 port=reservation.localPort(); reservation.close();
@@ -91,13 +91,13 @@ class TestBulkResponsiveness : public QObject {
         QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
         QElapsedTimer timer; timer.start();
         app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",dir.filePath("log.sqlite"),
-                  "--port",QString::number(port),"--show","bulkcheck:paperqsl"});
+                  "--port",QString::number(port),"--show","bulkcheck:"+mode});
         if (!app.waitForStarted(10000)) { output=app.errorString().toUtf8(); return false; }
         const QByteArray adif("<CALL:5>K1NEW<QSO_DATE:8>20260228<TIME_ON:6>120000<BAND:3>20m<MODE:3>FT8<EOR>");
         const auto packet=wsjtx::buildLoggedAdif(QStringLiteral("WSJT-X"),adif); QUdpSocket sender; bool sent=false;
         while (app.state()!=QProcess::NotRunning && timer.elapsed()<180000) {
             app.waitForReadyRead(100); output+=app.readAll();
-            if (!sent && output.contains("PROBE paperqsl running")) {
+            if (!sent && output.contains("PROBE "+mode.toUtf8()+" running")) {
                 if (sender.writeDatagram(packet,QHostAddress::LocalHost,port)!=packet.size()) { app.kill(); app.waitForFinished(5000); return false; }
                 sent=true;
             }
@@ -106,7 +106,7 @@ class TestBulkResponsiveness : public QObject {
         output+=app.readAll(); wallMs=timer.elapsed();
         const QString text=QString::fromUtf8(output);
         const auto match=QRegularExpression(QStringLiteral("\\[activity\\] UDP\\|(success|highlight)\\|[^\\n]*K1NEW")).match(text);
-        const int finish=text.indexOf(QStringLiteral("PROBE bulk result"));
+        const int finish=text.indexOf(mode==QLatin1String("tag") ? QStringLiteral("PROBE bulkcheck mode=tag") : QStringLiteral("PROBE bulk result"));
         return sent && match.hasMatch() && finish>match.capturedStart() && app.exitStatus()==QProcess::NormalExit && app.exitCode()==0;
     }
 
@@ -203,7 +203,7 @@ private slots:
             QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
             if (!enabled) { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
                 QVERIFY(q.exec("DROP TRIGGER extension_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER extension_qsl_update")); }
-            QByteArray output; qint64 wall=0; QVERIFY2(runPaperWithUdp(dir,output,wall),output.constData());
+            QByteArray output; qint64 wall=0; QVERIFY2(runMutationWithUdp(dir,"paperqsl",output,wall),output.constData());
             LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
             QVERIFY(q.exec("SELECT COUNT(*) FROM qsl_status WHERE service='card' AND rcvd='Y'")); QVERIFY(q.next());
             QVERIFY2(q.value(0).toInt()==20000,output.constData());
@@ -217,6 +217,26 @@ private slots:
             qInfo() << "QSL_EVENT_UDP_AB enabled=" << enabled << "qso=20000 udp=1 total_wall_ms=" << wall
                     << "max_gap_ms=" << metrics.captured(1).toLongLong() << "bulk_elapsed_ms=" << metrics.captured(2).toLongLong();
         }
+    }
+
+    void tagBulkConcurrentUdp()
+    {
+        if (!qEnvironmentVariableIsSet("DECODXLOG_BENCH_BULK_TAG_UDP")) QSKIP("opt-in 20k tag and concurrent UDP comparison");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection());
+          QVERIFY(q.prepare("INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) VALUES(?,?,'2026-02-28T00:00:00Z','20m','CW','2026-02-28T00:00:00Z','2026-02-28T00:00:00Z')"));
+          for (int i=0;i<20000;++i) { q.bindValue(0,QStringLiteral("fixture-%1").arg(i)); q.bindValue(1,QStringLiteral("K%1AAA").arg(i)); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); }
+          QVERIFY(db.connection().commit()); }
+        QByteArray output; qint64 wall=0; QVERIFY2(runMutationWithUdp(dir,"tag",output,wall),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM qso WHERE tags='bulk-test'")); QVERIFY(q.next()); QVERIFY2(q.value(0).toInt()==20000,output.constData());
+        QCOMPARE(db.qsoCount(),qint64(20001)); const auto received=db.latestIds("K1NEW",2); QCOMPARE(received.size(),1);
+        const auto record=db.record(received.first()); QVERIFY(record); QVERIFY(record->value("APP_DECOLOG_TAGS").isEmpty());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event e JOIN qso q ON q.uuid=e.qso_uuid WHERE q.tags='bulk-test' AND e.kind='updated'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),20000);
+        QVERIFY(q.exec("SELECT source FROM qso WHERE call='K1NEW'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(),QStringLiteral("udp_wsjtx"));
+        const auto metrics=QRegularExpression(QStringLiteral("PROBE bulkcheck mode=tag rows=20000 maxgap=(\\d+) elapsed=(\\d+)")).match(QString::fromUtf8(output));
+        QVERIFY2(metrics.hasMatch(),output.constData());
+        qInfo() << "TAG_UDP qso=20000 udp=1 total_wall_ms=" << wall << "max_gap_ms=" << metrics.captured(1).toLongLong() << "bulk_elapsed_ms=" << metrics.captured(2).toLongLong();
     }
 
     void deepScrollSingleBulkAndNoop()

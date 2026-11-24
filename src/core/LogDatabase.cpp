@@ -2072,9 +2072,10 @@ BulkEditResult runMutationBatches(LogDatabase& log, const QList<qint64>& ids,
     int done = 0;
     while (done < ids.size()) {
         const int end = qMin(int(ids.size()), done + batchSize);
-        if (!db.transaction()) {
+        QSqlQuery begin(db);
+        if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) {
             out.failed += int(ids.size()) - done;
-            out.errors << db.lastError().text();
+            out.errors << begin.lastError().text();
             break;
         }
         QList<qint64> changed;
