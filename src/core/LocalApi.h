@@ -12,6 +12,7 @@
 #include <QByteArray>
 #include <QHash>
 #include <QJsonObject>
+#include <QSet>
 #include <QObject>
 #include <QString>
 #include <QUrlQuery>
@@ -29,6 +30,8 @@ struct HttpRequest {
     QHash<QByteArray, QByteArray> headers;   // nomi in minuscolo
     QByteArray body;
     bool readOnly{false};
+    bool extensionCredential{false};
+    QSet<QString> extensionPermissions;
 };
 
 struct HttpResponse {
@@ -59,6 +62,8 @@ public:
     // Senza chiave il server risponde 401 a tutto: non c'e' un modo "aperto".
     void setToken(const QString& token) { m_token = token; }
     void setReadOnlyToken(const QString& token) { m_readOnlyToken = token; }
+    // Volatile grants; provisioning and persistent per-extension management are separate.
+    void setExtensionCredentials(const QHash<QString, QSet<QString>>& credentials) { m_extensionCredentials = credentials; }
     void setHandler(Handler handler) { m_handler = std::move(handler); }
 
     // Una chiave nuova, 32 caratteri esadecimali casuali.
@@ -71,7 +76,8 @@ signals:
     void listeningChanged();
 
 private:
-    enum class Access { None, ReadOnly, Full };
+    enum class Access { None, ReadOnly, Extension, Full };
+    QByteArray suppliedToken(const HttpRequest& request) const;
     Access accessFor(const HttpRequest& request) const;
     void readFrom(QTcpSocket* socket);
     void answer(QTcpSocket* socket, const HttpResponse& response);
@@ -79,6 +85,7 @@ private:
     QTcpServer* m_server{nullptr};
     QString m_token;
     QString m_readOnlyToken;
+    QHash<QString, QSet<QString>> m_extensionCredentials;
     Handler m_handler;
     QString m_lastError;
     QHash<QTcpSocket*, QByteArray> m_buffers;

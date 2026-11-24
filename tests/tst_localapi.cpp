@@ -3,6 +3,7 @@
 #include "core/LocalApi.h"
 
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QSignalSpy>
@@ -66,7 +67,9 @@ private slots:
             return HttpResponse::json(200, QJsonObject{{"method", QString::fromLatin1(r.method)},
                                                        {"path", r.path},
                                                        {"call", r.query.queryItemValue("call")},
-                                                       {"body", QString::fromUtf8(r.body)}});
+                                                       {"body", QString::fromUtf8(r.body)},
+                                                       {"extension", r.extensionCredential},
+                                                       {"qsoRead", r.extensionPermissions.contains(QStringLiteral("qso.read"))}});
         });
         QVERIFY(m_server.start(freePort()));
         QVERIFY(m_server.isListening());
@@ -158,6 +161,40 @@ private slots:
         m_server.setReadOnlyToken(m_token);
         QCOMPARE(call(m_net,"GET",base("/api/v1/status"),{},{{"X-DecoDXLog-Token",m_token.toLatin1()}}).status,401);
         m_server.setReadOnlyToken({});
+    }
+
+    void scopedExtensionCredentials()
+    {
+        const QString qsoToken = LocalApiServer::newToken();
+        const QString trackerToken = LocalApiServer::newToken();
+        // Baseline: the existing shared read-only credential grants both reads.
+        m_server.setReadOnlyToken(qsoToken);
+        const QList<QPair<QByteArray,QByteArray>> baseline{{"X-DecoDXLog-Token",qsoToken.toLatin1()}};
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},baseline).status,200);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/tracker"),{},baseline).status,200);
+        m_server.setReadOnlyToken({});
+        m_server.setExtensionCredentials({{qsoToken, {QStringLiteral("qso.read")}},
+                                          {trackerToken, {QStringLiteral("tracker.read")}}});
+        const QList<QPair<QByteArray,QByteArray>> qso{{"X-DecoDXLog-Token",qsoToken.toLatin1()}};
+        const QList<QPair<QByteArray,QByteArray>> tracker{{"X-DecoDXLog-Token",trackerToken.toLatin1()}};
+        const Answer caps = call(m_net,"GET",base("/api/v1/capabilities"),{},qso);
+        QCOMPARE(caps.status,200);
+        QVERIFY(caps.json.value("extension").toBool());
+        QVERIFY(caps.json.value("qsoRead").toBool());
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},qso).status,200);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/tracker"),{},qso).status,403);
+        QCOMPARE(call(m_net,"POST",base("/api/v1/qso"),"<EOR>",qso).status,403);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},tracker).status,403);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/tracker"),{},tracker).status,200);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/status"),{},tracker).status,403);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/unknown"),{},tracker).status,403);
+        m_server.setReadOnlyToken(qsoToken);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},qso).status,401);
+        m_server.setReadOnlyToken({});
+        m_server.setExtensionCredentials({{m_token,{QStringLiteral("qso.read")}}});
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},{{"X-DecoDXLog-Token",m_token.toLatin1()}}).status,401);
+        m_server.setExtensionCredentials({});
+        QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},qso).status,401);
     }
 
     void noKeyNoServer()

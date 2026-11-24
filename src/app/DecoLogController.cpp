@@ -4171,6 +4171,19 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const QString requested = request.query.queryItemValue(QStringLiteral("apiVersion"));
         if (!requested.isEmpty() && requested != QLatin1String("1"))
             return HttpResponse::error(400, QStringLiteral("unsupported API version"));
+        if (request.extensionCredential) {
+            QJsonArray operations;
+            for (const QString& permission : {QStringLiteral("status.read"), QStringLiteral("worked.read"),
+                                              QStringLiteral("qso.read"), QStringLiteral("tracker.read")})
+                if (request.extensionPermissions.contains(permission)) operations.append(permission);
+            return HttpResponse::json(200, QJsonObject{
+                {QStringLiteral("apiVersion"), 1},
+                {QStringLiteral("permissionModel"), QStringLiteral("extension-token")},
+                {QStringLiteral("operations"), operations},
+                {QStringLiteral("events"), false}, {QStringLiteral("txControl"), false},
+                {QStringLiteral("perExtensionPermissions"), true},
+                {QStringLiteral("durableAtomicIdempotency"), false}});
+        }
         return HttpResponse::json(200, QJsonObject{
             {QStringLiteral("apiVersion"), 1},
             {QStringLiteral("permissionModel"), request.readOnly ? QStringLiteral("read-only-token") : QStringLiteral("shared-token")},

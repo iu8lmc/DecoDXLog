@@ -123,7 +123,7 @@ quint16 LocalApiServer::port() const
     return m_server ? m_server->serverPort() : 0;
 }
 
-LocalApiServer::Access LocalApiServer::accessFor(const HttpRequest& request) const
+QByteArray LocalApiServer::suppliedToken(const HttpRequest& request) const
 {
     QByteArray given = request.headers.value("x-decodxlog-token");
     const QByteArray auth = request.headers.value("authorization");
@@ -131,11 +131,20 @@ LocalApiServer::Access LocalApiServer::accessFor(const HttpRequest& request) con
         given = auth.mid(7).trimmed();
     if (given.isEmpty())
         given = request.query.queryItemValue(QStringLiteral("token")).toLatin1();
+    return given;
+}
+
+LocalApiServer::Access LocalApiServer::accessFor(const HttpRequest& request) const
+{
+    const QByteArray given = suppliedToken(request);
     if (given.isEmpty()) return Access::None;
     const bool full = !m_token.isEmpty() && sameSecret(given, m_token.toLatin1());
     const bool read = !m_readOnlyToken.isEmpty() && sameSecret(given, m_readOnlyToken.toLatin1());
-    if (full && read) return Access::None;
-    return full ? Access::Full : read ? Access::ReadOnly : Access::None;
+    int extensionMatches = 0;
+    for (auto it = m_extensionCredentials.cbegin(); it != m_extensionCredentials.cend(); ++it)
+        if (!it.key().isEmpty() && sameSecret(given, it.key().toLatin1())) ++extensionMatches;
+    if (int(full) + int(read) + extensionMatches != 1) return Access::None;
+    return full ? Access::Full : read ? Access::ReadOnly : Access::Extension;
 }
 
 bool LocalApiServer::authorized(const HttpRequest& request) const
@@ -212,6 +221,24 @@ void LocalApiServer::readFrom(QTcpSocket* socket)
     if (access == Access::None) {
         answer(socket, HttpResponse::error(401, QStringLiteral("missing or wrong token")));
         return;
+    }
+    if (access == Access::Extension) {
+        const QByteArray given = suppliedToken(request);
+        for (auto it = m_extensionCredentials.cbegin(); it != m_extensionCredentials.cend(); ++it)
+            if (!it.key().isEmpty() && sameSecret(given, it.key().toLatin1())) request.extensionPermissions = it.value();
+        const QString path = request.path.endsWith(QLatin1Char('/')) ? request.path.chopped(1) : request.path;
+        QString permission;
+        if (path == QLatin1String("/api/v1/status")) permission = QStringLiteral("status.read");
+        else if (path == QLatin1String("/api/v1/worked")) permission = QStringLiteral("worked.read");
+        else if (path == QLatin1String("/api/v1/qsos")) permission = QStringLiteral("qso.read");
+        else if (path == QLatin1String("/api/v1/tracker")) permission = QStringLiteral("tracker.read");
+        const bool capabilities = path == QLatin1String("/api/v1/capabilities");
+        if (request.method != "GET" || (!capabilities && (permission.isEmpty() || !request.extensionPermissions.contains(permission)))) {
+            answer(socket, HttpResponse::error(403, QStringLiteral("extension permission denied")));
+            return;
+        }
+        request.readOnly = true;
+        request.extensionCredential = true;
     }
     if (access == Access::ReadOnly) {
         const QString path = request.path.endsWith(QLatin1Char('/')) ? request.path.chopped(1) : request.path;
