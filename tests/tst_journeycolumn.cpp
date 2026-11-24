@@ -1268,6 +1268,20 @@ private slots:
         QByteArray reopened; QVERIFY2(launch(dir,"dxgoalwatchprobe",reopened,5500,true),reopened.constData());
         QCOMPARE(reopened.count("[activity] DXCAMPAIGN|highlight|"),0);
     }
+    void damagedCampaignDoesNotSuppressHealthyWatch()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="A"; p.stationCallsign="9H1AA"; p.isDefault=true;
+          QCOMPARE(db.saveStationProfile(p),qint64(1)); const auto now=QDateTime::currentDateTimeUtc();
+          dxcampaign::Campaign c; c.title="Healthy"; c.calls={"3Y0J"}; c.start=now.date().addDays(-1); c.end=now.date().addDays(1);
+          c.source="fixture"; c.verifiedAt=now; c.bands={"20m"}; c.modes={"CW"}; c.watched=true; c.stationProfileId=1;
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO app_setting(key,value) VALUES('dx_campaign.broken','not json')")); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignwatchprobe",output,5000,true),output.constData());
+        QVERIFY2(output.contains("Healthy: 3Y0J") && output.contains("[activity] DXCAMPAIGN|warning|"),output.constData());
+        QCOMPARE(output.count("[activity] DXCAMPAIGN|highlight|"),1);
+    }
     void watchedCampaignAlertsRespectFiltersProfileAndRestart()
     {
         using namespace decolog::core;

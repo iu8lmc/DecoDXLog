@@ -25,7 +25,7 @@ struct Campaign {
 struct Cell { QString band, mode; int worked{0}, confirmed{0}; QString target; bool needed{false}; };
 bool save(LogDatabase& db, Campaign& campaign, QString* error = nullptr);
 std::optional<Campaign> load(const LogDatabase& db, const QString& id, QString* error = nullptr);
-QList<Campaign> list(const LogDatabase& db, QString* error = nullptr);
+QList<Campaign> list(const LogDatabase& db, QString* error = nullptr, int* invalidCount = nullptr);
 QList<Cell> matrix(const LogDatabase& db, const Campaign& campaign, QString* error = nullptr);
 QString matrixMode(const Campaign& campaign, const QString& reportedMode);
 bool watchGoalNeeded(const Campaign& campaign, const QList<Cell>& cells, const EnrichedSpot& spot);

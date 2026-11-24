@@ -2409,9 +2409,18 @@ QVariantMap campaignMap(const dxcampaign::Campaign& c)
 
 QVariantList DecoLogController::dxCampaigns() const
 {
-    QVariantList out; QString error;
-    for (const auto& c : dxcampaign::list(m_db,&error)) out << campaignMap(c);
+    QVariantList out; QString error; int invalid=0;
+    for (const auto& c : dxcampaign::list(m_db,&error,&invalid)) out << campaignMap(c);
     return out;
+}
+
+QString DecoLogController::dxCampaignListWarning() const
+{
+    if (!m_db.isOpen()) return {};
+    QString error; int invalid=0; dxcampaign::list(m_db,&error,&invalid);
+    if (!error.isEmpty()) return tr("Cannot load campaigns: %1").arg(error);
+    if (invalid) return tr("%1 campaign(s) could not be read and are not shown or watched.").arg(invalid);
+    return {};
 }
 
 void DecoLogController::reloadDxCampaignWatches()
@@ -2423,12 +2432,14 @@ void DecoLogController::reloadDxCampaignWatches()
     if (!m_db.isOpen()) return;
     const qint64 before=m_db.dataVersion();
     if (before<0) return;
-    QString error;
-    for (const auto& c : dxcampaign::list(m_db,&error)) if (c.watched && !c.archived) m_dxWatchedCampaigns << c;
+    QString error; int invalid=0;
+    for (const auto& c : dxcampaign::list(m_db,&error,&invalid)) if (c.watched && !c.archived) m_dxWatchedCampaigns << c;
     const qint64 after=m_db.dataVersion();
     if (!error.isEmpty() || before!=after || after<0) m_dxWatchedCampaigns.clear();
     else m_dxWatchDataVersion=after;
     if (!error.isEmpty()) addActivity(QStringLiteral("DXCAMPAIGN"),tr("Cannot load campaign watchlist: %1").arg(error),QStringLiteral("warning"));
+    else if (invalid) addActivity(QStringLiteral("DXCAMPAIGN"),tr("%1 campaign(s) could not be read and are not shown or watched.").arg(invalid),QStringLiteral("warning"));
+    emit dxCampaignChanged();
 }
 
 void DecoLogController::noteDxCampaignSpot(const EnrichedSpot& spot)

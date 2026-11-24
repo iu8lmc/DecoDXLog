@@ -11728,6 +11728,8 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Cannot load campaigns: %1</source><translation>Impossibile caricare le campagne: %1</translation></message>
+    <message><source>%1 campaign(s) could not be read and are not shown or watched.</source><translation>%1 campagne non possono essere lette e non sono visualizzate né monitorate.</translation></message>
     <message><source>LoTW grid observation added or linked after import</source><translation>Osservazione locator LoTW aggiunta o collegata dopo l'importazione</translation></message>
     <message><source>Some duplicate groups could not be merged; search and review again</source><translation>Alcuni gruppi di duplicati non sono stati uniti; ripeti la ricerca e la revisione</translation></message>
     <message><source>Cannot verify the open log; reopen it and search again</source><translation>Impossibile verificare il log aperto; riaprilo e ripeti la ricerca</translation></message>

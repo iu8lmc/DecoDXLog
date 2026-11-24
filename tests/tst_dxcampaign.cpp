@@ -13,6 +13,20 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void damagedCampaignDoesNotHideHealthyCampaign()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;
+        c.title="Healthy"; c.calls={"3Y0J"}; c.start=QDate(2026,1,1); c.end=c.start; c.source="fixture";
+        c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.watched=true;
+        QString error; QVERIFY(dxcampaign::save(db,c,&error));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO app_setting(key,value) VALUES('dx_campaign.broken','not json')"));
+        int invalid=0; const auto campaigns=dxcampaign::list(db,&error,&invalid);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(invalid,1); QCOMPARE(campaigns.size(),1);
+        QCOMPARE(campaigns.first().id,c.id); QVERIFY(campaigns.first().watched);
+        QVERIFY(dxcampaign::list(db,&error).isEmpty()); QVERIFY(!error.isEmpty());
+        QVERIFY(q.exec("DELETE FROM app_setting WHERE key='dx_campaign.broken'"));
+        QCOMPARE(dxcampaign::list(db,&error,&invalid).size(),1); QCOMPARE(invalid,0); QVERIFY(error.isEmpty());
+    }
     void malformedWatchFlagsAreNotTreatedAsFalse()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;

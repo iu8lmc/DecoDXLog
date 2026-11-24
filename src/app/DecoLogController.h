@@ -238,6 +238,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(QString awardAccount READ awardAccount WRITE setAwardAccount NOTIFY awardsChanged)
     Q_PROPERTY(QString awardTag READ awardTag WRITE setAwardTag NOTIFY awardsChanged)
     Q_PROPERTY(QVariantList dxCampaigns READ dxCampaigns NOTIFY dxCampaignChanged)
+    Q_PROPERTY(QString dxCampaignListWarning READ dxCampaignListWarning NOTIFY dxCampaignChanged)
     Q_PROPERTY(QVariantMap dxCampaign READ dxCampaign NOTIFY dxCampaignChanged)
     Q_PROPERTY(QVariantList dxCampaignMatrix READ dxCampaignMatrix NOTIFY dxCampaignChanged)
     Q_PROPERTY(bool dxCampaignBusy READ dxCampaignBusy NOTIFY dxCampaignChanged)
@@ -544,6 +545,7 @@ public:
     QString awardTag() const { return m_awardFilter.tag; }
     void setAwardTag(const QString& tag);
     QVariantList dxCampaigns() const;
+    QString dxCampaignListWarning() const;
     QVariantMap dxCampaign() const { return m_dxCampaign; }
     QVariantList dxCampaignMatrix() const { return m_dxCampaignMatrix; }
     bool dxCampaignBusy() const { return m_dxCampaignBusy; }

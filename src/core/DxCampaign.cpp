@@ -134,12 +134,16 @@ std::optional<Campaign> load(const LogDatabase& db,const QString& id,QString* er
     auto c=decode(q.value(0).toString()); if(!c || c->id!=id) { fail(error,QStringLiteral("Invalid campaign data")); return {}; }
     if(error) error->clear(); return c;
 }
-QList<Campaign> list(const LogDatabase& db,QString* error)
+QList<Campaign> list(const LogDatabase& db,QString* error,int* invalidCount)
 {
+    if (invalidCount) *invalidCount=0;
     QList<Campaign> out; if(!db.isOpen()) { fail(error,QStringLiteral("Log is not open")); return out; }
     QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT key,value FROM app_setting WHERE substr(key,1,?)=? ORDER BY key"));
     q.addBindValue(prefix.size()); q.addBindValue(prefix); if(!q.exec()) { fail(error,q.lastError().text()); return out; }
-    while(q.next()) { auto c=decode(q.value(1).toString()); if(!c || prefix+c->id!=q.value(0).toString()) { fail(error,QStringLiteral("Invalid campaign data")); return {}; } out << *c; }
+    while(q.next()) { auto c=decode(q.value(1).toString()); if(!c || prefix+c->id!=q.value(0).toString()) {
+        if (!invalidCount) { fail(error,QStringLiteral("Invalid campaign data")); return {}; }
+        ++*invalidCount; continue;
+    } out << *c; }
     if(q.lastError().isValid()) { fail(error,q.lastError().text()); return {}; } if(error) error->clear(); return out;
 }
 QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)

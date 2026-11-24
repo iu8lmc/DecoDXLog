@@ -388,6 +388,8 @@ GlassPanel {
             ColumnLayout {
                 Layout.preferredWidth: 205; Layout.fillHeight: true
                 Text { text: qsTr("Saved campaigns"); color: root.textColor; font.bold: true }
+                Text { objectName: "dxCampaignListWarning"; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                    text: root.campaignBackend ? root.campaignBackend.dxCampaignListWarning : ""; visible: !!text }
                 ListView {
                     id: campaignList; objectName: "dxCampaignList"; Layout.fillWidth: true; Layout.fillHeight: true; clip: true
                     model: root.campaignBackend ? root.campaignBackend.dxCampaigns : []
