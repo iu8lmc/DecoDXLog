@@ -87,6 +87,8 @@ def contains_secret(value, secret):
 
 def supported_scope(manifest):
     permissions = set(manifest["permissions"])
+    if permissions == {"qso.events"}:
+        return "event_counts"
     if "qso.read" in permissions and "tracker.read" not in permissions:
         return "recent_sample"
     if "tracker.read" in permissions and "qso.read" not in permissions:
@@ -94,7 +96,7 @@ def supported_scope(manifest):
     raise ValueError("the harness requires one supported example capability")
 
 
-def run_extension(manifest_path, token, port, timeout):
+def run_extension(manifest_path, token, port, timeout, state_path=None):
     manifest_path = pathlib.Path(manifest_path).resolve(strict=True)
     manifest = load_manifest(manifest_path)
     expected_scope = supported_scope(manifest)
@@ -110,6 +112,11 @@ def run_extension(manifest_path, token, port, timeout):
             command = [sys.executable, str(entry), "--port", str(port)]
             if expected_scope == "recent_sample":
                 command += ["--limit", "100"]
+            elif expected_scope == "event_counts":
+                state = pathlib.Path(state_path) if state_path is not None else pathlib.Path(directory) / "temporary-state.sqlite"
+                if state.is_symlink() or (state.exists() and not state.is_file()):
+                    raise ValueError("invalid extension state path")
+                command += ["--state", str(state)]
             process = subprocess.Popen(command, cwd=directory, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                        start_new_session=(os.name == "posix"))
             try:

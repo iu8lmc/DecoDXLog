@@ -766,6 +766,25 @@ private slots:
         QVERIFY(counter.value("counts").toObject().value("added").toInt()>=2);
         const auto replay=runCounter(); QCOMPARE(replay.value("counts").toObject(),counter.value("counts").toObject());
         QCOMPARE(replay.value("cursor").toString(),counter.value("cursor").toString());
+        const QString managerScript=QStringLiteral(DECODXLOG_SOURCE_DIR "/tools/extension_manager.py");
+        const QString root=m_dir.filePath(QStringLiteral("managed-events"));
+        QProcess manager; manager.setProcessEnvironment(env);
+        manager.start(python,{managerScript,QStringLiteral("--root"),root,QStringLiteral("install"),
+            QStringLiteral(DECODXLOG_SOURCE_DIR "/examples/extensions/event_counter.manifest.json"),QStringLiteral("--verify-port"),QString::number(m_apiPort)});
+        QVERIFY(manager.waitForFinished(10000)); QVERIFY2(manager.exitCode()==0,manager.readAllStandardError().constData());
+        const QString managedState=root+QStringLiteral("/org.decodxlog.example.event-counter/.event-state.sqlite");
+        QVERIFY(!QFile::exists(managedState));
+        auto runManaged=[&]() {
+            QProcess process; process.setProcessEnvironment(env);
+            process.start(python,{managerScript,QStringLiteral("--root"),root,QStringLiteral("run"),QStringLiteral("org.decodxlog.example.event-counter"),QStringLiteral("--port"),QString::number(m_apiPort)});
+            if (!process.waitForFinished(10000) || process.exitCode()!=0) return QJsonObject{};
+            return QJsonDocument::fromJson(process.readAllStandardOutput()).object();
+        };
+        QJsonObject managed=runManaged(); QVERIFY(!managed.isEmpty());
+        for (int i=0; managed.value("hasMore").toBool() && i<10; ++i) managed=runManaged();
+        QVERIFY(!managed.isEmpty()); QVERIFY(!managed.value("hasMore").toBool()); QVERIFY(QFile::exists(managedState));
+        const auto managedReplay=runManaged(); QCOMPARE(managedReplay.value("counts").toObject(),managed.value("counts").toObject());
+        QCOMPARE(managedReplay.value("cursor").toString(),managed.value("cursor").toString());
     }
 
     void scopedQsoEventsReportRetentionGap()

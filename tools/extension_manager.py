@@ -270,6 +270,11 @@ def run(root, identity, token, port, timeout):
     with _operation_lock(root):
         manifest_path, manifest = _current(root, identity)
         _verify_credential(manifest, token, port, timeout)
+        if harness.supported_scope(manifest) == 'event_counts':
+            state_path = _directory(root, identity) / '.event-state.sqlite'
+            if state_path.is_symlink() or (state_path.exists() and not state_path.is_file()):
+                raise ValueError('invalid extension state path')
+            return harness.run_extension(manifest_path, token, port, timeout, state_path=state_path)
         return harness.run_extension(manifest_path, token, port, timeout)
 
 

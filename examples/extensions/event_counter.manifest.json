@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "apiVersion": 1,
+  "id": "org.decodxlog.example.event-counter",
+  "version": "1.0.0",
+  "entrypoint": "event_counter.py",
+  "permissions": ["qso.events"]
+}

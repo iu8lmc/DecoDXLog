@@ -34,6 +34,43 @@ class Api(BaseHTTPRequestHandler):
 
 
 class ManagerTests(unittest.TestCase):
+    def test_managed_event_counter_persists_state_and_replays_safely(self):
+        class EventApi(Api):
+            def do_GET(self):
+                if self.headers.get('X-DecoDXLog-Token') != 'read-token': self.send_error(403); return
+                if self.path.startswith('/api/v1/capabilities'):
+                    value={'apiVersion':1,'permissionModel':'extension-token','extensionId':'org.decodxlog.example.event-counter',
+                           'perExtensionPermissions':True,'operations':['qso.events'],'events':True,'eventLogIdentity':'log-1'}
+                else:
+                    value={'log':'log-1','events':[], 'hasMore':False,'next':'1'} if 'after=1' in self.path else {
+                        'log':'log-1','events':[{'sequence':'1','qsoUuid':'q1','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'1'}
+                data=json.dumps(value).encode(); self.send_response(200); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); root=base/'extensions'; log=base/'log.sqlite'
+            with sqlite3.connect(log) as db: db.execute('CREATE TABLE qso(call TEXT)'); db.execute("INSERT INTO qso VALUES('K1ABC')")
+            server=ThreadingHTTPServer(('127.0.0.1',0),EventApi); thread=Thread(target=server.serve_forever,daemon=True); thread.start()
+            try:
+                manifest=ROOT/'examples/extensions/event_counter.manifest.json'; identity='org.decodxlog.example.event-counter'
+                manager.install(root,manifest,token='read-token',port=server.server_port)
+                state=root/identity/'.event-state.sqlite'
+                self.assertFalse(state.exists(), 'preflight must not create live state')
+                try:
+                    state.symlink_to(log)
+                except OSError:
+                    pass  # Symlink creation may be unavailable on Windows.
+                else:
+                    with self.assertRaises(ValueError): manager.run(root,identity,'read-token',server.server_port,5)
+                    state.unlink()
+                first=manager.run(root,identity,'read-token',server.server_port,5)
+                second=manager.run(root,identity,'read-token',server.server_port,5)
+                self.assertEqual(first['counts']['added'],1); self.assertEqual(second['counts']['added'],1)
+                self.assertEqual(second['cursor'],'1')
+                self.assertTrue((root/identity/'.event-state.sqlite').is_file())
+                manager.remove(root,identity); self.assertFalse((root/identity).exists())
+                with sqlite3.connect(log) as db: self.assertEqual(db.execute('SELECT call FROM qso').fetchone()[0],'K1ABC')
+            finally:
+                server.shutdown(); server.server_close(); thread.join()
+
     def test_scoped_credential_must_match_manifest(self):
         class ScopedApi(Api):
             def do_GET(self):
