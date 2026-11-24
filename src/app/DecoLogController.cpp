@@ -6962,6 +6962,11 @@ void DecoLogController::syncLotw(bool full)
         emit lotwChanged();
         return;
     }
+    m_lotwOrigin = m_db.sessionToken();
+    if (!m_lotwOrigin) {
+        m_lotwStatus = tr("LoTW: cannot verify the open log; reopen it before syncing");
+        m_lotwAuto = false; m_lotwRange = false; emit lotwChanged(); return;
+    }
     const QString since = full ? QString() : m_db.setting(QStringLiteral("lotw.last_qsl"));
     m_lotwStarting = true;
     m_lotwStatus = m_lotwRange
@@ -6975,6 +6980,10 @@ void DecoLogController::syncLotw(bool full)
 
     m_credentials->readSecret(QStringLiteral("lotw"), [this, user, since, from, to](const QString& secret, const QString& error) {
         m_lotwStarting = false;
+        if (!m_lotwOrigin || !m_db.matchesSessionToken(*m_lotwOrigin)) {
+            lotw::Report failed; failed.error=tr("LoTW: the log changed during download; no confirmations were applied");
+            onLotwReport(failed); return;
+        }
         if (!error.isEmpty() || secret.isEmpty()) {
             lotw::Report failed;
             failed.error = tr("LoTW: password not available (%1)").arg(error);
@@ -7008,6 +7017,12 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     m_lotwAuto = false;
     const bool ranged = m_lotwRange;
     m_lotwRange = false;
+    const bool sameOrigin = m_lotwOrigin && m_db.matchesSessionToken(*m_lotwOrigin);
+    m_lotwOrigin.reset();
+    if (!sameOrigin) {
+        m_lotwStatus=tr("LoTW: the log changed during download; no confirmations were applied");
+        emit lotwChanged(); return;
+    }
     if (!report.ok) {
         m_lotwStatus = report.error;
         m_db.setSetting(QStringLiteral("lotw.last_result"), report.error);

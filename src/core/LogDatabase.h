@@ -278,6 +278,13 @@ struct Ft2Award {
     int gridsConfirmed{0};
 };
 
+struct LogSessionToken {
+    QString path;
+    QString identity;
+    QByteArray fileIdentity;
+    quint64 generation{0};
+};
+
 class LogDatabase {
 public:
     LogDatabase();
@@ -299,6 +306,8 @@ public:
     QByteArray openFileIdentity() const { return m_openFileIdentity; }
     bool fileIdentityMatchesOpen() const;
     quint64 openGeneration() const { return m_openGeneration; }
+    std::optional<LogSessionToken> sessionToken() const;
+    bool matchesSessionToken(const LogSessionToken& token) const;
     QString lastError() const { return m_lastError; }
     int schemaVersion() const;
 

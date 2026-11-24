@@ -70,6 +70,15 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void logSessionTokenRejectsReopenAndReplacement()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("first.sqlite");
+        const QString other=dir.filePath("other.sqlite"); { LogDatabase second; QVERIFY(second.open(other)); }
+        LogDatabase db; QVERIFY(db.open(path)); const auto token=db.sessionToken(); QVERIFY(token.has_value()); QVERIFY(db.matchesSessionToken(*token));
+        QVERIFY(db.open(path)); QVERIFY(!db.matchesSessionToken(*token)); const auto reopened=db.sessionToken(); QVERIFY(reopened.has_value());
+        QVERIFY(QFile::rename(path,dir.filePath("original.sqlite"))); QVERIFY(QFile::rename(other,path));
+        QVERIFY(!db.matchesSessionToken(*reopened)); QVERIFY(!db.sessionToken().has_value());
+    }
     void contestNetReconcileReportsDifferencesWithoutOverwriting()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString leftPath=dir.filePath("left.sqlite"), rightPath=dir.filePath("right.sqlite");

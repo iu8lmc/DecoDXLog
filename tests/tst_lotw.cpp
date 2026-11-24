@@ -191,6 +191,26 @@ private slots:
         QVERIFY(query.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(query.next()); QCOMPARE(query.value(0).toInt(),2);
     }
 
+    void delayedDownloadCanBeBoundToOriginalLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); FakeLotw server; server.body=kReport;
+        LogDatabase db; QVERIFY(db.open(dir.filePath("one.sqlite")));
+        QVERIFY(db.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120300","FN41"),"fixture").id>0);
+        const auto origin=db.sessionToken(); QVERIFY(origin);
+        LotwClient client; client.setEndpoint(server.url()); QSignalSpy done(&client,&LotwClient::finished);
+        client.download("fixture","fixture",{}); QVERIFY(done.wait(5000));
+        const auto report=done.first().first().value<lotw::Report>(); QVERIFY(report.ok); QVERIFY(db.matchesSessionToken(*origin));
+        const auto applyIfSame=[&] { if (!db.matchesSessionToken(*origin)) return false;
+            return db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true).status==ConfirmationResult::Status::Confirmed; };
+        QVERIFY(applyIfSame());
+        QVERIFY(db.open(dir.filePath("two.sqlite")));
+        QVERIFY(db.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120300","FN40"),"fixture").id>0);
+        QVERIFY(!db.matchesSessionToken(*origin));
+        QVERIFY(!applyIfSame());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        QVERIFY(db.record(1)->value("LOTW_QSL_RCVD").isEmpty());
+    }
+
     void downloadedGridIsRetainedOnlyForUniqueMatch()
     {
         FakeLotw server; server.body=kReport; LotwClient client; client.setEndpoint(server.url());

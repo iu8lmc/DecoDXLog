@@ -324,6 +324,20 @@ bool LogDatabase::fileIdentityMatchesOpen() const
     return !m_openFileIdentity.isEmpty() && fileidentity::read(m_path)==m_openFileIdentity;
 }
 
+std::optional<LogSessionToken> LogDatabase::sessionToken() const
+{
+    if (!isOpen() || m_openFileIdentity.isEmpty() || !fileIdentityMatchesOpen()) return std::nullopt;
+    const QString id=identity();
+    if (id.isEmpty()) return std::nullopt;
+    return LogSessionToken{m_path,id,m_openFileIdentity,m_openGeneration};
+}
+
+bool LogDatabase::matchesSessionToken(const LogSessionToken& token) const
+{
+    return isOpen() && !token.fileIdentity.isEmpty() && m_path==token.path && m_openGeneration==token.generation
+        && m_openFileIdentity==token.fileIdentity && fileIdentityMatchesOpen() && identity()==token.identity;
+}
+
 qint64 LogDatabase::dataVersion() const
 {
     if (!isOpen()) return -1;

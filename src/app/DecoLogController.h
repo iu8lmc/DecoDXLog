@@ -1114,6 +1114,7 @@ private:
     bool      m_hamHubLinkHasPassword{false};
     QString   m_hamHubLinkNote;
     core::LotwClient  m_lotw;
+    std::optional<core::LogSessionToken> m_lotwOrigin;
     // Il periodo chiesto per il prossimo scarico LoTW, e se quello in corso e' per periodo.
     QDate m_lotwFrom;
     QDate m_lotwTo;
