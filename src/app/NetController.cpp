@@ -1100,6 +1100,7 @@ QString NetController::configureHandoffScope(const QString& scope)
         m_ctx.db->identity().isEmpty() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()))
         return tr("Enter a valid contest scope with an open file-backed log.");
     m_handoffScope=clean;
+    m_skedScanCursor.clear();
     m_handoffInvalidated=false;
     m_handoffPath=clean.isEmpty()?QString():m_ctx.db->path(); m_handoffIdentity=clean.isEmpty()?QString():m_ctx.db->identity();
     m_handoffGroup=clean.isEmpty()?QString():m_group;
@@ -1217,15 +1218,23 @@ void NetController::checkSkedReminders(const QDateTime& nowUtc)
     if (!m_ctx.activity || !handoffLogCurrent() || !nowUtc.isValid() || nowUtc.timeSpec()!=Qt::UTC) return;
     QString error; const auto offers=contesthandoff::incomingOffers(*m_ctx.db,m_handoffScope,m_id,&error);
     if (!error.isEmpty()) return;
+    if (offers.isEmpty()) return;
+    int start=0;
+    if (!m_skedScanCursor.isEmpty()) {
+        while (start<offers.size() && offers.at(start).id<=m_skedScanCursor) ++start;
+        if (start==offers.size()) start=0;
+    }
     int attempts=0;
-    for (const auto& offer:offers) {
+    for (int offset=0;offset<offers.size();++offset) {
+        const auto& offer=offers.at((start+offset)%offers.size());
         if (!handoffLogCurrent()) return;
         const QString seenKey=m_handoffPath+QChar::Null+QString::fromLatin1(m_handoffFileIdentity.toHex())+QChar::Null+m_handoffIdentity+QChar::Null+offer.id;
         if (offer.state!=QLatin1String("accepted") || offer.scheduledUtc.isEmpty() || m_remindedSkeds.contains(seenKey)) continue;
         const auto when=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
         const auto elapsed=when.secsTo(nowUtc);
         if (!when.isValid() || elapsed < -300 || elapsed > 600) continue;
-        if (++attempts>64) break;
+        if (attempts>=64) break;
+        ++attempts; m_skedScanCursor=offer.id;
         const auto claimed=contesthandoff::claimSkedReminder(*m_ctx.db,m_handoffScope,m_id,offer.id,nowUtc);
         if (!claimed.ok) continue;
         m_remindedSkeds.insert(seenKey);

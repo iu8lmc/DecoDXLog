@@ -211,6 +211,7 @@ private:
     QTimer m_handoffWatch;
     QTimer m_skedReminderTimer;
     QSet<QString> m_remindedSkeds;
+    QString m_skedScanCursor;
     QString m_handoffPath, m_handoffIdentity, m_handoffGroup;
     QByteArray m_handoffFileIdentity;
     quint64 m_handoffGeneration{0};

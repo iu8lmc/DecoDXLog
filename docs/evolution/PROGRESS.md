@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G10 prevent failed sked reminders starving later offers
+
+The sked reminder scan retains a cursor in the controller session and starts the next bounded scan after the last attempted offer, wrapping through the ordered list. It still attempts at most 64 claims per scan and preserves the existing per-session duplicate suppression. Reconfiguring the handoff scope clears the cursor. Failed claims can be retried after wraparound; a successful claim does not imply network delivery or authenticated identity.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic 65-offer fixture injected persistent SQLite errors for the first 64 claims while allowing the last. Before the change two scans produced no reminder for the last offer; afterwards the second scan emitted it. Once the fault was removed, subsequent scans emitted all remaining 64 once each and further scans produced no duplicates; no QSO was created. The existing restart/deduplication fixture, contestnet and netcontroller CTest groups (2/2), and the offscreen handoff dialog/restart fixture in English and Italian passed; git diff --check passed.
+
+This avoids indefinite starvation from a fixed failing prefix; it does not guarantee reminders for very large batches within the finite time window, survive every crash between claim and Activity, or provide desktop notification. The scan still reads the offer list and each claim separately, and large-log performance is not measured. The injected failure and UI tests are local and synthetic, not a real LAN, authenticated peers, physical UI, radio or other platform proof. Full G10/G13 acceptance remains open.
+
 ## 2026-11-24 — G05 bind import undo to the reviewed log file
 
 The desktop import-undo preview and confirmation now bind to the open log path, logical UUID, physical file identity and open generation. The worker verifies the captured UUID and file identity before scanning, inside each per-QSO transaction and before commit. If the context changes it stops; already committed items remain committed. A completion for a changed context does not apply the normal success path to the new log, and an activity warning includes any QSO already moved. Existing unguarded direct core calls retain their prior API behaviour; the desktop workflow supplies both identities.

@@ -18,6 +18,29 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void skedReminderDoesNotStarveLaterOffersAfterFailures()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("SkedFairnessTest"); QCoreApplication::setApplicationName("Reminders"); QSettings().setValue("net/enabled",false);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("skeds.sqlite"))); QString last;
+        for (int i=1;i<=65;++i) {
+            const QString id=QStringLiteral("00000000-0000-0000-0000-%1").arg(i,12,16,QLatin1Char('0'));
+            contesthandoff::Offer o{id,"event","sender","receiver",QStringLiteral("K%1AAA").arg(i),14025000,"2026-11-24T12:00:00Z"};
+            o.scheduledUtc="2030-01-01T12:00:00Z"; QVERIFY(contesthandoff::receiveOffer(db,"event","receiver","sender",contesthandoff::offerFrame(o)).ok);
+            QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",id,"accepted").ok); last=id;
+        }
+        QSqlQuery q(db.connection()); const QString lastKey="contest_handoff.reminder."+last;
+        QVERIFY2(q.exec(QStringLiteral("CREATE TRIGGER reject_sked_reminders BEFORE INSERT ON app_setting WHEN NEW.key LIKE 'contest_handoff.reminder.%%' AND NEW.key != '%1' BEGIN SELECT RAISE(FAIL,'injected'); END").arg(lastKey)),qPrintable(q.lastError().text()));
+        QStringList messages; NetController::Context ctx; ctx.db=&db; ctx.activity=[&](const QString& cat,const QString& message,const QString&) { if(cat=="SKED") messages << message; };
+        NetController net(ctx); net.setIdForTests("receiver"); QVERIFY(net.configureHandoffScope("event").isEmpty());
+        const auto now=QDateTime::fromString("2030-01-01T12:00:00Z",Qt::ISODate);
+        net.checkSkedReminders(now); QVERIFY(messages.isEmpty());
+        net.checkSkedReminders(now); QCOMPARE(messages.size(),1); QVERIFY(messages.first().contains("K65AAA"));
+        net.checkSkedReminders(now); QCOMPARE(messages.size(),1); QCOMPARE(db.qsoCount(),qint64(0));
+        QVERIFY(q.exec("DROP TRIGGER reject_sked_reminders")); net.checkSkedReminders(now); net.checkSkedReminders(now);
+        QCOMPARE(messages.size(),65); net.checkSkedReminders(now); QCOMPARE(messages.size(),65);
+    }
     void skedReminderFiresOnceAndSurvivesReopen()
     {
         using namespace decolog::core; using decolog::app::NetController;
