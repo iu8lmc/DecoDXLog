@@ -2815,3 +2815,11 @@ The VUCC candidate preview now excludes a QSO when its recorded own locator is m
 A/B on macOS arm64 / Qt 6.11.2: a synthetic QSO reporting own grids JN52 and JN54 was previously selected and is now excluded with a reason; an adjacent pair is still selected, a mismatching primary and malformed own grid are rejected, and missing own data retains previous behaviour. An ADIF import/preview/export fixture confirms the inconsistent original list is preserved. App and test targets built; CTest vucc, awards, database, migration and qmlpopups passed 5/5 before the final import fixture, which passed separately after rebuilding.
 
 Geometric adjacency does not prove the operator was physically on the boundary, and this change does not validate the 200 km/300 m site rules, award-account assignment, individual confirmation contents or ARRL acceptance. Error text remains English. Real LoTW data, physical UI, Windows/Linux and full G02/G13 acceptance remain open.
+
+## 2026-11-24 — G02 own VUCC locator in desktop review
+
+Added an isolated offscreen app fixture importing two synthetic confirmed contacts: one reports nonadjacent own grids JN52/JN54, the other the adjacent pair JN52/JN53. The VUCC review displays the first as excluded with the recorded reason and keeps the second as a candidate; both QSO remain in the log. No product behaviour changed.
+
+A/B on macOS arm64 / Qt 6.11.2: temporarily restoring the pre-validation VUCC implementation showed the invalid QSO as the first candidate with no exclusion; after restoring current code the app showed the other candidate and the expected exclusion. App and test targets rebuilt; CTest vucc, awards, database and qmlpopups passed 4/4.
+
+The app is driven programmatically offscreen and the exclusion reason is English. This checks imported synthetic values, not actual station location, LoTW confirmations, physical UI, Windows/Linux or ARRL acceptance. Full G02/G13 acceptance remains open.
