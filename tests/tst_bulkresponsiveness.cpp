@@ -7,6 +7,8 @@
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSqlQuery>
+#include <QSqlError>
+#include <QTimeZone>
 #include <QSettings>
 #include <QTemporaryDir>
 #include <QTest>
@@ -129,6 +131,31 @@ private slots:
                 QCOMPARE(db.qsoCount(),qint64(33)); const auto other=db.record(db.latestIds("ZY0SAT",1).first()); QVERIFY(other); QVERIFY(other->value("QSL_RCVD").isEmpty());
                 qInfo() << "QSL_EVENT_AB enabled=" << enabled << "attempt=" << attempt << "max_gap_ms=" << gap << "elapsed_ms=" << elapsed;
             }
+        }
+    }
+
+    void paperQslBulkEventsLargeAB()
+    {
+        if (!qEnvironmentVariableIsSet("DECODXLOG_BENCH_BULK_QSL_EVENTS")) QSKIP("opt-in 20k QSL event comparison");
+        QTemporaryDir seed; QVERIFY(seed.isValid()); const QString seedPath=seed.filePath("seed.sqlite");
+        { LogDatabase db; QVERIFY(db.open(seedPath)); QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection());
+          QVERIFY(q.prepare("INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) VALUES(?,'J51A',?,'20m','CW','2026-02-28T00:00:00Z','2026-02-28T00:00:00Z')"));
+          for (int i=0;i<20000;++i) { q.bindValue(0,QStringLiteral("fixture-%1").arg(i)); q.bindValue(1,QDateTime(QDate(2026,2,28),QTime(0,0),QTimeZone::UTC).addSecs(i).toString(Qt::ISODate)); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); }
+          QVERIFY(db.connection().commit());
+          QVERIFY(db.insertQso({{"CALL","ZY0SAT"},{"QSO_DATE","20260301"},{"TIME_ON","2035"},{"BAND","20m"},{"MODE","SSB"},{"GRIDSQUARE","HJ51AM"}},"fixture").id>0);
+          QVERIFY(q.exec("PRAGMA wal_checkpoint(TRUNCATE)")); }
+        for (int enabled=0;enabled<2;++enabled) {
+            QTemporaryDir dir; QVERIFY(dir.isValid()); QVERIFY(QFile::copy(seedPath,dir.filePath("log.sqlite")));
+            QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+            if (!enabled) { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+                QVERIFY(q.exec("DROP TRIGGER extension_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER extension_qsl_update")); }
+            QByteArray output; qint64 gap=0,elapsed=0; int rows=0;
+            QVERIFY2(runProbe(dir,"paperqsl",output,gap,elapsed,rows),output.constData()); QCOMPARE(rows,20000);
+            { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+              QVERIFY(q.exec("SELECT COUNT(*) FROM qsl_status WHERE service='card' AND rcvd='Y'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),20000);
+              QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event WHERE kind='confirmed' AND service='card'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),enabled?20000:0);
+              QCOMPARE(db.qsoCount(),qint64(20001)); const auto other=db.record(db.latestIds("ZY0SAT",1).first()); QVERIFY(other); QVERIFY(other->value("QSL_RCVD").isEmpty()); }
+            qInfo() << "QSL_EVENT_LARGE_AB enabled=" << enabled << "rows=" << rows << "max_gap_ms=" << gap << "elapsed_ms=" << elapsed;
         }
     }
 
