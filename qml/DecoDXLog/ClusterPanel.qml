@@ -353,7 +353,7 @@ GlassPanel {
         modal: true
         padding: 16
         width: Math.min(820, (Overlay.overlay ? Overlay.overlay.width : 900) - 40)
-        height: Math.min(680, Math.max(200, (Overlay.overlay ? Overlay.overlay.height : root.Window.window.height) - 40))
+        height: Math.min(680, Math.max(200, (Overlay.overlay ? Overlay.overlay.height : (root.Window.window ? root.Window.window.height : 720)) - 40))
         background: Rectangle { color: Theme.panelColor; border.color: Theme.glassBorder; radius: 6 }
         ColumnLayout {
             anchors.fill: parent
