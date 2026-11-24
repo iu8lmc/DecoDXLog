@@ -127,6 +127,80 @@ class TestRadioNet : public QObject {
             QCOMPARE(result.status==InsertResult::Status::Inserted,!guarded); QCOMPARE(db.qsoCount(),guarded?qint64(0):qint64(1));
         }
     }
+    void guardedInsertRejectsUuidChangeBetweenCheckAndWrite()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("Explicit opt-in required for verified system SQLite driver");
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int (*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int (*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); if (!setAuthorizer) QSKIP("SQLite native authorizer unavailable");
+        struct Gate { std::atomic_bool ready{false},entered{false},done{false},changed{false},timedOut{false}; };
+        const auto hook=+[](void* opaque,int action,const char* table,const char*,const char*,const char*) {
+            auto* gate=static_cast<Gate*>(opaque); if (action==18 && table && std::strcmp(table,"qso")==0 && !gate->entered.exchange(true)) {
+                QElapsedTimer timer; timer.start(); while (!gate->done.load() && timer.elapsed()<5000) QThread::msleep(1); if (!gate->done.load()) gate->timedOut=true;
+            } return 0;
+        };
+        for (const bool guarded:{false,true}) {
+            QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("race.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+            QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=WAL")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString().toLower(),QString("wal")); q.finish();
+            RadioNet net(&db); QVERIFY(net.start("Net")); QVERIFY(net.checkIn("K1ABC","Alice",{})); const qint64 sid=net.session().value("id").toLongLong();
+            q.prepare("SELECT s.uuid,m.id FROM radio_net_session s JOIN radio_net_member m ON m.session_id=s.id WHERE s.id=?"); q.addBindValue(sid); QVERIFY(q.exec()); QVERIFY(q.next());
+            const auto uuid=q.value(0).toString(); const auto mid=q.value(1).toLongLong(); q.finish();
+            QVariant handle=db.connection().driver()->handle(); if (QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native handle unavailable"); void* native=*static_cast<void**>(handle.data()); QVERIFY(native);
+            Gate gate; std::thread writer([&] { LogDatabase other; if (other.openExistingReadWrite(path)) { gate.ready=true; QElapsedTimer timer; timer.start();
+                while (!gate.entered.load() && timer.elapsed()<5000) QThread::msleep(1);
+                if (gate.entered.load()) { QSqlQuery change(other.connection()); gate.changed=change.exec("UPDATE radio_net_session SET uuid='00000000-0000-4000-8000-000000000001' WHERE id=1"); }
+            } gate.done=true; });
+            QElapsedTimer readyTimer; readyTimer.start(); while (!gate.ready.load() && !gate.done.load() && readyTimer.elapsed()<5000) QThread::msleep(1);
+            const bool ready=gate.ready.load(); const int installed=ready ? setAuthorizer(native,hook,&gate) : -1;
+            InsertResult result; if (installed==0) { AdifRecord record{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_RADIO_NET_SESSION",uuid},{"APP_DECOLOG_RADIO_NET_CALL","K1ABC"}};
+                result=db.insertQso(record,"manual",{},true,0,false,guarded?sid:0,guarded?mid:0); }
+            const int removed=installed==0?setAuthorizer(native,nullptr,nullptr):0; writer.join();
+            QVERIFY(ready); QCOMPARE(installed,0); QCOMPARE(removed,0); QVERIFY(gate.entered.load()); QVERIFY(gate.done.load()); QVERIFY(gate.changed.load()); QVERIFY(!gate.timedOut.load());
+            QCOMPARE(result.status==InsertResult::Status::Inserted,!guarded); QCOMPARE(db.qsoCount(),guarded?qint64(0):qint64(1));
+        }
+    }
+    void guardedSerialDraftSerializesConcurrentUuidChange()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("Explicit opt-in required for verified system SQLite driver");
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int (*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int (*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); if (!setAuthorizer) QSKIP("SQLite native authorizer unavailable");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("serial-race.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA journal_mode=WAL")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString().toLower(),QString("wal")); q.finish();
+        RadioNet net(&db); QVERIFY(net.start("Net")); QVERIFY(net.checkIn("K1ABC","Alice",{})); const qint64 sid=net.session().value("id").toLongLong();
+        q.prepare("SELECT s.uuid,m.id FROM radio_net_session s JOIN radio_net_member m ON m.session_id=s.id WHERE s.id=?"); q.addBindValue(sid); QVERIFY(q.exec()); QVERIFY(q.next());
+        const auto uuid=q.value(0).toString(); const auto mid=q.value(1).toLongLong(); q.finish();
+        QVERIFY(db.beginContestSerialRequest("event","node","req","authority",10).ok); QVERIFY(db.acceptContestSerialGrant("event","node","req","authority",10).ok);
+        QVariant handle=db.connection().driver()->handle(); if (QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native handle unavailable"); void* native=*static_cast<void**>(handle.data()); QVERIFY(native);
+        struct Gate { std::atomic_bool ready{false},entered{false},done{false},changed{false},timedOut{false}; } gate;
+        const auto hook=+[](void* opaque,int action,const char* table,const char*,const char*,const char*) {
+            auto* g=static_cast<Gate*>(opaque); if (action==18 && table && std::strcmp(table,"qso")==0 && !g->entered.exchange(true)) {
+                QElapsedTimer timer; timer.start(); while (!g->done.load() && timer.elapsed()<5000) QThread::msleep(1); if (!g->done.load()) g->timedOut=true;
+            } return 0;
+        };
+        std::thread writer([&] { LogDatabase other; if (other.openExistingReadWrite(path)) { gate.ready=true; QElapsedTimer timer; timer.start();
+            while (!gate.entered.load() && timer.elapsed()<5000) QThread::msleep(1);
+            if (gate.entered.load()) { QSqlQuery change(other.connection()); change.exec("PRAGMA busy_timeout=0"); gate.changed=change.exec("UPDATE radio_net_session SET uuid='00000000-0000-4000-8000-000000000001' WHERE id=1"); }
+        } gate.done=true; });
+        QElapsedTimer readyTimer; readyTimer.start(); while (!gate.ready.load() && !gate.done.load() && readyTimer.elapsed()<5000) QThread::msleep(1);
+        const bool ready=gate.ready.load(); const int installed=ready?setAuthorizer(native,hook,&gate):-1;
+        AdifRecord record{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"APP_DECOLOG_RADIO_NET_SESSION",uuid},{"APP_DECOLOG_RADIO_NET_CALL","K1ABC"}};
+        InsertResult result; if (installed==0) result=db.insertQsoWithContestSerial(record,"manual","event","node","req","authority",{},true,0,false,sid,mid);
+        const int removed=installed==0?setAuthorizer(native,nullptr,nullptr):0; writer.join();
+        QVERIFY(ready); QCOMPARE(installed,0); QCOMPARE(removed,0); QVERIFY(gate.entered.load()); QVERIFY(gate.done.load()); QVERIFY(!gate.changed.load()); QVERIFY(!gate.timedOut.load());
+        QCOMPARE(result.status,InsertResult::Status::Inserted); QCOMPARE(db.qsoCount(),qint64(1)); QCOMPARE(db.contestSerialRequest("event","node","req").state,QString("consumed"));
+        QVERIFY(q.exec("UPDATE radio_net_session SET uuid='00000000-0000-4000-8000-000000000001' WHERE id=1"));
+        QVERIFY(db.beginContestSerialRequest("event","node","req2","authority",11).ok); QVERIFY(db.acceptContestSerialGrant("event","node","req2","authority",11).ok);
+        QVERIFY(db.insertQsoWithContestSerial(record,"manual","event","node","req2","authority",{},true,0,false,sid,mid).status!=InsertResult::Status::Inserted);
+        QCOMPARE(db.contestSerialRequest("event","node","req2").state,QString("granted")); QCOMPARE(db.qsoCount(),qint64(1));
+        record.set("APP_DECOLOG_RADIO_NET_SESSION","00000000-0000-4000-8000-000000000001");
+        QCOMPARE(db.insertQsoWithContestSerial(record,"manual","event","node","req2","authority",{},true,0,false,sid,mid).status,InsertResult::Status::Inserted);
+        QCOMPARE(db.contestSerialRequest("event","node","req2").state,QString("consumed")); QCOMPARE(db.qsoCount(),qint64(2));
+    }
     void radioNetGuardAndContestSerialCommitTogether()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); LogDatabase db,other; QVERIFY(db.open(path)); QVERIFY(other.open(path));
