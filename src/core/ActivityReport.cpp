@@ -273,7 +273,7 @@ Result runCustom(const QSqlDatabase& db,int utcYear,const QString& band,const QS
         selections << expression+QStringLiteral(" AS d%1").arg(i); positions << QString::number(i+1);
     }
     const QString validPower=QStringLiteral("CASE WHEN typeof(tx_pwr) IN ('integer','real') AND tx_pwr>=0 AND tx_pwr<=1.7976931348623157e308 THEN tx_pwr END");
-    selections << (aggregate==QLatin1String("entities") ? QStringLiteral("COUNT(DISTINCT CASE WHEN typeof(dxcc)='integer' AND dxcc>0 THEN dxcc END)") : aggregate==QLatin1String("mean_power") ? QStringLiteral("AVG(%1)").arg(validPower) : aggregate==QLatin1String("calls") ? QStringLiteral("COUNT(DISTINCT NULLIF(TRIM(call),''))")
+    selections << (aggregate==QLatin1String("entities") ? QStringLiteral("COUNT(DISTINCT CASE WHEN typeof(dxcc)='integer' AND dxcc>0 THEN dxcc END)") : aggregate==QLatin1String("mean_power") ? QStringLiteral("AVG(%1)").arg(validPower) : aggregate==QLatin1String("calls") ? QStringLiteral("COUNT(DISTINCT NULLIF(UPPER(TRIM(call)),''))")
                    : aggregate==QLatin1String("days") ? QStringLiteral("COUNT(DISTINCT strftime('%Y-%m-%d',qso_datetime_on))") : QStringLiteral("COUNT(*)"));
     if (aggregate==QLatin1String("mean_power")) selections << QStringLiteral("COUNT(%1)").arg(validPower) << QStringLiteral("COUNT(*)-COUNT(%1)").arg(validPower);
     QString sql=QStringLiteral("SELECT %1 FROM qso WHERE deleted=0").arg(selections.join(','));

@@ -12,6 +12,17 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void distinctCallsNormalizeCaseAndWhitespace()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto* call : {"K1AAA","K1BBB","K1CCC","K1DDD","K1EEE"})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET call=CASE call WHEN 'K1BBB' THEN ' k1aaa ' WHEN 'K1CCC' THEN 'K1AAA/P' WHEN 'K1DDD' THEN '' WHEN 'K1EEE' THEN '  ' ELSE call END"));
+        const auto result=activityreport::runCustom(db.connection(),2026,"20m",{"band"},"calls");
+        QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.rows.size(),1);
+        QCOMPARE(result.rows.first().toMap().value("value").toInt(),2);
+        QVERIFY(activityreport::customCsv(result,{"band"},"calls").contains("\"20m\",2"));
+    }
     void customReportGroupsByUtcDayAndHour()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));

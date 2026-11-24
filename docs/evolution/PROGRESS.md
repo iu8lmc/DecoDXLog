@@ -3131,3 +3131,11 @@ An offscreen app fixture now opens an isolated log with a missing radio-net even
 A/B on macOS arm64 / Qt 6.11.2: with SQL errors temporarily treated as an empty overview, both warning controls were hidden. Restoring checked error propagation made the banner and dialog diagnostic visible; the fixture passed and CTest radionet and qmlpopups passed 2/2. The first B test run used the system's Italian locale while asserting English; it displayed the Italian warnings, and the fixture was corrected to explicitly request English before the A/B comparison. App rebuilt and git diff --check passed.
 
 The fixture is programmatic and offscreen, using a deliberately damaged synthetic database; it does not prove physical layout or interaction, external-change detection, Windows/Linux or full G08/G13 acceptance.
+
+## 2026-11-24 — G07 distinct-call aggregation normalizes case
+
+The custom report's distinct-call aggregate now compares recorded calls after trimming surrounding spaces and uppercasing ASCII letters. Blank calls are excluded, while different suffixes such as `/P` remain distinct. Stored QSO values are not changed and CSV continues to contain the report count.
+
+A/B on macOS arm64 / Qt 6.11.2: synthetic legacy-style stored calls `K1AAA`, ` k1aaa `, `K1AAA/P` and two blanks previously produced three distinct calls; the test failed against that behavior and now produces two, including in CSV. App and test targets built; CTest activityreport and qmlpopups passed 2/2; git diff --check passed.
+
+SQLite's built-in uppercasing is ASCII-oriented and its default trim removes ordinary spaces; malformed Unicode or other whitespace is not normalized. The test changes synthetic database rows directly to reproduce legacy variations. It does not exercise the actual report dialog, PDF, a large log or Windows/Linux. Full G07/G13 acceptance remains open.
