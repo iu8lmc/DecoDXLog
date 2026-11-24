@@ -795,6 +795,16 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(finished.first().first().toBool());
         const auto result=act.previewResult(); const auto rows=result.value("potaCorrespondentRows").toList();
         QCOMPARE(rows.size(),205); QCOMPARE(rows.last().toMap().value("call").toString(),QString("K0204"));
+        QSet<qint64> ids;
+        for (int i=0; i<rows.size(); ++i) {
+            const auto row=rows.at(i).toMap();
+            const qint64 id=row.value("id").toLongLong();
+            QVERIFY(id>0); QVERIFY(!ids.contains(id)); ids.insert(id);
+            QCOMPARE(row.value("call").toString(),QStringLiteral("K%1").arg(i,4,10,QLatin1Char('0')));
+            QCOMPARE(row.value("reason").toString(),QStringLiteral("multipleReferences"));
+            QVERIFY(!row.value("uuid").toString().isEmpty());
+        }
+        QCOMPARE(ids.size(),205);
         QCOMPARE(result.value("potaCorrespondentOmitted").toInt(),0);
         const auto groups=result.value("groups").toList(); QCOMPARE(groups.size(),2);
         for (const auto& group : groups) QCOMPARE(group.toMap().value("potaCorrespondentReview").toInt(),205);
