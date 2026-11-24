@@ -34,7 +34,14 @@ private slots:
         net.checkSkedReminders(scheduled.addSecs(-300)); QCOMPARE(messages.size(),1); QVERIFY(messages.first().contains("K1ABC"));
         net.checkSkedReminders(scheduled); QCOMPARE(messages.size(),1);
         db.close(); QVERIFY(db.open(path)); QVERIFY(net.configureHandoffScope("event").isEmpty()); net.checkSkedReminders(scheduled); QCOMPARE(messages.size(),1);
+        NetController restarted(ctx); restarted.setIdForTests("receiver"); QVERIFY(restarted.configureHandoffScope("event").isEmpty());
+        restarted.checkSkedReminders(scheduled); QCOMPARE(messages.size(),2);
+        restarted.checkSkedReminders(scheduled); QCOMPARE(messages.size(),2);
         QCOMPARE(db.qsoCount(),qint64(0));
+        db.close(); QVERIFY(db.open(dir.filePath("another.sqlite")));
+        QVERIFY(contesthandoff::receiveOffer(db,"event","receiver","sender",contesthandoff::offerFrame(o)).ok);
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",o.id,"accepted").ok);
+        QVERIFY(net.configureHandoffScope("event").isEmpty()); net.checkSkedReminders(scheduled); QCOMPARE(messages.size(),3);
     }
     void addressedHandoffTravelsBetweenControllersAndPersists()
     {

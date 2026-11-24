@@ -151,6 +151,8 @@ private slots:
                  output.contains("\"staleRows\":0") && output.contains("[activity] SKED|warning|") && output.contains("K2BBB") && !output.contains("TypeError"),output.constData());
         { using namespace decolog::core; LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           const auto offers=contesthandoff::incomingOffers(db,"test-event","receiver"); QCOMPARE(offers.size(),2); QCOMPARE(offers.first().state,QString("accepted")); }
+        QByteArray reopened; QVERIFY2(launch(dir,"nethandoffprobe",reopened,3500,true),reopened.constData());
+        QVERIFY2(reopened.contains("[activity] SKED|warning|") && reopened.contains("K2BBB") && !reopened.contains("TypeError"),reopened.constData());
     }
     void stationNetworkExperimentalQsoDialog_data()
     {

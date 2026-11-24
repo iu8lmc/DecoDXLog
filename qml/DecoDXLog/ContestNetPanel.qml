@@ -238,7 +238,7 @@ GlassPanel {
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
                 text: qsTr("Status messages can be lost and station identities can be impersonated. Retry or verify status with the other operator.") }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                text: qsTr("Accepted incoming skeds appear once in Activity from five minutes before to ten minutes after the scheduled time while this scope is configured.") }
+                text: qsTr("Accepted incoming skeds appear in Activity once per app session, from five minutes before to ten minutes after the scheduled time while this scope is configured.") }
             RowLayout {
                 Layout.fillWidth: true
                 LabeledField { label: qsTr("Contest scope"); Layout.fillWidth: true

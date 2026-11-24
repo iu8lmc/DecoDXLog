@@ -2389,7 +2389,7 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
-    <message><source>Accepted incoming skeds appear once in Activity from five minutes before to ten minutes after the scheduled time while this scope is configured.</source><translation>Gli sked ricevuti e accettati appaiono una volta in Attività da cinque minuti prima a dieci minuti dopo l'orario previsto, mentre questo ambito è configurato.</translation></message>
+    <message><source>Accepted incoming skeds appear in Activity once per app session, from five minutes before to ten minutes after the scheduled time while this scope is configured.</source><translation>Gli sked ricevuti e accettati appaiono una volta per sessione dell'app in Attività, da cinque minuti prima a dieci minuti dopo l'orario previsto, mentre questo ambito è configurato.</translation></message>
     <message><source>Sked time UTC (optional)</source><translation>Orario sked UTC (facoltativo)</translation></message>
     <message><source>Skeds require a station version that supports them.</source><translation>Gli sked richiedono una versione che li supporti su entrambe le stazioni.</translation></message>
     <message><source>Sked: %1</source><translation>Sked: %1</translation></message>

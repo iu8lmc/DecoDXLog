@@ -1101,7 +1101,6 @@ QString NetController::configureHandoffScope(const QString& scope)
         return tr("Enter a valid contest scope with an open file-backed log.");
     m_handoffScope=clean;
     m_handoffInvalidated=false;
-    m_remindedSkeds.clear();
     m_handoffPath=clean.isEmpty()?QString():m_ctx.db->path(); m_handoffIdentity=clean.isEmpty()?QString():m_ctx.db->identity();
     m_handoffGroup=clean.isEmpty()?QString():m_group;
     m_handoffFileIdentity=clean.isEmpty()?QByteArray():m_ctx.db->openFileIdentity(); m_handoffGeneration=clean.isEmpty()?0:m_ctx.db->openGeneration();
@@ -1212,15 +1211,16 @@ void NetController::checkSkedReminders(const QDateTime& nowUtc)
     int attempts=0;
     for (const auto& offer:offers) {
         if (!handoffLogCurrent()) return;
-        if (offer.state!=QLatin1String("accepted") || offer.scheduledUtc.isEmpty() || m_remindedSkeds.contains(offer.id)) continue;
+        const QString seenKey=m_handoffPath+QChar::Null+QString::fromLatin1(m_handoffFileIdentity.toHex())+QChar::Null+m_handoffIdentity+QChar::Null+offer.id;
+        if (offer.state!=QLatin1String("accepted") || offer.scheduledUtc.isEmpty() || m_remindedSkeds.contains(seenKey)) continue;
         const auto when=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
         const auto elapsed=when.secsTo(nowUtc);
         if (!when.isValid() || elapsed < -300 || elapsed > 600) continue;
         if (++attempts>64) break;
         const auto claimed=contesthandoff::claimSkedReminder(*m_ctx.db,m_handoffScope,m_id,offer.id,nowUtc);
         if (!claimed.ok) continue;
-        m_remindedSkeds.insert(offer.id);
-        if (!claimed.replayed) m_ctx.activity(QStringLiteral("SKED"),tr("Sked %1 at %2 UTC on %3 Hz from %4").arg(offer.call,offer.scheduledUtc,QString::number(offer.frequencyHz),offer.sender),QStringLiteral("warning"));
+        m_remindedSkeds.insert(seenKey);
+        m_ctx.activity(QStringLiteral("SKED"),tr("Sked %1 at %2 UTC on %3 Hz from %4").arg(offer.call,offer.scheduledUtc,QString::number(offer.frequencyHz),offer.sender),QStringLiteral("warning"));
     }
 }
 
