@@ -30,6 +30,23 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void partitionPreviewRejectsReplacementBeforePublication()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Open-file replacement fixture requires Unix rename semantics");
+#else
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"), clone=dir.filePath("clone.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty()); AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(rec); QVERIFY(db.insertQso(rec,"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("PRAGMA wal_checkpoint(TRUNCATE)")); q.finish(); QVERIFY(q.exec("PRAGMA journal_mode=DELETE")); q.finish();
+        q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
+        QSignalSpy finished(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
+        QVERIFY(QFile::rename(path,path+".old")); QVERIFY(QFile::rename(clone,path));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(!finished.first().first().toBool());
+        QVERIFY(!act.previewResult().value("error").toString().isEmpty()); QVERIFY(act.previewResult().value("groups").toList().isEmpty());
+#endif
+    }
     void partitionExportRejectsSameIdentityReplacement()
     {
 #ifndef Q_OS_UNIX
@@ -64,6 +81,7 @@ private slots:
         q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); q.finish();
         { LogDatabase copy; QVERIFY(copy.open(clone)); QCOMPARE(copy.identity(),db.identity()); rec.set("CALL","K1BBB"); QVERIFY(copy.insertQso(rec,"fixture",{},true,0,false).id>0); }
         QVERIFY(QFile::rename(path,path+".old")); QVERIFY(QFile::rename(clone,path));
+        QVERIFY2(!act.partitionPreview().value("error").toString().isEmpty(),"synchronous preview accepted a replaced log path");
         QSignalSpy finished(&act,&ActivationController::previewFinished); const bool started=act.startPartitionPreview();
         if (started) { QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(!finished.first().first().toBool()); }
         else QVERIFY(!act.previewResult().value("error").toString().isEmpty());

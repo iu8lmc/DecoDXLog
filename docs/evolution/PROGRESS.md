@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G06 guard synchronous and pending activation previews
+
+The legacy synchronous activation preview is also exposed to QML: for file-backed logs it now checks the open file's identity and context before and after its scan, while retaining in-memory support. A/B on macOS arm64 / Qt 6.11.2: after a synthetic same-UUID clone replaced the open path, the synchronous preview previously returned data; it now returns an error.
+
+A second controlled test starts the background preview, replaces the path before its result can be delivered to the controller and checks that no groups are published. With the controller from before the asynchronous guard, the test failed because it reported success; with the current controller it rejects the result. The worker may have completed its read before the rename: the fixture forces the order relative to publication, not every point during the read. The existing same-identity export guard tests and normal offscreen multi-program export passed, along with activation, database, migration and qmlpopups CTest 4/4; git diff --check passed.
+
+The Unix rename fixture uses synthetic databases. Checks remain non-atomic against arbitrary replacement and restoration, and do not make live SQLite replacement safe. Physical interaction, Windows/Linux, external award importers and complete G06/G13 acceptance remain open.
+
 ## 2026-11-24 — G06 bind activation preview and partition export to the open file
 
 Asynchronous activation previews now capture the open log path, logical UUID, physical file identity and open generation. The worker checks the path and UUID around its read, and the controller checks the same context before publishing. Partition export requires the reviewed preview's context, checks the worker's opened log and checks the physical file again before committing the ADIF output. A file that cannot be identified is refused. The synchronous in-memory preview API remains available.

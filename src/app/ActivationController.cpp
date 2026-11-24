@@ -980,7 +980,13 @@ QVariantMap ActivationController::partitionPreview() const
     if (!m_session.active || m_session.sessionUuid.isEmpty())
         return {{QStringLiteral("error"), tr("This session has no tracked identity; its QSO cannot be attributed automatically.")}};
     if (!m_ctx.db || !m_ctx.db->isOpen()) return {{QStringLiteral("error"), tr("The log is not open.")}};
-    return scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {}, true, {}, nullptr, m_sotaCatalogue->path(), m_potaCatalogue->path());
+    const bool fileBacked=m_ctx.db->path()!=QLatin1String(":memory:");
+    const QString path=m_ctx.db->path(), identity=m_ctx.db->identity(); const QByteArray fileIdentity=m_ctx.db->openFileIdentity(); const quint64 generation=m_ctx.db->openGeneration();
+    const auto same=[&] { return m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==path && m_ctx.db->openGeneration()==generation &&
+        (!fileBacked || (!identity.isEmpty() && !fileIdentity.isEmpty() && m_ctx.db->identity()==identity && m_ctx.db->openFileIdentity()==fileIdentity && m_ctx.db->fileIdentityMatchesOpen())); };
+    if (!same()) return {{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
+    const auto result=scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {}, true, {}, nullptr, m_sotaCatalogue->path(), m_potaCatalogue->path());
+    return same() ? result : QVariantMap{{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
 }
 
 QString ActivationController::sessionReviewToken(const QString& uuid) const
