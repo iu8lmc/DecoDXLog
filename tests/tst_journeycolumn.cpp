@@ -1523,6 +1523,18 @@ private slots:
         QCOMPARE(first->source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(first->verifiedAt.toString(Qt::ISODate),QString("2026-01-09T10:00:00Z"));
         QCOMPARE(second->end,QDate(2026,10,7)); QCOMPARE(second->revision,1); QCOMPARE(second->source,QString("original source")); QCOMPARE(db.qsoCount(),1);
     }
+    void dxCampaignHistoryPageNavigation()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); dxcampaign::Campaign c;
+          c.title="Pages"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; QString error;
+          QVERIFY(dxcampaign::save(db,c,&error)); for (int i=0;i<55;++i) { c.title=QString("Pages %1").arg(i); QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); } }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistoryprobe",output,5000),output.constData());
+        const auto marker=QByteArray("PROBE dxhistory pages "); const int index=output.indexOf(marker); QVERIFY2(index>=0,output.constData());
+        const auto page=QJsonDocument::fromJson(output.mid(index+marker.size()).split('\n').first()).object();
+        QCOMPARE(page.value("first").toInt(),55); QCOMPARE(page.value("older").toInt(),5); QCOMPARE(page.value("back").toInt(),55); QVERIFY(page.value("error").toString().isEmpty());
+    }
     void dxCampaignHistoryIsVisibleAfterRestart()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

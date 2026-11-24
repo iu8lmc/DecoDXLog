@@ -3839,6 +3839,7 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
     <message><source>Previous saved revisions</source><translation>Revisioni precedenti salvate</translation></message>
     <message><source>Only changes saved after history was introduced are available. Older revisions cannot be recovered here.</source><translation>Sono disponibili solo le modifiche salvate dopo l'introduzione dello storico. Le revisioni precedenti non sono recuperabili qui.</translation></message>
     <message><source>Older revisions</source><translation>Revisioni meno recenti</translation></message>
+    <message><source>Newer revisions</source><translation>Revisioni più recenti</translation></message>
     <message><source>History</source><translation>Storico</translation></message>
     <message><source>Close</source><translation>Chiudi</translation></message>
     <message>

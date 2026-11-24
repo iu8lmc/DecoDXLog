@@ -290,6 +290,13 @@ GlassPanel {
     Timer { id:historyProbeResult; interval:500; onTriggered: {
         const row=campaignHistoryList.itemAtIndex(0)
         console.warn("PROBE dxhistory " + JSON.stringify({visible:campaignHistory.visible,rows:campaignHistory.rows,error:campaignHistory.historyError,rendered:row ? row.text : ""}))
+        if (campaignHistory.hasMore) {
+            const first=campaignHistory.rows[0].revision
+            campaignHistory.older()
+            const older=campaignHistory.rows[0].revision
+            campaignHistory.newer()
+            console.warn("PROBE dxhistory pages " + JSON.stringify({first:first,older:older,back:campaignHistory.rows[0].revision,error:campaignHistory.historyError}))
+        }
     } }
     function probeCampaignRestore() {
         campaignDialog.edit({bands:["20m"],modes:["CW"]})
@@ -373,14 +380,28 @@ GlassPanel {
         property var logContext:({})
         property var rows:[]
         property bool hasMore:false
+        property int beforeRevision:0
+        property var previousPages:[]
         property string historyError:""
         function displayHistory(c,context) {
-            campaignId=c.id; logContext=context; rows=[]; hasMore=false; historyError=""
+            campaignId=c.id; logContext=context; rows=[]; hasMore=false; historyError=""; previousPages=[]
             page(c.revision); open()
         }
         function page(before) {
             const result=root.campaignBackend.dxCampaignHistory(campaignId,before,logContext)
-            historyError=result.error || ""; rows=result.rows || []; hasMore=!!result.hasMore
+            historyError=result.error || ""
+            if (historyError) return false
+            rows=result.rows || []; hasMore=!!result.hasMore; beforeRevision=before; campaignHistoryList.positionViewAtBeginning()
+            return true
+        }
+        function older() {
+            if (!hasMore || !rows.length) return
+            const oldBefore=beforeRevision
+            if (page(rows[rows.length-1].revision)) previousPages=previousPages.concat([oldBefore])
+        }
+        function newer() {
+            if (!previousPages.length) return
+            if (page(previousPages[previousPages.length-1])) previousPages=previousPages.slice(0,-1)
         }
         body:ColumnLayout {
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor
@@ -401,8 +422,8 @@ GlassPanel {
                 }
             }
             RowLayout {
-                CalendarButton { text:qsTr("Older revisions"); enabled:campaignHistory.hasMore && campaignHistory.rows.length>0
-                    onClicked:campaignHistory.page(campaignHistory.rows[campaignHistory.rows.length-1].revision) }
+                CalendarButton { text:qsTr("Newer revisions"); enabled:campaignHistory.previousPages.length>0; onClicked:campaignHistory.newer() }
+                CalendarButton { text:qsTr("Older revisions"); enabled:campaignHistory.hasMore && campaignHistory.rows.length>0; onClicked:campaignHistory.older() }
                 CalendarButton { text:qsTr("Close"); onClicked:campaignHistory.close() }
             }
         }
