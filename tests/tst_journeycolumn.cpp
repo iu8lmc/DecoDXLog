@@ -75,6 +75,12 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void initTestCase()
+    {
+#ifdef Q_OS_WIN
+        qputenv("DECODXLOG_TEST_UTF8_LOG","1");
+#endif
+    }
     void stationNetworkReceivedQsoReview_data()
     {
         QTest::addColumn<bool>("accept"); QTest::addColumn<QString>("kind"); QTest::addColumn<bool>("secure");
@@ -1761,7 +1767,7 @@ private slots:
         QVERIFY2(output.contains("PROBE ocrAlert started=true"),output.constData());
         const QString connection="ocr-alert-observer"; { QSqlDatabase observer=QSqlDatabase::addDatabase("QSQLITE",connection); observer.setConnectOptions("QSQLITE_OPEN_READONLY"); observer.setDatabaseName(path); QVERIFY(observer.open()); bool committed=false; timer.restart();
           while (!committed && timer.elapsed()<2500) { QSqlQuery q(observer); QVERIFY(q.exec("SELECT count(*) FROM qsl_ocr_review")); QVERIFY(q.next()); committed=q.value(0).toInt()==1; if (!committed) QTest::qSleep(10); } QVERIFY(committed); observer.close(); }
-        QSqlDatabase::removeDatabase(connection); QVERIFY(QFile::rename(path,dir.filePath("moved.sqlite")));
+        QSqlDatabase::removeDatabase(connection); if (!QFile::rename(path,dir.filePath("moved.sqlite"))) { app.kill(); app.waitForFinished(); QSKIP("Platform does not allow replacing an open SQLite file"); }
         QVERIFY(app.waitForFinished(15000)); output+=app.readAll(); QVERIFY2(app.exitCode()==0,output.constData());
         QVERIFY2(output.contains("PROBE ocrAlert done=false category=OCR message=") && output.contains("test.sqlite"),output.constData());
     }

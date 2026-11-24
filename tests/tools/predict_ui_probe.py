@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from contextlib import closing
 """Read-only PREDICT app probe with isolated local UDP fixtures."""
 import os
 import pathlib
@@ -72,7 +73,7 @@ for stopped in (False, True):
             expected_commands = ['GET_MODE'] if stopped else ['GET_MODE', 'GET_TLE OSCAR-7', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7', 'GET_MODE']
             if server.commands != expected_commands:
                 raise SystemExit(f'Unexpected commands: {server.commands}')
-            with sqlite3.connect(root/'test.sqlite') as db:
+            with closing(sqlite3.connect(root/'test.sqlite')) as db:
                 assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
             server.shutdown()
             print(f'PASS stopped={stopped}, commands={server.commands}')
@@ -98,7 +99,7 @@ for stopped in (False, True):
             expected_commands = ['GET_MODE'] if stopped else ['GET_MODE', 'GET_LIST', 'GET_MODE']
             if server.commands != expected_commands:
                 raise SystemExit(f'Unexpected commands: {server.commands}')
-            with sqlite3.connect(root/'test.sqlite') as db:
+            with closing(sqlite3.connect(root/'test.sqlite')) as db:
                 assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
             server.shutdown()
             print(f'PASS list stopped={stopped}, commands={server.commands}')
@@ -129,7 +130,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-live-') as tmp:
         allowed = {'GET_MODE', 'GET_SAT OSCAR-7', 'GET_DOPPLER OSCAR-7', 'GET_TLE OSCAR-7'}
         if set(server.commands) - allowed or server.commands.count('GET_SAT OSCAR-7') != 2:
             raise SystemExit(f'Unexpected live commands: {server.commands}')
-        with sqlite3.connect(root/'test.sqlite') as db:
+        with closing(sqlite3.connect(root/'test.sqlite')) as db:
             assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
         server.shutdown()
         Fixture.handle = original_handle
@@ -153,7 +154,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
             raise SystemExit(f'FAIL pass: {output}; requests={server.commands}')
         if len(server.commands) != 6 or server.commands[0] != 'GET_TLE OSCAR-7' or not server.commands[1].startswith('PREDICT "OSCAR-7" ') or server.commands[2:4] != ['GET_TLE OSCAR-7', 'GET_TLE OSCAR-7'] or server.commands[4] != 'PREDICT "OSCAR-7" 1800000121' or server.commands[5] != 'GET_TLE OSCAR-7':
             raise SystemExit(f'Unexpected pass commands: {server.commands}')
-        with sqlite3.connect(root/'test.sqlite') as db:
+        with closing(sqlite3.connect(root/'test.sqlite')) as db:
             assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
         server.shutdown()
         print(f'PASS pass: {server.commands}')
@@ -186,7 +187,7 @@ for change_tle in (False, True):
                 raise SystemExit(f'Following pass did not use selected LOS: {server.commands}')
             if len(server.commands) != count * 3 or any(not c.startswith(('GET_TLE OSCAR-7', 'PREDICT "OSCAR-7" ')) for c in server.commands):
                 raise SystemExit(f'Unexpected schedule commands: {server.commands}')
-            with sqlite3.connect(root/'test.sqlite') as db:
+            with closing(sqlite3.connect(root/'test.sqlite')) as db:
                 assert db.execute('SELECT COUNT(*) FROM qso').fetchone()[0] == 0
             server.shutdown()
             print(f'PASS schedule change_tle={change_tle}: {server.commands}')
@@ -223,7 +224,7 @@ for fresh, save_mode, mapping in ((False, '', ''), (True, '', ''), (True, 'CW', 
                 raise SystemExit(f'FAIL out-of-range offset: {output}')
             if save and any(marker not in output for marker in ('PROBE predictDraftBeforeSave count=0', 'PROBE predictDraftInvalid kept=true', 'PROBE predictDraftSaved=true')):
                 raise SystemExit(f'FAIL explicit save: {output}')
-            with sqlite3.connect(root/'test.sqlite') as db:
+            with closing(sqlite3.connect(root/'test.sqlite')) as db:
                 rows = db.execute('SELECT call,freq,band,freq_rx,band_rx,prop_mode,sat_name,mode,sat_mode FROM qso WHERE deleted=0').fetchall()
                 if save:
                     assert rows == [('K1AAA', float(expected_tx), '2m', float(expected_rx), '70cm', 'SAT', 'OSCAR-7', save_mode, 'V/U')], rows

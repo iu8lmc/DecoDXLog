@@ -156,7 +156,7 @@ class TestTesseractOcr : public QObject {
         { LogDatabase replacement; QVERIFY(replacement.open(other)); QVERIFY(replacement.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0); }
         LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
         QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished); QVERIFY(search.start("K1ABC"));
-        QVERIFY(QFile::rename(path,dir.filePath("original.sqlite"))); QVERIFY(QFile::rename(other,path));
+        if (!QFile::rename(path,dir.filePath("original.sqlite"))) QSKIP("Platform does not allow replacing an open SQLite file"); QVERIFY(QFile::rename(other,path));
         QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.at(0).first().toBool()); QVERIFY(search.matches().isEmpty());
     }
     void completedReviewIsAttributedToOriginalLogSession()
@@ -210,7 +210,7 @@ class TestTesseractOcr : public QObject {
     void acquisitionIsAtomicAndKeepsExistingLinks()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
-        const QString dbPath = dir.filePath("log #?.sqlite");
+        const QString dbPath = dir.filePath("log # space.sqlite");
         const QString image = makeImage(dir, "card.png", false); QVERIFY(!image.isEmpty());
         QFile file(image); QVERIFY(file.open(QIODevice::ReadOnly)); const QByteArray bytes = file.readAll(); file.close();
         const QString hash = QString::fromLatin1(QCryptographicHash::hash(bytes, QCryptographicHash::Sha256).toHex());

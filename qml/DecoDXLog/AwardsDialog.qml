@@ -10,6 +10,7 @@ import Decodium.UI
 
 DialogFrame {
     id: root
+    function probeLocalFileUrl(path) { const p=String(path).replace(/\\/g,"/"); return "file://" + (p.startsWith("/") ? "" : "/") + encodeURI(p).replace(/#/g,"%23").replace(/\?/g,"%3F") }
 
     signal openQso(var id)
     signal openPaperQueue()
@@ -673,16 +674,16 @@ DialogFrame {
     function probeMarathonReviewedRoundTrip(path,profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
         cycleMarathonCandidate("entity",0); cycleMarathonCandidate("zone",0)
-        const saved=saveMarathonReviewed("file://"+path,marathonPreview.snapshot)
+        const saved=saveMarathonReviewed(root.probeLocalFileUrl(path),marathonPreview.snapshot)
         refreshMarathon(); const before=marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId
-        const loaded=loadMarathonReviewed("file://"+path)
+        const loaded=loadMarathonReviewed(root.probeLocalFileUrl(path))
         console.warn("PROBE marathonReviewedRoundTrip saved="+saved+" before="+before+" loaded="+loaded+" after="+marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId)
     }
     function probeMarathonSingleBand(path,profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="cw"; marathonBand="20m"; refreshMarathon()
         const count=marathonWorkingEntities.length, zones=marathonWorkingZones.length
-        const saved=saveMarathonReviewed("file://"+path,marathonPreview.snapshot)
-        const loaded=loadMarathonReviewed("file://"+path)
+        const saved=saveMarathonReviewed(root.probeLocalFileUrl(path),marathonPreview.snapshot)
+        const loaded=loadMarathonReviewed(root.probeLocalFileUrl(path))
         console.warn("PROBE marathonSingleBand band="+marathonPreview.band+" count="+count+" zones="+zones+" saved="+saved+" loaded="+loaded+" exclusions="+marathonPreview.exclusions.join("|"))
     }
     function probeMarathonEntityLimit(profile) {
@@ -700,25 +701,25 @@ DialogFrame {
     function probeMarathonReviewedImport(path,profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
         const before=marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId
-        const error=loadMarathonReviewed("file://"+path)
+        const error=loadMarathonReviewed(root.probeLocalFileUrl(path))
         console.warn("PROBE marathonReviewedImport error="+error+" before="+before+" after="+marathonWorkingEntities[0].qsoId+","+marathonWorkingZones[0].qsoId+" notice="+marathonImportNotice)
     }
     function probeMarathonReviewedExport(path,profile,dbPath) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon()
         cycleMarathonCandidate("entity",0); cycleMarathonCandidate("zone",0)
-        const success=saveMarathonReviewed("file://"+path,marathonPreview.snapshot)
-        const stale=saveMarathonReviewed("file://"+path,"stale")
-        const protectedPath=saveMarathonReviewed("file://"+dbPath,marathonPreview.snapshot)
-        const oldProtected=decolog.saveCqMarathonExport("file://"+dbPath,marathonPreview.edition,marathonPreview.category,marathonPreview.maxPerEntity,marathonPreview.stationProfileId)
+        const success=saveMarathonReviewed(root.probeLocalFileUrl(path),marathonPreview.snapshot)
+        const stale=saveMarathonReviewed(root.probeLocalFileUrl(path),"stale")
+        const protectedPath=saveMarathonReviewed(root.probeLocalFileUrl(dbPath),marathonPreview.snapshot)
+        const oldProtected=decolog.saveCqMarathonExport(root.probeLocalFileUrl(dbPath),marathonPreview.edition,marathonPreview.category,marathonPreview.maxPerEntity,marathonPreview.stationProfileId)
         marathonYear=2025
-        const changed=saveMarathonReviewed("file://"+path,"")
+        const changed=saveMarathonReviewed(root.probeLocalFileUrl(path),"")
         console.warn("PROBE marathonReviewedExport success="+success+" stale="+stale+" protected="+protectedPath+" oldProtected="+oldProtected+" changed="+changed)
     }
     function beginMarathonAdif(file,year,profile) {
         marathonAdifMessage=decolog.exportCqMarathonReviewAdif(file,year,profile)
         if (marathonAdifProbe && marathonAdifMessage.length) console.warn("PROBE marathonAdif start="+marathonAdifMessage)
     }
-    function probeMarathonAdif(path,profile) { openAt("dxcc"); marathonAdifProbe=true; beginMarathonAdif("file://"+path,2026,Number(profile)) }
+    function probeMarathonAdif(path,profile) { openAt("dxcc"); marathonAdifProbe=true; beginMarathonAdif(root.probeLocalFileUrl(path),2026,Number(profile)) }
     Connections { target:decolog
         function onCqMarathonAdifFinished(success,count,invalidTimestamp,error) {
             root.marathonAdifMessage=success ? qsTr("Exported %1 QSO; %2 invalid UTC timestamps skipped. Review before uploading.").arg(count).arg(invalidTimestamp) : qsTr("Export failed: %1").arg(error)

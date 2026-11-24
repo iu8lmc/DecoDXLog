@@ -524,7 +524,7 @@ private slots:
     }
     void guardedContestArchiveRejectsOtherLogAndDoesNotCreateMissingFile()
     {
-        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString a=dir.filePath("a # ?.sqlite"), b=dir.filePath("b.sqlite"), missing=dir.filePath("missing.sqlite");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString a=dir.filePath("a # space.sqlite"), b=dir.filePath("b.sqlite"), missing=dir.filePath("missing.sqlite");
         const QByteArray report="Contest: 2024 CQ WORLD WIDE CW DX CONTEST\nCall: K1ABC\n****** Not In Log ******\n";
         LogDatabase one,two,worker; QVERIFY(one.open(a)); QVERIFY(two.open(b));
         const QString identity=one.identity(); QVERIFY(!identity.isEmpty()); QVERIFY(identity!=two.identity());

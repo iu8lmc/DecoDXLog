@@ -13,9 +13,13 @@
 #include <QElapsedTimer>
 
 #include <QFile>
+#include <QDir>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUrl>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 
 using namespace decolog::core;
 using decolog::app::ActivationController;
@@ -199,7 +203,7 @@ private slots:
         ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
         QSignalSpy preview(&act,&ActivationController::contestReportFinished); QSignalSpy saved(&act,&ActivationController::contestReportArchiveFinished);
         QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(reportPath))); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
-        QVERIFY(QFile::rename(path,moved)); QVERIFY(act.archiveContestReportPreview()); QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,5000);
+        if (!QFile::rename(path,moved)) QSKIP("Platform does not allow replacing an open SQLite file"); QVERIFY(act.archiveContestReportPreview()); QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,5000);
         QVERIFY(!saved.first().at(0).toBool()); QVERIFY(!QFile::exists(path));
     }
     void archiveRejectsDifferentDatabaseReplacedAtSamePath()
@@ -212,7 +216,7 @@ private slots:
         ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
         QSignalSpy preview(&act,&ActivationController::contestReportFinished); QSignalSpy saved(&act,&ActivationController::contestReportArchiveFinished);
         QVERIFY(act.startContestReportPreview(QUrl::fromLocalFile(reportPath))); QTRY_COMPARE_WITH_TIMEOUT(preview.size(),1,5000);
-        QVERIFY(QFile::rename(first,moved)); QVERIFY(QFile::rename(replacement,first));
+        if (!QFile::rename(first,moved)) QSKIP("Platform does not allow replacing an open SQLite file"); QVERIFY(QFile::rename(replacement,first));
         QVERIFY(act.archiveContestReportPreview()); QTRY_COMPARE_WITH_TIMEOUT(saved.size(),1,5000);
         QVERIFY(!saved.first().at(0).toBool()); LogDatabase verify; QVERIFY(verify.open(first)); QVERIFY(verify.contestReports().isEmpty());
     }
@@ -227,7 +231,13 @@ private slots:
         const auto row=history.first().at(0).toMap().value("reports").toList().first().toMap(); const auto sha=row.value("sha256").toString();
         QVERIFY(!act.startContestReportExport(id,sha,QUrl::fromLocalFile(path)));
         QVERIFY(!act.startContestReportExport(id,sha,QUrl::fromLocalFile(path+"-wal")));
-        const QString alias=dir.filePath("alias.sqlite"); QVERIFY(QFile::link(path,alias));
+        const QString alias=dir.filePath("alias.sqlite");
+#ifdef Q_OS_WIN
+        const QString aliasNative=QDir::toNativeSeparators(alias), pathNative=QDir::toNativeSeparators(path);
+        QVERIFY(CreateHardLinkW(reinterpret_cast<LPCWSTR>(aliasNative.utf16()),reinterpret_cast<LPCWSTR>(pathNative.utf16()),nullptr));
+#else
+        QVERIFY(QFile::link(path,alias));
+#endif
         QVERIFY(!act.startContestReportExport(id,sha,QUrl::fromLocalFile(alias)));
         QVERIFY(!act.startContestReportExport(id,QStringLiteral("wrong"),QUrl::fromLocalFile(dir.filePath("wrong.rpt"))));
         const QString output=dir.filePath("copy.rpt"); QVERIFY(act.startContestReportExport(id,sha,QUrl::fromLocalFile(output)));

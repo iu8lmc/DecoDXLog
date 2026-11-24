@@ -13,6 +13,7 @@ import Decodium.UI
 
 RoundedWindow {
     id: root
+    function probeLocalFileUrl(path) { const p=String(path).replace(/\\/g,"/"); return "file://" + (p.startsWith("/") ? "" : "/") + encodeURI(p).replace(/#/g,"%23").replace(/\?/g,"%3F") }
 
     property int revision: 0
     property int comparisonLogRevision: 0
@@ -47,7 +48,7 @@ RoundedWindow {
         contestComparison.open(); comparisonContest.text="CQ-WW-CW"
         comparisonA.setTexts(decolog.showDate("2024-11-23"),decolog.showDate("2024-11-23"))
         comparisonB.setTexts(decolog.showDate("2025-11-22"),decolog.showDate("2025-11-22"))
-        comparisonFindings.fileA="file://"+folder+"/a.rpt"; comparisonFindings.fileB="file://"+folder+"/b.rpt"
+        comparisonFindings.fileA=root.probeLocalFileUrl(folder+"/a.rpt"); comparisonFindings.fileB=root.probeLocalFileUrl(folder+"/b.rpt")
         comparisonFindings.probing=true; comparisonFindings.probingStale=stale; comparisonFindings.open(); findingsCompare.clicked()
         if (stale) comparisonContest.text="OTHER"
     }
@@ -209,7 +210,7 @@ RoundedWindow {
             if (root.reportHistoryProbe) {
                 console.warn("PROBE lcr history " + (result.reports || []).length + " " + reportHistory.errorText)
                 if ((result.reports || []).length) {
-                    if (root.reportExportProbePath) reportHistory.exportSelected(result.reports[0], "file://" + root.reportExportProbePath)
+                    if (root.reportExportProbePath) reportHistory.exportSelected(result.reports[0], root.probeLocalFileUrl(root.reportExportProbePath))
                     else reportHistory.openSelected(result.reports[0])
                 }
             }

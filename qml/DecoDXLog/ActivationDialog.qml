@@ -9,6 +9,7 @@ import Decodium.UI
 
 DialogFrame {
     id: root
+    function probeLocalFileUrl(path) { const p=String(path).replace(/\\/g,"/"); return "file://" + (p.startsWith("/") ? "" : "/") + encodeURI(p).replace(/#/g,"%23").replace(/\?/g,"%3F") }
     signal openQsoRequested(var id)
     property string previewLogPath: ""
     property bool probeOpenExcluded: false
@@ -88,7 +89,7 @@ DialogFrame {
     function probePotaCatalogue() {
         root.openDialog("pota")
         root.probePotaMode = true
-        potaImportDialog.importPath("file://" + decolog.currentLogInfo().path + ".pota.csv")
+        potaImportDialog.importPath(root.probeLocalFileUrl(decolog.currentLogInfo().path + ".pota.csv"))
     }
     function probeSotaUpdate() {
         root.openDialog("pota")
@@ -98,7 +99,7 @@ DialogFrame {
     function probeSotaCatalogue() {
         root.openDialog("pota")
         root.probeSotaMode = true
-        sotaImportDialog.importPath("file://" + decolog.currentLogInfo().path + ".sota.csv")
+        sotaImportDialog.importPath(root.probeLocalFileUrl(decolog.currentLogInfo().path + ".sota.csv"))
     }
     function probeExclusions() {
         root.openDialog("pota")
@@ -201,7 +202,7 @@ DialogFrame {
                 root.probeExportStep++
                 const program = root.probeExportStep === 1 ? "SOTA" : "IOTA"
                 const group = (root.partitionPreview.groups || []).find(g => g.program === program)
-                const started = group && root.act.startPartitionExport(group, "file://" + decolog.currentLogInfo().path + "." + program + ".adi")
+                const started = group && root.act.startPartitionExport(group, root.probeLocalFileUrl(decolog.currentLogInfo().path + "." + program + ".adi"))
                 console.warn("PROBE multiExport " + program + " started=" + !!started)
                 if (!started) { root.probeAwaitExport = false; root.act.stop() }
             }
@@ -264,7 +265,7 @@ DialogFrame {
             if (root.probeClosedMode) {
                 console.warn("PROBE closedPreview success=" + success + " reported=" + root.partitionPreview.reportedCount)
                 const group = (root.partitionPreview.groups || []).find(g => g.program === "POTA" && g.reference === "IT-0001")
-                const started = group && root.act.startPartitionExport(group, "file://" + decolog.currentLogInfo().path + ".closed.adi")
+                const started = group && root.act.startPartitionExport(group, root.probeLocalFileUrl(decolog.currentLogInfo().path + ".closed.adi"))
                 console.warn("PROBE closedExport started=" + !!started)
                 if (!started) root.probeClosedMode = false
                 return
@@ -274,7 +275,7 @@ DialogFrame {
                 console.warn("PROBE multiPreview reported=" + root.partitionPreview.reportedCount + " groups=" + (root.partitionPreview.groups || []).length + " error=" + (root.partitionPreview.error || ""))
                 const group = (root.partitionPreview.groups || []).find(g => g.program === "POTA" && g.reference === "IT-0001")
                 root.probeAwaitExport = true
-                const started = group && root.act.startPartitionExport(group, "file://" + decolog.currentLogInfo().path + ".probe.adi")
+                const started = group && root.act.startPartitionExport(group, root.probeLocalFileUrl(decolog.currentLogInfo().path + ".probe.adi"))
                 console.warn("PROBE multiExport started=" + !!started)
                 if (!started) { root.probeAwaitExport = false; root.act.stop() }
             }

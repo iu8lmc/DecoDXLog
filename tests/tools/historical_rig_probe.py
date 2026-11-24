@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from contextlib import closing
 """Historical QSO through a live loopback split-rig fixture, without RF."""
 import json
 import os
@@ -45,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-historical-rig-') as tmp, Serve
     output = result.stdout + result.stderr
     if result.returncode or 'PROBE historicalProfile count=4' not in output:
         raise SystemExit(f'Historical entry did not complete: {output}; commands={commands}')
-    with sqlite3.connect(root/'test.sqlite') as db:
+    with closing(sqlite3.connect(root/'test.sqlite')) as db:
         rows = db.execute('SELECT call,freq,band,freq_rx,band_rx,adif_extra FROM qso WHERE deleted=0 ORDER BY id').fetchall()
     if len(rows) != 4:
         raise SystemExit(f'Expected four explicit records, got {len(rows)}')

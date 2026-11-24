@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from contextlib import closing
 """Isolated app + loopback rigctld fixture; no radio or RF is used."""
 import os
 import pathlib
@@ -44,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-split-probe-') as tmp, Server((
     server.shutdown()
     if result.returncode or 'PROBE rigSplitSaved=true' not in result.stdout + result.stderr:
         raise SystemExit(f'Application probe did not save: {result.stdout} {result.stderr}; commands={commands}')
-    with sqlite3.connect(root/'test.sqlite') as db:
+    with closing(sqlite3.connect(root/'test.sqlite')) as db:
         rows = db.execute('SELECT freq,band,freq_rx,band_rx FROM qso WHERE deleted=0').fetchall()
     expected = [(145.9, '2m', 435.25, '70cm')]
     if rows != expected:

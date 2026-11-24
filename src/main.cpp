@@ -415,6 +415,14 @@ void bringForwardTheOldName()
 
 int main(int argc, char* argv[])
 {
+    // Test subprocesses capture the byte stream, independently of the runner's
+    // active code page. The normal application logger remains unchanged.
+    if (qEnvironmentVariableIsSet("DECODXLOG_TEST_UTF8_LOG")) {
+        qInstallMessageHandler(+[](QtMsgType type,const QMessageLogContext& context,const QString& message) {
+            const QByteArray bytes=qFormatLogMessage(type,context,message).toUtf8();
+            std::fwrite(bytes.constData(),1,size_t(bytes.size()),stderr); std::fputc('\n',stderr); std::fflush(stderr);
+        });
+    }
     decolog::startupTrace("main entered");
     // I menu li disegna DecoDXLog, non Windows. Da Qt 6.8 i menu di QML possono
     // diventare menu nativi del sistema: quelli non sanno niente del tema e su

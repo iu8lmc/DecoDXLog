@@ -12,6 +12,7 @@ import Decodium.UI
 
 RoundedWindow {
     id: root
+    function probeLocalFileUrl(path) { const p=String(path).replace(/\\/g,"/"); return "file://" + (p.startsWith("/") ? "" : "/") + encodeURI(p).replace(/#/g,"%23").replace(/\?/g,"%3F") }
 
     property string mode: ""
     property int year: 0
@@ -242,9 +243,9 @@ RoundedWindow {
             }
             if (String(root.reportProbePath).length) {
                 console.warn("PROBE activityreport result " + JSON.stringify(result))
-                if (root.reportProbePdf) { console.warn("PROBE activityreport pdf protected " + decolog.exportActivityReportPdf("file://" + decolog.currentLogInfo().path)); root.beginReportPdf(root.reportProbePath) }
+                if (root.reportProbePdf) { console.warn("PROBE activityreport pdf protected " + decolog.exportActivityReportPdf(root.probeLocalFileUrl(decolog.currentLogInfo().path))); root.beginReportPdf(root.reportProbePath) }
                 else console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
-                console.warn("PROBE activityreport protected " + decolog.exportActivityReport("file://" + decolog.currentLogInfo().path))
+                console.warn("PROBE activityreport protected " + decolog.exportActivityReport(root.probeLocalFileUrl(decolog.currentLogInfo().path)))
                 console.warn("PROBE activityreport settings " + JSON.stringify(decolog.activityReportSettings()))
                 Qt.callLater(function() {
                     function inspect(index) {

@@ -112,9 +112,9 @@ private slots:
         CredentialStore credentials("test-only-large-log");
         credentials.m_secretCache.insert(credential, QStringLiteral("fixture-password"));
         QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
-        int requests = 0, ticks = 0;
+        int requests = 0, ticks = 0; QElapsedTimer heartbeatClock; qint64 lastTick=0, maxGap=0;
         QTimer heartbeat; heartbeat.setInterval(10);
-        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        connect(&heartbeat, &QTimer::timeout, this, [&] { const qint64 now=heartbeatClock.elapsed(); maxGap=qMax(maxGap,now-lastTick); lastTick=now; ++ticks; });
         connect(&server, &QTcpServer::newConnection, this, [&] {
             QTcpSocket* socket = server.nextPendingConnection();
             connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
@@ -137,18 +137,20 @@ private slots:
         QslController controller(ctx);
         const QUrl endpoint(QStringLiteral("http://127.0.0.1:%1/test").arg(server.serverPort()));
         controller.m_web.setEndpoints(endpoint, endpoint);
+        heartbeatClock.start(); heartbeat.start();
         QElapsedTimer prepare; prepare.start();
         QCOMPARE(controller.uploadQsos({selected, selected}, service), 1);
         const qint64 prepareMs = prepare.elapsed();
         QTRY_COMPARE_WITH_TIMEOUT(requests, 1, 5000);
         QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 5000);
-        QVERIFY(ticks >= 5);
+        maxGap=qMax(maxGap,heartbeatClock.elapsed()-lastTick);
+        QVERIFY2(ticks > 0 && maxGap < 1000, qPrintable(QStringLiteral("No heartbeat or event-loop gap %1 ms").arg(maxGap)));
         QCOMPARE(refreshes, 1);
         QCOMPARE(refreshedIds, QSet<qint64>{selected});
         QCOMPARE(db.qslStatus(selected).first().sent, QStringLiteral("Y"));
         QCOMPARE(controller.uploadQsos({selected}, service), 0);
         QCOMPARE(requests, 1);
-        qInfo() << service << "one selected of 20000, preparation ms" << prepareMs << "heartbeat ticks" << ticks;
+        qInfo() << service << "one selected of 20000, preparation ms" << prepareMs << "heartbeat ticks" << ticks << "max gap ms" << maxGap;
     }
 
     void bulkSchedulingWakesOnlyEnabledRequestedServices()

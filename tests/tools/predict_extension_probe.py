@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from contextlib import closing
 """Run the tracker adapter against an isolated app and simulated PREDICT UDP server."""
 import datetime
 import json
@@ -125,6 +126,6 @@ with tempfile.TemporaryDirectory(prefix="decolog-tracker-extension-") as tmp:
             app.terminate()
             output, _ = app.communicate(timeout=10)
             server.shutdown()
-        with sqlite3.connect(root / "test.sqlite") as db:
+        with closing(sqlite3.connect(root / "test.sqlite")) as db:
             assert db.execute("SELECT COUNT(*) FROM qso").fetchone()[0] == 0
         print("PASS tracker adapter: fresh, stale, read-only, no control packets or QSO")

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from contextlib import closing
 """PREDICT tracker draft with a connected loopback rig; no RF hardware."""
 import datetime
 import json
@@ -49,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-tracker-rig-') as tmp, RigServe
     expected=['GET_MODE','GET_TLE OSCAR-7','GET_SAT OSCAR-7','GET_DOPPLER OSCAR-7','GET_TLE OSCAR-7','GET_MODE']
     if result.returncode or 'PROBE trackerRig selections=true tracker=true connected=true' not in output or tracker.commands != expected:
         raise SystemExit(f'Probe failed: {output}; rig={rig.commands}; tracker={tracker.commands}')
-    with sqlite3.connect(root/'test.sqlite') as db:
+    with closing(sqlite3.connect(root/'test.sqlite')) as db:
         rows=db.execute('SELECT call,freq,band,freq_rx,band_rx,prop_mode,sat_name,mode FROM qso WHERE deleted=0').fetchall()
         if save:
             assert rows==[('K1AAA',145.998596,'2m',435.004184,'70cm','SAT','OSCAR-7','CW')], rows
