@@ -54,6 +54,11 @@ private slots:
         shifted.qsoUtc="1983-01-01T00:00:00"; QVERIFY(select({shifted},Rules{{},{},"6m",100}).eligible.isEmpty());
         QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='bad' WHERE call='K1BBB'"));
         const auto malformed=select(loadEntries(db),Rules{{},{},"6m",100}); QVERIFY(malformed.eligible.isEmpty()); QVERIFY(malformed.exclusions.join('\n').contains("UTC timestamp"));
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='1983-01-01T00:00:00' WHERE call='K1BBB'"));
+        const auto legacy=select(loadEntries(db),Rules{{},{},"6m",100}); QCOMPARE(legacy.eligible.size(),1);
+        QCOMPARE(legacy.eligible.first().qsoUtc,QString("1983-01-01T00:00:00Z"));
+        QVERIFY(q.exec("SELECT qso_datetime_on FROM qso WHERE call='K1BBB'")); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toString(),QString("1983-01-01T00:00:00"));
     }
     void separatesTerrestrialAndSatelliteCandidates()
     {

@@ -495,7 +495,8 @@ private slots:
         { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>19821231<TIME_ON:6>235959<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM10<QSL_RCVD:1>Y<EOR>"
               "<CALL:5>K1BBB<QSO_DATE:8>19830101<TIME_ON:6>000000<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EOR>";
-          QCOMPARE(db.importAdif(data).inserted,2); }
+          QCOMPARE(db.importAdif(data).inserted,2);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='1983-01-01T00:00:00' WHERE call='K1BBB'")); }
         QByteArray output; QVERIFY2(launch(dir,"vuccreviewprobe",output,4500),output.constData());
         QVERIFY2(output.contains("PROBE vuccReview open=true row=EM11") && output.contains("1983-01-01T00:00:00Z") && output.contains("before 1983-01-01 UTC") && !output.contains("TypeError"),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));

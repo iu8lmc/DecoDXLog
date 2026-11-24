@@ -2987,3 +2987,11 @@ Campaign matrices and focused goal-alert lookups now interpret unzoned legacy QS
 A/B on macOS arm64 / Qt 6.11.2: a synthetic legacy QSO inside the campaign period produced zero worked contacts before the fix; afterwards both the matrix and focused goal lookup recognize it. The fixture also checks an out-of-period unzoned timestamp and an invalid timestamp remain excluded. App and test targets built; CTest activityreport, dxcampaign, qmlpopups and activity_utc_pdf passed 4/4. During investigation an initial proposed report test was discarded after confirming that unzoned legacy QSO are explicitly defined as UTC; no report behavior was changed.
 
 The new case is a core-level synthetic fixture, not a physical desktop or live cluster test. The stored timestamp is interpreted according to the existing legacy convention, which cannot prove the original operator's clock was correct. Windows/Linux and full G04/G13 acceptance remain open.
+
+## 2026-11-24 — G02 VUCC legacy UTC timestamps
+
+VUCC now normalizes an unzoned timestamp read from a local QSO as UTC wall time, following the existing database legacy convention. It leaves the database value untouched; direct external entries passed to the selection API still require an explicitly zoned timestamp. This prevents valid legacy QSO being excluded solely because their stored timestamp lacks `Z`, without asserting award credit.
+
+A/B on macOS arm64 / Qt 6.11.2: the database-backed VUCC boundary fixture initially rejected an unzoned 1983-01-01 QSO; it now includes that candidate, retains the raw database value and still rejects a directly supplied unzoned entry and malformed data. An offscreen desktop fixture displays the normalized boundary candidate and the pre-1983 exclusion. App and tests built; CTest database, dxcampaign, migration, vucc and qmlpopups passed 5/5, and the focused desktop fixture passed separately.
+
+The legacy convention cannot verify the source clock, and selection is not proof of official eligibility or credit. The UI run is synthetic and programmatic. Other paths including Marathon and confirmation-delay reporting still treat unzoned legacy timestamps differently and require review. Live ARRL, physical UI, Windows/Linux and full G02/G13 acceptance remain open.

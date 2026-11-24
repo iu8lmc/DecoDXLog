@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QDateTime>
+#include <QTimeZone>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -266,6 +267,14 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.evidence = query.value(6).toString();
         entry.propMode=query.value(8).toString(); entry.satName=query.value(9).toString(); entry.rxBand=query.value(10).toString();
         entry.qsoUtc=query.value(11).toString();
+        // Database legacy QSO timestamps without a zone are UTC wall time.
+        // Inputs passed directly to select() still require an explicit zone.
+        QDateTime recorded=QDateTime::fromString(entry.qsoUtc,Qt::ISODateWithMs);
+        if (recorded.isValid() && recorded.timeSpec()==Qt::LocalTime) {
+            recorded.setTimeZone(QTimeZone::UTC);
+            entry.qsoUtc=recorded.toString(Qt::ISODateWithMs);
+            if (recorded.time().msec()==0) entry.qsoUtc=recorded.toString(Qt::ISODate);
+        }
         const auto observations=QJsonDocument::fromJson(query.value(12).toByteArray());
         if (!observations.isArray()) { if (error) *error=QStringLiteral("Cannot read LoTW grid observations"); return {}; }
         entry.lotwGridObservations=observations.array(); entry.lotwGridObservationCount=query.value(13).toInt();
