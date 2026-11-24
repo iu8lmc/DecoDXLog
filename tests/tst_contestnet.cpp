@@ -50,6 +50,19 @@ private slots:
         const auto legacyEvents=contesthandoff::history(legacy,"event","receiver",offer.id,false,&error);
         QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(legacyEvents.size(),1); QCOMPARE(legacyEvents.first().state,QString("accepted"));
     }
+    void skedReminderSnapshotRejectsChangedState()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("sked.sqlite")));
+        contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","event","sender","receiver","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        offer.scheduledUtc="2026-11-25T18:30:00Z"; QVERIFY(contesthandoff::receiveOffer(db,"event","receiver","sender",contesthandoff::offerFrame(offer)).ok);
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",offer.id,"accepted").ok);
+        const auto now=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate); const auto items=contesthandoff::incomingOffers(db,"event","receiver"); QCOMPARE(items.size(),1);
+        QVERIFY(contesthandoff::claimSkedReminderSnapshot(db,"event","receiver",items.first(),now).ok);
+        QVERIFY(contesthandoff::claimSkedReminderSnapshot(db,"event","receiver",items.first(),now).replayed);
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",offer.id,"completed").ok);
+        const auto stale=contesthandoff::claimSkedReminderSnapshot(db,"event","receiver",items.first(),now); QVERIFY(!stale.ok); QVERIFY(!stale.replayed);
+        QVERIFY(!contesthandoff::claimSkedReminderSnapshot(db,"wrong","receiver",items.first(),now).ok); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void skedReminderIsDueAcceptedAndPersistent()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("reminders.sqlite"); LogDatabase db; QVERIFY(db.open(path));

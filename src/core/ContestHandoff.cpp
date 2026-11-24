@@ -196,25 +196,30 @@ QList<HistoryEntry> history(const LogDatabase& db,const QString& scope,const QSt
     if (q.lastError().isValid()) { if (error) *error=q.lastError().text(); return {}; }
     return entries;
 }
+Result claimSkedReminderSnapshot(LogDatabase& db,const QString& scope,const QString& recipient,const Offer& offer,const QDateTime& nowUtc) {
+    if (!nowUtc.isValid() || nowUtc.timeSpec()!=Qt::UTC) return {false,false,QStringLiteral("Invalid reminder time")};
+    if (!db.isOpen() || !identifier(scope) || !identifier(recipient) || offer.scope!=scope || offer.recipient!=recipient || !valid(offer))
+        return {false,false,QStringLiteral("Invalid or misaddressed handoff offer")};
+    const auto scheduled=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
+    const auto seconds=scheduled.secsTo(nowUtc);
+    if (offer.state!=QLatin1String("accepted") || !scheduled.isValid() || seconds < -300 || seconds > 600)
+        return {false,false,QStringLiteral("Sked is not eligible for a reminder")};
+    const auto value=QString::fromUtf8(QJsonDocument(offerFrame(offer)).toJson(QJsonDocument::Compact));
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT OR IGNORE INTO app_setting(key,value) SELECT ?,'1' WHERE EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?) AND EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value='accepted')"));
+    q.addBindValue(reminderPrefix+offer.id); q.addBindValue(incomingPrefix+offer.id); q.addBindValue(value); q.addBindValue(statePrefix+offer.id);
+    if (!q.exec()) return {false,false,q.lastError().text()};
+    if (q.numRowsAffected()==1) return {true,false,{}};
+    QSqlQuery read(db.connection()); read.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=? AND EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?) AND EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value='accepted')"));
+    read.addBindValue(reminderPrefix+offer.id); read.addBindValue(incomingPrefix+offer.id); read.addBindValue(value); read.addBindValue(statePrefix+offer.id);
+    if (!read.exec()) return {false,false,read.lastError().text()};
+    if (read.next() && read.value(0).toString()==QLatin1String("1")) return {true,true,{}};
+    return {false,false,QStringLiteral("Sked changed; reminder not recorded")};
+}
 Result claimSkedReminder(LogDatabase& db,const QString& scope,const QString& recipient,const QString& id,const QDateTime& nowUtc) {
     if (!nowUtc.isValid() || nowUtc.timeSpec()!=Qt::UTC) return {false,false,QStringLiteral("Invalid reminder time")};
     QString error; const auto offers=incomingOffers(db,scope,recipient,&error);
     if (!error.isEmpty()) return {false,false,error};
-    for (const auto& offer:offers) if (offer.id==id) {
-        const auto scheduled=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
-        const auto seconds=scheduled.secsTo(nowUtc);
-        if (offer.state!=QLatin1String("accepted") || !scheduled.isValid() || seconds < -300 || seconds > 600)
-            return {false,false,QStringLiteral("Sked is not eligible for a reminder")};
-        const auto value=QString::fromUtf8(QJsonDocument(offerFrame(offer)).toJson(QJsonDocument::Compact));
-        QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT OR IGNORE INTO app_setting(key,value) SELECT ?,'1' WHERE EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?) AND EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value='accepted')"));
-        q.addBindValue(reminderPrefix+id); q.addBindValue(incomingPrefix+id); q.addBindValue(value); q.addBindValue(statePrefix+id);
-        if (!q.exec()) return {false,false,q.lastError().text()};
-        if (q.numRowsAffected()==1) return {true,false,{}};
-        QSqlQuery read(db.connection()); read.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); read.addBindValue(reminderPrefix+id);
-        if (!read.exec()) return {false,false,read.lastError().text()};
-        if (read.next() && read.value(0).toString()==QLatin1String("1")) return {true,true,{}};
-        return {false,false,QStringLiteral("Sked changed; reminder not recorded")};
-    }
+    for (const auto& offer:offers) if (offer.id==id) return claimSkedReminderSnapshot(db,scope,recipient,offer,nowUtc);
     return {false,false,QStringLiteral("Handoff offer not found")};
 }
 }

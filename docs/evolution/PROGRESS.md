@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G10 avoid repeated full sked-list reads
+
+The reminder controller now passes each already-validated offer snapshot to the claim operation instead of rereading the complete offer list for every claim. The claim still checks the stored offer bytes and accepted state in the conditional SQLite write; replay also requires that both still match. The original ID-based API remains available. A stale snapshot whose offer became completed is rejected, including when a prior reminder marker exists.
+
+A/B on macOS arm64 / Qt 6.11.2: an opt-in file-backed synthetic test (`DECOLOG_BENCH_SKED_SCAN=1`) scanned 1,500 due accepted offers and emitted the bounded 64 reminders in three samples. Before: 603/516/516 ms; after: 11/10/10 ms. The first sample creates markers and later samples replay them, in both variants. The controlled starvation/retry and restart/deduplication cases, stale-state core case, contestnet and netcontroller CTest groups (2/2), and the offscreen English/Italian handoff dialog fixture passed; no QSO was created. git diff --check passed.
+
+The first full netcontroller CTest attempt timed out in the separate three-node serial grant fixture: its 12-second wait needed 13.25 seconds in that run. That case passed in isolation (6.04 seconds), and the full group then passed on rerun; the reason for the intermittent delay was not established. The timing comparison is a small warm-cache local sample, not p95, slow-storage or sustained-load evidence. The scan still reads the list once, remains limited to 64 attempts per cycle and does not guarantee delivery or authenticated identity. Simulated local tests do not establish real LAN, physical UI, Windows/Linux, hardware or full G10/G13 acceptance.
+
 ## 2026-11-24 — G10 prevent failed sked reminders starving later offers
 
 The sked reminder scan retains a cursor in the controller session and starts the next bounded scan after the last attempted offer, wrapping through the ordered list. It still attempts at most 64 claims per scan and preserves the existing per-session duplicate suppression. Reconfiguring the handoff scope clears the cursor. Failed claims can be retried after wraparound; a successful claim does not imply network delivery or authenticated identity.

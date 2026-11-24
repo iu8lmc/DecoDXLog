@@ -1235,7 +1235,7 @@ void NetController::checkSkedReminders(const QDateTime& nowUtc)
         if (!when.isValid() || elapsed < -300 || elapsed > 600) continue;
         if (attempts>=64) break;
         ++attempts; m_skedScanCursor=offer.id;
-        const auto claimed=contesthandoff::claimSkedReminder(*m_ctx.db,m_handoffScope,m_id,offer.id,nowUtc);
+        const auto claimed=contesthandoff::claimSkedReminderSnapshot(*m_ctx.db,m_handoffScope,m_id,offer,nowUtc);
         if (!claimed.ok) continue;
         m_remindedSkeds.insert(seenKey);
         m_ctx.activity(QStringLiteral("SKED"),tr("Sked %1 at %2 UTC on %3 Hz from %4").arg(offer.call,offer.scheduledUtc,QString::number(offer.frequencyHz),offer.sender),QStringLiteral("warning"));

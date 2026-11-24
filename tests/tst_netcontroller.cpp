@@ -12,12 +12,37 @@
 #include <QJsonDocument>
 #include <QSqlError>
 #include <QFile>
+#include <QElapsedTimer>
 #include <QUdpSocket>
 #include <memory>
 
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void benchmarkSkedReminderScan()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_SKED_SCAN")) QSKIP("Opt-in synthetic timing comparison");
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("SkedBenchmark"); QCoreApplication::setApplicationName("Reminders"); QSettings().setValue("net/enabled",false);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("skeds.sqlite"))); QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection());
+        QVERIFY(q.prepare("INSERT INTO app_setting(key,value) VALUES(?,?)"));
+        for (int i=1;i<=1500;++i) {
+            const QString id=QStringLiteral("00000000-0000-0000-0000-%1").arg(i,12,16,QLatin1Char('0'));
+            contesthandoff::Offer o{id,"event","sender","receiver",QStringLiteral("K%1AAA").arg(i),14025000,"2026-11-24T12:00:00Z"}; o.scheduledUtc="2030-01-01T12:00:00Z";
+            const auto frame=contesthandoff::offerFrame(o); QVERIFY(!frame.isEmpty());
+            q.bindValue(0,"contest_handoff.in."+id); q.bindValue(1,QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact))); QVERIFY(q.exec());
+            q.bindValue(0,"contest_handoff.state."+id); q.bindValue(1,"accepted"); QVERIFY(q.exec());
+        }
+        QVERIFY(db.connection().commit()); const auto now=QDateTime::fromString("2030-01-01T12:00:00Z",Qt::ISODate);
+        for (int i=0;i<3;++i) {
+            int reminders=0; NetController::Context ctx; ctx.db=&db; ctx.activity=[&](const QString& cat,const QString&,const QString&) { if(cat=="SKED") ++reminders; };
+            NetController net(ctx); net.setIdForTests("receiver"); QVERIFY(net.configureHandoffScope("event").isEmpty());
+            QElapsedTimer timer; timer.start(); net.checkSkedReminders(now); const auto elapsed=timer.elapsed(); QCOMPARE(reminders,64);
+            qInfo() << "SKED_SCAN_BENCH offers=1500 reminders=" << reminders << "sample=" << i << "elapsed_ms=" << elapsed;
+        }
+        QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void skedReminderDoesNotStarveLaterOffersAfterFailures()
     {
         using namespace decolog::core; using decolog::app::NetController;
