@@ -21,6 +21,10 @@ private slots:
         bool found=false; for (const auto& group:plan.unverifiedElectronic) if (group.service=="lotw") {
             found=true; QCOMPARE(group.qsoIds,QList<qint64>({a,b})); QCOMPARE(group.uniqueBenefits,1);
         } QVERIFY(found);
+        QSqlQuery received(db.connection()); received.prepare("UPDATE qsl_status SET rcvd='Y' WHERE qso_id=? AND service='lotw'");
+        received.addBindValue(pending); QVERIFY(received.exec());
+        const auto refreshed=qslplanner::build(db,{}, {"dxcc"}); QVERIFY2(refreshed.error.isEmpty(),qPrintable(refreshed.error));
+        QVERIFY(refreshed.unverifiedElectronic.isEmpty()); QVERIFY(refreshed.pendingElectronic.isEmpty()); QVERIFY(refreshed.candidates.isEmpty());
     }
     void rejectsMissingRouteProvenance()
     {
