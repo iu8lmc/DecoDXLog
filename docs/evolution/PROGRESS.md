@@ -2963,3 +2963,11 @@ The LoTW full-sync cursor now remains unchanged when reconciliation has ambiguou
 A/B on macOS arm64 / Qt 6.11.2: a fake HTTP period download previously omitted `qso_qslsince` and failed the new assertion; it now sends the explicit date, and a non-ranged fake download verifies the same. The policy fixture initially failed to build without the new LoTW policy; it now covers normal, ranged, error, ambiguous and invalid cases. App and test targets built; CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6.
 
 Persistent ambiguous or invalid input will cause repeated downloads from the retained cursor until addressed. Not-found records can still be missed on a later import into this log unless the user requests a full sync; the latest summary is not a durable reconciliation queue. The policy and fake HTTP request were tested, not failure injection through the full desktop controller or real LoTW. Windows/Linux and G02/G05/G13 acceptance remain open.
+
+## 2026-11-24 — G05 retry unresolved full LoTW downloads
+
+For a full, non-ranged LoTW reconciliation with ambiguous records, invalid records or database errors, the saved cursor now rewinds to the explicit beginning of confirmation history. Previously retaining an existing newer cursor could skip older unresolved records on the next incremental sync. The status explains that the next sync will recheck the full history. Ranged syncs still leave the cursor untouched; successful full and incremental syncs retain the existing advancement policy.
+
+A/B on macOS arm64 / Qt 6.11.2: the new cursor-policy test initially failed to build because the policy did not exist. It now checks full versus incremental and ranged runs, ambiguous and invalid records, database errors, successful advancement and absent timestamps. App and tests built; CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6.
+
+This is a policy test and controller integration build, not a full desktop fault-injection or real-service test. Repeated unresolved records can force repeated full downloads; no durable per-record reconciliation queue exists. Not-found behavior and remaining G02/G05/G13 limitations remain as above. Windows/Linux are untested.

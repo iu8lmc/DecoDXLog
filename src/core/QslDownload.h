@@ -81,6 +81,8 @@ QDateTime downloadSince(const QDateTime& lastSuccess, bool everything);
 // A partial date range or a database failure must not advance the full-sync cursor.
 bool mayAdvanceCursor(bool ranged, int databaseErrors);
 bool mayAdvanceLotwCursor(bool ranged, int databaseErrors, int ambiguous, int invalid);
+QString lotwCursorAfterSync(const QString& previous, const QString& lastQsl, bool full, bool ranged,
+                            int databaseErrors, int ambiguous, int invalid);
 
 // Lo scarico automatico ogni `hours` ore: tocca se non si e' mai provato, o
 // se dall'ultimo tentativo (riuscito o no) sono passate le ore. Un tentativo

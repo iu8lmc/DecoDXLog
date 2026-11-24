@@ -1121,6 +1121,7 @@ private:
     QDate m_lotwFrom;
     QDate m_lotwTo;
     bool m_lotwRange{false};
+    bool m_lotwFull{false};
     bool      m_lotwStarting{false};
     core::ConfirmationDownloader m_confirmDownloader;
     std::optional<core::LogSessionToken> m_confirmOrigin;

@@ -125,6 +125,13 @@ private slots:
         QVERIFY(!confirmations::mayAdvanceLotwCursor(false,0,0,1));
         QVERIFY(!confirmations::mayAdvanceLotwCursor(false,1,0,0));
         QVERIFY(!confirmations::mayAdvanceLotwCursor(true,0,0,0));
+        QCOMPARE(confirmations::lotwCursorAfterSync("2026-09-01 00:00:00","2026-10-01 00:00:00",true,false,0,1,0),QString("1900-01-01"));
+        QCOMPARE(confirmations::lotwCursorAfterSync("2026-09-01 00:00:00","2026-10-01 00:00:00",false,false,0,1,0),QString("2026-09-01 00:00:00"));
+        QCOMPARE(confirmations::lotwCursorAfterSync("2026-09-01 00:00:00","2026-10-01 00:00:00",true,true,0,1,0),QString("2026-09-01 00:00:00"));
+        QCOMPARE(confirmations::lotwCursorAfterSync("2026-09-01 00:00:00","2026-10-01 00:00:00",true,false,0,0,0),QString("2026-10-01 00:00:00"));
+        QCOMPARE(confirmations::lotwCursorAfterSync("2026-09-01 00:00:00","2026-10-01 00:00:00",true,false,1,0,0),QString("1900-01-01"));
+        QCOMPARE(confirmations::lotwCursorAfterSync("2026-09-01 00:00:00","",true,false,0,0,0),QString("2026-09-01 00:00:00"));
+        QCOMPARE(confirmations::lotwCursorAfterSync("","2026-10-01 00:00:00",false,false,0,0,1),QString(""));
     }
 
     void changedLogRejectsDownloadedConfirmations()

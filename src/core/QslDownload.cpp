@@ -188,6 +188,15 @@ bool mayAdvanceLotwCursor(bool ranged, int databaseErrors, int ambiguous, int in
     return mayAdvanceCursor(ranged, databaseErrors) && ambiguous == 0 && invalid == 0;
 }
 
+QString lotwCursorAfterSync(const QString& previous, const QString& lastQsl, bool full, bool ranged,
+                            int databaseErrors, int ambiguous, int invalid)
+{
+    if (ranged) return previous;
+    if (databaseErrors || ambiguous || invalid)
+        return full ? QStringLiteral("1900-01-01") : previous;
+    return lastQsl.isEmpty() ? previous : lastQsl;
+}
+
 QDateTime downloadSince(const QDateTime& lastSuccess, bool everything)
 {
     if (everything || !lastSuccess.isValid())

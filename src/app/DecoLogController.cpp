@@ -6981,6 +6981,7 @@ void DecoLogController::syncLotw(bool full)
         m_lotwAuto = false; m_lotwRange = false; emit lotwChanged(); return;
     }
     const QString since = full ? QString() : m_db.setting(QStringLiteral("lotw.last_qsl"));
+    m_lotwFull = full;
     m_lotwStarting = true;
     m_lotwStatus = m_lotwRange
         ? tr("LoTW: downloading the confirmations of the QSOs from %1 to %2…")
@@ -7030,6 +7031,8 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     m_lotwAuto = false;
     const bool ranged = m_lotwRange;
     m_lotwRange = false;
+    const bool full = m_lotwFull;
+    m_lotwFull = false;
     const bool sameOrigin = m_lotwOrigin && m_db.matchesSessionToken(*m_lotwOrigin);
     m_lotwOrigin.reset();
     if (!sameOrigin) {
@@ -7064,8 +7067,11 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     // Il segno dell'ultimo scarico si sposta solo con lo scarico di tutto: uno
     // scarico per periodo lo porterebbe avanti e il prossimo "solo le nuove"
     // salterebbe le conferme degli altri QSO arrivate nel frattempo.
-    if (!report.lastQsl.isEmpty() && confirmations::mayAdvanceLotwCursor(ranged, tally.errors, tally.ambiguous, tally.invalid))
-        m_db.setSetting(QStringLiteral("lotw.last_qsl"), report.lastQsl);
+    const QString previousCursor=m_db.setting(QStringLiteral("lotw.last_qsl"));
+    const QString nextCursor=confirmations::lotwCursorAfterSync(previousCursor,report.lastQsl,full,ranged,
+                                                               tally.errors,tally.ambiguous,tally.invalid);
+    if (nextCursor!=previousCursor)
+        m_db.setSetting(QStringLiteral("lotw.last_qsl"),nextCursor);
     m_db.setSetting(QStringLiteral("lotw.last_sync_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
 
     m_lotwStatus = tr("LoTW: %1 new confirmations, %2 already marked, %3 not in the log")
@@ -7074,6 +7080,8 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
         m_lotwStatus += tr("; %1 database error(s), download cursor not advanced").arg(tally.errors);
     if (tally.ambiguous > 0 || tally.invalid > 0)
         m_lotwStatus += tr("; %1 ambiguous and %2 invalid records, download cursor not advanced").arg(tally.ambiguous).arg(tally.invalid);
+    if (!ranged && full && (tally.errors || tally.ambiguous || tally.invalid) && nextCursor!=previousCursor)
+        m_lotwStatus += tr("; the next sync will recheck the full history");
     m_db.setSetting(QStringLiteral("lotw.last_result"), m_lotwStatus);
     addActivity(QStringLiteral("LOTW"), m_lotwStatus, tally.errors > 0 ? QStringLiteral("error") : (tally.ambiguous > 0 || tally.invalid > 0) ? QStringLiteral("warning") : confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     for (const QString& m : missing)
