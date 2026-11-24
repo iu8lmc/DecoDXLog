@@ -8,6 +8,7 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QCryptographicHash>
 #include <QTest>
 #include <QElapsedTimer>
@@ -187,6 +188,24 @@ class TestTesseractOcr : public QObject {
         QVERIFY(acquisition.loadReviews(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),5,5000);
         QVERIFY(done.last().first().toBool()); QCOMPARE(acquisition.reviews().size(),1);
     }
+    void largeLogSimilarSearchComparison()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_OCR_LARGE_LOG")) QSKIP("Opt-in synthetic large-log benchmark");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
+        const auto exact=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture").id; QVERIFY(exact>0);
+        QSqlQuery seed(db.connection()); QVERIFY2(seed.exec(QStringLiteral(
+            "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<100000) "
+            "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) "
+            "SELECT printf('synthetic-%d',i),'K1ABD','2026-03-04T14:30:00Z','20m','CW','2026-03-04T14:30:00Z','2026-03-04T14:30:00Z' FROM n")),qPrintable(seed.lastError().text()));
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished); QElapsedTimer timer;
+        timer.start(); QVERIFY(search.startFiltered("K1ABC","2026-03-04","14:30")); QVERIFY(done.wait(30000));
+        const qint64 exactMs=timer.elapsed(); QVERIFY(done.last().first().toBool()); QCOMPARE(search.matches().size(),1); QCOMPARE(search.matches().first().toMap().value("id").toLongLong(),exact);
+        timer.restart(); QVERIFY(search.startSimilar("K1ABC","2026-03-04","14:30")); QVERIFY(done.wait(30000));
+        const qint64 similarMs=timer.elapsed(); QVERIFY(done.last().first().toBool()); QCOMPARE(search.matches().size(),100); QVERIFY(search.truncated()); QCOMPARE(search.matches().first().toMap().value("id").toLongLong(),exact);
+        qInfo() << "OCR synthetic 100001 QSO exact ms" << exactMs << "similar ms" << similarMs;
+        QCOMPARE(db.qsoCount(),qint64(100001));
+    }
+
     void similarSearchKeepsExactMatchesBeforeTheLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("ranked.sqlite")));
