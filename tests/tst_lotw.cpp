@@ -338,6 +338,27 @@ private slots:
         QCOMPARE(unknown.applyConfirmation("lotw",incoming).status,ConfirmationResult::Status::Confirmed);
     }
 
+    void matchingUsesUtcInstantForOffsetQso()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto a=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture",{},true,0,false);
+        const auto b=db.insertQso(qso("K1ABC","20m","CW","","20260910","120100","FN41"),"fixture",{},true,0,false);
+        QVERIFY(a.id>0 && b.id>0); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE id WHEN 1 THEN '2026-09-10T12:00:10+01:00' ELSE '2026-09-10T13:00:00+01:00' END"));
+        const auto incoming=qso("K1ABC","20m","CW","","20260910","120000","FN42");
+        const auto result=db.applyConfirmation("lotw",incoming,1800,{}, {},true);
+        QCOMPARE(result.status,ConfirmationResult::Status::Confirmed); QCOMPARE(result.id,b.id);
+        QVERIFY(db.record(a.id)->value("LOTW_QSL_RCVD").isEmpty());
+        QVERIFY(q.exec("SELECT qso_id FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toLongLong(),b.id); QVERIFY(!q.next());
+        LogDatabase other; QVERIFY(other.open(":memory:"));
+        const auto id=other.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture").id; QVERIFY(id>0);
+        QSqlQuery oq(other.connection()); QVERIFY(oq.exec("UPDATE qso SET qso_datetime_on='2026-09-10T12:00:10+01:00'"));
+        QCOMPARE(other.applyConfirmation("eqsl",incoming,1800).status,ConfirmationResult::Status::NotFound);
+        QVERIFY(oq.exec("UPDATE qso SET qso_datetime_on='2026-09-10T13:30:00+01:00'"));
+        QCOMPARE(other.applyConfirmation("eqsl",incoming,1800).status,ConfirmationResult::Status::Confirmed);
+        QCOMPARE(other.applyConfirmation("lotw",incoming,-1).status,ConfirmationResult::Status::Error);
+    }
+
     void gridObservationHistoryPagesAndRejectsChangedQso()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("history.sqlite")));

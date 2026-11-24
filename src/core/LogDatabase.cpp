@@ -2806,6 +2806,7 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
                                                   const QList<qint64>& exceptProfiles, bool retainLotwGridObservation)
 {
     ConfirmationResult res;
+    if (windowSeconds < 0) { res.status=ConfirmationResult::Status::Error; res.message=QStringLiteral("Invalid confirmation window"); return res; }
     const QslFields* fields = nullptr;
     for (const auto& f : kQslFields) {
         if (service == QLatin1String(f.service) && *f.rcvd)
@@ -2861,8 +2862,12 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     q.addBindValue(service);
     q.addBindValue(call);
     q.addBindValue(band);
-    q.addBindValue(on.addSecs(-windowSeconds).toString(Qt::ISODate));
-    q.addBindValue(on.addSecs(windowSeconds).toString(Qt::ISODate));
+    // Widen the indexed text range for zoned timestamps, then enforce the
+    // actual interval on parsed UTC instants below.
+    const QDateTime broadLower=on.addSecs(-qint64(windowSeconds)).addDays(-1);
+    const QDateTime broadUpper=on.addSecs(qint64(windowSeconds)).addDays(1);
+    q.addBindValue(broadLower.isValid()?broadLower.toString(Qt::ISODate):QString());
+    q.addBindValue(broadUpper.isValid()?broadUpper.toString(Qt::ISODate):QString(QChar(0xffff)));
     if (!q.exec()) {
         res.status = ConfirmationResult::Status::Error;
         res.message = q.lastError().text();
@@ -2880,7 +2885,11 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
             if (!localStation.isEmpty() && localStation != lotwStation)
                 continue;
         }
-        const qint64 distance = qAbs(parseIso(q.value(3).toString()).secsTo(on));
+        const QDateTime recorded=parseIso(q.value(3).toString());
+        if (!recorded.isValid()) continue;
+        const qint64 distanceMs=qAbs(recorded.msecsTo(on));
+        if (distanceMs>qint64(windowSeconds)*1000) continue;
+        const qint64 distance=distanceMs/1000;
         if (distance < bestDistance) {
             bestDistance = distance;
             bestMatches.clear();
@@ -2888,6 +2897,7 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
         if (distance == bestDistance)
             bestMatches.append({q.value(0).toLongLong(), q.value(4).toString() == QLatin1String("Y")});
     }
+    if (q.lastError().isValid()) { res.status=ConfirmationResult::Status::Error; res.message=q.lastError().text(); return res; }
     if (bestMatches.isEmpty())
         return res;
     if (bestMatches.size() > 1) {

@@ -3011,3 +3011,11 @@ Contest report candidate lookup retains a bounded indexed text prefilter widened
 A/B on macOS arm64 / Qt 6.11.2: a synthetic report minute previously selected an out-of-window `+01:00` QSO while missing a correct offset QSO; the new test failed before the fix and now returns only the correct offset, legacy UTC and previous-day `-12:00` entries in instant order. CTest contestreport and qmlpopups passed 2/2; an offscreen desktop report fixture opened a `+01:00` candidate. Following the final extreme-date prefilter fallback, the contestreport suite passed again (14 passed, one optional public sample skipped). App and test targets built before that final fallback.
 
 The widened text prefilter covers normal ISO offsets, not arbitrary invalid timestamp formats; SQLite date parsing and underlying data quality still apply. The desktop case uses a synthetic report, not an official log checking report or physical input. Query performance under a large log and Windows/Linux remain unmeasured; full G10/G13 acceptance remains open.
+
+## 2026-11-24 — G05 confirmation matching by UTC instant
+
+The shared LoTW/eQSL/QRZ confirmation matcher now widens its indexed timestamp prefilter for normal ISO offsets, then verifies each valid parsed UTC instant against the actual matching window before selecting the nearest QSO. It refuses negative windows and reports SQL iteration errors. Mode, station and ambiguity handling remain in place; a matched LoTW grid observation stays in the same transaction as its confirmation.
+
+A/B on macOS arm64 / Qt 6.11.2: with two synthetic QSO the previous text filter confirmed the wrong `+01:00` QSO an hour outside the window and missed the true match. The new test failed before the fix and now confirms only the correct QSO and attaches the observation to it. It also exercises eQSL outside/at the 30-minute boundary and a negative window. App and test targets built; CTest database, lotw, qsl, qsldownload, migration, vucc and qmlpopups passed 7/7.
+
+This is a synthetic database test, not live LoTW/eQSL/QRZ or full desktop reconciliation. The widened prefilter can examine more rows and has not been benchmarked on large logs. The heuristic match still cannot prove QSO identity, and invalid or non-ISO timestamps are excluded. Windows/Linux and full G05/G13 acceptance remain open.
