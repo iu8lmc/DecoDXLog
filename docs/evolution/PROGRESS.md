@@ -2703,3 +2703,11 @@ The activation preview now lists up to 200 distinct QSO whose correspondent POTA
 A/B on macOS arm64 / Qt 6.11.2: the synthetic fixture previously returned no review rows despite four flagged QSO; it now returns their identities and retains the expected exported ADIF. An offscreen app fixture displayed the expected K1ABC review row. App and test targets built; CTest activation, database, migration and qmlpopups passed 4/4.
 
 The new action reuses the existing guarded opening function but its button was not independently clicked in the POTA fixture; the existing excluded-QSO workflow has separate stale-record tests. The 200-row bound and omission counter have not been load-tested here, and omitted QSO cannot yet be paged from the database. Physical UI, live POTA, Windows/Linux and full G06/G13 acceptance remain open.
+
+## 2026-11-24 — G06 POTA review navigation A/B
+
+The offscreen desktop POTA fixture now invokes the actual review-row button and observes the matching QSO detail dialog open. It also passes a copy of the row with a different revision to the shared guard and verifies rejection. No functional product logic was changed; the additional probe runs only under the existing test startup mode.
+
+A/B on macOS arm64 / Qt 6.11.2: temporarily disabling the revision comparison allowed the stale row to open and failed the new assertion; after restoring it, the stale row was rejected and the unchanged row opened QSO 1. App and test targets rebuilt, the focused scenario passed and CTest activation, database, migration and qmlpopups passed 4/4.
+
+The stale row uses a deliberately altered revision value rather than an actual concurrent edit; a separate existing excluded-QSO fixture exercises an edit. The app is programmatically driven offscreen, not a physical interaction. The 200-row limit, live POTA, Windows/Linux and full G06/G13 acceptance remain open.

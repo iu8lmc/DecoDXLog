@@ -2085,7 +2085,7 @@ RoundedWindow {
             }
         }
     }
-    ActivationDialog { id: activationDialog; onOpenQsoRequested: (id) => { window.openQso(id); if (startupShow === "activationopenexcludedprobe") console.warn("PROBE activation open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)) } }
+    ActivationDialog { id: activationDialog; onOpenQsoRequested: (id) => { window.openQso(id); if (startupShow === "activationopenexcludedprobe") console.warn("PROBE activation open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)); if (startupShow === "potacatalogueprobe") console.warn("PROBE potaReview open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)) } }
     RadioNetDialog { id: radioNetDialog }
     RoverDialog { id: roverDialog }
     PredictDialog { id: predictDialog }

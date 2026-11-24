@@ -232,7 +232,13 @@ DialogFrame {
                     const group = groupRepeater.itemAt(0)
                     if (group) console.warn("PROBE potaGroup status=" + group.modelData.potaSnapshotStatus + " location=" + group.modelData.potaLocationStatus + " text=" + group.probeText())
                     const row = potaReviewRepeater.itemAt(0)
-                    if (row) console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentRows.length)
+                    if (row) {
+                        console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentRows.length)
+                        const stale = Object.assign({}, row.modelData)
+                        stale.revision = Number(stale.revision) + 1
+                        console.warn("PROBE potaReview stale=" + root.openExcludedQso(stale))
+                        row.probeOpen()
+                    }
                 })
                 return
             }
@@ -876,8 +882,9 @@ DialogFrame {
             RowLayout {
                 required property var modelData
                 Layout.fillWidth: true
+                function probeOpen() { openPotaReview.clicked() }
                 Note { Layout.fillWidth: true; text: qsTr("POTA review QSO #%1 · %2 · %3").arg(modelData.id).arg(modelData.call || "—").arg(modelData.at || "—") }
-                GlassButton { text: qsTr("Open QSO…"); onClicked: root.openExcludedQso(modelData) }
+                GlassButton { id: openPotaReview; text: qsTr("Open QSO…"); onClicked: root.openExcludedQso(modelData) }
             }
         }
         RowLayout {

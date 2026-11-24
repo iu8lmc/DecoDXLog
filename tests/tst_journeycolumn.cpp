@@ -1556,6 +1556,8 @@ private slots:
         QVERIFY2(output.contains("correspondent park needs review: 1 QSO") ||
                  output.contains("parco del corrispondente da verificare: 1 QSO"), output.constData());
         QVERIFY2(output.contains("PROBE potaReview call=K1ABC total=1"), output.constData());
+        QVERIFY2(output.contains("PROBE potaReview stale=false"), output.constData());
+        QVERIFY2(output.contains("PROBE potaReview open QSO 1 visible=true"), output.constData());
         QVERIFY(QFileInfo::exists(dir.filePath("data/pota-catalogue.sqlite")));
     }
     void sotaOfficialUpdateInDesktopWhenRequested()
