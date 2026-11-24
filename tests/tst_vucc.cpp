@@ -11,6 +11,22 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void usesEffectiveAdifGridWhenExtraOverridesColumn()
+    {
+        using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto* call : {"K1AAA","K1BBB","K1CCC"}) {
+            AdifRecord r{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","6m"},{"MODE","CW"},{"GRIDSQUARE","EM10"},{"QSL_RCVD","Y"}};
+            QVERIFY(db.insertQso(r,"fixture",{},true,0,false).id>0);
+        }
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(COALESCE(adif_extra,'{}'),'$.GRIDSQUARE',CASE call WHEN 'K1AAA' THEN 'EM12' WHEN 'K1BBB' THEN 'bad' ELSE 'EM14' END), gridsquare=CASE WHEN call='K1CCC' THEN '' ELSE gridsquare END"));
+        QString error; const auto entries=loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(entries.size(),3);
+        const auto selected=select(entries,Rules{{},{},"6m",100}); QCOMPARE(selected.eligible.size(),2);
+        QSet<QString> grids; for (const auto &e : selected.eligible) grids.insert(e.grid);
+        QCOMPARE(grids,(QSet<QString>{"EM12","EM14"})); QVERIFY(selected.exclusions.join('\n').contains("invalid or inconsistent grid"));
+        QCOMPARE(db.record(1)->value("GRIDSQUARE"),QString("EM12")); QCOMPARE(db.record(3)->value("GRIDSQUARE"),QString("EM14"));
+        QVERIFY(q.exec("UPDATE qso SET adif_extra=json_set(adif_extra,'$.GRIDSQUARE',42) WHERE call='K1AAA'"));
+        QVERIFY(loadEntries(db,&error).isEmpty()); QVERIFY(!error.isEmpty());
+    }
     void comparesStoredObservationsWithoutGrantingCredit()
     {
         Entry e{1,"EM98","6m",{},{},true,"lotw"}; e.qsoUtc="2026-01-01T12:00:00Z";

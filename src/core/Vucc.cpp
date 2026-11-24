@@ -239,6 +239,7 @@ Result select(const QList<Entry>& entries, const Rules& rules)
 
 QList<Entry> loadEntries(const LogDatabase& db, QString* error)
 {
+    if (error) error->clear();
     QList<Entry> entries;
     QSqlQuery query(db.connection());
     query.setForwardOnly(true);
@@ -255,7 +256,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "(SELECT COUNT(*) FROM lotw_grid_observation o WHERE o.id IN (SELECT id FROM lotw_grid_observation WHERE qso_id=q.id UNION "
             "SELECT observation_id FROM lotw_grid_observation_link WHERE qso_id=q.id)), q.uuid, q.revision "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
-            "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
+            "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%' OR q.adif_extra LIKE '%\"GRIDSQUARE\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
         return {};
     }
@@ -294,12 +295,14 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             const QJsonValue grids = object.value(QStringLiteral("VUCC_GRIDS"));
             const QJsonValue myGrids = object.value(QStringLiteral("MY_VUCC_GRIDS"));
             const QJsonValue myGrid = object.value(QStringLiteral("MY_GRIDSQUARE"));
+            const QJsonValue grid = object.value(QStringLiteral("GRIDSQUARE"));
             if ((!grids.isUndefined() && !grids.isString()) || (!myGrids.isUndefined() && !myGrids.isString()) ||
-                (!myGrid.isUndefined() && !myGrid.isString())) {
+                (!myGrid.isUndefined() && !myGrid.isString()) || (!grid.isUndefined() && !grid.isString())) {
                 if (error) *error = QStringLiteral("QSO %1: invalid VUCC grid field type").arg(entry.qsoId);
                 return {};
             }
             entry.grids = grids.toString();
+            if (!grid.isUndefined()) entry.grid=grid.toString();
             entry.myGrids = myGrids.toString();
             entry.myGrid = myGrid.toString();
         }
@@ -307,6 +310,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             continue;
         entries << entry;
     }
+    if (query.lastError().isValid()) { if (error) *error=query.lastError().text(); return {}; }
     return entries;
 }
 
