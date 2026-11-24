@@ -3417,3 +3417,11 @@ Added an offscreen app fixture that pauses the GUI event loop after starting a m
 A/B on macOS arm64 / Qt 6.11.2: with the pre-version-check controller from `09b29d1`, the worker calculated zero and the app published that stale zero after the external commit. With the controller from `694a631`, no stale zero was published and the eventual matrix showed one worked QSO. The focused in-flight, external-write and file-replacement offscreen fixtures passed after restoring the current controller. git diff --check passed.
 
 This forces one ordering between worker completion and GUI publication; it does not cover all transaction schedules, high write rates, physical UI, real services or other platforms. The isolated worktree still awaits integration after the separate full CTest running on the main checkout.
+
+## 2026-11-24 — G01/G04 large-log campaign refresh observation
+
+Added an opt-in offscreen app benchmark with a file-backed synthetic log of 100,000 matching QSO. While the campaign matrix is displayed, a separate connection inserts six more QSO and a 50 ms QML timer samples event-loop responsiveness for eight seconds. The test verifies the final matrix and reports timer count and maximum interval; it is skipped in ordinary runs unless `DECOLOG_BENCH_DX_MATRIX=1` is set.
+
+A/B on macOS arm64 / Qt 6.11.2: with the pre-monitor controller from `09b29d1`, the matrix stayed at 100,000 despite six committed QSO; the timer fired 160 times with a 64 ms maximum interval. With the controller from `694a631`, the matrix reached 100,006; two runs recorded 160 timer events with maximum intervals of 65 ms and 64 ms. The first benchmark build lacked a QSqlError include, and the first fixture write was rejected by normal duplicate detection; the fixture was corrected to insert the six deliberate duplicates explicitly. The current controller was restored and the B benchmark passed after the A run. git diff --check passed.
+
+This is a small synthetic local sample, not a p95/p99 measurement or a guarantee for larger logs, slow disks, sustained writes, actual user input, other platforms or hardware. A separate full CTest was running concurrently and may affect timing. This work remains in the detached worktree pending integration into the main checkout.

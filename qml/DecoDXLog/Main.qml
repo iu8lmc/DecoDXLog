@@ -1335,6 +1335,7 @@ RoundedWindow {
         else if (what[0] === "dxmatrixcontextprobe") { window.showPanel("dxcalendar"); dxMatrixContextProbe.start() }
         else if (what[0] === "dxmatrixexternalprobe") { window.showPanel("dxcalendar"); dxMatrixExternalProbe.start() }
         else if (what[0] === "dxmatrixraceprobe") { window.showPanel("dxcalendar"); dxMatrixRaceProbe.start() }
+        else if (what[0] === "dxmatrixperfprobe") { window.showPanel("dxcalendar"); dxMatrixPerfProbe.start() }
         else if (what[0] === "dxcampaignspotprobe") { window.showPanel("dxcalendar"); dxCampaignSpotProbe.start() }
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
@@ -1805,6 +1806,7 @@ RoundedWindow {
     Timer { id:dxMatrixContextProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeMatrixContext(); else console.warn("PROBE dxmatrix missing panel") } }
     Timer { id:dxMatrixExternalProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeMatrixExternal(); else console.warn("PROBE dxmatrixexternal missing panel") } }
     Timer { id:dxMatrixRaceProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeMatrixRace(); else console.warn("PROBE dxmatrixrace missing panel") } }
+    Timer { id:dxMatrixPerfProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeMatrixPerformance(); else console.warn("PROBE dxmatrixperf missing panel") } }
     Timer { id:dxCampaignSpotProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaignSpots(); else console.warn("PROBE dxspots missing panel") } }
     Timer { id:dxExternalWatchReady; interval:1000; onTriggered: { console.warn("PROBE dxexternal ready"); dxExternalWatchSpot.start() } }
     Timer { id:duplicateGuardStart; interval:1000; onTriggered: { duplicateGuardProbe.waiting=true; decolog.findDuplicates(5) } }

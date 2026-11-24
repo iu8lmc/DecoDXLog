@@ -225,6 +225,21 @@ GlassPanel {
     Timer { id:dxMatrixRaceResult; interval:3500; onTriggered: {
         console.warn("PROBE dxmatrixrace result " + JSON.stringify(root.campaignBackend.dxCampaignMatrix)); root.matrixRaceProbeActive=false
     } }
+    function probeMatrixPerformance() {
+        const rows=root.campaignBackend.dxCampaigns
+        if (!rows.length || !root.campaignBackend.selectDxCampaign(rows[0].id)) { console.warn("PROBE dxmatrixperf setup failed"); return }
+        dxMatrixPerfReady.start()
+    }
+    Timer { id:dxMatrixPerfReady; interval:100; repeat:true; property int tries:0; onTriggered: {
+        if (root.campaignBackend.dxCampaignBusy && ++tries<100) return
+        stop(); dxMatrixPerfHeartbeat.last=Date.now(); dxMatrixPerfHeartbeat.start(); console.warn("PROBE dxmatrixperf ready " + JSON.stringify(root.campaignBackend.dxCampaignMatrix)); dxMatrixPerfResult.start()
+    } }
+    Timer { id:dxMatrixPerfHeartbeat; interval:50; repeat:true; property double last:0; property double maximum:0; property int count:0; onTriggered: {
+        const now=Date.now(); maximum=Math.max(maximum,now-last); last=now; ++count
+    } }
+    Timer { id:dxMatrixPerfResult; interval:8000; onTriggered: {
+        dxMatrixPerfHeartbeat.stop(); console.warn("PROBE dxmatrixperf result " + JSON.stringify({beats:dxMatrixPerfHeartbeat.count,maxGapMs:dxMatrixPerfHeartbeat.maximum,busy:root.campaignBackend.dxCampaignBusy,error:root.campaignBackend.dxCampaignError,rows:root.campaignBackend.dxCampaignMatrix}))
+    } }
     function probeDateReview() {
         calendarObserved="2026-01-09T10:00:00Z"
         visibleEntries=[{entity:"Fixture expedition",title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-10",description:"Updated dates"}]

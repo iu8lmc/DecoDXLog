@@ -10,6 +10,7 @@
 #include <QStandardPaths>
 #include <QRegularExpression>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QTemporaryDir>
 #include <QTest>
 #include "core/LogDatabase.h"
@@ -1346,6 +1347,31 @@ private slots:
         QVERIFY2(output.contains("PROBE dxspots goalorder 3Y0K:true,3Y0J:false"),output.constData());
         QVERIFY2(output.contains("PROBE dxspots rendered 3Y0K") && output.contains("PROBE dxspots filtered []"),output.constData());
         QVERIFY2(!output.contains("\"call\":\"K1XYZ\"") && !output.contains("TypeError"),output.constData());
+    }
+    void benchmarkDxCampaignMatrixExternalWrites()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_DX_MATRIX")) QSKIP("Opt-in synthetic large-log benchmark");
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto path=dir.filePath("test.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); dxcampaign::Campaign c; c.title="Benchmark"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7);
+          c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+          QSqlQuery q(db.connection()); QVERIFY2(q.exec("WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM n WHERE i<99999) INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) SELECT printf('bench-%d',i),'ZZ1AAA','2026-01-03T12:00:00Z','20m','CW','2026-01-03T12:00:00Z','2026-01-03T12:00:00Z' FROM n"),qPrintable(q.lastError().text())); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software"); env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","13000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","dxmatrixperfprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE dxmatrixperf ready") && timer.elapsed()<30000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE dxmatrixperf ready") && output.contains("\"worked\":100000"),output.constData());
+        { LogDatabase writer; QVERIFY(writer.open(path)); for(int i=0;i<6;++i) {
+            const auto record=writer.insertQso({{"CALL","ZZ1AAA"},{"QSO_DATE","20260103"},{"TIME_ON",QStringLiteral("13%1").arg(i,2,10,QChar('0'))},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false);
+            QVERIFY2(record.status==InsertResult::Status::Inserted,qPrintable(record.message)); QThread::msleep(200);
+          } }
+        QVERIFY(app.waitForFinished(25000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        const auto marker=QByteArray("PROBE dxmatrixperf result "); const auto index=output.indexOf(marker); QVERIFY2(index>=0,output.constData());
+        const auto json=QJsonDocument::fromJson(output.mid(index+marker.size()).split('\n').first()).object();
+        QVERIFY2(!json.value("rows").toArray().isEmpty(),output.constData());
+        QVERIFY2(json.value("beats").toInt()>30 && !json.value("busy").toBool() && json.value("error").toString().isEmpty() &&
+            json.value("rows").toArray().first().toObject().value("worked").toInt()==100006,output.constData());
+        qInfo("DX_MATRIX_BENCH qso=100000 writes=6 beats=%d max_gap_ms=%.0f",json.value("beats").toInt(),json.value("maxGapMs").toDouble());
     }
     void dxCampaignMatrixDiscardsInFlightExternalWrite()
     {
