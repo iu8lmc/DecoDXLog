@@ -464,6 +464,22 @@
 <context>
     <name>AwardsDialog</name>
     <message>
+        <source>Show QSO</source>
+        <translation>Mostra QSO</translation>
+    </message>
+    <message>
+        <source>Show QSO awaiting %1</source>
+        <translation>Mostra QSO in attesa di %1</translation>
+    </message>
+    <message>
+        <source>Showing QSO awaiting %1</source>
+        <translation>QSO in attesa di %1</translation>
+    </message>
+    <message>
+        <source>Show all candidates</source>
+        <translation>Mostra tutti i candidati</translation>
+    </message>
+    <message>
         <source>Recorded electronic requests awaiting confirmation; potential benefits may overlap between services.</source>
         <translation>Richieste elettroniche registrate in attesa di conferma; i benefici potenziali possono sovrapporsi tra servizi.</translation>
     </message>

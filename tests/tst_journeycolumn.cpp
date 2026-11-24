@@ -1263,6 +1263,7 @@ private slots:
         QByteArray output; QVERIFY2(launch(dir,"qslplanprobe",output,7000),output.constData());
         QVERIFY2(output.contains("PROBE qslplan status 3 potential benefits · 3 candidate QSO"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan electronic LOTW: 1 QSO · 2 potential benefits") || output.contains("PROBE qslplan electronic LOTW: 1 QSO · 2 benefici potenziali"),output.constData());
+        QVERIFY2(output.contains("PROBE qslplan filtered count=1 id=2") && output.contains("PROBE qslplan all count=3"), output.constData());
         QVERIFY2(output.contains("K1PAA") && output.contains("M0ABC"),output.constData());
         QVERIFY2(output.contains("\"date\":\"2026-10-15\"") && output.contains("\"dateStatus\":\"valid\"") && output.contains("PROBE qslplan pending card: recorded sent 2026-10-15"),output.constData());
         QVERIFY2(output.contains("PROBE qslplan row K1PAA") && output.contains("DXCC 291"),output.constData());

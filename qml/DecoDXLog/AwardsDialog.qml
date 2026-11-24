@@ -110,6 +110,14 @@ DialogFrame {
         return !plannerSaveError
     }
 
+    property string plannerPendingService: ""
+    function plannerCandidateRows() {
+        if (decolog.qslPlan.stale || plannerSelectionDirty) return []
+        const rows = decolog.qslPlan.candidates || []
+        if (!plannerPendingService) return rows
+        return rows.filter(c => (c.pending || []).indexOf(plannerPendingService) >= 0 &&
+                                (c.benefits || []).some(b => (b.services || []).indexOf(plannerPendingService) >= 0))
+    }
     function schedulePlannerRefresh() {
         if (qslPlanner.visible && plannerGoals.length > 0) plannerRefresh.restart()
     }
@@ -254,7 +262,13 @@ DialogFrame {
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
             console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
             const electronic = electronicRoutes.itemAt(0)
-            console.warn("PROBE qslplan electronic " + (electronic ? electronic.text : "missing"))
+            console.warn("PROBE qslplan electronic " + (electronic ? electronic.probeText : "missing"))
+            if (electronic) {
+                electronic.probeFilter()
+                console.warn("PROBE qslplan filtered count=" + qslPlanCandidates.count + " id=" + (qslPlanCandidates.count ? qslPlanCandidates.model[0].id : 0))
+                root.plannerPendingService = ""
+                console.warn("PROBE qslplan all count=" + qslPlanCandidates.count)
+            }
             const grouped = paperRoutes.itemAtIndex(0)
             console.warn("PROBE qslplan group " + (grouped ? grouped.probeText : "missing"))
             costEditor.edit(plan.paperRoutes[0]); amountField.text = "12.50"; currencyField.text = "EUR"; saveCostButton.clicked()
@@ -310,7 +324,7 @@ DialogFrame {
         title: qsTr("Potential QSL plan")
         info: qsTr("Review before requesting; no messages are sent")
         dialogKey: "qslPlanner"
-        onVisibleChanged: if (visible) root.loadPlannerScope(true)
+        onVisibleChanged: { if (visible) root.loadPlannerScope(true); else root.plannerPendingService = "" }
         width: 960; height: 650
         body: ColumnLayout {
             spacing: 8
@@ -381,11 +395,29 @@ DialogFrame {
             Repeater {
                 id: electronicRoutes
                 model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.pendingElectronic || [])
-                Text {
+                RowLayout {
                     required property var modelData
-                    Layout.fillWidth: true; color: Theme.textPrimary; wrapMode: Text.Wrap
-                    text: qsTr("%1: %2 QSO · %3 potential benefits").arg(modelData.service.toUpperCase()).arg(modelData.qsoCount).arg(modelData.uniqueBenefits)
+                    readonly property string probeText: electronicLabel.text
+                    function probeFilter() { electronicFilter.clicked() }
+                    Layout.fillWidth: true
+                    Text {
+                        id: electronicLabel
+                        Layout.fillWidth: true; color: Theme.textPrimary; wrapMode: Text.Wrap
+                        text: qsTr("%1: %2 QSO · %3 potential benefits").arg(modelData.service.toUpperCase()).arg(modelData.qsoCount).arg(modelData.uniqueBenefits)
+                    }
+                    GlassButton {
+                        id: electronicFilter
+                        text: qsTr("Show QSO")
+                        Accessible.name: qsTr("Show QSO awaiting %1").arg(modelData.service.toUpperCase())
+                        onClicked: root.plannerPendingService = modelData.service
+                    }
                 }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                visible: root.plannerPendingService.length > 0
+                Text { Layout.fillWidth: true; color: Theme.textSecondary; text: qsTr("Showing QSO awaiting %1").arg(root.plannerPendingService.toUpperCase()) }
+                GlassButton { text: qsTr("Show all candidates"); onClicked: root.plannerPendingService = "" }
             }
             ListView {
                 id: paperRoutes; Layout.fillWidth: true; Layout.preferredHeight: Math.min(90, contentHeight)
@@ -410,7 +442,7 @@ DialogFrame {
                 id: qslPlanCandidates
                 objectName: "qslPlanCandidates"
                 Layout.fillWidth: true; Layout.fillHeight: true; clip: true; spacing: 4
-                model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.candidates || [])
+                model: root.plannerCandidateRows()
                 delegate: Rectangle {
                     required property var modelData
                     readonly property string probeText: candidateHeading.text + " " + candidatePriority.text + " " + candidateBenefits.text
