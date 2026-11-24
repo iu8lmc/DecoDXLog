@@ -132,6 +132,9 @@ public:
     Q_INVOKABLE QVariantList qsoIds() const;
     // Read-only grouped view of QSO reporting the active session UUID.
     Q_INVOKABLE QVariantMap partitionPreview() const;
+    // Internal building block for paged review. Callers must compare the
+    // returned group fingerprints before combining pages from separate reads.
+    QVariantMap partitionPreviewPage(qint64 afterId, int limit) const;
     // Nome del file suggerito per l'invio (POTA e compagnia).
     Q_INVOKABLE QString suggestedFileName() const;
     // I contest che il programma conosce (quelli dell'enumerazione ADIF piu' i

@@ -747,6 +747,18 @@ private slots:
         QVERIFY2(seed.exec("INSERT INTO qsl_status(qso_id,service,sent,rcvd) SELECT id,'lotw','Y','N' FROM qso"),qPrintable(seed.lastError().text()));
         const bool reviews = qEnvironmentVariableIsSet("DECOLOG_BENCH_POTA_REVIEW");
         if (reviews) QVERIFY(seed.exec("UPDATE qso SET pota_ref='US-0001,US-0002'"));
+        if (qEnvironmentVariableIsSet("DECOLOG_BENCH_POTA_PAGED")) {
+            QElapsedTimer pageTimer; pageTimer.start();
+            const bool full=qEnvironmentVariable("DECOLOG_BENCH_POTA_PAGED")==QLatin1String("full");
+            const auto page=act.partitionPreviewPage(0,full ? -1 : 100);
+            QVERIFY2(page.value("error").toString().isEmpty(),qPrintable(page.value("error").toString()));
+            QCOMPARE(page.value("reportedCount").toInt(),20000);
+            QCOMPARE(page.value("potaCorrespondentRows").toList().size(),reviews ? (full ? 20000 : 100) : 0);
+            QCOMPARE(page.value("potaCorrespondentTotal").toLongLong(),reviews ? qint64(20000) : qint64(0));
+            QCOMPARE(page.value("potaCorrespondentHasMore").toBool(),reviews && !full);
+            qInfo("ACTIVATION_PAGE_BENCH qso=20000 review=%d full=%d elapsed_ms=%lld",reviews,full,static_cast<long long>(pageTimer.elapsed()));
+            return;
+        }
         QElapsedTimer timer; timer.start(); int ticks=0; qint64 last=0, maxGap=0;
         QTimer heartbeat; heartbeat.setInterval(10); QObject::connect(&heartbeat,&QTimer::timeout,[&] { const qint64 now=timer.elapsed(); maxGap=qMax(maxGap,now-last); last=now; ++ticks; }); heartbeat.start();
         QSignalSpy done(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
@@ -808,6 +820,29 @@ private slots:
         QCOMPARE(result.value("potaCorrespondentOmitted").toInt(),0);
         const auto groups=result.value("groups").toList(); QCOMPARE(groups.size(),2);
         for (const auto& group : groups) QCOMPARE(group.toMap().value("potaCorrespondentReview").toInt(),205);
+        QVariantList paged; qint64 cursor=0;
+        for (int page=0; page<3; ++page) {
+            const auto part=act.partitionPreviewPage(cursor,100);
+            QVERIFY2(part.value("error").toString().isEmpty(),qPrintable(part.value("error").toString()));
+            QCOMPARE(part.value("groups").toList(),groups);
+            QCOMPARE(part.value("potaCorrespondentTotal").toLongLong(),qint64(205));
+            const auto pageRows=part.value("potaCorrespondentRows").toList();
+            QCOMPARE(pageRows.size(),page<2 ? 100 : 5);
+            QCOMPARE(part.value("potaCorrespondentHasMore").toBool(),page<2);
+            paged.append(pageRows); cursor=pageRows.last().toMap().value("id").toLongLong();
+        }
+        QCOMPARE(paged,rows);
+        const auto empty=act.partitionPreviewPage(cursor,100);
+        QVERIFY(empty.value("potaCorrespondentRows").toList().isEmpty());
+        QVERIFY(!empty.value("potaCorrespondentHasMore").toBool());
+        QVERIFY(!act.partitionPreviewPage(-1,100).value("error").toString().isEmpty());
+        QVERIFY(!act.partitionPreviewPage(0,0).value("error").toString().isEmpty());
+        QVERIFY(!act.partitionPreviewPage(0,1001).value("error").toString().isEmpty());
+        QSqlQuery changed(db.connection());
+        QVERIFY(changed.exec("UPDATE qso SET comment='changed after preview' WHERE call='K0200'"));
+        const auto stale=act.partitionPreviewPage(cursor,100);
+        QVERIFY(stale.value("error").toString().isEmpty());
+        QVERIFY(stale.value("groups").toList()!=groups);
     }
 
     void potaExportPreservesExplicitAndAmbiguousCorrespondentFields()

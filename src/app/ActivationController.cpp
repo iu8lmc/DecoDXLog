@@ -803,7 +803,8 @@ QVariantList ActivationController::qsoIds() const
 namespace {
 QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled,
                                  bool ownsTransaction = true, const QString& selectedKey = {}, QList<qint64>* selectedIds = nullptr,
-                                 const QString& cataloguePath = {}, const QString& potaCataloguePath = {})
+                                 const QString& cataloguePath = {}, const QString& potaCataloguePath = {},
+                                 qint64 reviewAfterId = 0, int reviewLimit = -1)
 {
     QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
     const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
@@ -824,6 +825,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
     QVariantList excluded, potaCorrespondentRows;
+    qint64 potaCorrespondentTotal = 0;
+    bool potaCorrespondentHasMore = false;
     const auto exclude = [&](const QString& reason) {
         if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
             {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
@@ -896,11 +899,16 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                         groups[key][QStringLiteral("potaCorrespondentReview")] = groups[key].value(QStringLiteral("potaCorrespondentReview")).toInt() + 1;
                         if (!selectedIds && !potaReviewRecorded) {
                             potaReviewRecorded = true;
-                            const QString reason = other.contains(QLatin1Char(',')) ? QStringLiteral("multipleReferences")
-                                : invalidPotaSig || (!other.isEmpty() && !singleValid) ? QStringLiteral("invalidReference") : QStringLiteral("conflictingSig");
-                            potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
-                                {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)},
-                                {QStringLiteral("reason"), reason}};
+                            ++potaCorrespondentTotal;
+                            if (q.value(2).toLongLong() > reviewAfterId) {
+                                if (reviewLimit < 0 || potaCorrespondentRows.size() < reviewLimit) {
+                                    const QString reason = other.contains(QLatin1Char(',')) ? QStringLiteral("multipleReferences")
+                                        : invalidPotaSig || (!other.isEmpty() && !singleValid) ? QStringLiteral("invalidReference") : QStringLiteral("conflictingSig");
+                                    potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
+                                        {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)},
+                                        {QStringLiteral("reason"), reason}};
+                                } else potaCorrespondentHasMore = true;
+                            }
                         }
                     }
                 }
@@ -969,6 +977,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     result[QStringLiteral("uncertainPeriod")] = uncertainPeriod;
     result[QStringLiteral("excluded")] = excluded;
     result[QStringLiteral("potaCorrespondentRows")] = potaCorrespondentRows;
+    result[QStringLiteral("potaCorrespondentTotal")] = potaCorrespondentTotal;
+    result[QStringLiteral("potaCorrespondentHasMore")] = potaCorrespondentHasMore;
     if (ownsTransaction && !db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;
     return result;
@@ -977,6 +987,13 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
 
 QVariantMap ActivationController::partitionPreview() const
 {
+    return partitionPreviewPage(0, -1);
+}
+
+QVariantMap ActivationController::partitionPreviewPage(qint64 afterId, int limit) const
+{
+    if (afterId < 0 || limit == 0 || limit < -1 || limit > 1000)
+        return {{QStringLiteral("error"), tr("Invalid review page.")}};
     if (!m_session.active || m_session.sessionUuid.isEmpty())
         return {{QStringLiteral("error"), tr("This session has no tracked identity; its QSO cannot be attributed automatically.")}};
     if (!m_ctx.db || !m_ctx.db->isOpen()) return {{QStringLiteral("error"), tr("The log is not open.")}};
@@ -985,7 +1002,7 @@ QVariantMap ActivationController::partitionPreview() const
     const auto same=[&] { return m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==path && m_ctx.db->openGeneration()==generation &&
         (!fileBacked || (!identity.isEmpty() && !fileIdentity.isEmpty() && m_ctx.db->identity()==identity && m_ctx.db->openFileIdentity()==fileIdentity && m_ctx.db->fileIdentityMatchesOpen())); };
     if (!same()) return {{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
-    const auto result=scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {}, true, {}, nullptr, m_sotaCatalogue->path(), m_potaCatalogue->path());
+    const auto result=scanPartitionPreview(m_ctx.db->connection(), m_session.sessionUuid, {}, true, {}, nullptr, m_sotaCatalogue->path(), m_potaCatalogue->path(), afterId, limit);
     return same() ? result : QVariantMap{{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
 }
 
