@@ -2616,6 +2616,8 @@ void DecoLogController::refreshDxCampaign()
                 for (const auto& cell : matrix) rows << QVariantMap{{QStringLiteral("band"),cell.band},
                     {QStringLiteral("mode"),cell.mode},{QStringLiteral("worked"),cell.worked},{QStringLiteral("confirmed"),cell.confirmed},
                     {QStringLiteral("target"),cell.target},{QStringLiteral("needed"),cell.needed}};
+                if (qEnvironmentVariableIsSet("DECOLOG_TEST_DX_MATRIX_TRACE") && !rows.isEmpty())
+                    qWarning("PROBE dxmatrixrace worker worked=%d",rows.first().toMap().value(QStringLiteral("worked")).toInt());
             }
             workerChanged=workerVersion<0 || db.dataVersion()!=workerVersion;
         }

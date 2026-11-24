@@ -16,6 +16,7 @@ GlassPanel {
     readonly property var campaignBackend: typeof decolog === "undefined" ? null : decolog
     property string calendarObserved: ""
     property int campaignSpotRevision: 0
+    property bool matrixRaceProbeActive: false
     property var visibleEntries: []
     property int parseSerial: 0
     property int filterSerial: 0
@@ -205,6 +206,24 @@ GlassPanel {
     } }
     Timer { id:dxMatrixExternalResult; interval:4000; onTriggered: {
         console.warn("PROBE dxmatrixexternal result " + JSON.stringify({error:root.campaignBackend.dxCampaignError,rows:root.campaignBackend.dxCampaignMatrix}))
+    } }
+    function probeMatrixRace() {
+        const rows=root.campaignBackend.dxCampaigns
+        if (!rows.length) { console.warn("PROBE dxmatrixrace setup failed"); return }
+        matrixRaceProbeActive=true
+        if (!root.campaignBackend.selectDxCampaign(rows[0].id)) { console.warn("PROBE dxmatrixrace setup failed"); return }
+        console.warn("PROBE dxmatrixrace queued")
+        const deadline=Date.now()+2500; while (Date.now()<deadline) {}
+        console.warn("PROBE dxmatrixrace resumed"); dxMatrixRaceResult.start()
+    }
+    Connections { target:root.campaignBackend
+        function onDxCampaignChanged() {
+            if (root.matrixRaceProbeActive && !root.campaignBackend.dxCampaignBusy && root.campaignBackend.dxCampaignMatrix.length)
+                console.warn("PROBE dxmatrixrace published " + JSON.stringify(root.campaignBackend.dxCampaignMatrix))
+        }
+    }
+    Timer { id:dxMatrixRaceResult; interval:3500; onTriggered: {
+        console.warn("PROBE dxmatrixrace result " + JSON.stringify(root.campaignBackend.dxCampaignMatrix)); root.matrixRaceProbeActive=false
     } }
     function probeDateReview() {
         calendarObserved="2026-01-09T10:00:00Z"

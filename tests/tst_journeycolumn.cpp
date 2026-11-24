@@ -1347,6 +1347,25 @@ private slots:
         QVERIFY2(output.contains("PROBE dxspots rendered 3Y0K") && output.contains("PROBE dxspots filtered []"),output.constData());
         QVERIFY2(!output.contains("\"call\":\"K1XYZ\"") && !output.contains("TypeError"),output.constData());
     }
+    void dxCampaignMatrixDiscardsInFlightExternalWrite()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto path=dir.filePath("test.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); dxcampaign::Campaign c; c.title="Spring"; c.calls={"ZZ1AAA"};
+          c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate);
+          c.bands={"20m"}; c.modes={"CW"}; c.goals={{"20m","CW","worked"}}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","9000"); env.insert("DECOLOG_TEST_DX_MATRIX_TRACE","1");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","dxmatrixraceprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE dxmatrixrace worker worked=0") && timer.elapsed()<15000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE dxmatrixrace worker worked=0") && !output.contains("PROBE dxmatrixrace resumed"),output.constData());
+        { LogDatabase writer; QVERIFY(writer.open(path)); QVERIFY(writer.insertQso({{"CALL","ZZ1AAA"},{"QSO_DATE","20260103"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0); }
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        const auto published=output.mid(output.indexOf("PROBE dxmatrixrace resumed"));
+        for (const auto& line:published.split('\n')) if (line.contains("PROBE dxmatrixrace published")) QVERIFY2(!line.contains("\"worked\":0"),output.constData());
+        QVERIFY2(published.contains("PROBE dxmatrixrace result") && published.contains("\"worked\":1") && !published.contains("TypeError"),output.constData());
+    }
     void dxCampaignMatrixRefreshesOnExternalWrite()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

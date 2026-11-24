@@ -3409,3 +3409,11 @@ While a campaign is selected, a one-second monitor checks the open-log context a
 A/B on macOS arm64 / Qt 6.11.2: an offscreen app fixture initially showed a worked-goal cell as open after a second connection added a matching QSO; after the change it refreshed from zero to one worked QSO and marked the goal satisfied. The same-path replacement, date-review replacement, ordinary date review, campaign creation and ranked-spot app fixtures passed. CTest dxcampaign and qmlpopups passed 2/2; translation XML and git diff --check passed. This increment was developed in the detached worktree while the main checkout's separate full CTest continued.
 
 The monitor is periodic, so a displayed matrix can be stale briefly between an external commit and its next check; no forced write at every point of the worker was tested. Any external SQLite commit, even unrelated to the campaign, can cause a recalculation, and high-write or large-log responsiveness has not been benchmarked. Physical UI, real cluster/calendar, cross-platform behavior and full G04/G13 acceptance remain open.
+
+## 2026-11-24 — G04 force an in-flight campaign matrix race
+
+Added an offscreen app fixture that pauses the GUI event loop after starting a matrix calculation, waits for a test-only worker trace showing the old result, and writes a matching QSO through another SQLite connection before the queued result can be published. The trace is enabled only with `DECOLOG_TEST_DX_MATRIX_TRACE`; the test does not send cluster or radio traffic.
+
+A/B on macOS arm64 / Qt 6.11.2: with the pre-version-check controller from `09b29d1`, the worker calculated zero and the app published that stale zero after the external commit. With the controller from `694a631`, no stale zero was published and the eventual matrix showed one worked QSO. The focused in-flight, external-write and file-replacement offscreen fixtures passed after restoring the current controller. git diff --check passed.
+
+This forces one ordering between worker completion and GUI publication; it does not cover all transaction schedules, high write rates, physical UI, real services or other platforms. The isolated worktree still awaits integration after the separate full CTest running on the main checkout.
