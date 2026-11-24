@@ -2371,6 +2371,35 @@ private slots:
         QVERIFY(db.duplicateGroups(60,5000,&error).isEmpty()); QVERIFY(!error.isEmpty());
     }
 
+    void reviewedMergeRejectsChangedQsl()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        AdifRecord r{{"CALL","K1ABC"},{"QSO_DATE","20260910"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}};
+        const auto one=db.insertQso(r,"fixture",{},true,0,false).id, two=db.insertQso(r,"fixture",{},true,0,false).id;
+        QVERIFY(one>0 && two>0); MergeGroup group{one,{two}};
+        group.expectedFingerprints.insert(one,db.mergeReviewFingerprint(one)); group.expectedFingerprints.insert(two,db.mergeReviewFingerprint(two));
+        QVERIFY(!group.expectedFingerprints.value(one).isEmpty() && !group.expectedFingerprints.value(two).isEmpty());
+        QSqlQuery q(db.connection()); q.prepare("INSERT INTO qsl_status(qso_id,service,rcvd) VALUES(?,'card','Y')"); q.addBindValue(two); QVERIFY(q.exec());
+        const auto rejected=db.mergeBatch({group}); QCOMPARE(rejected.failed,1); QVERIFY(rejected.keptIds.isEmpty()); QCOMPARE(db.qsoCount(),qint64(2));
+        group.expectedFingerprints[two]=db.mergeReviewFingerprint(two);
+        const auto accepted=db.mergeBatch({group}); QCOMPARE(accepted.failed,0); QCOMPARE(accepted.keptIds.size(),1); QCOMPARE(db.qsoCount(),qint64(1));
+    }
+
+    void reviewedMergeRejectsReplacedFile()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Fixture replaces an open SQLite file on POSIX");
+#endif
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("original.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); AdifRecord r{{"CALL","K1ABC"},{"QSO_DATE","20260910"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}};
+        const auto one=db.insertQso(r,"fixture",{},true,0,false).id, two=db.insertQso(r,"fixture",{},true,0,false).id; QVERIFY(one>0 && two>0);
+        MergeGroup group{one,{two}}; group.expectedFingerprints.insert(one,db.mergeReviewFingerprint(one)); group.expectedFingerprints.insert(two,db.mergeReviewFingerprint(two));
+        QSqlQuery checkpoint(db.connection()); QVERIFY(checkpoint.exec("PRAGMA wal_checkpoint(TRUNCATE)")); checkpoint.finish();
+        QVERIFY(QFile::rename(path,dir.filePath("moved.sqlite"))); QFile replacement(path); QVERIFY(replacement.open(QIODevice::WriteOnly)); replacement.close();
+        const auto result=db.mergeBatch({group}); QCOMPARE(result.failed,1); QVERIFY(result.keptIds.isEmpty()); db.close();
+        LogDatabase original; QVERIFY(original.open(dir.filePath("moved.sqlite"))); QCOMPARE(original.qsoCount(),qint64(2));
+    }
+
     void duplicateGroupsSynthetic100k()
     {
         if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_DUPLICATES")) QSKIP("Synthetic 100k benchmark is opt-in");

@@ -80,6 +80,18 @@ class TestBulkResponsiveness : public QObject {
     }
 
 private slots:
+    void reviewedDuplicateMerge()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+          for (const auto* call:{"K1AAA","K1AAA","K1BBB","K1BBB"}) {
+              const auto r=db.insertQso({{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false); QVERIFY(r.id>0);
+          } }
+        QByteArray output; qint64 gap=0,elapsed=0; int rows=0;
+        QVERIFY2(runProbe(dir,"merge",output,gap,elapsed,rows),output.constData()); QCOMPARE(rows,4);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+        QVERIFY(db.meta(2)->deleted); QVERIFY(db.meta(4)->deleted);
+    }
     void callsignSearchAndBulkPaperConfirmation()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();

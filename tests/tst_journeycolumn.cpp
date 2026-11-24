@@ -1058,6 +1058,29 @@ private slots:
         QSettings settings(iniPath(dir),QSettings::IniFormat); const auto defs=decolog::core::newqso::decodeCustomFields(settings.value("ui/newQso/customFields").toString());
         QVERIFY(std::any_of(defs.cbegin(),defs.cend(),[](const QVariant& v) { const auto d=v.toMap(); return d.value("name")=="APP_TYPED_DOUBLE" && d.value("formula")=="{APP_TYPED_POWER} * 2"; }));
     }
+    void duplicateReviewGuard_data()
+    {
+        QTest::addColumn<bool>("changeQsl"); QTest::newRow("unchanged") << false; QTest::newRow("changed-qsl") << true;
+    }
+    void duplicateReviewGuard()
+    {
+        QFETCH(bool,changeQsl); using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("test.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); const AdifRecord r{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+          QVERIFY(db.insertQso(r,"fixture",{},true,0,false).id>0); QVERIFY(db.insertQso(r,"fixture",{},true,0,false).id>0); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","duplicateguardprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE duplicateguard ready") && timer.elapsed()<15000) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE duplicateguard ready"),output.constData());
+        if (changeQsl) { LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd) VALUES(2,'card','Y')")); }
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains(changeQsl?"PROBE duplicateguard accepted=false":"PROBE duplicateguard accepted=true"),output.constData());
+        LogDatabase check; QVERIFY(check.open(path)); QCOMPARE(check.qsoCount(),qint64(changeQsl?2:1));
+    }
+
     void externalCampaignAppearsWithoutRestart_data()
     {
         QTest::addColumn<bool>("editExisting"); QTest::newRow("created") << false; QTest::newRow("changed-callsign") << true;

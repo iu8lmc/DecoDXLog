@@ -651,6 +651,7 @@ RoundedWindow {
         id: bulkCheckHeartbeat
         interval: 10; repeat: true
         property bool sawRunning: false
+        property bool mergeStarted: false
         property int settledTicks: 0
         property int heartbeatTicks: 0
         property double startedAt: 0
@@ -684,6 +685,14 @@ RoundedWindow {
         function onBulkChanged() {
             if (bulkCheckHeartbeat.running && decolog.bulkProgress >= 0)
                 bulkCheckHeartbeat.sawRunning = true
+        }
+        function onDuplicatesChanged() {
+            if (!bulkCheckHeartbeat.running || bulkCheckHeartbeat.mode !== "merge" || bulkCheckHeartbeat.mergeStarted || decolog.duplicates.busy) return
+            if (decolog.duplicates.error) { console.warn("PROBE bulkcheck error=duplicate search failed"); Qt.quit(); return }
+            if (!decolog.duplicates.searched) return
+            bulkCheckHeartbeat.mergeStarted=true
+            if (!decolog.mergeDuplicatesAsync([{keep: 1, ids: [1, 2]}, {keep: 3, ids: [3, 4]}]))
+                console.warn("PROBE bulkcheck error=merge refused")
         }
         function onImportChanged() {
             if (bulkCheckHeartbeat.running && bulkCheckHeartbeat.mode === "import" && decolog.importProgress >= 0)
@@ -836,8 +845,7 @@ RoundedWindow {
                         else console.warn("PROBE bulkcheck error=udp refused")
                     } else if (key === "merge") {
                         bulkCheckHeartbeat.rows = 4
-                        if (!decolog.mergeDuplicatesAsync([{keep: 1, ids: [1, 2]}, {keep: 3, ids: [3, 4]}]))
-                            console.warn("PROBE bulkcheck error=merge refused")
+                        decolog.findDuplicates(5)
                     } else if (key === "tag" || key === "tagremove") {
                         if (!decolog.tagQsosAsync(ids, "bulk-test", key === "tag")) console.warn("PROBE bulkcheck error=tag refused")
                     } else {
@@ -1327,6 +1335,7 @@ RoundedWindow {
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
         else if (what[0] === "dxgoalraceprobe") dxGoalRaceProbe.start()
         else if (what[0] === "dxexternalwatchprobe") dxExternalWatchReady.start()
+        else if (what[0] === "duplicateguardprobe") duplicateGuardStart.start()
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
         else if (what[0].indexOf("netreceive") === 0) { window.openContestDesk(); contestLayout.setShown("net",true); netReceiveProbe.start() }
         else if ((what[0] === "netwireprobe" || what[0] === "netwiresecureprobe")) { window.openContestDesk(); contestLayout.setShown("net",true); netWireProbe.start() }
@@ -1780,6 +1789,20 @@ RoundedWindow {
     Timer { id:dxDatesProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeDateReview(); else console.warn("PROBE dxdates missing panel") } }
     Timer { id:dxCampaignSpotProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaignSpots(); else console.warn("PROBE dxspots missing panel") } }
     Timer { id:dxExternalWatchReady; interval:1000; onTriggered: { console.warn("PROBE dxexternal ready"); dxExternalWatchSpot.start() } }
+    Timer { id:duplicateGuardStart; interval:1000; onTriggered: { duplicateGuardProbe.waiting=true; decolog.findDuplicates(5) } }
+    Connections { id:duplicateGuardProbe; target:decolog; property bool waiting:false
+        function onDuplicatesChanged() {
+            if (!waiting || decolog.duplicates.busy) return
+            waiting=false
+            const groups=decolog.duplicates.groups || []
+            if (!decolog.duplicates.searched || groups.length!==1) { console.warn("PROBE duplicateguard search failed"); return }
+            console.warn("PROBE duplicateguard ready"); duplicateGuardMerge.start()
+        }
+    }
+    Timer { id:duplicateGuardMerge; interval:2500; onTriggered: {
+        const g=decolog.duplicates.groups[0]; const ok=decolog.mergeDuplicatesAsync([{keep:g.keep,ids:g.rows.map(r=>r.id)}]);
+        console.warn("PROBE duplicateguard accepted="+ok)
+    } }
     Timer { id:dxExternalWatchSpot; interval:2500; onTriggered: {
         decolog.cluster.filter={maxAgeMinutes:30}; decolog.cluster.injectLine("DX de IK1AAA: 14025.0 3Y0J CW 1200Z"); console.warn("PROBE dxexternal sent")
     } }

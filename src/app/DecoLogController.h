@@ -1343,6 +1343,10 @@ private:
     int m_damagedFieldCount{-1};
     quint64 m_damagedCountGeneration{0};
     QVariantMap m_duplicates;
+    std::optional<core::LogSessionToken> m_duplicatesOrigin;
+    quint64 m_duplicatesGeneration{0};
+    quint64 m_duplicatesLogVersion{0};
+    qint64 m_duplicatesDataVersion{-1};
 
     // I conti dell'entita' per la scheda del nominativo (quante volte, bande,
     // modi, caselle con le conferme): per un'entita' comune su un log grande

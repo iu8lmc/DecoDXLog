@@ -128,6 +128,7 @@ struct BulkEditResult {
 struct MergeGroup {
     qint64 keep{0};
     QList<qint64> others;
+    QHash<qint64, QString> expectedFingerprints; // optional for legacy callers
 };
 
 struct RepairBatchResult {
@@ -398,6 +399,7 @@ public:
     // e profilo di stazione, e ognuno entro `windowSeconds` dal QSO prima. Un
     // gruppo per lista, gli id in ordine di tempo; al massimo `limit` gruppi.
     QList<QList<qint64>> duplicateGroups(int windowSeconds, int limit = 5000, QString* error = nullptr) const;
+    QString mergeReviewFingerprint(qint64 id) const;
 
     // Unisce dei doppioni in `keep`: prende dagli altri i campi che gli mancano,
     // le conferme (una Y vince), le etichette e il riferimento remoto dove lui

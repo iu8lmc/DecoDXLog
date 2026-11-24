@@ -3645,6 +3645,7 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
 </context>
 <context>
     <name>DuplicatesDialog</name>
+    <message><source>Duplicate review: %1</source><translation>Revisione dei duplicati: %1</translation></message>
     <message><source>Duplicate search failed: %1</source><translation>Ricerca dei duplicati non riuscita: %1</translation></message>
     <message>
         <source>DUPLICATE QSO</source>
@@ -11725,6 +11726,10 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Some duplicate groups could not be merged; search and review again</source><translation>Alcuni gruppi di duplicati non sono stati uniti; ripeti la ricerca e la revisione</translation></message>
+    <message><source>Cannot verify the open log; reopen it and search again</source><translation>Impossibile verificare il log aperto; riaprilo e ripeti la ricerca</translation></message>
+    <message><source>The log changed during the search; search again</source><translation>Il log è cambiato durante la ricerca; ripeti la ricerca</translation></message>
+    <message><source>The log changed after review; search again</source><translation>Il log è cambiato dopo la revisione; ripeti la ricerca</translation></message>
     <message><source>; the next sync will recheck the full history</source><translation>; la prossima sincronizzazione ricontrollerà tutta la cronologia</translation></message>
     <message><source>; %1 ambiguous and %2 invalid records, download cursor not advanced</source><translation>; %1 record ambigui e %2 non validi, cursore di download non aggiornato</translation></message>
     <message><source>Confirmations: cannot verify the open log; reopen it before syncing</source><translation>Conferme: impossibile verificare il log aperto; riaprilo prima della sincronizzazione</translation></message>

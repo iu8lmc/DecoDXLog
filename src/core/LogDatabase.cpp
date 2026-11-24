@@ -1468,6 +1468,7 @@ public:
                 for (int i = 0; i < columns; ++i) row.append(QJsonValue::fromVariant(q.value(i)));
                 rows.append(row);
             }
+            if (q.lastError().isValid()) { q.finish(); return {}; }
             q.finish();
             if (index == 0 && rows.size() != 1) return {};
             parts.append(rows);
@@ -1480,6 +1481,13 @@ private:
     bool m_ready{true};
 };
 } // namespace
+
+QString LogDatabase::mergeReviewFingerprint(qint64 id) const
+{
+    if (!isOpen() || id<=0) return {};
+    ImportFingerprintReader reader(connection());
+    return reader.read(id);
+}
 
 /* Fingerprints retain the schema-13 JSON representation; only SQL statements
  * are reused. Older stored hashes therefore remain valid. */
@@ -2470,6 +2478,22 @@ MergeBatchResult LogDatabase::mergeBatch(const QList<MergeGroup>& groups, const 
     const BulkEditResult mutations = runMutationBatches(*this, indices,
         [this, &groups, &automaticServices, &prepared](qint64 index, QString& error) {
             const MergeGroup& group = groups.at(index - 1);
+            if (!group.expectedFingerprints.isEmpty()) {
+                if (!fileIdentityMatchesOpen()) { error=QStringLiteral("Log file changed since review; search again"); return -1; }
+                QSet<qint64> ids{group.keep}; for (const qint64 id:group.others) ids.insert(id);
+                if (ids.contains(0) || ids.size()!=group.others.size()+1 || group.expectedFingerprints.size()!=ids.size()) {
+                    error=QStringLiteral("Invalid reviewed merge group"); return -1;
+                }
+                ImportFingerprintReader fingerprint(connection());
+                for (const qint64 id:ids) {
+                    const QString expected=group.expectedFingerprints.value(id);
+                    const QString actual=fingerprint.read(id);
+                    const auto current=meta(id);
+                    if (expected.isEmpty() || actual.isEmpty() || actual!=expected || !current || current->deleted) {
+                        error=QStringLiteral("QSO #%1 changed since review; search again").arg(id); return -1;
+                    }
+                }
+            }
             QList<qint64> others;
             QSet<qint64> seen;
             for (const qint64 id : group.others) {

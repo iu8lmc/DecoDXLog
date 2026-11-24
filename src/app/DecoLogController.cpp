@@ -47,6 +47,7 @@
 #include <QSysInfo>
 #include <QTimeZone>
 #include <QSqlDatabase>
+#include <QSqlError>
 #include <QSqlQuery>
 #include <QUdpSocket>
 #include <QXmlStreamWriter>
@@ -5766,8 +5767,11 @@ QVariantList describeDuplicates(const LogDatabase& db, int windowSeconds, bool* 
         for (const qint64 id : group) {
             const auto r = db.record(id);
             const auto m = db.meta(id);
-            if (!r || !m)
-                continue;
+            const QString fingerprint=db.mergeReviewFingerprint(id);
+            if (!r || !m || m->deleted || fingerprint.isEmpty()) {
+                if (error) *error=QStringLiteral("Cannot review QSO #%1; search again").arg(id);
+                return {};
+            }
             QStringList confirmed;
             if (r->value(QStringLiteral("LOTW_QSL_RCVD")) == QLatin1String("Y"))
                 confirmed << QStringLiteral("LoTW");
@@ -5788,6 +5792,7 @@ QVariantList describeDuplicates(const LogDatabase& db, int windowSeconds, bool* 
             const QString submode = r->value(QStringLiteral("SUBMODE"));
             rows << QVariantMap{
                 {QStringLiteral("id"), id},
+                {QStringLiteral("fingerprint"), fingerprint},
                 {QStringLiteral("call"), r->value(QStringLiteral("CALL"))},
                 {QStringLiteral("when"), QStringLiteral("%1-%2-%3 %4:%5:%6")
                                              .arg(date.mid(0, 4), date.mid(4, 2), date.mid(6, 2), time.mid(0, 2),
@@ -5812,17 +5817,28 @@ void DecoLogController::findDuplicates(int windowMinutes)
 {
     if (m_duplicates.value(QStringLiteral("busy")).toBool() || m_bulkProgress >= 0)
         return;
+    m_duplicatesOrigin.reset(); m_duplicatesGeneration=m_db.openGeneration();
+    m_duplicatesLogVersion=m_logVersion; m_duplicatesDataVersion=m_db.dataVersion();
+    const QString dbPath = m_db.path();
+    if (!dbPath.isEmpty() && dbPath!=QLatin1String(":memory:")) m_duplicatesOrigin=m_db.sessionToken();
+    if (!m_db.isOpen() || m_duplicatesDataVersion<0 || (!dbPath.isEmpty() && dbPath!=QLatin1String(":memory:") && !m_duplicatesOrigin)) {
+        m_duplicates={{QStringLiteral("error"),tr("Cannot verify the open log; reopen it and search again")}}; emit duplicatesChanged(); return;
+    }
     const int minutes = std::clamp(windowMinutes, 1, 24 * 60);
     m_duplicates = {{QStringLiteral("busy"), true}, {QStringLiteral("windowMinutes"), minutes},
                     {QStringLiteral("groups"), QVariantList{}}};
     emit duplicatesChanged();
-    auto done = [this, minutes](const QVariantList& groups, bool limited, const QString& error) {
+    const auto origin=m_duplicatesOrigin; const auto generation=m_duplicatesGeneration;
+    const auto version=m_duplicatesLogVersion; const auto dataVersion=m_duplicatesDataVersion;
+    auto done = [this, minutes, origin, generation, version, dataVersion](const QVariantList& groups, bool limited, const QString& error) {
+        const bool stale=!m_db.isOpen() || m_db.openGeneration()!=generation || m_logVersion!=version || m_db.dataVersion()!=dataVersion ||
+            (origin && !m_db.matchesSessionToken(*origin));
+        const QString finalError=stale ? tr("The log changed during the search; search again") : error;
         m_duplicates = {{QStringLiteral("busy"), false}, {QStringLiteral("windowMinutes"), minutes},
-                        {QStringLiteral("searched"), error.isEmpty()}, {QStringLiteral("limited"), limited}, {QStringLiteral("error"), error},
-                        {QStringLiteral("groups"), groups}};
+                        {QStringLiteral("searched"), finalError.isEmpty()}, {QStringLiteral("limited"), limited}, {QStringLiteral("error"), finalError},
+                        {QStringLiteral("groups"), finalError.isEmpty()?groups:QVariantList{}}};
         emit duplicatesChanged();
     };
-    const QString dbPath = m_db.path();
     if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:")) {
         bool limited = false;
         QString error;
@@ -5832,14 +5848,16 @@ void DecoLogController::findDuplicates(int windowMinutes)
     }
     // Su un milione di QSO si legge tutto il log: su un altro filo.
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, minutes, done] {
+    m_importPool.start([self, dbPath, minutes, done, origin] {
         LogDatabase db;
         QVariantList groups;
         bool limited = false;
         QString error;
-        if (db.open(dbPath))
-            groups = describeDuplicates(db, minutes * 60, &limited, &error);
-        else error=db.lastError();
+        if (!db.openReadOnly(dbPath)) error=db.lastError();
+        else if (!origin || db.identity()!=origin->identity || db.openFileIdentity()!=origin->fileIdentity || !db.fileIdentityMatchesOpen())
+            error=QStringLiteral("Log identity changed; search again");
+        else if (!db.connection().transaction()) error=db.connection().lastError().text();
+        else { groups=describeDuplicates(db, minutes * 60, &limited, &error); db.connection().rollback(); }
         QMetaObject::invokeMethod(
             self.data(), [self, groups, limited, error, done] {
                 if (self)
@@ -5850,18 +5868,34 @@ void DecoLogController::findDuplicates(int windowMinutes)
 }
 
 namespace {
-QList<MergeGroup> mergeGroups(const QVariantList& groups)
+QList<MergeGroup> mergeGroups(const QVariantList& groups, const QVariantList& reviewed)
 {
     QList<MergeGroup> out;
+    QSet<qint64> used;
     for (const QVariant& g : groups) {
         const QVariantMap m = g.toMap();
         MergeGroup group;
         group.keep = m.value(QStringLiteral("keep")).toLongLong();
+        QSet<qint64> selected;
         for (const QVariant& v : m.value(QStringLiteral("ids")).toList()) {
-            if (v.toLongLong() != group.keep && v.toLongLong() > 0)
-                group.others << v.toLongLong();
+            const qint64 id=v.toLongLong();
+            if (id<=0 || selected.contains(id) || used.contains(id)) return {};
+            selected.insert(id); if (id!=group.keep) group.others << id;
         }
-        if (group.keep > 0 && !group.others.isEmpty()) out << group;
+        if (!selected.contains(group.keep) || group.others.isEmpty()) return {};
+        bool matched=false;
+        for (const auto& candidate:reviewed) {
+            QSet<qint64> ids; QHash<qint64,QString> fingerprints;
+            for (const auto& item:candidate.toMap().value(QStringLiteral("rows")).toList()) {
+                const auto row=item.toMap(); const qint64 id=row.value(QStringLiteral("id")).toLongLong();
+                ids.insert(id); fingerprints.insert(id,row.value(QStringLiteral("fingerprint")).toString());
+            }
+            if (ids!=selected) continue;
+            for (const auto& fingerprint:fingerprints) if (fingerprint.isEmpty()) return {};
+            group.expectedFingerprints=fingerprints; matched=true; break;
+        }
+        if (!matched) return {};
+        used.unite(selected); out << group;
     }
     return out;
 }
@@ -5871,6 +5905,12 @@ int DecoLogController::finishMergeBatch(const MergeBatchResult& result)
 {
     for (const QString& e : result.errors)
         addActivity(QStringLiteral("LOG"), e, QStringLiteral("error"));
+    if (result.failed) {
+        m_duplicates[QStringLiteral("error")]=tr("Some duplicate groups could not be merged; search and review again");
+        m_duplicates[QStringLiteral("searched")]=false;
+        m_duplicates[QStringLiteral("groups")]=QVariantList{};
+        emit duplicatesChanged();
+    }
     if (result.keptIds.isEmpty()) {
         if (result.failed)
             addActivity(QStringLiteral("LOG"), tr("Could not merge %1 duplicate group(s)").arg(result.failed),
@@ -5904,14 +5944,26 @@ int DecoLogController::finishMergeBatch(const MergeBatchResult& result)
 int DecoLogController::mergeDuplicates(const QVariantList& groups)
 {
     if (m_bulkProgress >= 0 || !m_db.isOpen()) return 0;
-    return finishMergeBatch(m_db.mergeBatch(mergeGroups(groups), m_qsl->enabledAutomaticServices()));
+    if (!m_duplicates.value(QStringLiteral("searched")).toBool() || m_db.openGeneration()!=m_duplicatesGeneration ||
+        m_logVersion!=m_duplicatesLogVersion || m_db.dataVersion()!=m_duplicatesDataVersion ||
+        (m_duplicatesOrigin && !m_db.matchesSessionToken(*m_duplicatesOrigin))) return 0;
+    const auto reviewed=mergeGroups(groups,m_duplicates.value(QStringLiteral("groups")).toList());
+    if (reviewed.isEmpty()) return 0;
+    return finishMergeBatch(m_db.mergeBatch(reviewed, m_qsl->enabledAutomaticServices()));
 }
 
 bool DecoLogController::mergeDuplicatesAsync(const QVariantList& values)
 {
     if (m_bulkProgress >= 0 || m_duplicates.value(QStringLiteral("busy")).toBool()) return false;
-    const QList<MergeGroup> groups = mergeGroups(values);
-    if (groups.isEmpty() || !m_db.isOpen()) return false;
+    if (!m_db.isOpen() || !m_duplicates.value(QStringLiteral("searched")).toBool() ||
+        m_db.openGeneration()!=m_duplicatesGeneration || m_logVersion!=m_duplicatesLogVersion ||
+        m_db.dataVersion()!=m_duplicatesDataVersion || (m_duplicatesOrigin && !m_db.matchesSessionToken(*m_duplicatesOrigin))) {
+        m_duplicates[QStringLiteral("error")]=tr("The log changed after review; search again");
+        m_duplicates[QStringLiteral("searched")]=false; m_duplicates[QStringLiteral("groups")]=QVariantList{};
+        emit duplicatesChanged(); return false;
+    }
+    const QList<MergeGroup> groups = mergeGroups(values,m_duplicates.value(QStringLiteral("groups")).toList());
+    if (groups.isEmpty()) return false;
     const QString path = m_db.path();
     if (path.isEmpty() || path == QLatin1String(":memory:")) {
         mergeDuplicates(values);
@@ -5923,12 +5975,15 @@ bool DecoLogController::mergeDuplicatesAsync(const QVariantList& values)
     emit bulkChanged();
     emit duplicatesChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, path, groups, automatic] {
+    const auto origin=m_duplicatesOrigin;
+    m_importPool.start([self, path, groups, automatic, origin] {
         LogDatabase db;
         MergeBatchResult result;
         if (!db.open(path)) {
             result.failed = int(groups.size());
             result.errors << db.lastError();
+        } else if (!origin || db.identity()!=origin->identity || db.openFileIdentity()!=origin->fileIdentity || !db.fileIdentityMatchesOpen()) {
+            result.failed=int(groups.size()); result.errors << QStringLiteral("Log identity changed; search again");
         } else {
             int lastPercent = -1;
             result = db.mergeBatch(groups, automatic, [self, &lastPercent](int done, int total) {
@@ -5944,13 +5999,13 @@ bool DecoLogController::mergeDuplicatesAsync(const QVariantList& values)
             });
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, path, result] {
+        QMetaObject::invokeMethod(self.data(), [self, path, result, origin] {
             if (!self) return;
             self->m_bulkProgress = -1;
             self->m_duplicates[QStringLiteral("merging")] = false;
             emit self->bulkChanged();
             emit self->duplicatesChanged();
-            if (!self->m_db.isOpen() || self->m_db.path() != path) {
+            if (!origin || !self->m_db.matchesSessionToken(*origin)) {
                 self->addActivity(QStringLiteral("LOG"),
                                   tr("A background log change finished on a log that is no longer open"),
                                   QStringLiteral("warning"));

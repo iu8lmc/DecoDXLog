@@ -109,7 +109,7 @@ Popup {
         }
 
         Text { Layout.fillWidth: true; visible: !!root.result.error; wrapMode: Text.Wrap; color: Theme.warningColor
-            text: qsTr("Duplicate search failed: %1").arg(root.result.error || "") }
+            text: qsTr("Duplicate review: %1").arg(root.result.error || "") }
 
         Rectangle {
             Layout.fillWidth: true
