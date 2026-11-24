@@ -2389,6 +2389,10 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Status messages can be lost and station identities can be impersonated. Retry or verify status with the other operator.</source><translation>I messaggi di stato possono andare persi e le identità delle stazioni possono essere falsificate. Riprova o verifica lo stato con l'altro operatore.</translation></message>
+    <message><source>Resend status</source><translation>Reinvia stato</translation></message>
+    <message><source>Sent offers — reported status is unauthenticated</source><translation>Proposte inviate — lo stato ricevuto non è autenticato</translation></message>
+    <message><source>No status received</source><translation>Nessuno stato ricevuto</translation></message>
     <message><source>Received offer status is local to this log and is not sent to the other station.</source><translation>Lo stato delle proposte ricevute è locale a questo log e non viene inviato all'altra stazione.</translation></message>
     <message><source>Pending</source><translation>In attesa</translation></message>
     <message><source>Accepted</source><translation>Accettata</translation></message>
@@ -13057,6 +13061,9 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::NetController</name>
+    <message><source>Handoff state saved locally, but the datagram is too large.</source><translation>Stato salvato localmente, ma il datagramma è troppo grande.</translation></message>
+    <message><source>Status transmission attempted; delivery and station identity are not confirmed.</source><translation>Invio dello stato tentato; consegna e identità della stazione non sono confermate.</translation></message>
+    <message><source>Remote handoff status received; station identity is not authenticated.</source><translation>Stato remoto ricevuto; l'identità della stazione non è autenticata.</translation></message>
     <message><source>Cannot change handoff state: %1</source><translation>Impossibile cambiare lo stato della proposta: %1</translation></message>
     <message><source>Log or network changed; configure the handoff scope again.</source><translation>Il log o la rete sono cambiati; configura nuovamente l'ambito dei passaggi.</translation></message>
     <message><source>Enter a valid contest scope with an open file-backed log.</source><translation>Inserisci un ambito contest valido con un log su file aperto.</translation></message>

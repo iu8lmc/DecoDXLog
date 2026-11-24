@@ -228,7 +228,7 @@ GlassPanel {
             Text { id: handoffWarning; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
                 text: qsTr("Station identities are not authenticated and delivery is not confirmed. Agree the same contest scope with the other station. This station ID: %1").arg(root.net.nodeId) }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
-                text: qsTr("Received offer status is local to this log and is not sent to the other station.") }
+                text: qsTr("Status messages can be lost and station identities can be impersonated. Retry or verify status with the other operator.") }
             RowLayout {
                 Layout.fillWidth: true
                 LabeledField { label: qsTr("Contest scope"); Layout.fillWidth: true
@@ -261,15 +261,17 @@ GlassPanel {
                     GlassButton { text: qsTr("Accept"); visible: modelData.state === "pending"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"accepted") }
                     GlassButton { text: qsTr("Decline"); visible: modelData.state === "pending"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"declined") }
                     GlassButton { text: qsTr("Complete"); visible: modelData.state === "accepted"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"completed") }
+                    GlassButton { text: qsTr("Resend status"); enabled: root.net.running; onClicked: handoffDialog.result = root.net.sendHandoffStatus(modelData.id) }
                 }
             }
-            Text { text: qsTr("Sent offers — delivery unconfirmed"); color: Theme.textPrimary; font.bold: true }
+            Text { text: qsTr("Sent offers — reported status is unauthenticated"); color: Theme.textPrimary; font.bold: true }
             ListView {
                 id: handoffOutboxList; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 100
                 clip: true; model: root.net.handoffOutbox; ScrollBar.vertical: PanelScrollBar {}
                 delegate: RowLayout { required property var modelData; width: handoffOutboxList.width
                     Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
-                        text: qsTr("%1 · %2 Hz · to %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.recipient).arg(modelData.createdUtc) }
+                        text: qsTr("%1 · %2 Hz · to %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.recipient).arg(modelData.createdUtc) + " · " +
+                              (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : modelData.state === "completed" ? qsTr("Completed") : qsTr("No status received")) }
                     GlassButton { text: qsTr("Retry"); enabled: root.net.running
                         onClicked: handoffDialog.result = root.net.retryHandoffOffer(modelData.id) }
                 }

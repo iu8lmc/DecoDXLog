@@ -1159,7 +1159,26 @@ QString NetController::setHandoffState(const QString& id,const QString& state)
     if (!handoffLogCurrent()) return tr("Log or network changed; configure the handoff scope again.");
     const auto result=contesthandoff::setIncomingState(*m_ctx.db,m_handoffScope,m_id,id,state);
     if (!result.ok) return tr("Cannot change handoff state: %1").arg(result.error);
-    emit handoffChanged(); return {};
+    emit handoffChanged();
+    if (m_net.running()) return sendHandoffStatus(id);
+    return {};
+}
+QString NetController::sendHandoffStatus(const QString& id)
+{
+    if (!m_net.running() || !handoffLogCurrent()) return tr("Configure a running network and the current log's handoff scope first.");
+    QString error; const auto offers=contesthandoff::incomingOffers(*m_ctx.db,m_handoffScope,m_id,&error);
+    if (!error.isEmpty()) return tr("Cannot read handoff offers: %1").arg(error);
+    for (const auto& offer : offers) if (offer.id==id) {
+        const auto frame=contesthandoff::offerFrame(offer);
+        QJsonObject body{{QStringLiteral("offer"),frame},{QStringLiteral("state"),offer.state}}, probe=body;
+        probe.insert(QStringLiteral("seq"),std::numeric_limits<qint64>::max()); probe.insert(QStringLiteral("session"),m_sessionId);
+        probe.insert(QStringLiteral("protocol"),2); probe.insert(QStringLiteral("name"),m_name);
+        if (ContestNet::pack(m_group,m_id,QStringLiteral("handoff_state_v1"),probe).size()>1472)
+            return tr("Handoff state saved locally, but the datagram is too large.");
+        emit handoffStatusSent(frame,offer.state); send(QStringLiteral("handoff_state_v1"),body);
+        m_handoffStatus=tr("Status transmission attempted; delivery and station identity are not confirmed."); emit handoffChanged(); return {};
+    }
+    return tr("Handoff offer not found in this log and scope.");
 }
 
 void NetController::requestSync()
@@ -1250,6 +1269,14 @@ void NetController::onReceived(const QString& from, const QString& type, const Q
             if (received.ok && !received.replayed) {
                 m_handoffStatus=tr("Handoff offer received; sender identity is not authenticated.");
                 emit handoffChanged();
+            }
+            if (received.ok) sendHandoffStatus(body.value(QStringLiteral("offer")).toObject().value(QStringLiteral("id")).toString());
+        }
+    } else if (type == QLatin1String("handoff_state_v1")) {
+        if (handoffLogCurrent() && body.value(QStringLiteral("offer")).isObject() && body.value(QStringLiteral("state")).isString()) {
+            const auto received=contesthandoff::receiveRemoteState(*m_ctx.db,m_handoffScope,m_id,from,body.value(QStringLiteral("offer")).toObject(),body.value(QStringLiteral("state")).toString());
+            if (received.ok && !received.replayed) {
+                m_handoffStatus=tr("Remote handoff status received; station identity is not authenticated."); emit handoffChanged();
             }
         }
     } else if (type == QLatin1String("serial_request_v3")) {

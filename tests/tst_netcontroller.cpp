@@ -29,7 +29,7 @@ private slots:
         a.setTarget(QHostAddress::LocalHost); b.setTarget(QHostAddress::LocalHost); a.setEnabled(true); b.setEnabled(true);
         QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QVERIFY(b.configureHandoffScope("cqww-2026").isEmpty());
         QVERIFY(!a.sendHandoffOffer("sender","K1ABC",14025000).isEmpty()); QVERIFY(!a.sendHandoffOffer("receiver","bad call",14025000).isEmpty());
-        QSignalSpy sent(&a,&NetController::handoffOfferSent); QVERIFY(a.sendHandoffOffer("receiver","K1ABC",14025000).isEmpty()); QCOMPARE(sent.size(),1);
+        QSignalSpy sent(&a,&NetController::handoffOfferSent), statuses(&b,&NetController::handoffStatusSent); QVERIFY(a.sendHandoffOffer("receiver","K1ABC",14025000).isEmpty()); QCOMPARE(sent.size(),1);
         QCOMPARE(a.handoffOutbox().size(),1); QCOMPARE(b.handoffInbox().size(),0);
         const auto offerId=a.handoffOutbox().first().toMap().value("id").toString(); QVERIFY(!offerId.isEmpty());
         QVERIFY(a.retryHandoffOffer(offerId).isEmpty()); QCOMPARE(sent.size(),2); QCOMPARE(sent.last().first().toJsonObject(),sent.first().first().toJsonObject());
@@ -39,8 +39,12 @@ private slots:
         QVERIFY(b.configureHandoffScope("other-contest").isEmpty()); QVERIFY(deliver(7)>0); QTest::qWait(100); QVERIFY(b.handoffInbox().isEmpty());
         QVERIFY(b.configureHandoffScope("cqww-2026").isEmpty());
         QVERIFY(deliver(1)>0); QTRY_COMPARE_WITH_TIMEOUT(b.handoffInbox().size(),1,3000);
+        QTRY_COMPARE(statuses.size(),1);
+        auto deliverStatus=[&](int index,int seq) { QJsonObject packet{{"offer",statuses.at(index).at(0).toJsonObject()},{"state",statuses.at(index).at(1).toString()},{"seq",seq},{"session","status-relay"}}; const auto bytes=ContestNet::pack("FIELD","receiver","handoff_state_v1",packet); return relay.writeDatagram(bytes,QHostAddress::LocalHost,senderPort); };
+        QVERIFY(deliverStatus(0,1)>0); QTRY_COMPARE_WITH_TIMEOUT(a.handoffOutbox().first().toMap().value("state").toString(),QString("pending"),3000);
         QCOMPARE(b.handoffInbox().first().toMap().value("state").toString(),QString("pending"));
         QVERIFY(!b.setHandoffState(offerId,"completed").isEmpty()); QVERIFY(b.setHandoffState(offerId,"accepted").isEmpty());
+        QCOMPARE(statuses.size(),2); QVERIFY(deliverStatus(1,2)>0); QTRY_COMPARE_WITH_TIMEOUT(a.handoffOutbox().first().toMap().value("state").toString(),QString("accepted"),3000);
         QVERIFY(deliver(2)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
         QCOMPARE(b.handoffInbox().first().toMap().value("call").toString(),QString("K1ABC"));
         QSqlQuery corrupt(target.connection()); QVERIFY(corrupt.exec("INSERT INTO app_setting(key,value) VALUES('contest_handoff.in.bad','broken')"));
@@ -51,9 +55,13 @@ private slots:
         QVERIFY(a.handoffOutbox().isEmpty()); QVERIFY(b.handoffInbox().isEmpty()); QVERIFY(!a.handoffError().isEmpty());
         QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QVERIFY(b.configureHandoffScope("cqww-2026").isEmpty());
         QCOMPARE(a.handoffOutbox().size(),1); QCOMPARE(b.handoffInbox().size(),1);
+        QCOMPARE(a.handoffOutbox().first().toMap().value("state").toString(),QString("accepted"));
         QCOMPARE(b.handoffInbox().first().toMap().value("state").toString(),QString("accepted"));
         QVERIFY(b.setHandoffState(offerId,"completed").isEmpty());
         a.setEnabled(true); b.setEnabled(true); QVERIFY(a.retryHandoffOffer(offerId).isEmpty()); QCOMPARE(sent.size(),3);
+        QVERIFY(b.sendHandoffStatus(offerId).isEmpty()); const int completedIndex=statuses.size()-1;
+        QVERIFY(deliverStatus(completedIndex,3)>0); QTRY_COMPARE_WITH_TIMEOUT(a.handoffOutbox().first().toMap().value("state").toString(),QString("completed"),3000);
+        QVERIFY(deliverStatus(1,4)>0); QTest::qWait(100); QCOMPARE(a.handoffOutbox().first().toMap().value("state").toString(),QString("completed"));
         QVERIFY(deliver(3)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
         QSignalSpy changed(&a,&NetController::handoffChanged); a.setGroup("OTHER"); QVERIFY(!changed.isEmpty());
         QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty()); QVERIFY(!a.retryHandoffOffer(offerId).isEmpty());

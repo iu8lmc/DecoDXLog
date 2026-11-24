@@ -21,6 +21,19 @@ class TestContestNet : public QObject {
     Q_OBJECT
 
 private slots:
+    void handoffRemoteStateRejectsWrongPeerAndReordering()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("sender.sqlite"); LogDatabase sender; QVERIFY(sender.open(path));
+        contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","contest-2026","node-a","node-b","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        QVERIFY(contesthandoff::storeOutgoing(sender,offer).ok); const auto frame=contesthandoff::offerFrame(offer);
+        QVERIFY(!contesthandoff::receiveRemoteState(sender,"contest-2026","node-a","impostor",frame,"accepted").ok);
+        QVERIFY(contesthandoff::receiveRemoteState(sender,"contest-2026","node-a","node-b",frame,"completed").ok);
+        QVERIFY(contesthandoff::receiveRemoteState(sender,"contest-2026","node-a","node-b",frame,"accepted").replayed);
+        QVERIFY(!contesthandoff::receiveRemoteState(sender,"contest-2026","node-a","node-b",frame,"declined").ok);
+        auto modified=frame; modified.insert("call","K2ABC"); QVERIFY(!contesthandoff::receiveRemoteState(sender,"contest-2026","node-a","node-b",modified,"completed").ok);
+        sender.close(); QVERIFY(sender.open(path)); const auto list=contesthandoff::outgoingOffers(sender,"contest-2026","node-a");
+        QCOMPARE(list.size(),1); QCOMPARE(list.first().state,QString("completed")); QCOMPARE(sender.qsoCount(),qint64(0));
+    }
     void handoffOfferIsAddressedIdempotentAndPersistent()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("handoff.sqlite"); LogDatabase recipient; QVERIFY(recipient.open(path));
