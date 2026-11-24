@@ -15,6 +15,7 @@
 #include <atomic>
 #include <thread>
 #include <cstring>
+#include <filesystem>
 
 using namespace decolog::core;
 class TestRadioNet : public QObject {
@@ -396,6 +397,19 @@ class TestRadioNet : public QObject {
         QCOMPARE(json.value(QStringLiteral("history")).toArray().size(), 207);
         QCOMPARE(net.events().size(), 200);
         QCOMPARE(db.qsoCount(), 0);
+    }
+
+    void exportRejectsDatabaseHardlink()
+    {
+#ifdef Q_OS_UNIX
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); RadioNet net(&db); QVERIFY(net.start("Test"));
+        const QString alias=dir.filePath("hardlink.sqlite"); std::error_code error;
+        std::filesystem::create_hard_link(path.toStdString(),alias.toStdString(),error);
+        QVERIFY2(!error,error.message().c_str()); QVERIFY(!net.exportSession(QUrl::fromLocalFile(alias)));
+#else
+        QSKIP("Hard-link fixture requires Unix");
+#endif
     }
 
     void exportReportsUnwritableDestination()

@@ -2735,3 +2735,11 @@ Each flagged correspondent QSO now has an explanatory reason: multiple park refe
 A/B on macOS arm64 / Qt 6.11.2: the synthetic fixture previously returned no row reasons; it now distinguishes four affected QSO including an ADIF-extra override, while the existing exported-file assertions still pass. An offscreen app probe observed the multiple-parks reason and text, and the third-page probe passed. App and test targets built; CTest activation, database, migration and qmlpopups passed 4/4.
 
 Only one reason is shown per QSO even if multiple issues coexist. The test does not cover all malformed reference forms, physical input, live POTA, Windows/Linux or full G06/G13 acceptance. The unbounded in-memory review list remains as previously measured.
+
+## 2026-11-24 — G08 protect Net Manager export aliases
+
+Radio-net JSON export now checks native file identity as well as resolved paths against the current log and SQLite sidecars, both before scheduling and in the worker before writing and committing. It disables QSaveFile direct-write fallback. This rejects a hard link to the open log even when its path differs. The identity checks are point-in-time checks, not a guarantee against all filesystem races.
+
+A/B on macOS arm64 / Qt 6.11.2: a temporary hard link to the test log was accepted as an export target before the change and rejected afterwards. A separate normal export still produced the complete 207-event history. An initial combined fixture created and removed the hard link while the SQLite connection remained open and subsequently observed a disk I/O error; separating the hard-link fixture from the normal-export fixture avoided that interaction, whose cause was not determined. App and test targets built; CTest radionet, database, migration and qmlpopups passed 4/4.
+
+The hard-link test is Unix-only and does not demonstrate every alias or race ordering. The worker's existing source-log replacement and session-identity behavior was not changed or tested here. Physical UI, Windows/Linux, real radio nets and full G08/G13 acceptance remain open.

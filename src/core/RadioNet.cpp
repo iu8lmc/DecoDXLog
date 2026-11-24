@@ -1,5 +1,6 @@
 #include "core/RadioNet.h"
 #include "core/LogDatabase.h"
+#include "core/FileIdentity.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -18,6 +19,24 @@
 namespace decolog::core {
 namespace {
 QString nowUtc() { return QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs); }
+bool safeNetExportDestination(const QString &destination, const QString &source)
+{
+    if (destination.isEmpty()) return false;
+    const auto resolved = [](const QString &path) {
+        const QFileInfo info(path);
+        if (info.exists()) return info.canonicalFilePath();
+        const QString parent = QFileInfo(info.absolutePath()).canonicalFilePath();
+        return QDir(parent.isEmpty() ? info.absolutePath() : parent).filePath(info.fileName());
+    };
+    const QString target = resolved(destination);
+    const QByteArray targetIdentity = fileidentity::read(destination);
+    for (const QString &suffix : {QString(), QStringLiteral("-wal"), QStringLiteral("-shm"), QStringLiteral("-journal")}) {
+        const QString protectedPath = source + suffix;
+        const QByteArray protectedIdentity = fileidentity::read(protectedPath);
+        if (target == resolved(protectedPath) || (!targetIdentity.isEmpty() && targetIdentity == protectedIdentity)) return false;
+    }
+    return true;
+}
 } // namespace
 RadioNet::RadioNet(LogDatabase *db, QObject *parent) : QObject(parent), m_db(db) {}
 RadioNet::~RadioNet() { m_exportPool.waitForDone(); }
@@ -532,20 +551,9 @@ bool RadioNet::exportSession(const QUrl &file)
     const QString source = m_db->path();
     if (source.isEmpty() || source == QLatin1String(":memory:"))
         return fail(tr("A file-backed log is required for export"));
-    const auto resolved = [](const QString &path) {
-        const QFileInfo info(path);
-        if (info.exists())
-            return info.canonicalFilePath();
-        const QString parent = QFileInfo(info.absolutePath()).canonicalFilePath();
-        return QDir(parent.isEmpty() ? info.absolutePath() : parent).filePath(info.fileName());
-    };
     const QString destination = file.toLocalFile();
-    const QString target = resolved(destination);
-    for (const QString &suffix :
-         {QString(), QStringLiteral("-wal"), QStringLiteral("-shm"), QStringLiteral("-journal")}) {
-        if (target == resolved(source + suffix))
-            return fail(tr("Choose a file outside the open log database"));
-    }
+    if (!safeNetExportDestination(destination, source))
+        return fail(tr("Choose a file outside the open log database"));
     const qint64 sessionId = m_sessionId;
     m_exportCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancel = m_exportCancel;
@@ -569,7 +577,10 @@ bool RadioNet::exportSession(const QUrl &file)
                     error = sql.lastError().text();
                 } else {
                     QSaveFile output(destination);
-                    if (!output.open(QIODevice::WriteOnly)) {
+                    output.setDirectWriteFallback(false);
+                    if (!safeNetExportDestination(destination, source)) {
+                        error = tr("Choose a file outside the open log database");
+                    } else if (!output.open(QIODevice::WriteOnly)) {
                         error = output.errorString();
                     } else {
                         const auto write = [&output, &error](const QByteArray &bytes) {
@@ -655,6 +666,10 @@ bool RadioNet::exportSession(const QUrl &file)
                                 ok = write(QByteArrayLiteral("}\n"));
                             if (ok && !sql.commit()) {
                                 error = sql.lastError().text();
+                                ok = false;
+                            }
+                            if (ok && !safeNetExportDestination(destination, source)) {
+                                error = tr("Choose a file outside the open log database");
                                 ok = false;
                             }
                             if (ok && !output.commit()) {
