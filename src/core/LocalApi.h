@@ -68,6 +68,7 @@ public:
 
     // Una chiave nuova, 32 caratteri esadecimali casuali.
     static QString newToken();
+    static bool parseExtensionCredentials(const QByteArray& json, QHash<QString, QSet<QString>>* credentials);
 
     // Per i test e per chi risponde: la richiesta ha la chiave giusta?
     bool authorized(const HttpRequest& request) const;

@@ -1,6 +1,8 @@
 #include "core/LocalApi.h"
 
 #include <QJsonDocument>
+#include <QJsonArray>
+#include <QRegularExpression>
 #include <QRandomGenerator>
 #include <QTcpServer>
 #include <QTcpSocket>
@@ -132,6 +134,42 @@ QByteArray LocalApiServer::suppliedToken(const HttpRequest& request) const
     if (given.isEmpty())
         given = request.query.queryItemValue(QStringLiteral("token")).toLatin1();
     return given;
+}
+
+bool LocalApiServer::parseExtensionCredentials(const QByteArray& json, QHash<QString, QSet<QString>>* credentials)
+{
+    if (!credentials) return false;
+    credentials->clear();
+    if (json.isEmpty()) return true;
+    if (json.size() > 65536) return false;
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(json, &error);
+    if (error.error != QJsonParseError::NoError || !document.isArray() || document.array().size() > 64) return false;
+    static const QRegularExpression idPattern(QStringLiteral("^[a-z0-9]+(?:[.-][a-z0-9]+)+$"));
+    static const QRegularExpression tokenPattern(QStringLiteral("^[0-9a-f]{32}$"));
+    const QSet<QString> allowed{QStringLiteral("qso.read"), QStringLiteral("status.read"),
+                                QStringLiteral("worked.read"), QStringLiteral("tracker.read")};
+    QHash<QString, QSet<QString>> parsed;
+    QSet<QString> identities;
+    for (const auto& item : document.array()) {
+        if (!item.isObject()) return false;
+        const QJsonObject object = item.toObject();
+        if (object.size() != 3 || !object.value(QStringLiteral("id")).isString() ||
+            !object.value(QStringLiteral("token")).isString() || !object.value(QStringLiteral("permissions")).isArray()) return false;
+        const QString id = object.value(QStringLiteral("id")).toString();
+        const QString token = object.value(QStringLiteral("token")).toString();
+        if (id.size() > 128 || !idPattern.match(id).hasMatch() || !tokenPattern.match(token).hasMatch() ||
+            identities.contains(id) || parsed.contains(token)) return false;
+        QSet<QString> permissions;
+        for (const auto& value : object.value(QStringLiteral("permissions")).toArray()) {
+            if (!value.isString() || !allowed.contains(value.toString()) || permissions.contains(value.toString())) return false;
+            permissions.insert(value.toString());
+        }
+        if (permissions.isEmpty()) return false;
+        identities.insert(id); parsed.insert(token, permissions);
+    }
+    *credentials = parsed;
+    return true;
 }
 
 LocalApiServer::Access LocalApiServer::accessFor(const HttpRequest& request) const

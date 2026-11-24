@@ -246,6 +246,7 @@ private slots:
             ini.setValue(QStringLiteral("api/port"), m_apiPort);
             ini.setValue(QStringLiteral("api/token"), QStringLiteral("0123456789abcdef0123456789abcdef"));
             ini.setValue(QStringLiteral("api/readOnlyToken"), QStringLiteral("fedcba9876543210fedcba9876543210"));
+            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"test.report","token":"11111111111111111111111111111111","permissions":["qso.read"]}])"));
             ini.setValue(QStringLiteral("watch/files"),
                          QVariantList{QVariantMap{{QStringLiteral("path"), QDir::fromNativeSeparators(fldigiLog)},
                                                   {QStringLiteral("label"), QStringLiteral("fldigi")},
@@ -709,6 +710,41 @@ private slots:
         done.wait(5000);
         QCOMPARE(anonymous->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), 401);
         anonymous->deleteLater();
+    }
+
+    void scopedExtensionReadsThroughApplication()
+    {
+        QNetworkAccessManager net;
+        auto request = [&](const QByteArray& method, const QString& path) {
+            QNetworkRequest r(QUrl(QStringLiteral("http://127.0.0.1:%1%2").arg(m_apiPort).arg(path)));
+            r.setRawHeader("X-DecoDXLog-Token", "11111111111111111111111111111111");
+            QNetworkReply* reply = net.sendCustomRequest(r, method, "");
+            QSignalSpy done(reply, &QNetworkReply::finished); done.wait(5000);
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const QJsonObject json = QJsonDocument::fromJson(reply->readAll()).object();
+            reply->deleteLater(); return std::pair{status,json};
+        };
+        const auto caps = request("GET", QStringLiteral("/api/v1/capabilities"));
+        QCOMPARE(caps.first,200);
+        QCOMPARE(caps.second.value("permissionModel").toString(),QStringLiteral("extension-token"));
+        QVERIFY(caps.second.value("perExtensionPermissions").toBool());
+        QCOMPARE(caps.second.value("operations").toArray(),QJsonArray{QStringLiteral("qso.read")});
+        QCOMPARE(request("GET",QStringLiteral("/api/v1/qsos")).first,200);
+        QCOMPARE(request("GET",QStringLiteral("/api/v1/tracker")).first,403);
+        QCOMPARE(request("POST",QStringLiteral("/api/v1/qso")).first,403);
+        const QString python = QStandardPaths::findExecutable(QStringLiteral("python3"));
+        QVERIFY2(!python.isEmpty(), "Python 3 required to exercise the sample extension");
+        QProcess report;
+        QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+        environment.insert(QStringLiteral("DECODXLOG_READ_TOKEN"), QStringLiteral("11111111111111111111111111111111"));
+        report.setProcessEnvironment(environment);
+        report.start(python, {QStringLiteral(DECODXLOG_SOURCE_DIR "/examples/extensions/recent_activity.py"),
+                              QStringLiteral("--port"), QString::number(m_apiPort)});
+        QVERIFY(report.waitForFinished(10000));
+        QCOMPARE(report.exitCode(), 0);
+        const QByteArray output = report.readAllStandardOutput();
+        QVERIFY(!output.contains("11111111111111111111111111111111"));
+        QCOMPARE(QJsonDocument::fromJson(output).object().value("scope").toString(),QStringLiteral("recent_sample"));
     }
 
     void aBurstIsAllLogged()

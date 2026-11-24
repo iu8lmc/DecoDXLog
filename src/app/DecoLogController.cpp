@@ -4136,6 +4136,10 @@ void DecoLogController::startApi()
     }
     m_api.setToken(m_apiToken);
     m_api.setReadOnlyToken(m_apiReadOnlyToken);
+    QHash<QString, QSet<QString>> extensionCredentials;
+    if (!LocalApiServer::parseExtensionCredentials(QSettings().value(QStringLiteral("api/extensionCredentials")).toByteArray(), &extensionCredentials))
+        addActivity(QStringLiteral("API"), tr("Invalid extension credentials; extension access is disabled"), QStringLiteral("error"));
+    m_api.setExtensionCredentials(extensionCredentials);
     m_api.setHandler([this](const HttpRequest& r) { return handleApi(r); });
     if (m_api.start(static_cast<quint16>(m_apiPort)))
         addActivity(QStringLiteral("API"), tr("Local interface on http://127.0.0.1:%1/api/v1/").arg(m_apiPort));

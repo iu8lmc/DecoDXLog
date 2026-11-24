@@ -197,6 +197,26 @@ private slots:
         QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},qso).status,401);
     }
 
+    void extensionCredentialConfigurationFailsClosed()
+    {
+        QHash<QString, QSet<QString>> parsed;
+        const QByteArray good = R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":["qso.read"]}])";
+        QVERIFY(LocalApiServer::parseExtensionCredentials(good, &parsed));
+        QCOMPARE(parsed.size(),1);
+        QVERIFY(parsed.value(QStringLiteral("11111111111111111111111111111111")).contains(QStringLiteral("qso.read")));
+        const QList<QByteArray> bad{
+            "not json", "{}",
+            R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":["qso.write"]}])",
+            R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":[]}])",
+            R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":["qso.read"]},{"id":"example.report","token":"22222222222222222222222222222222","permissions":["tracker.read"]}])",
+            R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":["qso.read"]},{"id":"example.tracker","token":"11111111111111111111111111111111","permissions":["tracker.read"]}])"};
+        for (const auto& value : bad) {
+            parsed.insert(QStringLiteral("sentinel"), {});
+            QVERIFY(!LocalApiServer::parseExtensionCredentials(value, &parsed));
+            QVERIFY(parsed.isEmpty());
+        }
+    }
+
     void noKeyNoServer()
     {
         // Senza chiave anche con la chiave vuota si risponde 401.

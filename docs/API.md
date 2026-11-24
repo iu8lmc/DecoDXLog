@@ -32,6 +32,12 @@ conservate nelle impostazioni locali dell'applicazione, non nel portachiavi;
 chi può leggerle può usarle. C'è una sola chiave condivisa di sola lettura, non
 un'identità o una revoca indipendente per ogni estensione.
 
+## Credenziali sperimentali per estensione
+
+Per prove avanzate, l'impostazione locale `api/extensionCredentials` può contenere un array JSON di oggetti con esattamente `id`, `token` e `permissions`. Ogni ID e token deve essere unico; il token è una chiave casuale di 32 caratteri esadecimali minuscoli e i soli permessi ammessi sono `qso.read`, `status.read`, `worked.read` e `tracker.read`. Una configurazione non valida disabilita tutte queste credenziali. Le modifiche sono caricate all'avvio dell'interfaccia API; riavviala o riavvia l'app dopo aver modificato o rimosso una credenziale. Non usare la chiave completa o quella condivisa: una collisione nega l'autenticazione. Non condividere i token tra estensioni.
+
+Questa è una configurazione sperimentale manuale: non esiste ancora una schermata per creare, assegnare o revocare le credenziali né un collegamento automatico ai manifest. Le chiavi sono conservate in chiaro nelle impostazioni locali, non nel portachiavi; chi può leggere le impostazioni può usarle. I permessi limitano le richieste API, non l'accesso del codice Python a file, rete o credenziali del sistema. La disinstallazione di un'estensione non revoca automaticamente la chiave. Le API di scrittura e TX restano negate a queste credenziali.
+
 ## Le richieste
 
 Tutte le risposte sono JSON.
@@ -41,9 +47,7 @@ Tutte le risposte sono JSON.
 Ritorna la versione del contratto e le operazioni effettivamente disponibili;
 una versione richiesta diversa da `1` produce `400`. Il campo `permissionModel` vale `shared-token` per la chiave completa e
 `read-only-token` per quella in sola lettura; `operations` riporta soltanto
-le operazioni consentite alla chiave utilizzata. Non esistono ancora permessi per estensione,
-eventi, controllo TX o idempotenza transazionale durevole; i rispettivi campi
-booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
+le operazioni consentite alla chiave utilizzata. Una credenziale sperimentale per estensione restituisce `extension-token` e i propri permessi di lettura; le altre chiavi rimangono condivise. Eventi, controllo TX e idempotenza transazionale durevole non sono disponibili e i relativi campi booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
 
 ### `GET /api/v1/tracker`
 
