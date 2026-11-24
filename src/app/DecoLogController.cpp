@@ -4111,7 +4111,7 @@ void DecoLogController::revokeApiReadOnlyToken()
 QVariantList DecoLogController::apiExtensionCredentials() const
 {
     const QByteArray raw = QSettings().value(QStringLiteral("api/extensionCredentials")).toByteArray();
-    QHash<QString, QSet<QString>> parsed;
+    QHash<QString, ExtensionCredential> parsed;
     if (!LocalApiServer::parseExtensionCredentials(raw, &parsed) || raw.isEmpty()) return {};
     return QJsonDocument::fromJson(raw).array().toVariantList();
 }
@@ -4120,7 +4120,7 @@ QString DecoLogController::createApiExtensionCredential(const QString& id, const
 {
     QSettings settings;
     const QByteArray raw = settings.value(QStringLiteral("api/extensionCredentials")).toByteArray();
-    QHash<QString, QSet<QString>> parsed;
+    QHash<QString, ExtensionCredential> parsed;
     if (!LocalApiServer::parseExtensionCredentials(raw, &parsed)) return tr("Extension credential configuration is invalid.");
     QJsonArray entries = raw.isEmpty() ? QJsonArray{} : QJsonDocument::fromJson(raw).array();
     for (const auto& entry : entries)
@@ -4140,7 +4140,7 @@ QString DecoLogController::revokeApiExtensionCredential(const QString& id)
 {
     QSettings settings;
     const QByteArray raw = settings.value(QStringLiteral("api/extensionCredentials")).toByteArray();
-    QHash<QString, QSet<QString>> parsed;
+    QHash<QString, ExtensionCredential> parsed;
     if (!LocalApiServer::parseExtensionCredentials(raw, &parsed)) return tr("Extension credential configuration is invalid.");
     QJsonArray entries; bool found = false;
     for (const auto& entry : QJsonDocument::fromJson(raw).array()) {
@@ -4183,7 +4183,7 @@ void DecoLogController::startApi()
     }
     m_api.setToken(m_apiToken);
     m_api.setReadOnlyToken(m_apiReadOnlyToken);
-    QHash<QString, QSet<QString>> extensionCredentials;
+    QHash<QString, ExtensionCredential> extensionCredentials;
     if (!LocalApiServer::parseExtensionCredentials(QSettings().value(QStringLiteral("api/extensionCredentials")).toByteArray(), &extensionCredentials))
         addActivity(QStringLiteral("API"), tr("Invalid extension credentials; extension access is disabled"), QStringLiteral("error"));
     m_api.setExtensionCredentials(extensionCredentials);
@@ -4230,6 +4230,7 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
             return HttpResponse::json(200, QJsonObject{
                 {QStringLiteral("apiVersion"), 1},
                 {QStringLiteral("permissionModel"), QStringLiteral("extension-token")},
+                {QStringLiteral("extensionId"), request.extensionId},
                 {QStringLiteral("operations"), operations},
                 {QStringLiteral("events"), false}, {QStringLiteral("txControl"), false},
                 {QStringLiteral("perExtensionPermissions"), true},

@@ -47,7 +47,7 @@ Tutte le risposte sono JSON.
 Ritorna la versione del contratto e le operazioni effettivamente disponibili;
 una versione richiesta diversa da `1` produce `400`. Il campo `permissionModel` vale `shared-token` per la chiave completa e
 `read-only-token` per quella in sola lettura; `operations` riporta soltanto
-le operazioni consentite alla chiave utilizzata. Una credenziale sperimentale per estensione restituisce `extension-token` e i propri permessi di lettura; le altre chiavi rimangono condivise. Eventi, controllo TX e idempotenza transazionale durevole non sono disponibili e i relativi campi booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
+le operazioni consentite alla chiave utilizzata. Una credenziale sperimentale per estensione restituisce `extension-token`, l’`extensionId` assegnato e i propri permessi di lettura; le altre chiavi rimangono condivise. Eventi, controllo TX e idempotenza transazionale durevole non sono disponibili e i relativi campi booleani sono `false`. La scoperta non costituisce isolamento delle estensioni.
 
 ### `GET /api/v1/tracker`
 

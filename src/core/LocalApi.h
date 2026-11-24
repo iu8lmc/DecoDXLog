@@ -23,6 +23,11 @@ class QTcpSocket;
 
 namespace decolog::core {
 
+struct ExtensionCredential {
+    QString id;
+    QSet<QString> permissions;
+};
+
 struct HttpRequest {
     QByteArray method;                       // GET, POST...
     QString path;                            // /api/v1/qso
@@ -31,6 +36,7 @@ struct HttpRequest {
     QByteArray body;
     bool readOnly{false};
     bool extensionCredential{false};
+    QString extensionId;
     QSet<QString> extensionPermissions;
 };
 
@@ -63,12 +69,12 @@ public:
     void setToken(const QString& token) { m_token = token; }
     void setReadOnlyToken(const QString& token) { m_readOnlyToken = token; }
     // Volatile grants; provisioning and persistent per-extension management are separate.
-    void setExtensionCredentials(const QHash<QString, QSet<QString>>& credentials) { m_extensionCredentials = credentials; }
+    void setExtensionCredentials(const QHash<QString, ExtensionCredential>& credentials) { m_extensionCredentials = credentials; }
     void setHandler(Handler handler) { m_handler = std::move(handler); }
 
     // Una chiave nuova, 32 caratteri esadecimali casuali.
     static QString newToken();
-    static bool parseExtensionCredentials(const QByteArray& json, QHash<QString, QSet<QString>>* credentials);
+    static bool parseExtensionCredentials(const QByteArray& json, QHash<QString, ExtensionCredential>* credentials);
 
     // Per i test e per chi risponde: la richiesta ha la chiave giusta?
     bool authorized(const HttpRequest& request) const;
@@ -86,7 +92,7 @@ private:
     QTcpServer* m_server{nullptr};
     QString m_token;
     QString m_readOnlyToken;
-    QHash<QString, QSet<QString>> m_extensionCredentials;
+    QHash<QString, ExtensionCredential> m_extensionCredentials;
     Handler m_handler;
     QString m_lastError;
     QHash<QTcpSocket*, QByteArray> m_buffers;

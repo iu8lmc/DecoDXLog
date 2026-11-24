@@ -173,8 +173,8 @@ private slots:
         QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},baseline).status,200);
         QCOMPARE(call(m_net,"GET",base("/api/v1/tracker"),{},baseline).status,200);
         m_server.setReadOnlyToken({});
-        m_server.setExtensionCredentials({{qsoToken, {QStringLiteral("qso.read")}},
-                                          {trackerToken, {QStringLiteral("tracker.read")}}});
+        m_server.setExtensionCredentials({{qsoToken, {QStringLiteral("test.report"), {QStringLiteral("qso.read")}}},
+                                          {trackerToken, {QStringLiteral("test.tracker"), {QStringLiteral("tracker.read")}}}});
         const QList<QPair<QByteArray,QByteArray>> qso{{"X-DecoDXLog-Token",qsoToken.toLatin1()}};
         const QList<QPair<QByteArray,QByteArray>> tracker{{"X-DecoDXLog-Token",trackerToken.toLatin1()}};
         const Answer caps = call(m_net,"GET",base("/api/v1/capabilities"),{},qso);
@@ -191,7 +191,7 @@ private slots:
         m_server.setReadOnlyToken(qsoToken);
         QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},qso).status,401);
         m_server.setReadOnlyToken({});
-        m_server.setExtensionCredentials({{m_token,{QStringLiteral("qso.read")}}});
+        m_server.setExtensionCredentials({{m_token,{QStringLiteral("test.collision"), {QStringLiteral("qso.read")}}}});
         QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},{{"X-DecoDXLog-Token",m_token.toLatin1()}}).status,401);
         m_server.setExtensionCredentials({});
         QCOMPARE(call(m_net,"GET",base("/api/v1/qsos"),{},qso).status,401);
@@ -199,11 +199,11 @@ private slots:
 
     void extensionCredentialConfigurationFailsClosed()
     {
-        QHash<QString, QSet<QString>> parsed;
+        QHash<QString, ExtensionCredential> parsed;
         const QByteArray good = R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":["qso.read"]}])";
         QVERIFY(LocalApiServer::parseExtensionCredentials(good, &parsed));
         QCOMPARE(parsed.size(),1);
-        QVERIFY(parsed.value(QStringLiteral("11111111111111111111111111111111")).contains(QStringLiteral("qso.read")));
+        QVERIFY(parsed.value(QStringLiteral("11111111111111111111111111111111")).permissions.contains(QStringLiteral("qso.read")));
         const QList<QByteArray> bad{
             "not json", "{}",
             R"([{"id":"example.report","token":"11111111111111111111111111111111","permissions":["qso.write"]}])",

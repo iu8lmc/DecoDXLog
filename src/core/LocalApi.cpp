@@ -136,7 +136,7 @@ QByteArray LocalApiServer::suppliedToken(const HttpRequest& request) const
     return given;
 }
 
-bool LocalApiServer::parseExtensionCredentials(const QByteArray& json, QHash<QString, QSet<QString>>* credentials)
+bool LocalApiServer::parseExtensionCredentials(const QByteArray& json, QHash<QString, ExtensionCredential>* credentials)
 {
     if (!credentials) return false;
     credentials->clear();
@@ -149,7 +149,7 @@ bool LocalApiServer::parseExtensionCredentials(const QByteArray& json, QHash<QSt
     static const QRegularExpression tokenPattern(QStringLiteral("^[0-9a-f]{32}$"));
     const QSet<QString> allowed{QStringLiteral("qso.read"), QStringLiteral("status.read"),
                                 QStringLiteral("worked.read"), QStringLiteral("tracker.read")};
-    QHash<QString, QSet<QString>> parsed;
+    QHash<QString, ExtensionCredential> parsed;
     QSet<QString> identities;
     for (const auto& item : document.array()) {
         if (!item.isObject()) return false;
@@ -166,7 +166,7 @@ bool LocalApiServer::parseExtensionCredentials(const QByteArray& json, QHash<QSt
             permissions.insert(value.toString());
         }
         if (permissions.isEmpty()) return false;
-        identities.insert(id); parsed.insert(token, permissions);
+        identities.insert(id); parsed.insert(token, ExtensionCredential{id, permissions});
     }
     *credentials = parsed;
     return true;
@@ -263,7 +263,10 @@ void LocalApiServer::readFrom(QTcpSocket* socket)
     if (access == Access::Extension) {
         const QByteArray given = suppliedToken(request);
         for (auto it = m_extensionCredentials.cbegin(); it != m_extensionCredentials.cend(); ++it)
-            if (!it.key().isEmpty() && sameSecret(given, it.key().toLatin1())) request.extensionPermissions = it.value();
+            if (!it.key().isEmpty() && sameSecret(given, it.key().toLatin1())) {
+                request.extensionId = it.value().id;
+                request.extensionPermissions = it.value().permissions;
+            }
         const QString path = request.path.endsWith(QLatin1Char('/')) ? request.path.chopped(1) : request.path;
         QString permission;
         if (path == QLatin1String("/api/v1/status")) permission = QStringLiteral("status.read");

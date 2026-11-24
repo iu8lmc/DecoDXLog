@@ -728,6 +728,7 @@ private slots:
         QCOMPARE(caps.first,200);
         QCOMPARE(caps.second.value("permissionModel").toString(),QStringLiteral("extension-token"));
         QVERIFY(caps.second.value("perExtensionPermissions").toBool());
+        QCOMPARE(caps.second.value("extensionId").toString(),QStringLiteral("test.report"));
         QCOMPARE(caps.second.value("operations").toArray(),QJsonArray{QStringLiteral("qso.read")});
         QCOMPARE(request("GET",QStringLiteral("/api/v1/qsos")).first,200);
         QCOMPARE(request("GET",QStringLiteral("/api/v1/tracker")).first,403);
