@@ -13,6 +13,11 @@ PredictPassSchedule::PredictPassSchedule(QObject *parent) : QObject(parent)
             finish(false, QStringLiteral("Orbital data changed between passes"));
             return;
         }
+        if (!m_passes.isEmpty() && pass.value(QStringLiteral("aos")).toLongLong()
+                <= m_passes.last().toMap().value(QStringLiteral("los")).toLongLong()) {
+            finish(false, QStringLiteral("Tracker returned overlapping passes"));
+            return;
+        }
         m_fingerprint = fingerprint;
         m_passes.append(pass);
         if (m_passes.size() == m_count) { finish(true, {}); return; }

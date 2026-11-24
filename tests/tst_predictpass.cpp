@@ -111,6 +111,28 @@ class TestPredictPass : public QObject {
         schedule.cancel();
         QCOMPARE(done.size(), 1); QVERIFY(!done.first().at(0).toBool()); QVERIFY(!schedule.busy());
     }
+    void scheduleRejectsOverlappingPasses()
+    {
+        QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost,0)); int predictions=0;
+        connect(&server,&QUdpSocket::readyRead,&server,[&] {
+            while (server.hasPendingDatagrams()) {
+                QByteArray cmd(int(server.pendingDatagramSize()),Qt::Uninitialized); QHostAddress from; quint16 port;
+                server.readDatagram(cmd.data(),cmd.size(),&from,&port);
+                if (cmd.startsWith("GET_TLE")) server.writeDatagram("OSCAR-7\n1 07530U 74089B   18126.90857181 -.00000043  00000-0  11708-4 0  9999\n2 07530 101.6842  94.8539 0012518  56.0919 329.7963 12.53632314989425\n",from,port);
+                else {
+                    const qint64 base=predictions++ == 0 ? 1800000000 : 1800000060;
+                    server.writeDatagram(QByteArray::number(base)+" Fri 15Jan27 08:00:00 0 183\n"+
+                        QByteArray::number(base+60)+" Fri 15Jan27 08:01:00 30 174\n"+
+                        QByteArray::number(base+120)+" Fri 15Jan27 08:02:00 0 160\n\x1a\n",from,port);
+                }
+            }
+        });
+        PredictPassSchedule schedule; QSignalSpy done(&schedule,&PredictPassSchedule::finished);
+        QVERIFY(schedule.request("127.0.0.1",server.localPort(),"OSCAR-7",1800000000,2));
+        QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,4000); QVERIFY(!done.first().at(0).toBool());
+        QCOMPARE(schedule.passes().size(),1);
+    }
+
     void scheduleStopsWhenTleChangesBetweenPasses()
     {
         QUdpSocket server; QVERIFY(server.bind(QHostAddress::LocalHost, 0));

@@ -2791,3 +2791,11 @@ Finishing or recovering a contest audio partial now verifies that its filesystem
 A/B on macOS arm64 / Qt 6.11.2: a synthetic partial with an additional hard link was previously recovered, rewriting the shared header; it is now rejected and both names retain the original bytes. A separate test confirms active-recording finalization also rejects a hard-linked file; ordinary recovery and recovery after abrupt process exit still pass. App and test targets built; CTest contestaudio, contestaudiocontroller, contestreport, database and qmlpopups passed 5/5.
 
 The hard-link fixtures run on Unix only. This path-based check does not eliminate a filesystem replacement race after validation, and support on Windows, network/removable filesystems, physical audio devices and interrupted power loss remains unverified. G10/G13 acceptance remains open.
+
+## 2026-11-24 — G09 reject overlapping tracker passes
+
+The multi-pass PREDICT schedule now rejects a subsequent pass whose AOS is at or before the previous LOS. It preserves the already collected partial schedule and reports an incomplete schedule, as for other tracker errors. A first pass already in progress remains accepted by the existing planner; no rig command is issued by this check.
+
+A/B on macOS arm64 / Qt 6.11.2 with a local synthetic UDP tracker: two passes overlapping by 60 seconds were previously reported as a successful schedule; now the second is rejected and the first remains available. Existing sequential-pass, cancellation and ongoing-pass tests also pass. App and test targets built; CTest predictpass, predicttracker, roversession, database and qmlpopups passed 5/5.
+
+The fixture checks temporal consistency, not the orbital correctness of the tracker, realistic radio Doppler or hardware. It does not exercise the incomplete-schedule message in the physical UI, a live tracker, Windows/Linux or the remaining G09/G13 acceptance requirements.
