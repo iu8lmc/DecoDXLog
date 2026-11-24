@@ -23,6 +23,7 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <QVariantMap>
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -30,6 +31,9 @@ class QNetworkReply;
 namespace decolog::core {
 
 namespace confirmations {
+
+// Bounded local identifiers for a past ambiguous download, not current QSO state.
+QVariantMap ambiguousCandidateSummary(const QList<qint64>& candidates);
 
 struct Report {
     bool ok{false};

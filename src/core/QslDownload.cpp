@@ -18,6 +18,12 @@
 namespace decolog::core {
 
 namespace confirmations {
+QVariantMap ambiguousCandidateSummary(const QList<qint64>& candidates)
+{
+    QVariantList ids;
+    for (const qint64 id : candidates) { if (ids.size() >= 50) break; ids << id; }
+    return {{QStringLiteral("candidateIds"),ids},{QStringLiteral("candidateCount"),candidates.size()}};
+}
 
 namespace {
 

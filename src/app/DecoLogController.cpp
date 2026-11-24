@@ -7264,9 +7264,8 @@ DecoLogController::ConfirmTally DecoLogController::applyConfirmations(const QStr
             ++t.ambiguous;
             QVariantMap m = row(c, QStringLiteral("ambiguous"), r.message, 0);
             if (!m.isEmpty()) {
-                QVariantList ids; for (const qint64 id : r.candidates) { if (ids.size()>=50) break; ids << id; }
-                m.insert(QStringLiteral("candidateIds"),ids);
-                m.insert(QStringLiteral("candidateCount"),r.candidates.size());
+                const QVariantMap details=confirmations::ambiguousCandidateSummary(r.candidates);
+                for (auto it=details.cbegin(); it!=details.cend(); ++it) m.insert(it.key(),it.value());
                 t.rows << m;
             }
             break;

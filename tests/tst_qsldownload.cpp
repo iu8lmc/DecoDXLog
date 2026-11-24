@@ -114,6 +114,15 @@ class TestQslDownload : public QObject {
     Q_OBJECT
 
 private slots:
+    void ambiguousCandidateSummaryIsBounded()
+    {
+        QList<qint64> candidates; for (qint64 id=1; id<=75; ++id) candidates << id;
+        const auto details=confirmations::ambiguousCandidateSummary(candidates);
+        QCOMPARE(details.value("candidateCount").toInt(),75);
+        const auto ids=details.value("candidateIds").toList(); QCOMPARE(ids.size(),50);
+        QCOMPARE(ids.first().toLongLong(),qint64(1)); QCOMPARE(ids.last().toLongLong(),qint64(50));
+        QCOMPARE(confirmations::ambiguousCandidateSummary({}).value("candidateCount").toInt(),0);
+    }
     void cursorRequiresCompleteDatabaseSuccess()
     {
         QVERIFY(confirmations::mayAdvanceCursor(false,0));

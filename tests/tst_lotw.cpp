@@ -2,6 +2,7 @@
 // download contro un server HTTP finto (credenziali mai negli errori).
 #include "core/LogDatabase.h"
 #include "core/Lotw.h"
+#include "core/QslDownload.h"
 #include "core/Vucc.h"
 
 #include <QSignalSpy>
@@ -344,7 +345,11 @@ private slots:
         const auto one=db.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120200","FN41"),"fixture",{},true,0,false);
         const auto two=db.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120400","FN40"),"fixture",{},true,0,false);
         QVERIFY(one.id>0 && two.id>0);
-        QCOMPARE(db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true).status,ConfirmationResult::Status::Ambiguous);
+        const auto ambiguous=db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true);
+        QCOMPARE(ambiguous.status,ConfirmationResult::Status::Ambiguous);
+        const auto details=confirmations::ambiguousCandidateSummary(ambiguous.candidates);
+        QCOMPARE(details.value("candidateCount").toInt(),2); const auto ids=details.value("candidateIds").toList();
+        QVERIFY(ids.contains(one.id)); QVERIFY(ids.contains(two.id));
         QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0); q.finish();
         QVERIFY(db.softDeleteQso(two.id));
         QCOMPARE(db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true).status,ConfirmationResult::Status::Confirmed);
