@@ -34,6 +34,10 @@ Report parseReport(const QByteArray& data)
         report.error = QCoreApplication::translate("Lotw", "LoTW: incomplete report (unterminated record or tag)");
         return report;
     }
+    if (doc.invalidFieldLength) {
+        report.error = QCoreApplication::translate("Lotw", "LoTW: invalid ADIF field length in report");
+        return report;
+    }
     report.lastQsl = doc.header.value(QStringLiteral("APP_LOTW_LASTQSL")).trimmed();
     bool ok = false;
     const int declared = doc.header.value(QStringLiteral("APP_LOTW_NUMREC")).trimmed().toInt(&ok);

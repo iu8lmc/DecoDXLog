@@ -41,6 +41,7 @@ struct AdifDocument {
     QList<AdifRecord> records;
     bool              unterminatedRecord{false};
     bool              unterminatedTag{false};
+    bool              invalidFieldLength{false};
 };
 
 namespace adif {

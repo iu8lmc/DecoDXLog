@@ -4946,6 +4946,10 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 <context>
     <name>Lotw</name>
     <message>
+        <source>LoTW: invalid ADIF field length in report</source>
+        <translation>LoTW: lunghezza di un campo ADIF non valida nel rapporto</translation>
+    </message>
+    <message>
         <source>LoTW: incomplete report (unterminated record or tag)</source>
         <translation>LoTW: rapporto incompleto (record o campo non terminato)</translation>
     </message>

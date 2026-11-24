@@ -190,6 +190,19 @@ private slots:
         QVERIFY(lotw::parseReport(kReport+"\n<APP_LoTW_EOF:1>Y").ok);
     }
 
+    void rejectsMalformedFieldLength()
+    {
+        QByteArray malformed=kReport;
+        malformed.replace("<QSL_RCVD:1>Y", "<QSL_RCVD:x>Y");
+        const auto general=adif::parse(malformed);
+        QCOMPARE(general.records.size(),3);
+        QVERIFY(general.invalidFieldLength);
+        QVERIFY(!lotw::parseReport(malformed).ok);
+        malformed=kReport; malformed.replace("<QSL_RCVD:1>Y", "<QSL_RCVD:-1>Y");
+        QVERIFY(!lotw::parseReport(malformed).ok);
+        QVERIFY(lotw::parseReport(kReport).ok);
+    }
+
     void parseMixedCaseHeaderAndPreserveConfirmationGrid()
     {
         QByteArray mixed=kReport; mixed.replace("<eoh>","<eOh>");

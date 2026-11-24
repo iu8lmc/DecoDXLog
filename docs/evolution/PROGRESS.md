@@ -2921,3 +2921,11 @@ The general ADIF parser now reports an unterminated trailing record or tag while
 A/B on macOS arm64 / Qt 6.11.2: removing the final EOR from a three-record report previously passed the record-count check; the new test failed on that baseline and now rejects it. It also rejects a trailing incomplete tag, accepts the complete fixture and standalone EOF marker, and confirms generic ADIF parsing still returns the unterminated record. App and tests built; CTest adif, database, lotw, qsldownload, migration, vucc and qmlpopups passed 7/7.
 
 This checks record and tag termination, not every form of malformed ADIF or missing/non-numeric count; a syntactically complete but semantically truncated or incorrect report can still pass. The full controller failure path, real LoTW, physical UI and Windows/Linux remain untested. G02/G05/G13 acceptance remains open.
+
+## 2026-11-24 — G05 reject invalid LoTW ADIF lengths
+
+The general ADIF parser now reports nonnumeric or negative field lengths while keeping its existing permissive parsing behavior. LoTW rejects reports carrying that indicator before applying confirmations or the cursor; an Italian error was added.
+
+A/B on macOS arm64 / Qt 6.11.2: a fixture with nonnumeric QSL_RCVD field lengths previously passed the record-count and termination checks and was accepted. The new test failed on that baseline; it now rejects nonnumeric and negative lengths while accepting the intact report and confirming that generic parsing still returns its records. App and tests built; CTest adif, database, lotw, qsldownload, migration, vucc and qmlpopups passed 7/7.
+
+The check does not establish that all field values are complete or semantically valid. Real LoTW, the desktop controller failure flow and Windows/Linux remain untested; G02/G05/G13 acceptance remains open.

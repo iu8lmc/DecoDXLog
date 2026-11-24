@@ -172,8 +172,10 @@ AdifDocument parse(const QByteArray& data)
 
         bool ok = false;
         const qsizetype length = parts.at(1).trimmed().toLongLong(&ok);
-        if (!ok || length < 0)
+        if (!ok || length < 0) {
+            doc.invalidFieldLength = true;
             continue;
+        }
 
         qsizetype take = qMin(length, text.size() - pos);
         // Lunghezza in caratteri o in byte? Con solo ASCII coincidono. Altrimenti
