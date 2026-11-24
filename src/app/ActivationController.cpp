@@ -887,12 +887,15 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                         && Activation::normalizePrograms({{QStringLiteral("pota"), other}}, &normalized);
                     const bool explicitMatch = sig == QLatin1String("POTA")
                         && sigInfo == other.section(QLatin1Char('@'), 0, 0);
-                    if (!other.isEmpty() && (!singleValid || ((!sig.isEmpty() || !sigInfo.isEmpty()) && !explicitMatch))) {
+                    const bool incompletePotaSig=other.isEmpty() && sig==QLatin1String("POTA") && sigInfo.isEmpty();
+                    const bool invalidPotaSig=other.isEmpty() && sig==QLatin1String("POTA") && !sigInfo.isEmpty()
+                        && !Activation::normalizePrograms({{QStringLiteral("pota"),sigInfo}}, &normalized);
+                    if (incompletePotaSig || invalidPotaSig || (!other.isEmpty() && (!singleValid || ((!sig.isEmpty() || !sigInfo.isEmpty()) && !explicitMatch)))) {
                         groups[key][QStringLiteral("potaCorrespondentReview")] = groups[key].value(QStringLiteral("potaCorrespondentReview")).toInt() + 1;
                         if (!selectedIds && !potaReviewRecorded) {
                             potaReviewRecorded = true;
                             const QString reason = other.contains(QLatin1Char(',')) ? QStringLiteral("multipleReferences")
-                                : !singleValid ? QStringLiteral("invalidReference") : QStringLiteral("conflictingSig");
+                                : invalidPotaSig || (!other.isEmpty() && !singleValid) ? QStringLiteral("invalidReference") : QStringLiteral("conflictingSig");
                             potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
                                 {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)},
                                 {QStringLiteral("reason"), reason}};

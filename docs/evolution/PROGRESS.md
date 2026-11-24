@@ -3211,3 +3211,11 @@ New QSL import rows now distinguish invalid incoming records from database failu
 A/B on macOS arm64 / Qt 6.11.2: an offscreen app opened a synthetic summary containing two invalid records and three database errors. Previously the copied run summary showed two generic errors, omitted database errors and the new error filter fixture failed. Afterwards it shows both counts and the filter exposes both row types. App and test targets built; CTest lotw, qsldownload and qmlpopups passed 3/3; translation XML and git diff --check passed.
 
 Older summaries stored database-error rows under the `invalid` kind, so their individual categories cannot be reconstructed, even though a stored database-error count can be shown. The controller's new classification was compiled but the desktop fixture injects a summary rather than causing an actual database failure during download. The run-level error-message branch remains separate. No live service, physical UI, Windows/Linux or full G05/G13 acceptance was tested.
+
+## 2026-11-24 — G06 review incomplete POTA correspondent SIG fields
+
+POTA partition preview now flags a QSO with `SIG=POTA`, no `POTA_REF` and a missing or locally invalid `SIG_INFO`; the existing review list explains whether the fields are incomplete or the reference is unrecognized. A valid standalone `SIG=POTA` and `SIG_INFO` is not flagged. Export retains the original correspondent fields and does not invent a reference.
+
+A/B on macOS arm64 / Qt 6.11.2: an expanded synthetic fixture previously reported four review QSO and missed two incomplete/invalid standalone SIG cases; it now reports six, leaves a valid seventh case unflagged and preserves all eight records and original fields in the exported ADIF. App and test targets built; CTest activation and qmlpopups passed 2/2; git diff --check passed.
+
+The validation is local syntax, not catalogue or official POTA acceptance. The new review reasons were checked through the controller fixture, not the visible desktop row or a real uploader. The pre-existing unbounded in-memory review list, physical UI, Windows/Linux and full G06/G13 acceptance remain open.
