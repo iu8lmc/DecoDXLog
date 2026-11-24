@@ -90,9 +90,17 @@ Report parseCqWw(const QByteArray& bytes)
     const QRegularExpression callRx(QStringLiteral(R"(^Call:\s*([A-Z0-9/]+)\s*$)"), QRegularExpression::CaseInsensitiveOption);
     const QRegularExpression headingRx(QStringLiteral(R"(^\s*\*{3,}\s*(.*?)\s*\*{3,}\s*$)"));
     const QRegularExpression rowRx(QStringLiteral(R"(^\s*(\d{3,6}(?:\.\d+)?)\s+(\S+)\s+(\d{4}-\d{2}-\d{2})\s+(\d{4})\s+([A-Z0-9/]+)\s+(\S+)\s+([A-Z0-9/]+)\s+(\S+)(?:\s+(?:correct\s+(\S+)|(incorrect\s+call)))?\s*$)"), QRegularExpression::CaseInsensitiveOption);
+    bool bodyStarted = false;
     for (const QString& line : report.lines) {
-        const auto contest = contestRx.match(line.trimmed());
-        const auto call = callRx.match(line.trimmed());
+        const QString trimmed = line.trimmed();
+        if (headingRx.match(trimmed).hasMatch()) bodyStarted = true;
+        const auto contest = contestRx.match(trimmed);
+        const auto call = callRx.match(trimmed);
+        if (!bodyStarted && ((trimmed.startsWith(QLatin1String("Contest:"), Qt::CaseInsensitive) && !contest.hasMatch())
+            || (trimmed.startsWith(QLatin1String("Call:"), Qt::CaseInsensitive) && !call.hasMatch()))) {
+            report.error = QStringLiteral("Malformed CQ WW identity header");
+            return report;
+        }
         if (contest.hasMatch()) {
             const QString value = contest.captured(1).simplified();
             if (!report.contest.isEmpty() && report.contest.compare(value, Qt::CaseInsensitive) != 0) {

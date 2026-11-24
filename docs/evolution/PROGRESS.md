@@ -2767,3 +2767,11 @@ The CQ WW report reader now rejects conflicting recognized contest or own-callsi
 A/B on macOS arm64 / Qt 6.11.2: a synthetic report with two different callsign headers was previously accepted and is now rejected; a conflicting contest header is also rejected, while identical repeated headers and the existing supported-row/unknown-line fixture pass. App and test targets built; CTest contestreport, database, activation and qmlpopups passed 4/4.
 
 The guard only compares headers recognized by the existing CQ WW parser; it is not a general LCR/UBN parser or an authenticity check. Synthetic reports were used; no additional official report, physical UI, Windows/Linux or real contest was exercised. G10/G13 acceptance remains open.
+
+## 2026-11-24 — G10 malformed CQ WW identity headers
+
+The CQ WW reader now rejects malformed `Call:` or `Contest:` lines in the header before the first section heading, instead of ignoring them when a valid identity line also exists. Unknown lines within a recognized review section remain in the unrecognized-line list. The parser retains its existing conservative scope and does not edit the source report.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic report with a valid call followed by `Call: K2XYZ?` was previously accepted and is now rejected; a malformed contest line is also rejected. A similar unknown line in the body is retained as unrecognized, and consistent repeated headers still pass. App and test targets built; CTest contestreport, database, activation and qmlpopups passed 4/4.
+
+Only the existing recognized header labels and first-section boundary are checked; malformed alternatives or report formats outside the supported reader remain unsupported. No additional official LCR, physical UI, Windows/Linux or real contest was exercised. G10/G13 acceptance remains open.

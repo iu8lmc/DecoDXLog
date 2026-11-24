@@ -164,7 +164,11 @@ private slots:
         QVERIFY(contestreport::parseCqWw(contest+call+row).error.isEmpty());
         QVERIFY(!contestreport::parseCqWw(contest+call+"Call: K2XYZ\n"+row).error.isEmpty());
         QVERIFY(!contestreport::parseCqWw(contest+"Contest: 2023 CQ WORLD WIDE CW DX CONTEST\n"+call+row).error.isEmpty());
+        QVERIFY(!contestreport::parseCqWw(contest+call+"Call: K2XYZ?\n"+row).error.isEmpty());
+        QVERIFY(!contestreport::parseCqWw(contest+call+"Contest: unknown edition\n"+row).error.isEmpty());
         QVERIFY(contestreport::parseCqWw(contest+contest+call+"Call: k1abc\n"+row).error.isEmpty());
+        const auto body=contestreport::parseCqWw(contest+call+row+"Call: K2XYZ?\n");
+        QVERIFY(body.error.isEmpty()); QCOMPARE(body.unrecognizedLines.size(),1);
     }
 
     void refusesUnrelatedAndOversizedInput()
