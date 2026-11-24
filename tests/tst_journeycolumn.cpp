@@ -1637,6 +1637,28 @@ private slots:
         QCOMPARE(current->revision,2); QCOMPARE(current->title,QString("Current")); QCOMPARE(current->stationProfileId,qint64(0));
     }
 
+    void dxCampaignHistoryDraftRejectsExternallyRemovedProfile()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString id; qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Old station"; p.stationCallsign="K1AAA"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          dxcampaign::Campaign c; c.title="Original"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.stationProfileId=profile;
+          QString error; QVERIFY(dxcampaign::save(db,c,&error)); id=c.id; c.title="Current"; c.stationProfileId=0; QVERIFY(dxcampaign::save(db,c,&error)); }
+        auto env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7500");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",dir.filePath("test.sqlite"),"--port","0","--show","dxcampaignhistoryexternalprofileprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE dxhistoryprofile ready id=") && timer.elapsed()<12000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE dxhistoryprofile ready id="+QByteArray::number(profile)),output.constData());
+        { LogDatabase external; QVERIFY(external.openExistingReadWrite(dir.filePath("test.sqlite"))); QSqlQuery q(external.connection());
+          q.prepare("UPDATE station_profile SET deleted=1 WHERE id=?"); q.addBindValue(profile); QVERIFY(q.exec()); QCOMPARE(q.numRowsAffected(),qint64(1)); }
+        QVERIFY(app.waitForFinished(15000)); output+=app.readAll(); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains("PROBE dxhistoryprofile rejected=true revision=2"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto current=dxcampaign::load(db,id); QVERIFY(current);
+        QCOMPARE(current->revision,2); QCOMPARE(current->title,QString("Current")); QCOMPARE(current->stationProfileId,qint64(0));
+    }
+
     void dxCampaignHistoryDraftRejectsProfileRemovedAfterReview()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString id; qint64 profile=0;

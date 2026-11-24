@@ -14,6 +14,24 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void reviewedProfileIsCheckedInsideCampaignWrite()
+    {
+        QTemporaryDir dir; LogDatabase db,other; const auto path=dir.filePath("campaign.sqlite"); QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        StationProfile profile; profile.name="Station"; profile.stationCallsign="K1AAA"; const qint64 id=db.saveStationProfile(profile); QVERIFY(id>0);
+        const auto savedProfile=db.stationProfile(id); QVERIFY(savedProfile); QVERIFY(!savedProfile->uuid.isEmpty());
+        dxcampaign::Campaign c; c.title="Current"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+        c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"};
+        QString error; QVERIFY(dxcampaign::save(db,c,&error)); c.stationProfileId=id; c.title="Reviewed";
+        QVERIFY(!dxcampaign::save(db,c,&error,QStringLiteral("different-uuid"))); QCOMPARE(c.revision,1);
+        QCOMPARE(dxcampaign::load(db,c.id)->title,QString("Current"));
+        QVERIFY2(dxcampaign::save(db,c,&error,savedProfile->uuid),qPrintable(error)); QCOMPARE(c.revision,2);
+        QSqlQuery q(other.connection()); q.prepare("UPDATE station_profile SET deleted=1 WHERE id=?"); q.addBindValue(id); QVERIFY(q.exec()); QCOMPARE(q.numRowsAffected(),qint64(1));
+        c.title="Must not save"; QVERIFY(!dxcampaign::save(db,c,&error,savedProfile->uuid)); QCOMPARE(c.revision,2);
+        QCOMPARE(dxcampaign::load(db,c.id)->title,QString("Reviewed"));
+        const auto history=dxcampaign::history(db,c.id,3,10,&error); QCOMPARE(history.size(),1); QCOMPARE(history.first().title,QString("Current"));
+        c.stationProfileId=0; c.title="All stations"; QVERIFY(dxcampaign::save(db,c,&error,QStringLiteral(""))); QCOMPARE(c.revision,3);
+    }
+
     void campaignHistoryPagesAndRejectsCorruptRows()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c; c.title="Pages"; c.calls={"3Y0J"};

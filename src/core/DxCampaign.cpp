@@ -118,7 +118,7 @@ std::optional<Campaign> decode(const QString& raw)
     if(!ok || c.id.isEmpty() || c.revision<1 || !valid(c,nullptr)) return {}; return c;
 }
 }
-bool save(LogDatabase& db,Campaign& c,QString* error)
+bool save(LogDatabase& db,Campaign& c,QString* error,const std::optional<QString>& expectedProfileUuid)
 {
     if(!db.isOpen()) return fail(error,QStringLiteral("Log is not open"));
     if(!valid(c,error)) return false;
@@ -129,6 +129,17 @@ bool save(LogDatabase& db,Campaign& c,QString* error)
     if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) return fail(error,begin.lastError().text());
     bool committed=false;
     const auto rollback=qScopeGuard([&] { if (!committed) db.connection().rollback(); });
+    if (expectedProfileUuid) {
+        if (c.stationProfileId==0) {
+            if (!expectedProfileUuid->isEmpty()) return fail(error,QStringLiteral("Station profile changed; review the campaign again"));
+        } else {
+            QSqlQuery profile(db.connection());
+            profile.prepare(QStringLiteral("SELECT 1 FROM station_profile WHERE id=? AND uuid=? AND deleted=0"));
+            profile.addBindValue(c.stationProfileId); profile.addBindValue(*expectedProfileUuid);
+            if (expectedProfileUuid->isEmpty() || !profile.exec() || !profile.next())
+                return fail(error,QStringLiteral("Station profile changed; review the campaign again"));
+        }
+    }
     QSqlQuery query(db.connection());
     if(creating) {
         query.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?)"));

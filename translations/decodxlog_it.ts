@@ -11810,6 +11810,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>The station profile changed; review the campaign again.</source><translation>Il profilo stazione è cambiato; ricontrolla la spedizione.</translation></message>
     <message><source>The log file changed or cannot be identified; reopen it before exporting.</source><translation>Il file del log è cambiato o non può essere identificato; riaprilo prima di esportare.</translation></message>
     <message><source>The radio net draft's log or session changed; reopen the draft.</source><translation>Il log o la sessione della bozza radio net sono cambiati; riapri la bozza.</translation></message>
     <message><source>Cannot check campaign log changes</source><translation>Impossibile controllare le modifiche al log della campagna</translation></message>

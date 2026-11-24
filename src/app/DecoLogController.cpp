@@ -2586,7 +2586,13 @@ bool DecoLogController::saveDxCampaign(const QVariantMap& values)
     if (values.contains(QStringLiteral("watchGoalsOnly"))) c.watchGoalsOnly=values.value(QStringLiteral("watchGoalsOnly")).toBool();
     else if (!c.id.isEmpty()) { const auto existing=dxcampaign::load(m_db,c.id); if (existing) c.watchGoalsOnly=existing->watchGoalsOnly; }
     c.revision=values.value(QStringLiteral("revision")).toInt();
-    if (!dxcampaign::save(m_db,c,&m_dxCampaignError)) { emit dxCampaignChanged(); return false; }
+    const auto expectedProfile=values.contains(QStringLiteral("_reviewProfileUuid"))
+        ? std::optional<QString>(values.value(QStringLiteral("_reviewProfileUuid")).toString()) : std::nullopt;
+    if (!dxcampaign::save(m_db,c,&m_dxCampaignError,expectedProfile)) {
+        if (m_dxCampaignError==QLatin1String("Station profile changed; review the campaign again"))
+            m_dxCampaignError=tr("The station profile changed; review the campaign again.");
+        emit dxCampaignChanged(); return false;
+    }
     reloadDxCampaignWatches();
     m_dxCampaign=campaignMap(c); m_dxCampaignPath=m_db.path(); m_dxCampaignContext=dxcampaign::captureReviewContext(m_db); m_dxCampaignError.clear(); emit dxCampaignChanged(); refreshDxCampaign(); return true;
 }

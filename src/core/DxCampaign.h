@@ -27,7 +27,8 @@ struct Cell { QString band, mode; int worked{0}, confirmed{0}; QString target; b
 struct ReviewContext { QString path, identity; QByteArray fileIdentity; quint64 generation{0}; };
 std::optional<ReviewContext> captureReviewContext(const LogDatabase& db);
 bool reviewContextCurrent(const LogDatabase& db,const ReviewContext& context);
-bool save(LogDatabase& db, Campaign& campaign, QString* error = nullptr);
+bool save(LogDatabase& db, Campaign& campaign, QString* error = nullptr,
+          const std::optional<QString>& expectedProfileUuid = std::nullopt);
 std::optional<Campaign> load(const LogDatabase& db, const QString& id, QString* error = nullptr);
 QList<Campaign> history(const LogDatabase& db, const QString& id, int beforeRevision, int limit, QString* error = nullptr);
 QList<Campaign> list(const LogDatabase& db, QString* error = nullptr, int* invalidCount = nullptr);
