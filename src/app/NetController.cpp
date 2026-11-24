@@ -820,6 +820,7 @@ void NetController::setGroup(const QString& group)
     QSettings().setValue(QStringLiteral("net/group"), g);
     if (m_enabled)
         restart();
+    emit handoffChanged();
     emit settingsChanged();
 }
 

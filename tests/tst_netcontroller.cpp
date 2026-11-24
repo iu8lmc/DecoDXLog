@@ -51,6 +51,8 @@ private slots:
         QCOMPARE(a.handoffOutbox().size(),1); QCOMPARE(b.handoffInbox().size(),1);
         a.setEnabled(true); b.setEnabled(true); QVERIFY(a.retryHandoffOffer(offerId).isEmpty()); QCOMPARE(sent.size(),3);
         QVERIFY(deliver(3)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
+        QSignalSpy changed(&a,&NetController::handoffChanged); a.setGroup("OTHER"); QVERIFY(!changed.isEmpty());
+        QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty()); QVERIFY(!a.retryHandoffOffer(offerId).isEmpty());
         a.setEnabled(false); b.setEnabled(false);
     }
     void experimentalQsoTransferBetweenControllersRecoversMissingFragment()

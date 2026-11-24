@@ -11,6 +11,13 @@ GlassPanel {
     id: root
 
     readonly property var net: decolog.net
+    function probeHandoff() {
+        root.net.setLoopbackForProbe(); root.net.enabled=true; handoffDialog.open()
+        handoffScope.text="test-event"; handoffDialog.configure()
+        handoffRecipient.text="other"; handoffCall.text="K1ABC"; handoffFrequency.text="14025000"; handoffDialog.sendOffer()
+        return {visible:handoffDialog.visible,scope:root.net.handoffScope,offers:root.net.handoffOutbox.length,
+            call:root.net.handoffOutbox.length ? root.net.handoffOutbox[0].call : "",warning:handoffWarning.text,error:handoffDialog.result}
+    }
     function probeNetworkReviewStart(secure) {
         root.net.setLoopbackForProbe(); root.net.enabled=true; qsoWireDialog.open(); wireKey.text=secure ? "a".repeat(64) : ""
         const error=root.net.setExperimentalQsoKey(wireKey.text); qsoWireDialog.keyReady=!error
@@ -106,6 +113,7 @@ GlassPanel {
         RowLayout {
             Layout.fillWidth:true
             GlassButton { text:qsTr("Serial experiment…"); onClicked:serialAuthorityDialog.open() }
+            GlassButton { text:qsTr("Multiplier handoff…"); onClicked:handoffDialog.open() }
             GlassButton { text:qsTr("Compare logs…"); onClicked:qsoComparisonDialog.open() }
             GlassButton { text:qsTr("QSO transfer experiment…"); onClicked:qsoWireDialog.open() }
             Item { Layout.fillWidth:true }
@@ -196,6 +204,66 @@ GlassPanel {
                 enabled: root.net.running && (decolog.callInfo.call || "").length > 0 && parseFloat(decolog.shownFrequency || "0") > 0
                 onClicked: root.net.sendSpot(decolog.callInfo.call, parseFloat(decolog.shownFrequency) * 1000, "")
             }
+        }
+    }
+
+    DialogFrame {
+        id: handoffDialog
+        transientParent: root.Window.window
+        title: qsTr("Multiplier handoff")
+        info: qsTr("Experimental station network")
+        width: 740; height: 740
+        property string result: ""
+        function configure() { result = root.net.configureHandoffScope(handoffScope.text) }
+        function sendOffer() {
+            const value = handoffFrequency.text.trim()
+            if (!/^[0-9]{1,13}$/.test(value)) { result = qsTr("Enter a frequency in whole hertz."); return }
+            result = root.net.sendHandoffOffer(handoffRecipient.text, handoffCall.text, Number(value))
+        }
+        body: ColumnLayout {
+            spacing: 7
+            Text { id: handoffWarning; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: qsTr("Station identities are not authenticated and delivery is not confirmed. Agree the same contest scope with the other station. This station ID: %1").arg(root.net.nodeId) }
+            RowLayout {
+                Layout.fillWidth: true
+                LabeledField { label: qsTr("Contest scope"); Layout.fillWidth: true
+                    StyledTextField { id: handoffScope; Layout.fillWidth: true; placeholderText: qsTr("Same scope on every station") } }
+                GlassButton { Layout.alignment: Qt.AlignBottom; text: qsTr("Apply"); onClicked: handoffDialog.configure() }
+            }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("Active scope: %1").arg(root.net.handoffScope || qsTr("none")) }
+            RowLayout {
+                Layout.fillWidth: true
+                LabeledField { label: qsTr("Recipient station ID"); Layout.fillWidth: true
+                    StyledTextField { id: handoffRecipient; Layout.fillWidth: true } }
+                LabeledField { label: qsTr("Callsign"); Layout.fillWidth: true
+                    StyledTextField { id: handoffCall; Layout.fillWidth: true; uppercase: true } }
+                LabeledField { label: qsTr("Frequency (Hz)"); Layout.fillWidth: true
+                    StyledTextField { id: handoffFrequency; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly; placeholderText: "14025000" } }
+                GlassButton { Layout.alignment: Qt.AlignBottom; text: qsTr("Send offer"); enabled: root.net.running
+                    onClicked: handoffDialog.sendOffer() }
+            }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
+                text: handoffDialog.result || root.net.handoffError || root.net.handoffStatus }
+            Text { text: qsTr("Received offers"); color: Theme.textPrimary; font.bold: true }
+            ListView {
+                id: handoffInboxList; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 100
+                clip: true; model: root.net.handoffInbox; ScrollBar.vertical: PanelScrollBar {}
+                delegate: Text { required property var modelData; width: handoffInboxList.width; wrapMode: Text.Wrap
+                    color: Theme.textPrimary; text: qsTr("%1 · %2 Hz · from %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.sender).arg(modelData.createdUtc) }
+            }
+            Text { text: qsTr("Sent offers — delivery unconfirmed"); color: Theme.textPrimary; font.bold: true }
+            ListView {
+                id: handoffOutboxList; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 100
+                clip: true; model: root.net.handoffOutbox; ScrollBar.vertical: PanelScrollBar {}
+                delegate: RowLayout { required property var modelData; width: handoffOutboxList.width
+                    Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
+                        text: qsTr("%1 · %2 Hz · to %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.recipient).arg(modelData.createdUtc) }
+                    GlassButton { text: qsTr("Retry"); enabled: root.net.running
+                        onClicked: handoffDialog.result = root.net.retryHandoffOffer(modelData.id) }
+                }
+            }
+            GlassButton { text: qsTr("Close"); onClicked: handoffDialog.close() }
         }
     }
 

@@ -125,6 +125,22 @@ private slots:
             if (kind=="edit") QCOMPARE(local.record(localId)->value("NAME"),accept?QString("Remote"):QString("Local")); }
 
     }
+    void stationNetworkHandoffDialog_data()
+    {
+        QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("warning");
+        QTest::newRow("English") << QStringLiteral("en") << QByteArray("not authenticated");
+        QTest::newRow("Italian") << QStringLiteral("it") << QByteArray("non sono autenticate");
+    }
+    void stationNetworkHandoffDialog()
+    {
+        QFETCH(QString,language); QFETCH(QByteArray,warning);
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
+        QVERIFY2(launch(dir,"nethandoffprobe",output,3500),output.constData());
+        QVERIFY2(output.contains("PROBE nethandoff") && output.contains("\"visible\":true") && output.contains("\"scope\":\"test-event\"") &&
+                 output.contains("\"offers\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
+                 output.contains("\"error\":\"\"") && !output.contains("TypeError"),output.constData());
+    }
     void stationNetworkExperimentalQsoDialog_data()
     {
         QTest::addColumn<QString>("language"); QTest::addColumn<QByteArray>("warning"); QTest::addColumn<bool>("secure");

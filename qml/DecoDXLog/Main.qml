@@ -1340,6 +1340,7 @@ RoundedWindow {
         else if (what[0] === "activationprofileprobe") Qt.callLater(() => activationDialog.probeSiteProfiles())
         else if (what[0].indexOf("netreceive") === 0) { window.openContestDesk(); contestLayout.setShown("net",true); netReceiveProbe.start() }
         else if ((what[0] === "netwireprobe" || what[0] === "netwiresecureprobe")) { window.openContestDesk(); contestLayout.setShown("net",true); netWireProbe.start() }
+        else if (what[0] === "nethandoffprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netHandoffProbe.start() }
         else if (what[0] === "netcompareprobe" || what[0] === "netimportprobe" || what[0] === "netimportcancelprobe" || what[0] === "netapplyprobe" || what[0] === "netapplycancelprobe" || what[0] === "netlongprobe") { window.openContestDesk(); contestLayout.setShown("net",true); netCompareProbe.start() }
         else if (what[0] === "contestserialpanelprobe" || what[0] === "contestserialwindowprobe") {
             decolog.activation.start({kind:"contest",contestId:"TEST",serialEnabled:true,nextSerial:1})
@@ -1920,6 +1921,13 @@ RoundedWindow {
             console.warn("PROBE netreceive choice " + choice)
             expectedCount=startupShow.indexOf("insert")>=0 ? (accepted?1:0) : (startupShow.indexOf("delete")>=0 && accepted?0:1)
             stage=3
+        }
+    }
+    Timer { id:netHandoffProbe; interval:300; repeat:true; property int tries:0
+        onTriggered: {
+            const container=contestLayout.panelFor("net"), panel=container ? container.item : null
+            if (!panel) { if (++tries>15) { console.warn("PROBE nethandoff missing panel"); stop() } return }
+            console.warn("PROBE nethandoff " + JSON.stringify(panel.probeHandoff())); stop()
         }
     }
     Timer { id:netWireProbe; interval:300; repeat:true; property int tries:0

@@ -2389,6 +2389,21 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Multiplier handoff…</source><translation>Passaggio moltiplicatori…</translation></message>
+    <message><source>Multiplier handoff</source><translation>Passaggio moltiplicatori</translation></message>
+    <message><source>Experimental station network</source><translation>Rete di stazione sperimentale</translation></message>
+    <message><source>Station identities are not authenticated and delivery is not confirmed. Agree the same contest scope with the other station. This station ID: %1</source><translation>Le identità delle stazioni non sono autenticate e la consegna non è confermata. Concorda lo stesso ambito contest con l'altra stazione. ID di questa stazione: %1</translation></message>
+    <message><source>Active scope: %1</source><translation>Ambito attivo: %1</translation></message>
+    <message><source>none</source><translation>nessuno</translation></message>
+    <message><source>Recipient station ID</source><translation>ID stazione destinataria</translation></message>
+    <message><source>Callsign</source><translation>Nominativo</translation></message>
+    <message><source>Frequency (Hz)</source><translation>Frequenza (Hz)</translation></message>
+    <message><source>Send offer</source><translation>Invia proposta</translation></message>
+    <message><source>Enter a frequency in whole hertz.</source><translation>Inserisci una frequenza in hertz interi.</translation></message>
+    <message><source>Received offers</source><translation>Proposte ricevute</translation></message>
+    <message><source>Sent offers — delivery unconfirmed</source><translation>Proposte inviate — consegna non confermata</translation></message>
+    <message><source>%1 · %2 Hz · from %3 · %4 UTC</source><translation>%1 · %2 Hz · da %3 · %4 UTC</translation></message>
+    <message><source>%1 · %2 Hz · to %3 · %4 UTC</source><translation>%1 · %2 Hz · a %3 · %4 UTC</translation></message>
     <message><source>Sender %1 · source log %2</source><translation>Mittente %1 · log di origine %2</translation></message>
     <message><source>The received snapshot may no longer match the sender's current log.</source><translation>L'istantanea ricevuta potrebbe non corrispondere più al log corrente del mittente.</translation></message>
     <message><source>Review received QSO…</source><translation>Esamina il QSO ricevuto…</translation></message>
