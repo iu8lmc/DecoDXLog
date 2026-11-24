@@ -1095,6 +1095,9 @@ private:
     QString m_dxCampaignError;
     bool m_dxCampaignBusy{false};
     quint64 m_dxCampaignGeneration{0};
+    qint64 m_dxCampaignDataVersion{-1};
+    quint64 m_dxCampaignLogVersion{0};
+    QTimer m_dxCampaignMonitor;
     QThreadPool m_dxCampaignPool;
     QThreadPool m_dxWatchPool;
     QSet<QString> m_dxWatchPending;

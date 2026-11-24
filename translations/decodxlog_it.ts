@@ -11775,6 +11775,8 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Cannot check campaign log changes</source><translation>Impossibile controllare le modifiche al log della campagna</translation></message>
+    <message><source>Campaign data changed; updating</source><translation>I dati della campagna sono cambiati; aggiornamento in corso</translation></message>
     <message><source>The log changed; reopen the campaign review.</source><translation>Il log è cambiato; riapri la revisione della campagna.</translation></message>
     <message><source>Cannot read rover session: %1</source><translation>Impossibile leggere la sessione rover: %1</translation></message>
     <message><source>Cannot load campaigns: %1</source><translation>Impossibile caricare le campagne: %1</translation></message>

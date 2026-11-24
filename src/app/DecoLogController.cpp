@@ -299,6 +299,14 @@ DecoLogController::DecoLogController(QObject* parent)
     m_activityModel = new ActivityModel(kMaxActivity, this);
     m_qslPlanPool.setMaxThreadCount(1);
     m_dxCampaignPool.setMaxThreadCount(1);
+    m_dxCampaignMonitor.setInterval(1000);
+    connect(&m_dxCampaignMonitor,&QTimer::timeout,this,[this] {
+        if (m_shuttingDown || m_dxCampaign.isEmpty()) return;
+        if (!m_dxCampaignContext || !dxcampaign::reviewContextCurrent(m_db,*m_dxCampaignContext) ||
+            m_dxCampaignDataVersion<0 || m_db.dataVersion()!=m_dxCampaignDataVersion || m_logVersion!=m_dxCampaignLogVersion)
+            refreshDxCampaign();
+    });
+    m_dxCampaignMonitor.start();
     m_dxWatchPool.setMaxThreadCount(1);
     m_activityReportPool.setMaxThreadCount(1);
     connect(this, &DecoLogController::logChanged, this, [this] {
@@ -2587,15 +2595,20 @@ void DecoLogController::refreshDxCampaign()
         m_dxCampaignBusy=false; m_dxCampaignError=tr("Log changed"); emit dxCampaignChanged(); return;
     }
     const auto context=*m_dxCampaignContext;
+    const qint64 dataVersion=m_db.dataVersion();
+    if (dataVersion<0) { m_dxCampaignDataVersion=-1; m_dxCampaignMatrix.clear(); m_dxCampaignBusy=false; m_dxCampaignError=tr("Cannot check campaign log changes"); emit dxCampaignChanged(); return; }
+    const quint64 logVersion=m_logVersion;
+    m_dxCampaignDataVersion=dataVersion; m_dxCampaignLogVersion=logVersion;
     const QString id=m_dxCampaign.value(QStringLiteral("id")).toString(), path=m_db.path();
     const quint64 generation=++m_dxCampaignGeneration; m_dxCampaignPool.clear();
     m_dxCampaignMatrix.clear(); m_dxCampaignBusy=true; m_dxCampaignError.clear(); emit dxCampaignChanged();
     QPointer<DecoLogController> self(this);
-    m_dxCampaignPool.start([self,path,id,generation,context] {
-        LogDatabase db; QString error; QVariantList rows; QVariantMap campaign;
+    m_dxCampaignPool.start([self,path,id,generation,context,dataVersion,logVersion] {
+        LogDatabase db; QString error; QVariantList rows; QVariantMap campaign; bool workerChanged=false;
         if (!db.open(path)) error=db.lastError();
         else if (db.identity()!=context.identity || db.openFileIdentity()!=context.fileIdentity || !db.fileIdentityMatchesOpen()) error=QStringLiteral("Log changed");
         else {
+            const qint64 workerVersion=db.dataVersion();
             const auto c=dxcampaign::load(db,id,&error);
             if (c) {
                 campaign=campaignMap(*c);
@@ -2604,13 +2617,16 @@ void DecoLogController::refreshDxCampaign()
                     {QStringLiteral("mode"),cell.mode},{QStringLiteral("worked"),cell.worked},{QStringLiteral("confirmed"),cell.confirmed},
                     {QStringLiteral("target"),cell.target},{QStringLiteral("needed"),cell.needed}};
             }
+            workerChanged=workerVersion<0 || db.dataVersion()!=workerVersion;
         }
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(),[self,generation,context,campaign,rows,error] {
+        QMetaObject::invokeMethod(self.data(),[self,generation,context,campaign,rows,error,dataVersion,logVersion,workerChanged] {
             if (!self || generation!=self->m_dxCampaignGeneration) return;
             self->m_dxCampaignBusy=false;
             if (!dxcampaign::reviewContextCurrent(self->m_db,context) || error==QLatin1String("Log changed")) {
                 self->m_dxCampaign.clear(); self->m_dxCampaignContext.reset(); self->m_dxCampaignMatrix.clear(); self->m_dxCampaignError=self->tr("Log changed"); }
+            else if (workerChanged || self->m_db.dataVersion()!=dataVersion || self->m_logVersion!=logVersion) {
+                self->m_dxCampaignDataVersion=-1; self->m_dxCampaignMatrix.clear(); self->m_dxCampaignError=self->tr("Campaign data changed; updating"); }
             else { if (!campaign.isEmpty()) self->m_dxCampaign=campaign; self->m_dxCampaignMatrix=rows; self->m_dxCampaignError=error; }
             emit self->dxCampaignChanged();
         },Qt::QueuedConnection);
@@ -2623,7 +2639,8 @@ QVariantList DecoLogController::dxCampaignSpots(int maxAgeMinutes) const
     const auto campaign=dxcampaign::load(m_db,m_dxCampaign.value(QStringLiteral("id")).toString());
     if (!campaign || campaign->revision!=m_dxCampaign.value(QStringLiteral("revision")).toInt()) return {};
     QVariantList spots=m_cluster->campaignRecommendations(*campaign,maxAgeMinutes);
-    if (m_dxCampaignBusy || m_dxCampaignMatrix.isEmpty() || !m_dxCampaignError.isEmpty()) return spots;
+    if (m_dxCampaignBusy || m_dxCampaignMatrix.isEmpty() || !m_dxCampaignError.isEmpty() || m_dxCampaignDataVersion<0 ||
+        m_db.dataVersion()!=m_dxCampaignDataVersion || m_logVersion!=m_dxCampaignLogVersion) return spots;
     for (QVariant& item : spots) {
         QVariantMap spot=item.toMap();
         const QString band=spot.value(QStringLiteral("band")).toString().trimmed().toLower();
