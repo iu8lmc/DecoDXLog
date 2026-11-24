@@ -99,6 +99,10 @@
 <context>
     <name>ActivationController</name>
     <message>
+        <source>Cannot fingerprint the session QSO.</source>
+        <translation>Impossibile calcolare l’impronta dei QSO della sessione.</translation>
+    </message>
+    <message>
         <source>Cannot read QSL status for the session QSO.</source>
         <translation>Impossibile leggere lo stato QSL dei QSO della sessione.</translation>
     </message>

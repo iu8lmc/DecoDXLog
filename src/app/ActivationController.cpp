@@ -812,12 +812,13 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=?")); exists.addBindValue(uuid);
     if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
     QSqlQuery q(db); q.setForwardOnly(true);
-    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision,call,qso.* FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
+    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision,call,qso.*, "
+        "(SELECT json_group_array(json_array(service,sent,sent_date,rcvd,rcvd_date,remote_id,via,last_error)) "
+        "FROM (SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,via,last_error FROM qsl_status "
+        "WHERE qso_id=qso.id ORDER BY service)) FROM qso WHERE deleted=0 AND "
+        "(CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
     q.addBindValue(uuid);
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
-    QSqlQuery qsl(db);
-    if (!qsl.prepare(QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,via,last_error FROM qsl_status WHERE qso_id=? ORDER BY service")))
-        return fail(tr("Cannot read QSL status for the session QSO."));
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
     QVariantList excluded;
@@ -855,16 +856,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         stream.setVersion(QDataStream::Qt_6_0);
         const int columnCount=q.record().count();
         for (int column=6; column<columnCount; ++column) stream << q.value(column);
-        qsl.bindValue(0,q.value(2));
-        if (!qsl.exec()) return fail(tr("Cannot read QSL status for the session QSO."));
-        while (qsl.next()) {
-            stream << quint8(1);
-            for (int column=0; column<8; ++column) stream << qsl.value(column);
-        }
-        if (qsl.lastError().isValid() || stream.status()!=QDataStream::Ok)
-            return fail(tr("Cannot read QSL status for the session QSO."));
-        qsl.finish();
-        stream << quint8(0);
+        if (stream.status()!=QDataStream::Ok)
+            return fail(tr("Cannot fingerprint the session QSO."));
         const QByteArray identity=QCryptographicHash::hash(recordBytes,QCryptographicHash::Sha256);
         bool found = false;
         for (const auto& pair : fields) {

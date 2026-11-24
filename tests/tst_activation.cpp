@@ -749,6 +749,24 @@ private slots:
         const auto preview=act.partitionPreview(); QVERIFY(!preview.value("error").toString().isEmpty()); QVERIFY(preview.value("groups").toList().isEmpty());
     }
 
+    void partitionFingerprintDetectsQslRowChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}}; act.applyTo(rec);
+        const auto qso=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(qso.id>0);
+        QslState st; st.service="lotw"; st.sent="Y"; QVERIFY(db.setQslState(qso.id,st)); st.service="eqsl"; QVERIFY(db.setQslState(qso.id,st));
+        QSignalSpy previewed(&act,&ActivationController::previewFinished), done(&act,&ActivationController::partitionExportFinished);
+        const QStringList statements={"UPDATE qsl_status SET rcvd='Y' WHERE qso_id=? AND service='eqsl'", "DELETE FROM qsl_status WHERE qso_id=? AND service='lotw'", "INSERT INTO qsl_status(qso_id,service,sent) VALUES(?,'qrz','Y')"};
+        for (const auto& sql:statements) {
+            previewed.clear(); QVERIFY(act.startPartitionPreview()); QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY(previewed.first().first().toBool());
+            const auto group=act.previewResult().value("groups").toList().first().toMap(); QSqlQuery q(db.connection()); q.prepare(sql); q.addBindValue(qso.id); QVERIFY(q.exec());
+            const QString out=dir.filePath("guard.adi"); done.clear(); QVERIFY(act.startPartitionExport(group,QUrl::fromLocalFile(out))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+            QVERIFY(!done.first().first().toBool()); QVERIFY(!QFile::exists(out));
+        }
+    }
+
     void partitionExportRejectsUnversionedDataAndQslChanges()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
