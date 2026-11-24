@@ -28,6 +28,11 @@ DialogFrame {
     property int previewPage: 0
     property int excludedPage: 0
     property int potaReviewPage: 0
+    property var potaReviewRows: []
+    property var potaReviewCursors: [0]
+    property bool potaReviewHasMore: false
+    property int potaReviewPendingPage: 0
+    property bool probePotaPages: false
     property var historyRows: []
     property var historyCursors: [0]
     property int historyPage: 0
@@ -173,6 +178,22 @@ DialogFrame {
         root.openQsoRequested(row.id)
         return true
     }
+    function requestPotaPage(page) {
+        if (root.act.potaPageBusy || page < 0) return
+        let cursors = root.potaReviewCursors.slice()
+        if (page > root.potaReviewPage) {
+            if (!root.potaReviewHasMore || !root.potaReviewRows.length) return
+            cursors = cursors.slice(0, page)
+            cursors.push(root.potaReviewRows[root.potaReviewRows.length - 1].id)
+        }
+        if (page >= cursors.length) return
+        root.potaReviewPendingPage = page
+        root.potaReviewCursors = cursors
+        if (!root.act.requestPotaReviewPage(cursors[page])) {
+            root.partitionMessage = qsTr("The log or QSO changed; recalculate the preview before opening it.")
+            root.potaReviewRows = []
+        }
+    }
     Connections {
         target: root.act
         function onChanged() { root.previewShown = false; root.historyCursors = [0]; root.historyPage = 0; root.historyRows = root.act.closedRuns(0) }
@@ -183,7 +204,30 @@ DialogFrame {
                 root.previewPage = 0
                 root.excludedPage = 0
                 root.potaReviewPage = 0
+                root.potaReviewRows = root.partitionPreview.potaCorrespondentRows || []
+                root.potaReviewHasMore = !!root.partitionPreview.potaCorrespondentHasMore
+                root.potaReviewCursors = [0]
             }
+        }
+        function onPotaReviewPageFinished(result) {
+            if (result.error) {
+                root.potaReviewRows = []
+                root.potaReviewHasMore = false
+                root.partitionMessage = result.error
+                root.probePotaPages = false
+                return
+            }
+            root.potaReviewRows = result.potaCorrespondentRows || []
+            root.potaReviewHasMore = !!result.potaCorrespondentHasMore
+            root.potaReviewPage = root.potaReviewPendingPage
+            if (root.probePotaPages) Qt.callLater(() => {
+                if (root.potaReviewPage === 1) potaReviewNext.clicked()
+                else {
+                    const third=potaReviewRepeater.itemAt(0)
+                    if (third) console.warn("PROBE potaReview third=" + third.modelData.call + " page=" + root.potaReviewPage)
+                    root.probePotaPages=false
+                }
+            })
         }
         function onPartitionExportFinished(success, message) {
             errorText.text = success ? "" : message
@@ -233,13 +277,10 @@ DialogFrame {
                     if (group) console.warn("PROBE potaGroup status=" + group.modelData.potaSnapshotStatus + " location=" + group.modelData.potaLocationStatus + " text=" + group.probeText())
                     const row = potaReviewRepeater.itemAt(0)
                     if (row) {
-                        console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentRows.length + " reason=" + row.modelData.reason + " text=" + row.probeText())
-                        if (root.partitionPreview.potaCorrespondentRows.length > 200) {
-                            potaReviewNext.clicked(); potaReviewNext.clicked()
-                            Qt.callLater(() => {
-                                const third = potaReviewRepeater.itemAt(0)
-                                if (third) console.warn("PROBE potaReview third=" + third.modelData.call + " page=" + root.potaReviewPage)
-                            })
+                        console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentTotal + " reason=" + row.modelData.reason + " text=" + row.probeText())
+                        if (root.partitionPreview.potaCorrespondentTotal > 200) {
+                            root.probePotaPages=true
+                            potaReviewNext.clicked()
                             return
                         }
                         const stale = Object.assign({}, row.modelData)
@@ -808,7 +849,7 @@ DialogFrame {
                     id: historyPreviewButton
                     text: qsTr("Preview")
                     enabled: !root.act.previewBusy && !root.act.partitionExportBusy
-                    onClicked: root.act.startRunPartitionPreview(modelData.uuid)
+                    onClicked: root.act.startPagedRunPartitionPreview(modelData.uuid)
                 }
             }
         }
@@ -834,7 +875,7 @@ DialogFrame {
             text: root.act.previewBusy ? qsTr("Cancel programme preview") : qsTr("Preview reported programme groups")
             onClicked: {
                 if (root.act.previewBusy) root.act.cancelPartitionPreview()
-                else root.act.startPartitionPreview()
+                else root.act.startPagedRunPartitionPreview(root.act.state.sessionUuid || "")
             }
         }
         GlassButton {
@@ -880,13 +921,13 @@ DialogFrame {
             GlassButton { id: exclusionNext; text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < (root.partitionPreview.excluded || []).length; onClicked: root.excludedPage++ }
         }
         Note {
-            visible: root.previewShown && (root.partitionPreview.potaCorrespondentRows || []).length > 0
+            visible: root.previewShown && (root.partitionPreview.potaCorrespondentTotal || 0) > 0
             color: Theme.warningColor
-            text: qsTr("POTA correspondent references to review: %1 QSO. Open a QSO to inspect its fields.").arg((root.partitionPreview.potaCorrespondentRows || []).length)
+            text: qsTr("POTA correspondent references to review: %1 QSO. Open a QSO to inspect its fields.").arg(root.partitionPreview.potaCorrespondentTotal || 0)
         }
         Repeater {
             id: potaReviewRepeater
-            model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.potaCorrespondentRows || []).slice(root.potaReviewPage * 100, (root.potaReviewPage + 1) * 100) : []
+            model: root.previewShown && !root.partitionPreview.error ? root.potaReviewRows : []
             RowLayout {
                 required property var modelData
                 Layout.fillWidth: true
@@ -898,10 +939,10 @@ DialogFrame {
             }
         }
         RowLayout {
-            visible: root.previewShown && (root.partitionPreview.potaCorrespondentRows || []).length > 100
-            GlassButton { text: qsTr("Previous review QSO"); enabled: root.potaReviewPage > 0; onClicked: root.potaReviewPage-- }
+            visible: root.previewShown && (root.partitionPreview.potaCorrespondentTotal || 0) > 100
+            GlassButton { text: qsTr("Previous review QSO"); enabled: !root.act.potaPageBusy && root.potaReviewPage > 0; onClicked: root.requestPotaPage(root.potaReviewPage - 1) }
             Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.potaReviewPage + 1) }
-            GlassButton { id: potaReviewNext; text: qsTr("Next review QSO"); enabled: (root.potaReviewPage + 1) * 100 < (root.partitionPreview.potaCorrespondentRows || []).length; onClicked: root.potaReviewPage++ }
+            GlassButton { id: potaReviewNext; text: qsTr("Next review QSO"); enabled: !root.act.potaPageBusy && root.potaReviewHasMore; onClicked: root.requestPotaPage(root.potaReviewPage + 1) }
         }
         Note {
             visible: root.previewShown && !!root.partitionPreview.potaCatalogue

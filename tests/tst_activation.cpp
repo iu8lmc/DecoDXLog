@@ -838,11 +838,28 @@ private slots:
         QVERIFY(!act.partitionPreviewPage(-1,100).value("error").toString().isEmpty());
         QVERIFY(!act.partitionPreviewPage(0,0).value("error").toString().isEmpty());
         QVERIFY(!act.partitionPreviewPage(0,1001).value("error").toString().isEmpty());
+        finished.clear();
+        QVERIFY(act.startPagedRunPartitionPreview(act.state().value("sessionUuid").toString()));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(finished.first().first().toBool());
+        QCOMPARE(act.previewResult().value("potaCorrespondentRows").toList().size(),100);
+        QSignalSpy pageDone(&act,&ActivationController::potaReviewPageFinished);
+        const auto firstPage=act.previewResult().value("potaCorrespondentRows").toList();
+        const qint64 firstCursor=firstPage.last().toMap().value("id").toLongLong();
+        QVERIFY(act.requestPotaReviewPage(firstCursor));
+        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
+        const auto second=pageDone.takeFirst().first().toMap();
+        QVERIFY(second.value("error").toString().isEmpty());
+        QCOMPARE(second.value("potaCorrespondentRows").toList(),rows.mid(100,100));
         QSqlQuery changed(db.connection());
         QVERIFY(changed.exec("UPDATE qso SET comment='changed after preview' WHERE call='K0200'"));
         const auto stale=act.partitionPreviewPage(cursor,100);
         QVERIFY(stale.value("error").toString().isEmpty());
         QVERIFY(stale.value("groups").toList()!=groups);
+        QVERIFY(act.requestPotaReviewPage(firstCursor));
+        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
+        const auto rejected=pageDone.takeFirst().first().toMap();
+        QVERIFY(!rejected.value("error").toString().isEmpty());
+        QVERIFY(rejected.value("potaCorrespondentRows").toList().isEmpty());
     }
 
     void potaExportPreservesExplicitAndAmbiguousCorrespondentFields()

@@ -31,6 +31,7 @@ class ActivationController : public QObject {
     Q_PROPERTY(QObject* sotaCatalogue READ sotaCatalogue CONSTANT)
     Q_PROPERTY(QObject* potaCatalogue READ potaCatalogue CONSTANT)
     Q_PROPERTY(bool previewBusy READ previewBusy NOTIFY previewChanged)
+    Q_PROPERTY(bool potaPageBusy READ potaPageBusy NOTIFY potaPageBusyChanged)
     Q_PROPERTY(bool contestReportBusy READ contestReportBusy NOTIFY contestReportBusyChanged)
     Q_PROPERTY(bool partitionExportBusy READ partitionExportBusy NOTIFY partitionExportChanged)
     Q_PROPERTY(QVariantMap previewResult READ previewResult NOTIFY previewChanged)
@@ -81,6 +82,9 @@ public:
     QObject* sotaCatalogue() const;
     QObject* potaCatalogue() const;
     bool previewBusy() const { return m_previewBusy; }
+    bool potaPageBusy() const { return m_potaPageBusy; }
+    Q_INVOKABLE bool startPagedRunPartitionPreview(const QString& uuid);
+    Q_INVOKABLE bool requestPotaReviewPage(qint64 afterId);
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
     Q_INVOKABLE bool startContestFindings(const QUrl &a, const QUrl &b, const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB);
@@ -222,6 +226,8 @@ signals:
     void contestReportHistoryFinished(const QVariantMap& result);
     void contestReportExportFinished(bool success, const QString& message);
     void previewFinished(bool success);
+    void potaPageBusyChanged();
+    void potaReviewPageFinished(const QVariantMap& result);
     void partitionExportChanged();
     void partitionExportFinished(bool success, const QString& message);
 
@@ -230,6 +236,10 @@ private:
     core::SotaCatalogue* m_sotaCatalogue{nullptr};
     core::PotaCatalogue* m_potaCatalogue{nullptr};
     QThreadPool m_previewPool;
+    QThreadPool m_potaPagePool;
+    std::shared_ptr<std::atomic_bool> m_potaPageCancel;
+    bool m_potaPageBusy{false};
+    bool m_nextPreviewPaged{false};
     QThreadPool m_contestReportPool;
     QStringList m_goalSelection;
     QString m_goalLogPath, m_goalLogIdentity;

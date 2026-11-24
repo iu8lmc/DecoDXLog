@@ -124,8 +124,10 @@ QObject* ActivationController::potaCatalogue() const { return m_potaCatalogue; }
 ActivationController::~ActivationController()
 {
     if (m_previewCancel) m_previewCancel->store(true);
+    if (m_potaPageCancel) m_potaPageCancel->store(true);
     if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     m_previewPool.waitForDone();
+    m_potaPagePool.waitForDone();
     m_contestReportPool.waitForDone();
     m_partitionExportPool.waitForDone();
 }
@@ -136,6 +138,7 @@ void ActivationController::invalidatePreview()
     m_previewSessionUuid.clear();
     m_previewLogPath.clear(); m_previewLogIdentity.clear(); m_previewFileIdentity.clear(); m_previewLogGeneration=0;
     if (m_previewCancel) m_previewCancel->store(true);
+    if (m_potaPageCancel) m_potaPageCancel->store(true);
     if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     if (!m_previewResult.isEmpty()) { m_previewResult.clear(); emit previewChanged(); }
 }
@@ -1513,9 +1516,19 @@ bool ActivationController::startPartitionPreview()
     return startRunPartitionPreview(m_session.active ? m_session.sessionUuid : QString());
 }
 
+bool ActivationController::startPagedRunPartitionPreview(const QString& uuid)
+{
+    if (m_previewBusy) return false;
+    m_nextPreviewPaged=true;
+    return startRunPartitionPreview(uuid);
+}
+
 bool ActivationController::startRunPartitionPreview(const QString& requestedUuid)
 {
     if (m_previewBusy) return false;
+    const bool paged=m_nextPreviewPaged; m_nextPreviewPaged=false;
+    ++m_previewGeneration;
+    if (m_potaPageCancel) m_potaPageCancel->store(true);
     m_previewResult.clear(); m_previewSessionUuid.clear(); m_previewLogPath.clear(); m_previewLogIdentity.clear(); m_previewFileIdentity.clear(); m_previewLogGeneration=0;
     if (requestedUuid.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
         m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:")) {
@@ -1538,7 +1551,7 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
     const auto cancelled = m_previewCancel;
     m_previewBusy = true; emit previewChanged();
     QPointer<ActivationController> self(this);
-    m_previewPool.start([self, path, logIdentity, fileIdentity, logGeneration, connectionName, uuid, cataloguePath, potaCataloguePath, generation, cancelled] {
+    m_previewPool.start([self, path, logIdentity, fileIdentity, logGeneration, connectionName, uuid, cataloguePath, potaCataloguePath, generation, cancelled, paged] {
         QVariantMap result;
         const QString connection = QStringLiteral("activation-preview-") + QUuid::createUuid().toString();
         {
@@ -1550,7 +1563,7 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
                 const auto matches=[&] { QSqlQuery check(db); return core::fileidentity::read(path)==fileIdentity && check.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && check.next() && check.value(0).toString()==logIdentity; };
                 if (!matches()) result[QStringLiteral("error")]=tr("The log or session changed; recalculate the preview.");
                 else {
-                    result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath, potaCataloguePath);
+                    result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath, potaCataloguePath, 0, paged ? 100 : -1);
                     if (!matches()) result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
                 }
             }
@@ -1570,6 +1583,67 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
             const bool success = self->m_previewResult.value(QStringLiteral("error")).toString().isEmpty();
             emit self->previewChanged(); emit self->previewFinished(success);
         }, Qt::QueuedConnection);
+    });
+    return true;
+}
+
+bool ActivationController::requestPotaReviewPage(qint64 afterId)
+{
+    if (afterId < 0 || m_potaPageBusy || m_previewBusy || m_previewSessionUuid.isEmpty() ||
+        m_previewResult.contains(QStringLiteral("error")) || !m_ctx.db || !m_ctx.db->isOpen() ||
+        m_ctx.db->path()!=m_previewLogPath || m_ctx.db->openGeneration()!=m_previewLogGeneration ||
+        m_ctx.db->identity()!=m_previewLogIdentity || m_ctx.db->openFileIdentity()!=m_previewFileIdentity ||
+        !m_ctx.db->fileIdentityMatchesOpen()) return false;
+    const auto signature=[](const QVariantMap& preview) {
+        QVariantList out;
+        for (const auto& value : preview.value(QStringLiteral("groups")).toList()) {
+            const auto group=value.toMap(); QVariantList fields;
+            for (const auto& key : {"program", "reference", "day", "operator", "grid", "count", "fingerprint"})
+                fields << group.value(QLatin1String(key));
+            out << QVariant(fields);
+        }
+        return out;
+    };
+    QSqlQuery versionQuery(m_ctx.db->connection());
+    if (!versionQuery.exec(QStringLiteral("PRAGMA data_version")) || !versionQuery.next()) return false;
+    const qint64 dataVersion=versionQuery.value(0).toLongLong();
+    const QString path=m_previewLogPath, identity=m_previewLogIdentity, uuid=m_previewSessionUuid;
+    const QByteArray fileIdentity=m_previewFileIdentity;
+    const quint64 generation=m_previewGeneration, logGeneration=m_previewLogGeneration;
+    const QVariantList expected=signature(m_previewResult);
+    const qint64 expectedTotal=m_previewResult.value(QStringLiteral("potaCorrespondentTotal")).toLongLong();
+    m_potaPageCancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_potaPageCancel;
+    m_potaPageBusy=true; emit potaPageBusyChanged();
+    QPointer<ActivationController> self(this);
+    m_potaPagePool.start([self,path,identity,uuid,fileIdentity,generation,logGeneration,afterId,dataVersion,expected,expectedTotal,cancelled,signature] {
+        QVariantMap result;
+        const QString connection=QStringLiteral("activation-pota-page-")+QUuid::createUuid().toString();
+        {
+            QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
+            db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100")); db.setDatabaseName(path);
+            const auto matches=[&] { QSqlQuery q(db); return core::fileidentity::read(path)==fileIdentity && q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && q.next() && q.value(0).toString()==identity; };
+            if (!db.open() || !matches()) result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
+            else {
+                result=scanPartitionPreview(db,uuid,cancelled,true,{},nullptr,{},{},afterId,100);
+                if (!matches() || (result.value(QStringLiteral("error")).toString().isEmpty() &&
+                    (signature(result)!=expected || result.value(QStringLiteral("potaCorrespondentTotal")).toLongLong()!=expectedTotal)))
+                    result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
+            }
+            db.close();
+        }
+        QSqlDatabase::removeDatabase(connection);
+        if (!self) return;
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,uuid,fileIdentity,generation,logGeneration,dataVersion,cancelled,result] {
+            if (!self) return;
+            self->m_potaPageBusy=false; self->m_potaPageCancel.reset(); emit self->potaPageBusyChanged();
+            if (self->m_previewGeneration!=generation) return;
+            const bool same=!cancelled->load() && self->m_previewGeneration==generation && self->m_previewSessionUuid==uuid && self->m_ctx.db && self->m_ctx.db->isOpen() &&
+                self->m_ctx.db->path()==path && self->m_ctx.db->openGeneration()==logGeneration && self->m_ctx.db->identity()==identity &&
+                self->m_ctx.db->openFileIdentity()==fileIdentity && self->m_ctx.db->fileIdentityMatchesOpen();
+            bool sameVersion=false;
+            if (same) { QSqlQuery q(self->m_ctx.db->connection()); sameVersion=q.exec(QStringLiteral("PRAGMA data_version")) && q.next() && q.value(0).toLongLong()==dataVersion; }
+            emit self->potaReviewPageFinished(same && sameVersion ? result : QVariantMap{{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}});
+        },Qt::QueuedConnection);
     });
     return true;
 }
