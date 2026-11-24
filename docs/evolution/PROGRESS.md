@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-24 — revalidate G01 and G11 working status
+
+Updated PLAN.md to reflect the already-recorded field/tag/delete contention A/B evidence and the implemented bounded event retention, managed example counter and explicit gap acceptance. This is a documentation correction, not additional functional or platform acceptance: missing events remain unrecoverable from the journal, external side effects are not atomically acknowledged, and durable atomic API idempotency remains open. The complete CTest started separately on code revision `fca99e1a` is still running; its outcome is not yet recorded.
+
 ## 2026-11-24 — G01 bulk deletion with concurrent incoming UDP
 
 An opt-in offscreen app fixture (`DECODXLOG_BENCH_BULK_DELETE_UDP=1`) selects 20,000 synthetic QSO for deletion and sends one WSJT-X LoggedADIF only after the operation starts. It verifies that the packet is logged before the operation finishes, all 20,000 selected records are soft-deleted, the incoming QSO remains active, and 20,000 deletion events exist.
