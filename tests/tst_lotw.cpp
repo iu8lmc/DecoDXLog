@@ -351,6 +351,18 @@ private slots:
         QVERIFY(q.exec("SELECT qso_id,grid FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toLongLong(),one.id); QCOMPARE(q.value(1).toString(),QString("FN42AB")); QVERIFY(!q.next());
     }
 
+    void lotwOwnCallDoesNotGuessBetweenKnownAndUnknownStation()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto unknown=qso("K1ABC","20m","CW","","20260910","120000","FN41");
+        auto known=qso("K1ABC","20m","CW","","20260910","120100","FN41"); known.set("STATION_CALLSIGN","IU8LMC");
+        const auto a=db.insertQso(unknown,"fixture",{},true,0,false), b=db.insertQso(known,"fixture",{},true,0,false); QVERIFY(a.id>0 && b.id>0);
+        auto incoming=qso("K1ABC","20m","CW","","20260910","120000","FN42"); incoming.set("STATION_CALLSIGN","IU8LMC");
+        const auto result=db.applyConfirmation("lotw",incoming,1800,{}, {},true);
+        QCOMPARE(result.status,ConfirmationResult::Status::Ambiguous); QVERIFY(result.candidates.contains(a.id)); QVERIFY(result.candidates.contains(b.id));
+        QVERIFY(db.record(a.id)->value("LOTW_QSL_RCVD").isEmpty()); QVERIFY(db.record(b.id)->value("LOTW_QSL_RCVD").isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+    }
     void lotwOwnCallRejectsExplicitlyDifferentStation()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

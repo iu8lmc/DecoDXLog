@@ -2915,19 +2915,23 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     // Il QSO piu' vicino nel tempo fra quelli dello stesso gruppo di modi.
     qint64 bestDistance = std::numeric_limits<qint64>::max();
     QList<QPair<qint64, bool>> bestMatches;
+    QList<qint64> knownStationCandidates, unknownStationCandidates;
     while (q.next()) {
         if (!group.isEmpty() && adif::modeGroup(q.value(1).toString(), q.value(2).toString()) != group)
             continue;
+        bool stationKnown=false;
         if (!lotwStation.isEmpty()) {
             const auto extra = QJsonDocument::fromJson(q.value(5).toString().toUtf8()).object();
             const QString localStation = extra.value(QStringLiteral("STATION_CALLSIGN")).toString().trimmed().toUpper();
             if (!localStation.isEmpty() && localStation != lotwStation)
                 continue;
+            stationKnown=!localStation.isEmpty();
         }
         const QDateTime recorded=parseIso(q.value(3).toString());
         if (!recorded.isValid()) continue;
         const qint64 distanceMs=qAbs(recorded.msecsTo(on));
         if (distanceMs>qint64(windowSeconds)*1000) continue;
+        if (!lotwStation.isEmpty()) (stationKnown ? knownStationCandidates : unknownStationCandidates).append(q.value(0).toLongLong());
         const qint64 distance=distanceMs/1000;
         if (distance < bestDistance) {
             bestDistance = distance;
@@ -2937,6 +2941,12 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
             bestMatches.append({q.value(0).toLongLong(), q.value(4).toString() == QLatin1String("Y")});
     }
     if (q.lastError().isValid()) { res.status=ConfirmationResult::Status::Error; res.message=q.lastError().text(); return res; }
+    if (!knownStationCandidates.isEmpty() && !unknownStationCandidates.isEmpty()) {
+        res.candidates=knownStationCandidates+unknownStationCandidates;
+        res.status=ConfirmationResult::Status::Ambiguous;
+        res.message=QStringLiteral("Matching QSOs include both known and unknown station callsigns");
+        return res;
+    }
     if (bestMatches.isEmpty())
         return res;
     if (bestMatches.size() > 1) {
