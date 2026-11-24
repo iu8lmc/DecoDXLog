@@ -833,7 +833,11 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
             ++uncertainPeriod; exclude(QStringLiteral("uncertainPeriod")); continue;
         }
         QDateTime timestamp = QDateTime::fromString(q.value(0).toString(), Qt::ISODate);
-        if (timestamp.isValid()) timestamp.setTimeZone(QTimeZone::UTC);
+        if (timestamp.isValid()) {
+            // Legacy timestamps without a zone are stored as UTC wall time.
+            if (timestamp.timeSpec() == Qt::LocalTime) timestamp.setTimeZone(QTimeZone::UTC);
+            else timestamp = timestamp.toUTC();
+        }
         QDate date = timestamp.date();
         if (extra.contains(QStringLiteral("QSO_DATE"))) date = QDate::fromString(extra.value(QStringLiteral("QSO_DATE")).toString(), QStringLiteral("yyyyMMdd"));
         if (!date.isValid()) { ++missingDate; exclude(QStringLiteral("missingDate")); continue; }

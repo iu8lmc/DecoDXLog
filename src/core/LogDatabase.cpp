@@ -119,7 +119,10 @@ QString nowIso()
 QDateTime parseIso(const QString& iso)
 {
     QDateTime dt = QDateTime::fromString(iso, Qt::ISODate);
-    dt.setTimeZone(QTimeZone::UTC);
+    if (!dt.isValid()) return dt;
+    // Unzoned legacy database values are UTC wall time; zoned values denote an instant.
+    if (dt.timeSpec() == Qt::LocalTime) dt.setTimeZone(QTimeZone::UTC);
+    else dt = dt.toUTC();
     return dt;
 }
 

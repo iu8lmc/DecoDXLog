@@ -449,6 +449,32 @@ private slots:
         QVERIFY(act.exportAdif(QUrl::fromLocalFile(output)).isEmpty());
         const auto reviewed=act.partitionPreview(); QCOMPARE(reviewed.value("groups").toList().size(),1); QCOMPARE(reviewed.value("uncertainPeriod").toInt(),0);
     }
+    void partitionDayUsesActualUtcForOffsetTimestamps()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;
+        ActivationController act(std::move(ctx)); QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(rec); const auto qso=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(qso.id>0);
+        QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET qso_datetime_on='2027-01-02T00:30:00+02:00' WHERE id=?"); q.addBindValue(qso.id); QVERIFY(q.exec());
+        rec.set("CALL","K1BBB"); const auto second=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(second.id>0);
+        q.prepare("UPDATE qso SET qso_datetime_on='2026-12-31T23:30:00-02:00' WHERE id=?"); q.addBindValue(second.id); QVERIFY(q.exec());
+        rec.set("CALL","K1CCC"); const auto third=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(third.id>0);
+        q.prepare("UPDATE qso SET qso_datetime_on='2027-01-01T00:30:00' WHERE id=?"); q.addBindValue(third.id); QVERIFY(q.exec());
+        const auto preview=act.partitionPreview(); QVERIFY2(preview.value("error").toString().isEmpty(),qPrintable(preview.value("error").toString()));
+        const auto groups=preview.value("groups").toList(); QCOMPARE(groups.size(),1);
+        QCOMPARE(groups.first().toMap().value("day").toString(),QString("2027-01-01"));
+        QCOMPARE(groups.first().toMap().value("count").toInt(),3);
+        const auto firstRecord=db.record(qso.id), secondRecord=db.record(second.id), legacyRecord=db.record(third.id);
+        QVERIFY(firstRecord && secondRecord && legacyRecord);
+        QCOMPARE(firstRecord->value("QSO_DATE"),QString("20270101")); QCOMPARE(firstRecord->value("TIME_ON"),QString("223000"));
+        QCOMPARE(secondRecord->value("QSO_DATE"),QString("20270101")); QCOMPARE(secondRecord->value("TIME_ON"),QString("013000"));
+        QCOMPARE(legacyRecord->value("QSO_DATE"),QString("20270101")); QCOMPARE(legacyRecord->value("TIME_ON"),QString("003000"));
+        const auto exported=adif::parse(db.exportAdif(QList<qint64>{qso.id,second.id,third.id})).records;
+        QCOMPARE(exported.size(),3); QMap<QString,QString> times;
+        for (const auto& entry:exported) { QCOMPARE(entry.value("QSO_DATE"),QString("20270101")); times.insert(entry.value("CALL"),entry.value("TIME_ON")); }
+        QCOMPARE(times.value("K1AAA"),QString("223000")); QCOMPARE(times.value("K1BBB"),QString("013000")); QCOMPARE(times.value("K1CCC"),QString("003000"));
+    }
+
     void previewGroupsReportedQsosWithoutAttributingUnrelatedContacts()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
