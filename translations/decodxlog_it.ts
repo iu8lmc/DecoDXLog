@@ -15937,6 +15937,8 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>QslOcrDialog</name>
+    <message><source>Remove</source><translation>Rimuovi</translation></message>
+    <message><source>Remove QSO %1 from selection</source><translation>Rimuovi il QSO %1 dalla selezione</translation></message>
     <message><source>invalid recorded timestamp: %1</source><translation>data e ora registrate non valide: %1</translation></message>
     <message>
         <source>similar — verify</source>

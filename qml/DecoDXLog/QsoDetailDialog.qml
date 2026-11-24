@@ -30,7 +30,7 @@ DialogFrame {
     property var managerSuggestion: ({})
     QslOcrDialog { id: qslOcrDialog; onAcquired: root.attachments = decolog.qsoDetail(root.qsoId).attachments || [] }
     QslOcrHistoryDialog { id: qslOcrHistory; onHistoryChanged: root.attachments = decolog.qsoDetail(root.qsoId).attachments || [] }
-    function probeOcr(url, match, acquire, filtered, similar) { qslOcrDialog.open(); qslOcrDialog.probe(url, match, acquire, filtered, similar) }
+    function probeOcr(url, match, acquire, filtered, similar, selection) { qslOcrDialog.open(); qslOcrDialog.probe(url, match, acquire, filtered, similar, selection) }
     function probeOcrHistory() { qslOcrHistory.openFor(root.qsoId, true) }
     function probeOcrReview() { qslOcrHistory.openFor(root.qsoId, false, true) }
     function probeOcrRevisions() { qslOcrHistory.openFor(root.qsoId, false, false, true) }

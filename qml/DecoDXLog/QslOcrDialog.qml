@@ -23,6 +23,7 @@ DialogFrame {
     property bool probeAcquire: false
     property bool probeFiltered: false
     property bool probeSimilar: false
+    property bool probeSelection: false
     property bool probeSecondSearch: false
     property string searchedCall: ""
     property string searchedCriteria: ""
@@ -36,12 +37,13 @@ DialogFrame {
         root.selectedQsos = enabled ? remaining.concat([row]) : remaining
         root.saved = false
     }
-    function probe(url, match, acquire, filtered, similar) {
+    function probe(url, match, acquire, filtered, similar, selection) {
         probing = true
         probeMatches = !!match
         probeAcquire = !!acquire
         probeFiltered = !!filtered
         probeSimilar = !!similar
+        probeSelection = !!selection
         probeSecondSearch = false
         selectedImage = url
         scan.clicked()
@@ -80,6 +82,10 @@ DialogFrame {
                              + " noMatchNotice=" + noMatchNotice.visible)
             if (root.probing && root.probeMatches && success && root.search.matches.length)
                 Qt.callLater(function() { const row=ocrCandidates.itemAtIndex(0); console.warn("PROBE qslCandidate " + (row ? row.probeText : "missing")) })
+            if (root.probing && root.probeSelection && success) {
+                for (const row of root.search.matches) root.toggleQso(row, true)
+                selectionProbeTimer.start()
+            }
             if (root.probing && root.probeFiltered && success) {
                 console.warn("PROBE qslFilterResult " + root.searchedCriteria + " " + (root.search.matches.length ? root.search.matches[0].at : "none"))
                 if (!root.probeSecondSearch) { root.probeSecondSearch=true; manualDate.text="2026-09-24"; searchButton.clicked() }
@@ -90,6 +96,12 @@ DialogFrame {
             }
         }
     }
+    Timer { id:selectionProbeTimer; interval:400; onTriggered: {
+        const row=selectedReview.itemAtIndex(0); const before=root.selectedQsos.length
+        const label=row ? row.probeText : "missing"; if (row) row.probeRemove()
+        console.warn("PROBE qslSelectionReview before="+before+" after="+root.selectedQsos.length+" row="+label)
+        if (row && root.selectedQsos.length===1) approveButton.clicked()
+    } }
     Connections {
         target: root.acquisition
         function onFinished(success) {
@@ -257,12 +269,18 @@ DialogFrame {
                 }
             }
         }
-        Text {
-            Layout.fillWidth: true
-            text: qsTr("Selected for attachment: %1").arg(root.selectedQsos.map(x => x.call + " #" + x.id).join(", ") || "—")
-            textFormat: Text.PlainText
-            color: Theme.textSecondary
-            elide: Text.ElideRight
+        Text { Layout.fillWidth:true; text:qsTr("Selected for attachment: %1").arg(root.selectedQsos.length); color:Theme.textSecondary }
+        ListView {
+            id:selectedReview; Layout.fillWidth:true; Layout.preferredHeight:Math.min(140,root.selectedQsos.length*38)
+            visible:root.selectedQsos.length>0; clip:true; model:root.selectedQsos; ScrollBar.vertical:ScrollBar {}
+            delegate:RowLayout {
+                required property var modelData; width:ListView.view.width
+                readonly property string probeText:selectedLabel.text
+                function probeRemove() { removeSelected.clicked() }
+                Text { id:selectedLabel; Layout.fillWidth:true; textFormat:Text.PlainText; elide:Text.ElideRight; color:Theme.textPrimary
+                    text:"#"+modelData.id+" · "+modelData.call+" · "+(modelData.timeValid ? modelData.at : qsTr("invalid recorded timestamp: %1").arg(modelData.rawAt || "—"))+" · "+modelData.band+" · "+modelData.mode }
+                GlassButton { id:removeSelected; text:qsTr("Remove"); Accessible.name:qsTr("Remove QSO %1 from selection").arg(modelData.id); enabled:!root.acquisition.busy; onClicked:root.toggleQso(modelData,false) }
+            }
         }
         Text { Layout.fillWidth: true; text: qsTr("Approval stores the OCR image copy and recognized text with the selected QSO; it does not mark them confirmed."); color: Theme.warningColor; wrapMode: Text.Wrap }
         RowLayout {

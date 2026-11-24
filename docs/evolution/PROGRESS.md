@@ -3083,3 +3083,11 @@ QSL OCR candidate results now present database timestamps converted to UTC, matc
 A/B on macOS arm64 / Qt 6.11.2: the new synthetic test previously showed `15:30+01:00` while filtering for `14:30 UTC`; it now displays `14:30Z`, preserves the original value, handles unzoned and invalid values, and returns both matching QSO under the UTC filter. CTest tesseractocr and qmlpopups passed 2/2. An offscreen app using local Tesseract and a synthetic QSL displayed the normalized UTC time and FT4 in the candidate row; the existing selected-date/time UI fixture passed separately. The first combined UI command included a misspelled test name; the correctly named fixture was rerun successfully.
 
 The UI and OCR fixtures are synthetic and programmatic; the original operator's clock and real-card OCR accuracy are not verified. A raw timestamp remains available in the result but is not shown for valid rows. Physical UI, Windows/Linux and full G12/G13 acceptance remain open.
+
+## 2026-11-24 — G12 inspect and remove selected QSL candidates
+
+The OCR review dialog now provides a scrollable list of all selected QSO with call, UTC time, band and mode, and a per-QSO Remove action before approval. Selection can still span searches and the existing limit of 100 remains. Removing a row only changes the pending selection; image attachment still requires explicit approval and does not mark a QSL confirmed. Italian and accessible button labels were added.
+
+A/B on macOS arm64 / Qt 6.11.2: the new offscreen app fixture initially failed because the selected-QSO review did not exist. After implementation, it uses local Tesseract and a synthetic card, selects two QSO, observes the actual review row, removes one and approves: only one QSO receives the image link and neither is marked confirmed. An initial immediate probe ran before the list delegate existed; the fixture was corrected to wait for its creation. The existing two-QSO approval fixture also passed. CTest tesseractocr and qmlpopups passed 2/2; app and tests built.
+
+The interaction is automated and offscreen with synthetic data, not a physical input or real-card accuracy test. Long individual row text can still be visually elided, and full G12/G13, Windows and Linux acceptance remain open.

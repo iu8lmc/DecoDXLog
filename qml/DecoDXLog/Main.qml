@@ -1401,6 +1401,7 @@ RoundedWindow {
         else if (what[0] === "qslocr") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr(window.probeLocalFileUrl(what.slice(1).join(":")))) }
         else if (what[0] === "qslocrmatches") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr(window.probeLocalFileUrl(what.slice(1).join(":")), true)) }
         else if (what[0] === "qslocrsimilar") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr(window.probeLocalFileUrl(what.slice(1).join(":")), true, false, false, true)) }
+        else if (what[0] === "qslocrselection") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr(window.probeLocalFileUrl(what.slice(1).join(":")), true, false, false, false, true)) }
         else if (what[0] === "qslocrfiltered") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr(window.probeLocalFileUrl(what.slice(1).join(":")), true, false, true)) }
         else if (what[0] === "qslocrattach") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcr(window.probeLocalFileUrl(what.slice(1).join(":")), true, true)) }
         else if (what[0] === "qslocrundo") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrHistory()) }

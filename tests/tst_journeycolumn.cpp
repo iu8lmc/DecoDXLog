@@ -1876,6 +1876,19 @@ private slots:
         QVERIFY(db.qslAttachments(1).isEmpty());
         QCOMPARE(db.record(1)->value("CALL"), QString("K1ABC"));
     }
+    void qslOcrSelectedQsosCanBeReviewedAndRemoved()
+    {
+        decolog::core::TesseractOcr engine; if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("card.png"); QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"),path));
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const auto* time:{"143000","153000"}) QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260923"},{"TIME_ON",time},{"BAND","20m"},{"MODE","FT4"}},"fixture",{},true,0,false).id>0); }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("qslocrselection:")+path,output,5500),output.constData());
+        QVERIFY2(output.contains("PROBE qslSelectionReview before=2") && output.contains("after=1") && output.contains("FT4") && !output.contains("TypeError"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
+        QCOMPARE(db.qslAttachments(1).size()+db.qslAttachments(2).size(),1);
+        QVERIFY(db.record(1)->value("QSL_RCVD").isEmpty()); QVERIFY(db.record(2)->value("QSL_RCVD").isEmpty());
+    }
+
     void qslOcrCandidateShowsFt4()
     {
         decolog::core::TesseractOcr engine; if (engine.executable().isEmpty()) QSKIP("Tesseract is not installed");
