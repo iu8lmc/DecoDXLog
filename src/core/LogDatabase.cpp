@@ -9,6 +9,7 @@
 #include "core/ContestReport.h"
 
 #include <QFile>
+#include <QCoreApplication>
 #include <QFileInfo>
 #include <QElapsedTimer>
 #include <QCryptographicHash>
@@ -1254,7 +1255,8 @@ bool LogDatabase::writeQsl(qint64 qsoId, const QList<QslState>& states, bool kee
 
 InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& source,
                                     const QString& sourceApp, bool manual, qint64 stationProfileId,
-                                    bool checkDuplicate, qint64 radioSessionId, qint64 radioMemberId)
+                                    bool checkDuplicate, qint64 radioSessionId, qint64 radioMemberId,
+                                    std::optional<RoverInsertGuard> roverGuard)
 {
     InsertResult result;
     if (!isOpen()) {
@@ -1305,6 +1307,24 @@ InsertResult LogDatabase::insertQso(const AdifRecord& input, const QString& sour
         rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_insert_qso"));
         rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_insert_qso"));
     };
+    if (roverGuard) {
+        const auto reject=[&] { rollbackInsert(); result.message=QCoreApplication::translate("LogDatabase", "Rover session or position changed; review the locator before saving."); m_lastError=result.message; return result; };
+        QSqlQuery rover(db);
+        if (!rover.exec(QStringLiteral("SELECT id,uuid,COALESCE(station_profile_id,0) FROM rover_session WHERE ended_at IS NULL LIMIT 1"))) return reject();
+        const bool active=rover.next();
+        if (rover.lastError().isValid() || active!=(roverGuard->sessionId>0)) return reject();
+        if (active) {
+            if (rover.value(0).toLongLong()!=roverGuard->sessionId || rover.value(1).toString()!=roverGuard->sessionUuid ||
+                rover.value(2).toLongLong()!=stationProfileId || roverGuard->grid.isEmpty() ||
+                input.value(QStringLiteral("MY_GRIDSQUARE")).compare(roverGuard->grid,Qt::CaseInsensitive)!=0) return reject();
+            const QDateTime when=parseIso(p->on); if (!when.isValid()) return reject();
+            QSqlQuery position(db); position.prepare(QStringLiteral("SELECT MIN(gridsquare),COUNT(DISTINCT gridsquare) FROM rover_position WHERE session_id=? AND effective_at=(SELECT MAX(effective_at) FROM rover_position WHERE session_id=? AND effective_at<=?)"));
+            position.addBindValue(roverGuard->sessionId); position.addBindValue(roverGuard->sessionId);
+            position.addBindValue(when.toUTC().toString(QStringLiteral("yyyy-MM-dd'T'HH:mm'Z'")));
+            if (!position.exec() || !position.next() || position.value(1).toInt()!=1 ||
+                position.value(0).toString()!=roverGuard->grid) return reject();
+        }
+    }
     if (radioSessionId || radioMemberId) {
         QSqlQuery radio(db);
         radio.prepare(QStringLiteral("SELECT s.uuid,m.call,COALESCE(s.station_profile_id,0) FROM radio_net_session s "
@@ -1359,7 +1379,8 @@ InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, co
                                                      const QString& requestId, const QString& authority,
                                                      const QString& sourceApp, bool manual,
                                                      qint64 stationProfileId, bool checkDuplicate,
-                                                     qint64 radioSessionId, qint64 radioMemberId)
+                                                     qint64 radioSessionId, qint64 radioMemberId,
+                                                     std::optional<RoverInsertGuard> roverGuard)
 {
     InsertResult result;
     if (!isOpen()) { result.message=QStringLiteral("database not open"); return result; }
@@ -1387,7 +1408,7 @@ InsertResult LogDatabase::insertQsoWithContestSerial(const AdifRecord& input, co
         if (!ok || number!=serial) return fail(QStringLiteral("The numeric sent exchange differs from the granted serial"));
     }
     AdifRecord record=input; if (existing.isEmpty()) record.set(QStringLiteral("STX"),QString::number(serial));
-    result=insertQso(record,source,sourceApp,manual,stationProfileId,checkDuplicate,radioSessionId,radioMemberId);
+    result=insertQso(record,source,sourceApp,manual,stationProfileId,checkDuplicate,radioSessionId,radioMemberId,roverGuard);
     if (result.status!=InsertResult::Status::Inserted) { db.rollback(); return result; }
     const auto qso=meta(result.id);
     if (!qso || qso->uuid.isEmpty()) return fail(QStringLiteral("Cannot identify the inserted QSO"));

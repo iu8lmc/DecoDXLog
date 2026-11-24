@@ -7,6 +7,28 @@ using namespace decolog::core;
 class TestRoverSession : public QObject {
     Q_OBJECT
   private slots:
+    void guardedInsertRejectsChangedPosition()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("rover.sqlite");
+        LogDatabase db,writer; QVERIFY(db.open(path)); QVERIFY(writer.open(path)); RoverSession rover(&db);
+        QVERIFY(rover.start("Trip","JN71")); const auto active=rover.session();
+        const QDateTime now=QDateTime::currentDateTimeUtc();
+        AdifRecord record{{"CALL","K1ABC"},{"QSO_DATE",now.toString("yyyyMMdd")},{"TIME_ON",now.toString("hhmm")},{"BAND","20m"},{"MODE","CW"},{"MY_GRIDSQUARE","JN71"}};
+        RoverInsertGuard guard{active.value("id").toLongLong(),active.value("uuid").toString(),"JN71"};
+        const auto newlyStarted=db.insertQso(record,"manual",{},true,0,false,0,0,RoverInsertGuard{});
+        QCOMPARE(newlyStarted.status,InsertResult::Status::Error); QCOMPARE(db.qsoCount(),qint64(0));
+        QSqlQuery q(writer.connection()); QVERIFY(q.exec("UPDATE rover_position SET gridsquare='JM67'"));
+        const auto baseline=db.insertQso(record,"manual",{},true,0,false);
+        QCOMPARE(baseline.status,InsertResult::Status::Inserted); QCOMPARE(db.record(baseline.id)->value("MY_GRIDSQUARE"),QString("JN71"));
+        QVERIFY(db.softDeleteQso(baseline.id));
+        const auto stale=db.insertQso(record,"manual",{},true,0,false,0,0,guard);
+        QCOMPARE(stale.status,InsertResult::Status::Error); QCOMPARE(db.qsoCount(),qint64(0));
+        guard.grid="JM67"; record.set("MY_GRIDSQUARE","JM67");
+        const auto accepted=db.insertQso(record,"manual",{},true,0,false,0,0,guard);
+        QCOMPARE(accepted.status,InsertResult::Status::Inserted); QCOMPARE(db.record(accepted.id)->value("MY_GRIDSQUARE"),QString("JM67"));
+        QVERIFY(rover.close()); const auto closed=db.insertQso(record,"manual",{},true,0,false,0,0,guard);
+        QCOMPARE(closed.status,InsertResult::Status::Error); QCOMPARE(db.qsoCount(),qint64(1));
+    }
     void failedSessionReadIsNotAnInactiveSession()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); RoverSession rover(&db);

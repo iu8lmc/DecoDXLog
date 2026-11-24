@@ -39,6 +39,7 @@ bool RoverSession::readSession(QVariantMap *result, QString *error) const
     if (!q.exec(QStringLiteral(
             "SELECT s.id,s.title,s.station_profile_id,s.started_at, "
             "(SELECT gridsquare FROM rover_position p WHERE p.session_id=s.id ORDER BY p.id DESC LIMIT 1) "
+            ",s.uuid "
             "FROM rover_session s WHERE s.ended_at IS NULL LIMIT 1"))) {
         if (error) *error=q.lastError().text(); return false;
     }
@@ -50,7 +51,7 @@ bool RoverSession::readSession(QVariantMap *result, QString *error) const
             {QStringLiteral("title"), q.value(1)},
             {QStringLiteral("profileId"), q.value(2)},
             {QStringLiteral("startedAt"), q.value(3)},
-            {QStringLiteral("grid"), q.value(4)}};
+            {QStringLiteral("grid"), q.value(4)}, {QStringLiteral("uuid"), q.value(5)}};
     return true;
 }
 QVariantList RoverSession::positions() const

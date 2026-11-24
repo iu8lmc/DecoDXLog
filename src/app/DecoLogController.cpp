@@ -4721,9 +4721,12 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         r.set(QStringLiteral("APP_DECOLOG_RADIO_NET_CALL"), radio.value(1).toString());
     }
     QVariantMap roverSession;
+    std::optional<RoverInsertGuard> roverGuard;
     if (!historical && m_rover && explicitMyGrid.isEmpty()) {
         QString roverReadError;
         if (!m_rover->readSession(&roverSession,&roverReadError)) return tr("Cannot read rover session: %1").arg(roverReadError);
+        roverGuard=RoverInsertGuard{roverSession.value(QStringLiteral("id")).toLongLong(),
+                                    roverSession.value(QStringLiteral("uuid")).toString(),{}};
     }
     if (!roverSession.isEmpty()) {
         if (m_activation->active())
@@ -4736,6 +4739,7 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
         if (!roverError.isEmpty() || roverGrid.isEmpty())
             return roverError.isEmpty() ? tr("The rover locator is unavailable") : roverError;
         r.set(QStringLiteral("MY_GRIDSQUARE"), roverGrid);
+        roverGuard->grid=roverGrid;
     }
     if (!historical) {
         applyEntity(r);
@@ -4750,8 +4754,8 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     const InsertResult res = experimentalSerial
         ? m_db.insertQsoWithContestSerial(r, QStringLiteral("manual"), serialGrant.value(QStringLiteral("scope")).toString(),
             serialGrant.value(QStringLiteral("requester")).toString(), serialGrant.value(QStringLiteral("requestId")).toString(),
-            serialGrant.value(QStringLiteral("authority")).toString(), QStringLiteral("DecoDXLog ") + version(), true, profileId, false, radioSessionId, radioMemberId)
-        : m_db.insertQso(r, QStringLiteral("manual"), QStringLiteral("DecoDXLog ") + version(), true, profileId, false, radioSessionId, radioMemberId);
+            serialGrant.value(QStringLiteral("authority")).toString(), QStringLiteral("DecoDXLog ") + version(), true, profileId, false, radioSessionId, radioMemberId,roverGuard)
+        : m_db.insertQso(r, QStringLiteral("manual"), QStringLiteral("DecoDXLog ") + version(), true, profileId, false, radioSessionId, radioMemberId,roverGuard);
     switch (res.status) {
     case InsertResult::Status::Inserted: {
         if (experimentalSerial) m_net->durableSerialQsoSaved();

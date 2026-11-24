@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE TS>
 <TS version="2.1" language="it_IT" sourcelanguage="en">
+<context><name>LogDatabase</name><message><source>Rover session or position changed; review the locator before saving.</source><translation>La sessione o la posizione rover è cambiata; controlla il locator prima di salvare.</translation></message></context>
 <context>
     <name>AboutDialog</name>
     <message>

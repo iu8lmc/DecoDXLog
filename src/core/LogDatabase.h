@@ -30,6 +30,12 @@ struct InsertResult {
     QString message;
 };
 
+struct RoverInsertGuard {
+    qint64 sessionId{0};
+    QString sessionUuid;
+    QString grid;
+};
+
 struct ContestNetChange {
     qint64 sequence{0};
     QString qsoUuid;
@@ -335,13 +341,15 @@ public:
                            bool manual = false,
                            qint64 stationProfileId = 0,
                            bool checkDuplicate = true,
-                           qint64 radioSessionId = 0, qint64 radioMemberId = 0);
+                           qint64 radioSessionId = 0, qint64 radioMemberId = 0,
+                           std::optional<RoverInsertGuard> roverGuard = {});
     InsertResult insertQsoWithContestSerial(const AdifRecord& record, const QString& source,
                                             const QString& scope, const QString& requester,
                                             const QString& requestId, const QString& authority,
                                             const QString& sourceApp = {}, bool manual = false,
                                             qint64 stationProfileId = 0, bool checkDuplicate = true,
-                                            qint64 radioSessionId = 0, qint64 radioMemberId = 0);
+                                            qint64 radioSessionId = 0, qint64 radioMemberId = 0,
+                                            std::optional<RoverInsertGuard> roverGuard = {});
     // Metadata only, from schema 28 onwards. Existing QSO need an initial
     // inventory; the sequence is local to this database, not a peer ACK.
     ContestNetChangePage contestNetChangesAfter(qint64 sequence, int limit) const;
