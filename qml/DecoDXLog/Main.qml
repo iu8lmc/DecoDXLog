@@ -1379,6 +1379,7 @@ RoundedWindow {
             console.warn("PROBE serialQso setup=" + setup + " config=" + config + " result=" + result + " shown=" + ui.shown + " available=" + ui.available + " checkedAfter=" + ui.checkedAfter + " missing=" + missing + " legacy=" + legacy + " stale=" + stale)
         })
         else if (what[0] === "potacatalogueprobe") Qt.callLater(() => activationDialog.probePotaCatalogue())
+        else if (what[0] === "potastaleprobe") Qt.callLater(() => activationDialog.probePotaStalePage())
         else if (what[0] === "sotaupdateprobe") Qt.callLater(() => activationDialog.probeSotaUpdate())
         else if (what[0] === "sotacatalogueprobe") Qt.callLater(() => activationDialog.probeSotaCatalogue())
         else if (what[0] === "exclusionprobe") Qt.callLater(() => activationDialog.probeExclusions())

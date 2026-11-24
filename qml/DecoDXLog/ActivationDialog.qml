@@ -33,6 +33,8 @@ DialogFrame {
     property bool potaReviewHasMore: false
     property int potaReviewPendingPage: 0
     property bool probePotaPages: false
+    property bool probePotaBack: false
+    property bool probePotaStale: false
     property var historyRows: []
     property var historyCursors: [0]
     property int historyPage: 0
@@ -96,6 +98,15 @@ DialogFrame {
         root.openDialog("pota")
         root.probePotaMode = true
         potaImportDialog.importPath(root.probeLocalFileUrl(decolog.currentLogInfo().path + ".pota.csv"))
+    }
+    function probePotaStalePage() {
+        root.probePotaStale = true
+        root.probePotaCatalogue()
+    }
+    Timer {
+        id: probePotaStaleTimer
+        interval: 1500
+        onTriggered: potaReviewNext.clicked()
     }
     function probeSotaUpdate() {
         root.openDialog("pota")
@@ -215,17 +226,27 @@ DialogFrame {
                 root.potaReviewHasMore = false
                 root.partitionMessage = result.error
                 root.probePotaPages = false
+                if (root.probePotaStale) {
+                    console.warn("PROBE potaReview changed error=" + result.error + " visible=" + partitionStatus.visible + " rows=" + root.potaReviewRows.length)
+                    root.probePotaStale = false
+                }
                 return
             }
             root.potaReviewRows = result.potaCorrespondentRows || []
             root.potaReviewHasMore = !!result.potaCorrespondentHasMore
             root.potaReviewPage = root.potaReviewPendingPage
             if (root.probePotaPages) Qt.callLater(() => {
-                if (root.potaReviewPage === 1) potaReviewNext.clicked()
+                if (root.potaReviewPage === 1 && !root.probePotaBack) potaReviewNext.clicked()
+                else if (root.potaReviewPage === 1) {
+                    const second=potaReviewRepeater.itemAt(0)
+                    if (second) console.warn("PROBE potaReview back=" + second.modelData.call + " page=" + root.potaReviewPage)
+                    root.probePotaPages=false; root.probePotaBack=false
+                }
                 else {
                     const third=potaReviewRepeater.itemAt(0)
                     if (third) console.warn("PROBE potaReview third=" + third.modelData.call + " page=" + root.potaReviewPage)
-                    root.probePotaPages=false
+                    root.probePotaBack=true
+                    potaReviewPrevious.clicked()
                 }
             })
         }
@@ -278,6 +299,11 @@ DialogFrame {
                     const row = potaReviewRepeater.itemAt(0)
                     if (row) {
                         console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentTotal + " reason=" + row.modelData.reason + " text=" + row.probeText())
+                        if (root.probePotaStale && root.partitionPreview.potaCorrespondentTotal > 100) {
+                            console.warn("PROBE potaReview ready for external change")
+                            probePotaStaleTimer.start()
+                            return
+                        }
                         if (root.partitionPreview.potaCorrespondentTotal > 200) {
                             root.probePotaPages=true
                             potaReviewNext.clicked()
@@ -884,6 +910,7 @@ DialogFrame {
             onClicked: root.act.cancelPartitionExport()
         }
         Note {
+            id: partitionStatus
             visible: root.partitionMessage.length > 0
             text: root.partitionMessage
         }
@@ -940,7 +967,7 @@ DialogFrame {
         }
         RowLayout {
             visible: root.previewShown && (root.partitionPreview.potaCorrespondentTotal || 0) > 100
-            GlassButton { text: qsTr("Previous review QSO"); enabled: !root.act.potaPageBusy && root.potaReviewPage > 0; onClicked: root.requestPotaPage(root.potaReviewPage - 1) }
+            GlassButton { id: potaReviewPrevious; text: qsTr("Previous review QSO"); enabled: !root.act.potaPageBusy && root.potaReviewPage > 0; onClicked: root.requestPotaPage(root.potaReviewPage - 1) }
             Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.potaReviewPage + 1) }
             GlassButton { id: potaReviewNext; text: qsTr("Next review QSO"); enabled: !root.act.potaPageBusy && root.potaReviewHasMore; onClicked: root.requestPotaPage(root.potaReviewPage + 1) }
         }
