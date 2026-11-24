@@ -184,7 +184,7 @@ for change_tle, overlap in ((False, False), (True, False), (False, True)):
             if overlap:
                 expected += '\nPROBE predictSchedule status=Incomplete schedule: Tracker returned overlapping passes'
             if not change_tle and not overlap:
-                expected += '\nPROBE schedule invalid rejected=true\nPROBE schedule start valid=1800000000 invalid=true\nPROBE schedule filter hidden=3 restored=3 cleared=true blocked=true\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200'
+                expected += '\nPROBE schedule invalid rejected=true\nPROBE schedule start valid=1800000000 invalid=true\nPROBE schedule filter hidden=3 restored=3 cleared=true blocked=true\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200\nPROBE schedule start changed cleared=true'
             if result.returncode or 'RangeError' in output or 'TypeError' in output or any(line not in output for line in expected.split('\n')):
                 raise SystemExit(f'FAIL schedule change_tle={change_tle}: {output}; requests={server.commands}')
             if 'PREDICT "OSCAR-7" 1800000000' not in server.commands:

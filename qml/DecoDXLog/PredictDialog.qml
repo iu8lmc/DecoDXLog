@@ -248,6 +248,8 @@ DialogFrame {
             root.passValid = success && root.visible
             if (root.probingScheduleNext) {
                 console.warn("PROBE selectedScheduleNext success=" + success + " aos=" + (root.plannedPass.aos || 0))
+                planningStartField.text = "2027-01-16T08:00:00Z"
+                console.warn("PROBE schedule start changed cleared=" + (!root.passValid && !root.scheduleVisible && !nextPassButton.enabled))
                 root.probingScheduleNext = false
             }
             status.text = success ? qsTr("Pass received") : qsTr("Tracker error: %1").arg(error)

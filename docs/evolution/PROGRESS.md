@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-24 — G09 invalidate displayed passes after planning-start change
+
+Extended the existing actual-app PREDICT fixture to change the UTC planning start after a schedule and a following pass have been displayed. It checks that the selected pass is invalidated, the schedule is hidden and the following-pass action becomes disabled. A/B on macOS arm64 / Qt 6.11.2: with the existing `onTextChanged` invalidation temporarily disabled the test reported `cleared=false` and failed; after restoring it the app reported `cleared=true` and the complete predictpass and predict_ui CTest groups passed 2/2. The existing fixture also verifies the expected synthetic UDP tracker requests and zero QSO in this scenario. git diff --check passed.
+
+The test drives an offscreen app programmatically against a simulated PREDICT server; it is not physical input, a live tracker, real radio/CAT/PTT, rotor or RF proof, and does not cover every possible in-flight ordering. No product behaviour changed in this increment; it adds a regression assertion for an existing protection. Windows/Linux and full G09/G13 acceptance remain open.
+
 ## 2026-11-24 — G03/G04 integrate planner and campaign history
 
 After the 124/124 full CTest on `fca99e1a`, the detached campaign-history and unverified-electronic-planner increments were cherry-picked through `ff06e4e7`. The main checkout rebuilt the app and relevant tests. The actual offscreen app tests passed for 55-revision history navigation, history after restart in English and Italian, and QSL pending/unverified filtering and invalidation. The native SQLite status-read-denial and unverified-benefit core tests passed with the opt-in macOS authorizer enabled; awards, qslplanner, dxcampaign, dxcalendar and qmlpopups CTest passed 5/5. git diff --check passed.
