@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G06 bind activation preview and partition export to the open file
+
+Asynchronous activation previews now capture the open log path, logical UUID, physical file identity and open generation. The worker checks the path and UUID around its read, and the controller checks the same context before publishing. Partition export requires the reviewed preview's context, checks the worker's opened log and checks the physical file again before committing the ADIF output. A file that cannot be identified is refused. The synchronous in-memory preview API remains available.
+
+A/B on macOS arm64 / Qt 6.11.2: two Unix-only synthetic fixtures replaced the open database path with a SQLite clone retaining the same log and activation identities. Before the fix, the asynchronous preview accepted the modified clone and the export accepted an unchanged clone and replaced an existing sentinel output. After the fix, both operations were refused and the sentinel was preserved. The complete activation, database, migration and qmlpopups CTest groups passed 4/4. The rebuilt offscreen app's normal multi-program activation fixture also passed, including creation of its partition export and separation of operator/correspondent references. git diff --check passed.
+
+These checks are not atomic filesystem operations: replacement and restoration between checks, every in-flight ordering, and all filesystem behaviours remain unproven. Replacing an open SQLite database is not made safe. The replacement fixtures drive the controller programmatically and use temporary synthetic databases; the normal app probe is offscreen. Windows/Linux, physical UI, actual award importers and full G06/G13 acceptance remain open.
+
 ## 2026-11-24 — G10 continue a sked reminder backlog in bounded slices
 
 When a scan reaches its 64-attempt limit and has successfully recorded at least one reminder, the controller schedules a single continuation 25 ms later. Each continuation uses the existing rotating cursor and revalidates the current handoff context. If an entire slice fails, it does not schedule a tight retry loop; the normal 30-second timer can try again. Reconfiguring the handoff scope cancels the pending continuation. The bounded in-memory Activity model and existing per-session duplicate suppression remain unchanged.

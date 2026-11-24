@@ -253,6 +253,9 @@ private:
     bool m_previewBusy{false};
     QVariantMap m_previewResult;
     QString m_previewSessionUuid;
+    QString m_previewLogPath, m_previewLogIdentity;
+    QByteArray m_previewFileIdentity;
+    quint64 m_previewLogGeneration{0};
     // Il punteggio e i moltiplicatori gia' presi, calcolati una volta per QSO
     // e non una volta per ogni riquadro che li mostra: in gara li leggono
     // quattro finestre e ogni riga del cluster, e ricalcolarli ogni volta

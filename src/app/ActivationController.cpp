@@ -8,6 +8,7 @@
 #include "core/ContestComparison.h"
 #include "core/Contests.h"
 #include "core/LogDatabase.h"
+#include "core/FileIdentity.h"
 #include "core/Spots.h"
 #include "core/SotaCatalogue.h"
 #include "core/PotaCatalogue.h"
@@ -133,6 +134,7 @@ void ActivationController::invalidatePreview()
 {
     ++m_previewGeneration;
     m_previewSessionUuid.clear();
+    m_previewLogPath.clear(); m_previewLogIdentity.clear(); m_previewFileIdentity.clear(); m_previewLogGeneration=0;
     if (m_previewCancel) m_previewCancel->store(true);
     if (m_partitionExportCancel) m_partitionExportCancel->store(true);
     if (!m_previewResult.isEmpty()) { m_previewResult.clear(); emit previewChanged(); }
@@ -1491,24 +1493,29 @@ bool ActivationController::startPartitionPreview()
 bool ActivationController::startRunPartitionPreview(const QString& requestedUuid)
 {
     if (m_previewBusy) return false;
-    m_previewResult.clear(); m_previewSessionUuid.clear();
+    m_previewResult.clear(); m_previewSessionUuid.clear(); m_previewLogPath.clear(); m_previewLogIdentity.clear(); m_previewFileIdentity.clear(); m_previewLogGeneration=0;
     if (requestedUuid.isEmpty() || !m_ctx.db || !m_ctx.db->isOpen() ||
         m_ctx.db->path().isEmpty() || m_ctx.db->path() == QLatin1String(":memory:")) {
         m_previewResult = {{QStringLiteral("error"), tr("A tracked session and an open file-backed log are required.")}};
         emit previewChanged(); return false;
     }
     const QString path = m_ctx.db->path();
+    const QString logIdentity=m_ctx.db->identity(); const QByteArray fileIdentity=m_ctx.db->openFileIdentity(); const quint64 logGeneration=m_ctx.db->openGeneration();
+    if (logIdentity.isEmpty() || fileIdentity.isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()) {
+        m_previewResult={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}}; emit previewChanged(); return false;
+    }
     const QString connectionName = m_ctx.db->connection().connectionName();
     const QString uuid = requestedUuid;
     const QString cataloguePath = m_sotaCatalogue->path();
     const QString potaCataloguePath = m_potaCatalogue->path();
     m_previewSessionUuid = uuid;
+    m_previewLogPath=path; m_previewLogIdentity=logIdentity; m_previewFileIdentity=fileIdentity; m_previewLogGeneration=logGeneration;
     const quint64 generation = m_previewGeneration;
     m_previewCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancelled = m_previewCancel;
     m_previewBusy = true; emit previewChanged();
     QPointer<ActivationController> self(this);
-    m_previewPool.start([self, path, connectionName, uuid, cataloguePath, potaCataloguePath, generation, cancelled] {
+    m_previewPool.start([self, path, logIdentity, fileIdentity, logGeneration, connectionName, uuid, cataloguePath, potaCataloguePath, generation, cancelled] {
         QVariantMap result;
         const QString connection = QStringLiteral("activation-preview-") + QUuid::createUuid().toString();
         {
@@ -1516,15 +1523,23 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
             db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=100"));
             db.setDatabaseName(path);
             if (!db.open()) result[QStringLiteral("error")] = tr("Cannot open the log for preview.");
-            else result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath, potaCataloguePath);
+            else {
+                const auto matches=[&] { QSqlQuery check(db); return core::fileidentity::read(path)==fileIdentity && check.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && check.next() && check.value(0).toString()==logIdentity; };
+                if (!matches()) result[QStringLiteral("error")]=tr("The log or session changed; recalculate the preview.");
+                else {
+                    result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath, potaCataloguePath);
+                    if (!matches()) result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
+                }
+            }
             db.close();
         }
         QSqlDatabase::removeDatabase(connection);
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(), [self, path, connectionName, uuid, generation, cancelled, result] {
+        QMetaObject::invokeMethod(self.data(), [self, path, logIdentity, fileIdentity, logGeneration, connectionName, uuid, generation, cancelled, result] {
             if (!self) return;
             self->m_previewBusy = false; self->m_previewCancel.reset();
             const bool same = self->m_ctx.db && self->m_ctx.db->isOpen() && self->m_ctx.db->path() == path &&
+                self->m_ctx.db->openGeneration()==logGeneration && self->m_ctx.db->identity()==logIdentity && self->m_ctx.db->openFileIdentity()==fileIdentity && self->m_ctx.db->fileIdentityMatchesOpen() &&
                 self->m_ctx.db->connection().connectionName() == connectionName &&
                 self->m_previewSessionUuid == uuid && self->m_previewGeneration == generation;
             self->m_previewResult = !same ? QVariantMap{{QStringLiteral("error"), tr("The log or session changed; recalculate the preview.")}}
@@ -1545,6 +1560,8 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
 {
     if (m_partitionExportBusy || m_previewBusy || !destination.isLocalFile() || m_previewSessionUuid.isEmpty() ||
         !m_ctx.db || !m_ctx.db->isOpen() || m_ctx.db->path() == QLatin1String(":memory:")) return false;
+    if (m_previewLogPath!=m_ctx.db->path() || m_previewLogIdentity.isEmpty() || m_previewLogIdentity!=m_ctx.db->identity() ||
+        m_previewFileIdentity.isEmpty() || m_previewFileIdentity!=m_ctx.db->openFileIdentity() || !m_ctx.db->fileIdentityMatchesOpen() || m_previewLogGeneration!=m_ctx.db->openGeneration()) return false;
     const QString program = group.value(QStringLiteral("program")).toString();
     if (program != QLatin1String("POTA") && program != QLatin1String("WWFF") &&
         program != QLatin1String("SOTA") && program != QLatin1String("IOTA")) return false;
@@ -1553,6 +1570,7 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
         if (item.toMap() == group) { found = true; break; }
     if (!found) return false;
     const QString path = m_ctx.db->path();
+    const QString logIdentity=m_previewLogIdentity; const QByteArray fileIdentity=m_previewFileIdentity;
     const QString output = destination.toLocalFile();
     if (!safeContestReportDestination(output, path)) return false;
     const QString uuid = m_previewSessionUuid;
@@ -1564,10 +1582,11 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
     const auto cancelled = m_partitionExportCancel;
     m_partitionExportBusy = true; emit partitionExportChanged();
     QPointer<ActivationController> self(this);
-    m_partitionExportPool.start([self, path, output, uuid, key, group, expected, program, cancelled] {
+    m_partitionExportPool.start([self, path, logIdentity, fileIdentity, output, uuid, key, group, expected, program, cancelled] {
         QString error;
         LogDatabase db;
         if (!db.openReadOnly(path)) error = tr("Cannot open the log for export.");
+        else if (db.identity()!=logIdentity || db.openFileIdentity()!=fileIdentity || !db.fileIdentityMatchesOpen()) error=tr("The log or session changed; recalculate the preview.");
         else if (!db.connection().transaction()) error = tr("Cannot open a consistent export snapshot.");
         else {
             QList<qint64> ids;
@@ -1612,6 +1631,7 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
                     }
                 }
             }
+            if (error.isEmpty() && (db.identity()!=logIdentity || db.openFileIdentity()!=fileIdentity || !db.fileIdentityMatchesOpen())) error=tr("The log or session changed; recalculate the preview.");
             if (!db.connection().commit() && error.isEmpty()) error = tr("Cannot complete the export snapshot.");
             if (cancelled->load() && error.isEmpty()) error = tr("Export cancelled.");
             if (error.isEmpty() && !safeContestReportDestination(output, path))
@@ -1623,6 +1643,7 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
                 else {
                     const QByteArray data = adif::writeDocument(doc);
                     if (file.write(data) != data.size() || cancelled->load()) { file.cancelWriting(); error = tr("Cannot write the export or export cancelled."); }
+                    else if (db.openFileIdentity()!=fileIdentity || !db.fileIdentityMatchesOpen()) { file.cancelWriting(); error=tr("The log or session changed; recalculate the preview."); }
                     else if (!file.commit()) error = file.errorString();
                 }
             }
