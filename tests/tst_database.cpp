@@ -990,6 +990,24 @@ private slots:
         }
     }
 
+    void undoImportProtectsLaterLotwObservations()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto prior=db.insertQso({{"CALL","K1OLD"},{"QSO_DATE","20260101"},{"TIME_ON","0800"},{"BAND","20m"},{"MODE","CW"}},"fixture").id; QVERIFY(prior>0);
+        QString error; QVERIFY(db.recordLotwGridObservation(prior,"FN42","",&error));
+        const auto imported=db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR><CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR><CALL:5>K1CCC<QSO_DATE:8>20260101<TIME_ON:4>1100<BAND:3>20m<MODE:2>CW<EOR>");
+        QCOMPARE(imported.inserted,3); const auto ids=imported.insertedIds;
+        QVERIFY(db.recordLotwGridObservation(ids[0],"FN43","",&error));
+        QSqlQuery q(db.connection()); q.prepare("INSERT INTO lotw_grid_observation_link(qso_id,observation_id,linked_at) SELECT ?,id,'fixture' FROM lotw_grid_observation WHERE qso_id=?"); q.addBindValue(ids[1]); q.addBindValue(prior); QVERIFY(q.exec());
+        const auto preview=db.undoLatestImport({},true); QCOMPARE(preview.changed,2); QCOMPARE(preview.eligible,1);
+        QCOMPARE(preview.issues[0].reason,QString("lotw_observation")); QCOMPARE(preview.issues[1].reason,QString("lotw_observation"));
+        const auto result=db.undoLatestImport(); QCOMPARE(result.changed,2); QCOMPARE(result.deleted,1);
+        QVERIFY(!db.meta(ids[0])->deleted); QVERIFY(!db.meta(ids[1])->deleted); QVERIFY(db.meta(ids[2])->deleted);
+        LogDatabase broken; QVERIFY(broken.open(":memory:")); const auto single=broken.importAdif("<CALL:5>K1DDD<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>"); QCOMPARE(single.inserted,1);
+        QSqlQuery fault(broken.connection()); QVERIFY(fault.exec("DROP TABLE lotw_grid_observation_link"));
+        const auto failed=broken.undoLatestImport(); QCOMPARE(failed.failed,1); QCOMPARE(failed.deleted,0); QVERIFY(!failed.errors.isEmpty()); QVERIFY(!broken.meta(single.insertedIds.first())->deleted);
+    }
+
     void undoImportKeepsFailedItemsAvailableForRetry()
     {
         LogDatabase db;

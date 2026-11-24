@@ -11727,6 +11727,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>LoTW grid observation added or linked after import</source><translation>Osservazione locator LoTW aggiunta o collegata dopo l'importazione</translation></message>
     <message><source>Some duplicate groups could not be merged; search and review again</source><translation>Alcuni gruppi di duplicati non sono stati uniti; ripeti la ricerca e la revisione</translation></message>
     <message><source>Cannot verify the open log; reopen it and search again</source><translation>Impossibile verificare il log aperto; riaprilo e ripeti la ricerca</translation></message>
     <message><source>The log changed during the search; search again</source><translation>Il log è cambiato durante la ricerca; ripeti la ricerca</translation></message>

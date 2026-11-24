@@ -3236,6 +3236,9 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
     struct Item { qint64 id; QString uuid; int revision; QString fingerprint; };
     QSqlQuery revision(db);
     revision.prepare(QStringLiteral("SELECT journal_revision FROM import_batch WHERE id=?"));
+    QSqlQuery observations(db);
+    observations.prepare(QStringLiteral("SELECT EXISTS(SELECT 1 FROM lotw_grid_observation WHERE qso_id=?) OR "
+                                        "EXISTS(SELECT 1 FROM lotw_grid_observation_link WHERE qso_id=?)"));
     const auto membershipUnchanged = [&revision, &out] {
         revision.bindValue(0, out.batchId);
         const bool ok = revision.exec() && revision.next()
@@ -3318,6 +3321,17 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
                 addIssue(item.id, reason, true);
                 db.rollback();
                 continue;
+            }
+            observations.bindValue(0,item.id); observations.bindValue(1,item.id);
+            if (!observations.exec() || !observations.next()) {
+                const QString error=observations.lastError().text(); observations.finish();
+                ++out.failed; addIssue(item.id,QStringLiteral("failed"),true);
+                if (out.errors.size()<20) out.errors << QStringLiteral("QSO %1: cannot inspect LoTW observations: %2").arg(item.id).arg(error);
+                db.rollback(); continue;
+            }
+            const bool hasObservations=observations.value(0).toBool(); observations.finish();
+            if (hasObservations) {
+                ++out.changed; addIssue(item.id,QStringLiteral("lotw_observation"),true); db.rollback(); continue;
             }
             if (preview) {
                 ++out.eligible;

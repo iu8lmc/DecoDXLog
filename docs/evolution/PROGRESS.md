@@ -3091,3 +3091,11 @@ The OCR review dialog now provides a scrollable list of all selected QSO with ca
 A/B on macOS arm64 / Qt 6.11.2: the new offscreen app fixture initially failed because the selected-QSO review did not exist. After implementation, it uses local Tesseract and a synthetic card, selects two QSO, observes the actual review row, removes one and approves: only one QSO receives the image link and neither is marked confirmed. An initial immediate probe ran before the list delegate existed; the fixture was corrected to wait for its creation. The existing two-QSO approval fixture also passed. CTest tesseractocr and qmlpopups passed 2/2; app and tests built.
 
 The interaction is automated and offscreen with synthetic data, not a physical input or real-card accuracy test. Long individual row text can still be visually elided, and full G12/G13, Windows and Linux acceptance remain open.
+
+## 2026-11-24 — G01/G05 protect LoTW observations during import undo
+
+Import-undo preview and execution now treat a later direct or linked LoTW grid observation as a change and retain that QSO. The review explains the reason. A failure to inspect the observation tables is reported as an error and does not delete the QSO. This adds a conservative check without changing the older persisted import-fingerprint format.
+
+A/B on macOS arm64 / Qt 6.11.2: before the fix, the synthetic preview marked QSO with direct and linked observations as unchanged; the new test failed and now retains both while undoing an independent unchanged QSO. A separate injected missing-table case fails closed. An offscreen desktop fixture displays the LoTW reason and confirms that only the eligible QSO is moved to history. App and test targets built; CTest database, lotw, migration and qmlpopups passed 4/4; the final fault-injection assertion passed separately.
+
+The checks and app scenario use synthetic local data; no live LoTW or physical UI was exercised. The observation check is per QSO and its large-import cost is unmeasured. Other possible newly added related tables still need audit; Windows/Linux and full G01/G05/G13 acceptance remain open.

@@ -2361,6 +2361,18 @@ private slots:
         QVERIFY2(output.contains("PROBE radioNet visible=true members=1 first=K1AAA"), output.constData());
     }
 
+    void importUndoShowsProtectedLotwObservation()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const auto imported=db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR><CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>");
+          QCOMPARE(imported.inserted,2); QString error; QVERIFY(db.recordLotwGridObservation(imported.insertedIds.last(),"FN42","",&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"undoimport",output,5000),output.constData());
+        QVERIFY2(output.contains("\"eligible\":1") && output.contains("\"changed\":1") && output.contains("PROBE importUndoView visible=true") &&
+                 (output.contains("LoTW grid observation added or linked after import") || output.contains("Osservazione locator LoTW aggiunta o collegata dopo l'importazione")),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QVERIFY(db.meta(1)->deleted); QVERIFY(!db.meta(2)->deleted);
+    }
+
     void importUndoDialogAcceptAndRejectAcrossRestart()
     {
         for (const bool accept : {false, true}) {
