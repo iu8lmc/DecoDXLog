@@ -482,6 +482,7 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message><source>Grids shown come from the local QSO; their presence on the confirmation has not been verified.</source><translation>I locator mostrati provengono dal QSO locale; la loro presenza sulla conferma non è stata verificata.</translation></message>
     <message>
         <source>Show QSO</source>
         <translation>Mostra QSO</translation>

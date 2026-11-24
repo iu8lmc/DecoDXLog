@@ -803,7 +803,7 @@ DialogFrame {
     Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close(); root.marathonPreview=({}); marathonReview.close() } }
     function probeVuccReview(satellite) {
         openAt("dxcc"); vuccBand=satellite ? "2m" : "6m"; vuccScopePicker.currentIndex=satellite ? 1 : 0; refreshVucc(); vuccReview.open()
-        Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")) })
+        Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")+" gridEvidence="+((root.vuccResult.eligible || [])[0] || {}).gridEvidence+" notice="+vuccGridEvidenceNotice.text) })
     }
     function probeVuccThreshold() {
         openAt("dxcc"); vuccScopePicker.currentIndex=0; vuccBand="70cm"; vuccTarget=125
@@ -818,6 +818,8 @@ DialogFrame {
         body:ColumnLayout { anchors.margins:12; spacing:6
             Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
                 text:qsTr("Local LoTW or paper confirmation status only. Non-satellite contacts without propagation data are assumed non-satellite and require review. Verify confirmation, propagation, grids, location, band and account with ARRL; these candidates are not award credit.") }
+            Text { id:vuccGridEvidenceNotice; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor
+                text:qsTr("Grids shown come from the local QSO; their presence on the confirmation has not been verified.") }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Candidate grids and recorded evidence") }
             ListView { id:vuccCandidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.eligible || []
                 ScrollBar.vertical:PanelScrollBar {}

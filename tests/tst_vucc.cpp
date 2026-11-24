@@ -161,6 +161,7 @@ private slots:
         const auto preview = select(entries, Rules{{}, {}, "6m", 100});
         QCOMPARE(preview.eligible.size(), 2);
         const auto exported = preview.toJson().object().value("eligible").toArray().first().toObject();
+        QCOMPARE(exported.value("gridEvidence").toString(),QStringLiteral("local-qso-unverified"));
         QCOMPARE(exported.value("reportedMyVuccGrids").toString(), QStringLiteral("JN52,JN53"));
         QCOMPARE(exported.value("reportedMyGrid").toString(), QStringLiteral("JN52"));
         const auto record = decolog::core::adif::parse(db.exportAdif()).records.first();

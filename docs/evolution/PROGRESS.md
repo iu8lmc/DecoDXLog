@@ -2823,3 +2823,11 @@ Added an isolated offscreen app fixture importing two synthetic confirmed contac
 A/B on macOS arm64 / Qt 6.11.2: temporarily restoring the pre-validation VUCC implementation showed the invalid QSO as the first candidate with no exclusion; after restoring current code the app showed the other candidate and the expected exclusion. App and test targets rebuilt; CTest vucc, awards, database and qmlpopups passed 4/4.
 
 The app is driven programmatically offscreen and the exclusion reason is English. This checks imported synthetic values, not actual station location, LoTW confirmations, physical UI, Windows/Linux or ARRL acceptance. Full G02/G13 acceptance remains open.
+
+## 2026-11-24 — G02 make VUCC grid evidence explicit
+
+The VUCC review now states that displayed grids come from local QSO data and have not been verified against the confirmation. Each eligible candidate in the controller result and JSON additionally carries `gridEvidence: local-qso-unverified`; local LoTW/paper status remains separate. Italian UI text was added. This is a provenance disclosure, not validation of a card or LoTW record, and does not change candidate selection.
+
+A/B on macOS arm64 / Qt 6.11.2: the candidate JSON previously lacked the grid-evidence field and the new assertion failed; it now supplies the explicit value. An offscreen app fixture observed both the field and the translated notice while exercising the existing own-grid exclusion. App and test targets built; CTest vucc, awards, database and qmlpopups passed 4/4.
+
+The new field does not store or verify the grid from the confirming source. The evidence model, official acceptance, account/geographical checks, physical UI and Windows/Linux remain unverified; full G02/G13 acceptance stays open.
