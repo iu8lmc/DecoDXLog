@@ -482,6 +482,7 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message><source> · LoTW observations (match unverified; showing %1 of %2): %3</source><translation> · Osservazioni LoTW (abbinamento non verificato; mostrate %1 di %2): %3</translation></message>
     <message><source>Grids shown come from the local QSO; their presence on the confirmation has not been verified.</source><translation>I locator mostrati provengono dal QSO locale; la loro presenza sulla conferma non è stata verificata.</translation></message>
     <message>
         <source>Show QSO</source>

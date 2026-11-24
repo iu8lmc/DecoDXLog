@@ -158,6 +158,16 @@ private slots:
         QCOMPARE(entries.size(), 1);
         QCOMPARE(entries.first().myGrids, QStringLiteral("JN52,JN53"));
         QCOMPARE(entries.first().myGrid, QStringLiteral("JN52"));
+        QVERIFY(db.recordLotwGridObservation(entries.first().qsoId,"FM18","FM18,FM19",&error));
+        const auto withObservation=select(loadEntries(db),Rules{{},{},"6m",100}).toJson().object().value("eligible").toArray().first().toObject();
+        const auto observations=withObservation.value("lotwGridObservations").toArray(); QCOMPARE(observations.size(),1);
+        QCOMPARE(observations.first().toObject().value("grid").toString(),QString("FM18"));
+        QCOMPARE(observations.first().toObject().value("vuccGrids").toString(),QString("FM18,FM19"));
+        QCOMPARE(withObservation.value("grid4").toString(),QString("EM98"));
+        for (const auto &grid : {QString("FM20"),QString("FM21"),QString("FM22")}) QVERIFY(db.recordLotwGridObservation(entries.first().qsoId,grid,QStringLiteral(""),&error));
+        const auto bounded=select(loadEntries(db),Rules{{},{},"6m",100}).toJson().object().value("eligible").toArray().first().toObject();
+        QCOMPARE(bounded.value("lotwGridObservationCount").toInt(),4); QCOMPARE(bounded.value("lotwGridObservations").toArray().size(),3);
+        QCOMPARE(bounded.value("lotwGridObservations").toArray().first().toObject().value("grid").toString(),QString("FM22"));
         const auto preview = select(entries, Rules{{}, {}, "6m", 100});
         QCOMPARE(preview.eligible.size(), 2);
         const auto exported = preview.toJson().object().value("eligible").toArray().first().toObject();

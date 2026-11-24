@@ -506,9 +506,11 @@ private slots:
         { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           const QByteArray data="<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM10<QSL_RCVD:1>Y<MY_GRIDSQUARE:4>JN52<MY_VUCC_GRIDS:9>JN52,JN54<EOR>"
               "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1201<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<MY_GRIDSQUARE:4>JN52<MY_VUCC_GRIDS:9>JN52,JN53<EOR>";
-          QCOMPARE(db.importAdif(data).inserted,2); }
+          const auto imported=db.importAdif(data); QCOMPARE(imported.inserted,2);
+          QString error; QVERIFY2(db.recordLotwGridObservation(imported.insertedIds.last(),"FM18","FM18,FM19",&error),qPrintable(error)); }
         QByteArray output; QVERIFY2(launch(dir,"vuccreviewprobe",output,4500),output.constData());
         QVERIFY2(output.contains("PROBE vuccReview open=true row=EM11") && output.contains("QSO 1: invalid or inconsistent operating locator data") && !output.contains("TypeError"),output.constData());
+        QVERIFY2(output.contains("FM18") && output.contains("FM18,FM19") && (output.contains("match unverified") || output.contains("abbinamento non verificato")),output.constData());
         QVERIFY2(output.contains("gridEvidence=local-qso-unverified") && (output.contains("their presence on the confirmation has not been verified") || output.contains("la loro presenza sulla conferma non è stata verificata")),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }

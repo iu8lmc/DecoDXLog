@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QList>
 #include <QString>
 #include "core/LogDatabase.h"
@@ -21,6 +22,8 @@ struct Entry {
     QString otherEvidence; // recorded confirmations not accepted by this candidate filter
     QString propMode, satName, rxBand, classification;
     QString qsoUtc;
+    QJsonArray lotwGridObservations;
+    int lotwGridObservationCount{0};
 };
 
 struct Rules {

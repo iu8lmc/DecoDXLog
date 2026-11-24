@@ -233,7 +233,10 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "IFNULL(p.operating_location, ''), "
             "EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
             "(SELECT group_concat(s.service, ',') FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
-            "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,''), q.qso_datetime_on "
+            "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,''), q.qso_datetime_on, "
+            "(SELECT json_group_array(json_object('grid',grid,'vuccGrids',vucc_grids,'observedAt',observed_at)) "
+            "FROM (SELECT grid,vucc_grids,observed_at FROM lotw_grid_observation WHERE qso_id=q.id ORDER BY id DESC LIMIT 3)), "
+            "(SELECT COUNT(*) FROM lotw_grid_observation WHERE qso_id=q.id) "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
             "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
@@ -250,6 +253,9 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.evidence = query.value(6).toString();
         entry.propMode=query.value(8).toString(); entry.satName=query.value(9).toString(); entry.rxBand=query.value(10).toString();
         entry.qsoUtc=query.value(11).toString();
+        const auto observations=QJsonDocument::fromJson(query.value(12).toByteArray());
+        if (!observations.isArray()) { if (error) *error=QStringLiteral("Cannot read LoTW grid observations"); return {}; }
+        entry.lotwGridObservations=observations.array(); entry.lotwGridObservationCount=query.value(13).toInt();
         const QByteArray extra = query.value(7).toByteArray();
         if (!extra.isEmpty()) {
             QJsonParseError parseError;
@@ -285,6 +291,8 @@ QJsonDocument Result::toJson() const
         rows.append(QJsonObject{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
                                 {QStringLiteral("grid4"), entry.grid},
                                 {QStringLiteral("gridEvidence"), QStringLiteral("local-qso-unverified")},
+                                {QStringLiteral("lotwGridObservations"), entry.lotwGridObservations},
+                                {QStringLiteral("lotwGridObservationCount"), entry.lotwGridObservationCount},
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("account"), entry.account},
                                 {QStringLiteral("site"), entry.site},

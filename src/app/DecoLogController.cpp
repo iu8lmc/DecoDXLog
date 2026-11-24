@@ -3475,6 +3475,8 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
         eligible << QVariantMap{{QStringLiteral("qsoId"), entry.qsoId},
                                 {QStringLiteral("grid4"), entry.grid},
                                 {QStringLiteral("gridEvidence"), QStringLiteral("local-qso-unverified")},
+                                {QStringLiteral("lotwGridObservations"), entry.lotwGridObservations.toVariantList()},
+                                {QStringLiteral("lotwGridObservationCount"), entry.lotwGridObservationCount},
                                 {QStringLiteral("band"), entry.band},
                                 {QStringLiteral("account"), entry.account},
                                 {QStringLiteral("site"), entry.site},
