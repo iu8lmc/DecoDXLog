@@ -715,6 +715,35 @@ private slots:
         }
     }
 
+    void partitionPreviewFailsWhenQslStateIsUnreadable()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;
+        ActivationController act(std::move(ctx)); QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(rec); QVERIFY(db.insertQso(rec,"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE qsl_status"));
+        const auto preview=act.partitionPreview(); QVERIFY(!preview.value("error").toString().isEmpty()); QVERIFY(preview.value("groups").toList().isEmpty());
+    }
+
+    void partitionExportRejectsUnversionedDataAndQslChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        AdifRecord rec{{"CALL","K1AAA"},{"QSO_DATE","20270101"},{"TIME_ON","223000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(rec); const auto qso=db.insertQso(rec,"fixture",{},true,0,false); QVERIFY(qso.id>0);
+        QSignalSpy previewed(&act,&ActivationController::previewFinished), done(&act,&ActivationController::partitionExportFinished);
+        for (int change=0;change<2;++change) {
+            previewed.clear(); QVERIFY(act.startPartitionPreview()); QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY(previewed.first().first().toBool());
+            const auto group=act.previewResult().value("groups").toList().first().toMap();
+            if (change==0) { QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET comment='external change' WHERE id=?"); q.addBindValue(qso.id); QVERIFY(q.exec()); }
+            else { QslState status; status.service="lotw"; status.sent="Y"; QVERIFY(db.setQslState(qso.id,status)); }
+            const QString path=dir.filePath(QString("protected-%1.adi").arg(change)); { QFile f(path); QVERIFY(f.open(QIODevice::WriteOnly)); QCOMPARE(f.write("protected"),qint64(9)); }
+            done.clear(); QVERIFY(act.startPartitionExport(group,QUrl::fromLocalFile(path))); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(!done.first().first().toBool());
+            QFile f(path); QVERIFY(f.open(QIODevice::ReadOnly)); QCOMPARE(f.readAll(),QByteArray("protected"));
+        }
+    }
+
     void partitionExportIsIsolatedAndRejectsStalePreview()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());

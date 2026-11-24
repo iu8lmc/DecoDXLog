@@ -99,6 +99,10 @@
 <context>
     <name>ActivationController</name>
     <message>
+        <source>Cannot read QSL status for the session QSO.</source>
+        <translation>Impossibile leggere lo stato QSL dei QSO della sessione.</translation>
+    </message>
+    <message>
         <source>Activation references cannot contain empty items</source>
         <translation>I riferimenti di attivazione non possono contenere elementi vuoti</translation>
     </message>

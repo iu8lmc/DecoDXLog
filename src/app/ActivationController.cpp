@@ -16,6 +16,8 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QCryptographicHash>
+#include <QDataStream>
+#include <QSqlRecord>
 #include <QSaveFile>
 #include <filesystem>
 #include <QFile>
@@ -810,9 +812,12 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     exists.prepare(QStringLiteral("SELECT 1 FROM activation_run WHERE uuid=?")); exists.addBindValue(uuid);
     if (!exists.exec() || !exists.next()) return fail(tr("The session journal is unavailable or inconsistent."));
     QSqlQuery q(db); q.setForwardOnly(true);
-    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision,call FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
+    q.prepare(QStringLiteral("SELECT qso_datetime_on,adif_extra,id,uuid,revision,call,qso.* FROM qso WHERE deleted=0 AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? ORDER BY id"));
     q.addBindValue(uuid);
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
+    QSqlQuery qsl(db);
+    if (!qsl.prepare(QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,via,last_error FROM qsl_status WHERE qso_id=? ORDER BY service")))
+        return fail(tr("Cannot read QSL status for the session QSO."));
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
     QVariantList excluded;
@@ -845,6 +850,22 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         const QString op = extra.value(QStringLiteral("OPERATOR")).toString().trimmed().toUpper();
         const QString stationCall = extra.value(QStringLiteral("STATION_CALLSIGN")).toString().trimmed();
         const QString grid = extra.value(QStringLiteral("MY_GRIDSQUARE")).toString().trimmed().toUpper();
+        QByteArray recordBytes;
+        QDataStream stream(&recordBytes, QIODevice::WriteOnly);
+        stream.setVersion(QDataStream::Qt_6_0);
+        const int columnCount=q.record().count();
+        for (int column=6; column<columnCount; ++column) stream << q.value(column);
+        qsl.bindValue(0,q.value(2));
+        if (!qsl.exec()) return fail(tr("Cannot read QSL status for the session QSO."));
+        while (qsl.next()) {
+            stream << quint8(1);
+            for (int column=0; column<8; ++column) stream << qsl.value(column);
+        }
+        if (qsl.lastError().isValid() || stream.status()!=QDataStream::Ok)
+            return fail(tr("Cannot read QSL status for the session QSO."));
+        qsl.finish();
+        stream << quint8(0);
+        const QByteArray identity=QCryptographicHash::hash(recordBytes,QCryptographicHash::Sha256);
         bool found = false;
         for (const auto& pair : fields) {
             QSet<QString> seen;
@@ -864,10 +885,6 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                 if (stationCall.isEmpty()) groups[key][QStringLiteral("missingStationCall")] = groups[key].value(QStringLiteral("missingStationCall")).toInt() + 1;
                 if (op.isEmpty()) groups[key][QStringLiteral("missingOperator")] = groups[key].value(QStringLiteral("missingOperator")).toInt() + 1;
                 if (stationCall.isEmpty() && op.isEmpty()) groups[key][QStringLiteral("missingCallIdentity")] = groups[key].value(QStringLiteral("missingCallIdentity")).toInt() + 1;
-                // Include the source fields used by grouping even if another writer
-                // changes them without updating the QSO revision.
-                const QByteArray identity = QJsonDocument(QJsonArray{q.value(3).toString(), QString::number(q.value(4).toLongLong()),
-                    q.value(0).toString(), q.value(1).toString(), q.value(5).toString()}).toJson(QJsonDocument::Compact);
                 hashes[key] = QCryptographicHash::hash(hashes.value(key) + identity, QCryptographicHash::Sha256);
                 if (selectedIds && key == selectedKey) selectedIds->append(q.value(2).toLongLong());
             }
