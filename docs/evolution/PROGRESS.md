@@ -2775,3 +2775,11 @@ The CQ WW reader now rejects malformed `Call:` or `Contest:` lines in the header
 A/B on macOS arm64 / Qt 6.11.2: a synthetic report with a valid call followed by `Call: K2XYZ?` was previously accepted and is now rejected; a malformed contest line is also rejected. A similar unknown line in the body is retained as unrecognized, and consistent repeated headers still pass. App and test targets built; CTest contestreport, database, activation and qmlpopups passed 4/4.
 
 Only the existing recognized header labels and first-section boundary are checked; malformed alternatives or report formats outside the supported reader remain unsupported. No additional official LCR, physical UI, Windows/Linux or real contest was exercised. G10/G13 acceptance remains open.
+
+## 2026-11-24 — G10 public CQ WW report identity checks
+
+Revalidated the recent CQ WW identity-header guards against the public [2024 CW 4O4A report](https://cqww.com/publiclcr/2024cw/4o4a.rpt), freshly downloaded to a temporary file with SHA-256 `04e9886a875f77f0b84d9b3d58f228eb4c9500b99803f7f4af89697164447ad9`. The optional fixture confirms the original report remains accepted, with 14 NIL, 20 incorrect calls and 6 incorrect exchanges as previously checked against its summary.
+
+A/B on macOS arm64 / Qt 6.11.2: the unchanged official sample passes, while synthetic conflicting and malformed callsign headers prepended to the same bytes are rejected. The optional `CQWW_LCR_SAMPLE` test passed on the freshly downloaded file; CTest contestcomparison, contestreport, database and activation passed 4/4. The external report is not stored in the repository and no production behavior changed.
+
+This confirms one public report and two synthetic mutations, not all CQ WW editions, official report variants or other LCR formats. Desktop interaction, Windows/Linux, real contest operations and full G10/G13 acceptance remain open.

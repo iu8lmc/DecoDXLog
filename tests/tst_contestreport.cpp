@@ -137,11 +137,13 @@ private slots:
     {
         const QString path=qEnvironmentVariable("CQWW_LCR_SAMPLE");
         if (path.isEmpty()) QSKIP("Optional public CQ WW sample not provided");
-        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const auto report=contestreport::parseCqWw(file.readAll());
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const QByteArray bytes=file.readAll(); const auto report=contestreport::parseCqWw(bytes);
         QVERIFY2(report.error.isEmpty(),qPrintable(report.error)); QCOMPARE(report.ownCall,QString("4O4A"));
         int nil=0, calls=0, exchange=0;
         for (const auto& entry : report.entries) { if (entry.kind=="not_in_log") ++nil; else if (entry.kind=="incorrect_call") ++calls; else if (entry.kind=="incorrect_exchange") ++exchange; }
         QCOMPARE(nil,14); QCOMPARE(calls,20); QCOMPARE(exchange,6); QCOMPARE(report.unrecognizedLines.size(),0);
+        QVERIFY(!contestreport::parseCqWw("Call: K1ZZZ\n"+bytes).error.isEmpty());
+        QVERIFY(!contestreport::parseCqWw("Call: K1ZZZ?\n"+bytes).error.isEmpty());
     }
     void acceptsExplicitIncorrectCallWithoutInventingCorrection()
     {
