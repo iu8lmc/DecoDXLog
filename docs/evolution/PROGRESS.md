@@ -2695,3 +2695,11 @@ Extended the file-backed POTA fixture with a synthetic legacy-style QSO whose st
 A/B on macOS arm64 / Qt 6.11.2: temporarily reading only structured columns made the preview report three cases instead of four and the test failed. Restoring extra-field precedence gave four cases and the exported-record assertions passed. CTest activation, database, migration and qmlpopups passed 4/4. The test target was rebuilt after restoration.
 
 The fixture directly injects the override into a synthetic database; it does not establish how frequently external imports produce it or cover every override field and malformed value. Live POTA, physical UI, Windows/Linux and full G06/G13 acceptance remain unverified.
+
+## 2026-11-24 — G06 locate POTA correspondent reviews
+
+The activation preview now lists up to 200 distinct QSO whose correspondent POTA fields need review, with call, timestamp and an Open QSO action. It reports how many additional contacts were omitted, displays 100 per page and uses the existing log/UUID/revision check before opening. A QSO belonging to several operator parks appears once in the list, while group counts remain per park. The review remains advisory and does not modify contacts or block export. Italian text was added.
+
+A/B on macOS arm64 / Qt 6.11.2: the synthetic fixture previously returned no review rows despite four flagged QSO; it now returns their identities and retains the expected exported ADIF. An offscreen app fixture displayed the expected K1ABC review row. App and test targets built; CTest activation, database, migration and qmlpopups passed 4/4.
+
+The new action reuses the existing guarded opening function but its button was not independently clicked in the POTA fixture; the existing excluded-QSO workflow has separate stale-record tests. The 200-row bound and omission counter have not been load-tested here, and omitted QSO cannot yet be paged from the database. Physical UI, live POTA, Windows/Linux and full G06/G13 acceptance remain open.

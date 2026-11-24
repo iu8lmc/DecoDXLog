@@ -145,6 +145,10 @@
 </context>
 <context>
     <name>ActivationDialog</name>
+    <message><source>POTA correspondent references to review (up to 200 shown; %1 omitted). Open a QSO to inspect its fields.</source><translation>Referenze POTA del corrispondente da verificare (massimo 200 mostrate; %1 omesse). Apri un QSO per esaminarne i campi.</translation></message>
+    <message><source>POTA review QSO #%1 · %2 · %3</source><translation>QSO POTA da verificare #%1 · %2 · %3</translation></message>
+    <message><source>Previous review QSO</source><translation>QSO da verificare precedenti</translation></message>
+    <message><source>Next review QSO</source><translation>QSO da verificare successivi</translation></message>
     <message>
       <source> · correspondent park needs review: %1 QSO</source>
       <translation> · parco del corrispondente da verificare: %1 QSO</translation>

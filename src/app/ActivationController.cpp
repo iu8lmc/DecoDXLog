@@ -821,7 +821,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     if (!q.exec()) return fail(tr("Cannot read the session QSO."));
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
-    QVariantList excluded;
+    QVariantList excluded, potaCorrespondentRows;
+    int potaCorrespondentOmitted = 0;
     const auto exclude = [&](const QString& reason) {
         if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
             {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
@@ -859,7 +860,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
         if (stream.status()!=QDataStream::Ok)
             return fail(tr("Cannot fingerprint the session QSO."));
         const QByteArray identity=QCryptographicHash::hash(recordBytes,QCryptographicHash::Sha256);
-        bool found = false;
+        bool found = false, potaReviewRecorded = false;
         for (const auto& pair : fields) {
             QSet<QString> seen;
             for (const QString& item : extra.value(pair.second).toString().split(QLatin1Char(','), Qt::SkipEmptyParts)) {
@@ -887,8 +888,16 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                         && Activation::normalizePrograms({{QStringLiteral("pota"), other}}, &normalized);
                     const bool explicitMatch = sig == QLatin1String("POTA")
                         && sigInfo == other.section(QLatin1Char('@'), 0, 0);
-                    if (!other.isEmpty() && (!singleValid || ((!sig.isEmpty() || !sigInfo.isEmpty()) && !explicitMatch)))
+                    if (!other.isEmpty() && (!singleValid || ((!sig.isEmpty() || !sigInfo.isEmpty()) && !explicitMatch))) {
                         groups[key][QStringLiteral("potaCorrespondentReview")] = groups[key].value(QStringLiteral("potaCorrespondentReview")).toInt() + 1;
+                        if (!selectedIds && !potaReviewRecorded) {
+                            potaReviewRecorded = true;
+                            if (potaCorrespondentRows.size() < 200)
+                                potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
+                                    {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)}};
+                            else ++potaCorrespondentOmitted;
+                        }
+                    }
                 }
                 if (stationCall.isEmpty()) groups[key][QStringLiteral("missingStationCall")] = groups[key].value(QStringLiteral("missingStationCall")).toInt() + 1;
                 if (op.isEmpty()) groups[key][QStringLiteral("missingOperator")] = groups[key].value(QStringLiteral("missingOperator")).toInt() + 1;
@@ -954,6 +963,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
     result[QStringLiteral("uncertainPeriod")] = uncertainPeriod;
     result[QStringLiteral("excluded")] = excluded;
+    result[QStringLiteral("potaCorrespondentRows")] = potaCorrespondentRows;
+    result[QStringLiteral("potaCorrespondentOmitted")] = potaCorrespondentOmitted;
     if (ownsTransaction && !db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;
     return result;
