@@ -1432,6 +1432,17 @@ private slots:
         QVERIFY2(output.contains("PROBE stale cost opened true") && output.contains("PROBE stale cost save true") && output.contains("PROBE stale cost clear true") && (output.contains("The reviewed log or plan changed") || output.contains("Il log o il piano verificato")),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto cost=qslplanner::routeCost(db,"M0ABC","B"); QVERIFY(cost); QCOMPARE(cost->amount,QString("9.99"));
     }
+    void qslPlannerDesktopReportsMissingProvenance()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"QSL_VIA","M0ABC"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE qso_enrichment")); }
+        QByteArray output; QVERIFY2(launch(dir,"qslplanerrorprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE qsl plan error status Cannot read QSL route provenance while planning:") && output.contains("visible=true candidates=0"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+    }
     void qslPlannerDesktopShowsBenefitsAndInvalidation()
     {
         using namespace decolog::core;

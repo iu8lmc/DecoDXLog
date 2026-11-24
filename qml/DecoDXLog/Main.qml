@@ -1319,6 +1319,7 @@ RoundedWindow {
         else if (what[0] === "historical") historicalQsoDialog.open()
         else if (what[0] === "importguideprobe") Qt.callLater(() => importSourceGuide.probe())
         else if (what[0] === "qslplanprobe") Qt.callLater(() => awardsDialog.probeQslPlan())
+        else if (what[0] === "qslplanerrorprobe") Qt.callLater(() => awardsDialog.probeQslPlanError())
         else if (what[0] === "clusterraceprobe") clusterRaceStart.start()
         else if (what[0] === "qslstalecostprobe") Qt.callLater(() => awardsDialog.probeQslStaleCost())
         else if (what[0] === "qslcostfileprobe") Qt.callLater(() => awardsDialog.probeQslCostFile())

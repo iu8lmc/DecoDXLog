@@ -3107,3 +3107,11 @@ The QSL planner now checks whether enrichment history can be read before attribu
 A/B on macOS arm64 / Qt 6.11.2: a synthetic QSO with a manager produced a normal plan; after removing the enrichment table, the previous planner silently returned a plan and the new test failed. The checked planner now reports an error and returns no candidates. App and test targets built; CTest database, awards, qslplanner and qmlpopups passed 4/4. An offscreen desktop fixture also passed the normal planning, route-source, queue and invalidation flow. An initial desktop command used an incorrect executable path; the corrected command passed.
 
 The injected database failure was tested at core level, not through the actual desktop dialog. Other callers of the unchecked enrichment API retain their previous behavior. The tests use synthetic data; physical UI, Windows/Linux and full G03/G13 acceptance remain open.
+
+## 2026-11-24 — G03 desktop provenance-error A/B
+
+An offscreen desktop integration fixture now opens the QSL planner against an isolated synthetic log with the enrichment table removed and inspects the visible status and candidate count. This closes the desktop fault-injection gap identified above.
+
+A/B on macOS arm64 / Qt 6.11.2: with the previous planner core, the actual dialog showed one potential benefit and one candidate despite the missing table. With the checked core, the visible status reports that route provenance cannot be read and there are no candidates. The initial A run timed out before the diagnostic probe printed; after shortening its bounded wait the A result was observed, then the fixed core was restored, rebuilt and passed. CTest qslplanner and qmlpopups passed 2/2; git diff --check passed.
+
+The test uses synthetic data and programmatic offscreen interaction; it does not exercise physical UI, Windows/Linux or actual QSL services. Other unchecked enrichment callers and full G03/G13 acceptance remain open.

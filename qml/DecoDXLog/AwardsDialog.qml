@@ -187,6 +187,12 @@ DialogFrame {
         console.warn("PROBE qslaccounts " + JSON.stringify({firstInitial:firstInitial,first:first,secondInitial:secondInitial,second:second,back:plannerGoals,error:plannerSaveError,label:plannerAccountLabel.text,options:accountPicker.accountOptions,field:accountInput.text,manual:manual}))
     }
     function probeQslPlan() { openAt("dxcc"); plannerProbeStart.start() }
+    function probeQslPlanError() { openAt("dxcc"); plannerErrorStart.start() }
+    Timer { id: plannerErrorStart; interval: 1000
+        onTriggered: { openPlannerButton.clicked(); plannerRefresh.stop(); root.plannerGoals=["dxcc"]; root.plannerSelectionDirty=false; decolog.buildQslPlan(root.plannerGoals); plannerErrorReady.start() } }
+    Timer { id: plannerErrorReady; interval: 100; repeat: true; property int tries: 0
+        onTriggered: { if ((decolog.qslPlanBusy || !decolog.qslPlan.error) && ++tries<20) return
+            stop(); console.warn("PROBE qsl plan error status " + qslPlanStatus.text + " visible=" + qslPlanStatus.visible + " candidates=" + (decolog.qslPlan.candidates || []).length) } }
     function probeQslStaleCost() { openAt("dxcc"); staleCostStart.start() }
     property bool costFileProbe: false
     function probeQslCostFile() { costFileProbe=true; openAt("dxcc"); staleCostStart.start() }
