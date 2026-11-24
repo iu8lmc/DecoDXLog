@@ -2625,3 +2625,11 @@ PDF exports of custom reports now label the day and hour dimensions `UTC day` an
 A/B on macOS arm64 / Qt 6.11.2: the generated PDF before the change had the correct rows but the new UTC-heading assertion failed. Afterwards it shows 2026-12-31 23 with two QSO (one stored +02:00, one Z) and 10 with one QSO, under explicit UTC headings. CTest activityreport, activity_power_pdf and activity_utc_pdf passed 3/3. A final PDF page was rendered with pdftoppm and visually inspected: both rows and headings are legible on one landscape page. The application and focused target built; git diff --check passed.
 
 The probe uses synthetic records and programmatic UI calls; it does not establish physical interaction, multi-page layout, every locale or Windows/Linux behavior. PDF headings remain English as in the existing renderer. G07 and integrated desktop acceptance remain open.
+
+## 2026-11-24 — G07 multi-page UTC report PDF
+
+Expanded the actual-app UTC report PDF fixture from its previous two-row, one-page scenario to include 120 additional synthetic daily groups. The resulting six-page PDF is parsed with pdftotext: every added group appears exactly once and each page repeats the UTC day/hour headings. The two offset-versus-Z contacts still group together as before. A rendered second page was visually inspected and showed legible rows, repeated headings and page number.
+
+A/B on macOS arm64 / Qt 6.11.2 compares the earlier one-page/two-group fixture with the expanded six-page/122-group output; it is a dataset comparison, not a production-code change. CTest activityreport, activity_power_pdf and activity_utc_pdf passed 3/3. The fixture invokes the real app programmatically with synthetic local data; git diff --check passed.
+
+This checks one grouping layout and one intermediate page visually, not every page, all dimension combinations, large cell contents, locales, physical interaction or Windows/Linux. No real log or service was used. Remaining G07 and integrated desktop acceptance stay open.
