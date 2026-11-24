@@ -34,7 +34,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 35;
+constexpr int kSchemaVersion = 36;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -108,6 +108,46 @@ private slots:
         QVERIFY(!db.extensionEventsAfter(identity,-1,2).ok); QVERIFY(!db.extensionEventsAfter(identity,0,0).ok); QVERIFY(!db.extensionEventsAfter(identity,0,501).ok);
     }
 
+    void extensionEventRetentionReportsGapsAndFutureCursors()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("retention.sqlite")));
+        const QString identity=db.identity(); QSqlQuery q(db.connection());
+        QVERIFY(q.exec("INSERT INTO extension_qso_event(sequence,qso_uuid,revision,kind,recorded_at) VALUES(1,'old',1,'added','2026-01-01T00:00:00Z')"));
+        QVERIFY(q.exec("INSERT INTO extension_qso_event(sequence,qso_uuid,revision,kind,recorded_at) VALUES(100002,'new',1,'added','2026-01-01T00:00:00Z')"));
+        const auto gap=db.extensionEventsAfter(identity,0,10); QVERIFY(!gap.ok); QVERIFY(gap.gap); QCOMPARE(gap.prunedThrough,qint64(1));
+        const auto page=db.extensionEventsAfter(identity,1,10); QVERIFY(page.ok); QCOMPARE(page.events.size(),1); QCOMPARE(page.events.first().sequence,qint64(100002));
+        const auto ahead=db.extensionEventsAfter(identity,100003,10); QVERIFY(!ahead.ok); QVERIFY(ahead.cursorAhead); QCOMPARE(ahead.highWatermark,qint64(100002));
+        QVERIFY(db.connection().transaction());
+        QVERIFY(q.exec("INSERT INTO extension_qso_event(sequence,qso_uuid,revision,kind,recorded_at) VALUES(200003,'rollback',1,'added','2026-01-01T00:00:00Z')"));
+        QVERIFY(db.connection().rollback());
+        const auto again=db.extensionEventsAfter(identity,1,10); QVERIFY(again.ok); QCOMPARE(again.events.first().sequence,qint64(100002));
+    }
+
+    void extensionEventRetentionBoundsRealHistory()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("bounded.sqlite"))); QSqlQuery q(db.connection());
+        QVERIFY(db.connection().transaction());
+        QVERIFY2(q.exec("WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<100005) INSERT INTO extension_qso_event(qso_uuid,revision,kind,recorded_at) SELECT 'fixture',1,'added','2026-01-01T00:00:00Z' FROM n"),qPrintable(q.lastError().text()));
+        QVERIFY(db.connection().commit());
+        QVERIFY(q.exec("SELECT COUNT(*),MIN(sequence),MAX(sequence) FROM extension_qso_event")); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(),100000); QCOMPARE(q.value(1).toLongLong(),qint64(6)); QCOMPARE(q.value(2).toLongLong(),qint64(100005));
+        const auto gap=db.extensionEventsAfter(db.identity(),0,1); QVERIFY(gap.gap); QCOMPARE(gap.prunedThrough,qint64(5));
+        const auto first=db.extensionEventsAfter(db.identity(),5,1); QVERIFY(first.ok); QCOMPARE(first.events.first().sequence,qint64(6));
+    }
+
+    void extensionEventRetentionMigrationPreservesCursorBoundary()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("schema35.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection());
+          QVERIFY(q.exec("DROP TRIGGER extension_qso_event_retention")); QVERIFY(q.exec("DROP TABLE extension_qso_event_state"));
+          QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=36"));
+          QVERIFY(q.exec("INSERT INTO extension_qso_event(sequence,qso_uuid,revision,kind,recorded_at) VALUES(1,'old',1,'added','2026-01-01T00:00:00Z')"));
+          QVERIFY(q.exec("INSERT INTO extension_qso_event(sequence,qso_uuid,revision,kind,recorded_at) VALUES(100002,'new',1,'added','2026-01-01T00:00:00Z')")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion);
+          const auto gap=db.extensionEventsAfter(db.identity(),0,2); QVERIFY(gap.gap); QCOMPARE(gap.prunedThrough,qint64(1)); QCOMPARE(gap.highWatermark,qint64(100002));
+          const auto page=db.extensionEventsAfter(db.identity(),1,2); QVERIFY(page.ok); QCOMPARE(page.events.size(),1); QCOMPARE(page.events.first().qsoUuid,QStringLiteral("new")); }
+    }
+
     void extensionEventInsertBenchmark()
     {
         if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_EXTENSION_EVENTS")) QSKIP("opt-in synthetic event benchmark");
@@ -134,7 +174,7 @@ private slots:
           QSqlQuery q(db.connection());
           for (const QString& name : {QStringLiteral("extension_qso_insert"),QStringLiteral("extension_qso_update"),QStringLiteral("extension_qso_delete"),QStringLiteral("extension_qsl_insert"),QStringLiteral("extension_qsl_update")})
               QVERIFY2(q.exec("DROP TRIGGER " + name),qPrintable(q.lastError().text()));
-          QVERIFY(q.exec("DROP TABLE extension_qso_event")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=35")); }
+          QVERIFY(q.exec("DROP TABLE extension_qso_event")); QVERIFY(q.exec("DROP TABLE extension_qso_event_state")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=35")); }
         { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),qint64(1));
           QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0); }
     }

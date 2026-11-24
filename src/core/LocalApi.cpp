@@ -27,6 +27,7 @@ QByteArray reason(int status)
     case 404: return "Not Found";
     case 405: return "Method Not Allowed";
     case 409: return "Conflict";
+    case 410: return "Gone";
     case 413: return "Payload Too Large";
     case 503: return "Service Unavailable";
     default: return "Error";

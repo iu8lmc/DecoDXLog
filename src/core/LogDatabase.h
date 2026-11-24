@@ -49,6 +49,10 @@ struct ExtensionQsoEvent {
 struct ExtensionQsoEventPage {
     bool ok{false};
     bool hasMore{false};
+    bool gap{false};
+    bool cursorAhead{false};
+    qint64 prunedThrough{0};
+    qint64 highWatermark{0};
     QList<ExtensionQsoEvent> events;
     QString error;
 };

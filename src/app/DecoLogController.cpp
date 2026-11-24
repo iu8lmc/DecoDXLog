@@ -4268,6 +4268,10 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
             return HttpResponse::error(400, QStringLiteral("invalid event cursor, log or limit"));
         if (!m_db.fileIdentityMatchesOpen() || m_db.identity()!=expected) return HttpResponse::error(409, QStringLiteral("event log changed"));
         const auto page=m_db.extensionEventsAfter(expected,after,limit);
+        if (page.gap) return HttpResponse::json(410, QJsonObject{{QStringLiteral("error"),QStringLiteral("event history pruned")},
+            {QStringLiteral("prunedThrough"),QString::number(page.prunedThrough)}, {QStringLiteral("highWatermark"),QString::number(page.highWatermark)}});
+        if (page.cursorAhead) return HttpResponse::json(409, QJsonObject{{QStringLiteral("error"),QStringLiteral("event cursor ahead")},
+            {QStringLiteral("highWatermark"),QString::number(page.highWatermark)}});
         if (!page.ok) return HttpResponse::error(503, QStringLiteral("event journal unavailable or log changed"));
         QJsonArray events;
         for (const auto& event : page.events) {

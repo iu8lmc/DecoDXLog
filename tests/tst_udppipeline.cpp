@@ -751,6 +751,32 @@ private slots:
         QCOMPARE(request("POST",path,eventToken).first,403);
     }
 
+    void scopedQsoEventsReportRetentionGap()
+    {
+        {
+            QSqlDatabase writer=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),QStringLiteral("event-retention")); writer.setDatabaseName(m_db); QVERIFY(writer.open()); QSqlQuery q(writer);
+            QVERIFY(q.exec("INSERT INTO extension_qso_event(qso_uuid,revision,kind,recorded_at) VALUES('retention-anchor',1,'added','2026-01-01T00:00:00Z')"));
+            QVERIFY(q.exec("SELECT high_watermark FROM extension_qso_event_state WHERE id=1")); QVERIFY(q.next()); const qint64 next=q.value(0).toLongLong()+100001;
+            QVERIFY(q.exec("INSERT INTO extension_qso_event(sequence,qso_uuid,revision,kind,recorded_at) VALUES("+QString::number(next)+",'retention-fixture',1,'added','2026-01-01T00:00:00Z')"));
+            writer.close();
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("event-retention"));
+        QNetworkAccessManager net;
+        auto get=[&](const QString& path) {
+            QNetworkRequest r(QUrl(QStringLiteral("http://127.0.0.1:%1%2").arg(m_apiPort).arg(path)));
+            r.setRawHeader("X-DecoDXLog-Token", "22222222222222222222222222222222");
+            QNetworkReply* reply=net.get(r); QSignalSpy done(reply,&QNetworkReply::finished); done.wait(5000);
+            const int status=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(); const auto json=QJsonDocument::fromJson(reply->readAll()).object(); reply->deleteLater(); return std::pair{status,json};
+        };
+        const auto caps=get(QStringLiteral("/api/v1/capabilities")); QCOMPARE(caps.first,200);
+        const QString log=caps.second.value("eventLogIdentity").toString(); QVERIFY(!log.isEmpty());
+        const auto gap=get(QStringLiteral("/api/v1/events?log=%1&after=0").arg(log)); QCOMPARE(gap.first,410);
+        const QString floor=gap.second.value("prunedThrough").toString(); QVERIFY(floor.toLongLong()>0);
+        const auto recovered=get(QStringLiteral("/api/v1/events?log=%1&after=%2").arg(log,floor)); QCOMPARE(recovered.first,200);
+        const auto ahead=get(QStringLiteral("/api/v1/events?log=%1&after=9223372036854775807").arg(log)); QCOMPARE(ahead.first,409);
+        QVERIFY(!ahead.second.value("highWatermark").toString().isEmpty());
+    }
+
     void scopedExtensionReadsThroughApplication()
     {
         QNetworkAccessManager net;

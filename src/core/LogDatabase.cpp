@@ -592,6 +592,13 @@ bool LogDatabase::migrate()
               QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qsl_update AFTER UPDATE OF qso_id,service,rcvd ON qsl_status "
               "WHEN NEW.rcvd='Y' AND (OLD.rcvd IS NOT 'Y' OR OLD.qso_id IS NOT NEW.qso_id OR OLD.service IS NOT NEW.service) BEGIN "
               "INSERT INTO extension_qso_event(qso_uuid,revision,kind,service,recorded_at) SELECT uuid,revision,'confirmed',NEW.service,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=NEW.qso_id AND deleted=0; END")}, nullptr},
+        {36, {QStringLiteral("CREATE TABLE IF NOT EXISTS extension_qso_event_state (id INTEGER PRIMARY KEY CHECK(id=1), pruned_through INTEGER NOT NULL, high_watermark INTEGER NOT NULL)"),
+              QStringLiteral("INSERT OR IGNORE INTO extension_qso_event_state(id,pruned_through,high_watermark) "
+              "SELECT 1,coalesce((SELECT max(sequence) FROM extension_qso_event WHERE sequence<=coalesce((SELECT seq FROM sqlite_sequence WHERE name='extension_qso_event'),0)-100000),0),coalesce((SELECT seq FROM sqlite_sequence WHERE name='extension_qso_event'),0)"),
+              QStringLiteral("DELETE FROM extension_qso_event WHERE sequence<=(SELECT high_watermark-100000 FROM extension_qso_event_state WHERE id=1)"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qso_event_retention AFTER INSERT ON extension_qso_event BEGIN "
+              "UPDATE extension_qso_event_state SET high_watermark=NEW.sequence, pruned_through=max(pruned_through,coalesce((SELECT max(sequence) FROM extension_qso_event WHERE sequence<=NEW.sequence-100000),0)) WHERE id=1; "
+              "DELETE FROM extension_qso_event WHERE sequence<=NEW.sequence-100000; END")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1459,16 +1466,24 @@ ExtensionQsoEventPage LogDatabase::extensionEventsAfter(const QString& logIdenti
     if (logIdentity.isEmpty() || sequence<0 || limit<1 || limit>500) { page.error=QStringLiteral("invalid event cursor or page size"); return page; }
     if (!fileIdentityMatchesOpen() || identity()!=logIdentity) { page.error=QStringLiteral("log changed"); return page; }
     QSqlQuery q(connection());
-    q.prepare(QStringLiteral("SELECT sequence,qso_uuid,previous_qso_uuid,revision,kind,service,recorded_at FROM extension_qso_event WHERE sequence>? ORDER BY sequence LIMIT ?"));
+    q.prepare(QStringLiteral("SELECT s.pruned_through,s.high_watermark,e.sequence,e.qso_uuid,e.previous_qso_uuid,e.revision,e.kind,e.service,e.recorded_at "
+                             "FROM extension_qso_event_state s LEFT JOIN extension_qso_event e ON e.sequence>? WHERE s.id=1 ORDER BY e.sequence LIMIT ?"));
     q.addBindValue(sequence); q.addBindValue(limit+1);
     if (!q.exec()) { page.error=q.lastError().text(); return page; }
+    bool stateSeen=false;
     while (q.next()) {
+        if (!stateSeen) {
+            stateSeen=true; page.prunedThrough=q.value(0).toLongLong(); page.highWatermark=q.value(1).toLongLong();
+            if (sequence<page.prunedThrough) { page.gap=true; page.error=QStringLiteral("event history pruned"); break; }
+            if (sequence>page.highWatermark) { page.cursorAhead=true; page.error=QStringLiteral("event cursor ahead"); break; }
+        }
+        if (q.value(2).isNull()) continue;
         if (page.events.size()==limit) { page.hasMore=true; break; }
-        page.events.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toInt(),q.value(4).toString(),q.value(5).toString(),q.value(6).toString()});
+        page.events.append({q.value(2).toLongLong(),q.value(3).toString(),q.value(4).toString(),q.value(5).toInt(),q.value(6).toString(),q.value(7).toString(),q.value(8).toString()});
     }
-    if (q.lastError().isValid()) { page.events.clear(); page.error=q.lastError().text(); return page; }
-    if (!fileIdentityMatchesOpen() || identity()!=logIdentity) { page.events.clear(); page.error=QStringLiteral("log changed"); return page; }
-    page.ok=true;
+    if (!stateSeen || q.lastError().isValid()) { page.events.clear(); page.error=QStringLiteral("event journal unavailable"); return page; }
+    if (!fileIdentityMatchesOpen() || identity()!=logIdentity) { page.events.clear(); page.gap=false; page.cursorAhead=false; page.error=QStringLiteral("log changed"); return page; }
+    page.ok=!page.gap && !page.cursorAhead;
     return page;
 }
 
