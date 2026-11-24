@@ -24,6 +24,8 @@ The detached increment now includes a 50-row paged read-only history dialog, bou
 
 No restore action is provided; revisions created before this increment cannot be recovered, the stored history is unbounded, and the view does not prove all filesystem replacement races, physical interaction, concurrent writers, migrations or cross-platform behaviour. The work remains in the detached worktree and is not accepted as G04 completion.
 
+Follow-up synthetic checks used two database connections to reject a stale update without adding a spurious revision, injected failure after history insertion to verify rollback of both history and campaign, then retried successfully. A 55-revision fixture checked the 50-row boundary and rejected a corrupt stored revision. The controller now checks the open-log context both before and after reading history. The focused fixtures, offscreen app history display and the dxcampaign, dxcalendar and qmlpopups groups passed again on macOS arm64; these checks do not cover simultaneous process crashes or every external writer.
+
 ## 2026-11-24 — G01 incoming QSO during bulk tag and delete
 
 An offscreen 20,000-QSO tag operation with a synthetic WSJT-X LoggedADIF packet exposed a separate contention failure: before the change the incoming QSO was saved but 200 tag changes failed with `database is locked` (19,800 applied). The shared mutation batch engine now reserves the SQLite writer with `BEGIN IMMEDIATE` before its reads; the background tag/delete worker also yields between committed batches while the application's incoming-QSO insert is active. The reservation applies to other users of the shared engine, but their priority behaviour has not been separately tested.

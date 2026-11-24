@@ -14,6 +14,34 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void campaignHistoryPagesAndRejectsCorruptRows()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c; c.title="Pages"; c.calls={"3Y0J"};
+        c.start=QDate(2026,1,1); c.end=c.start; c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate);
+        c.bands={"20m"}; c.modes={"CW"}; QString error; QVERIFY(dxcampaign::save(db,c,&error));
+        for (int i=0;i<55;++i) { c.title=QString("Page %1").arg(i); QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
+        const auto first=dxcampaign::history(db,c.id,c.revision,51,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(first.size(),51); QCOMPARE(first.first().revision,55); QCOMPARE(first.last().revision,5);
+        const auto second=dxcampaign::history(db,c.id,first.at(49).revision,51,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(second.size(),5); QCOMPARE(second.first().revision,5); QCOMPARE(second.last().revision,1);
+        QSqlQuery q(db.connection()); q.prepare("UPDATE app_setting SET value='broken' WHERE key=?"); q.addBindValue("dx_campaign_revision."+c.id+".1"); QVERIFY(q.exec());
+        QVERIFY(dxcampaign::history(db,c.id,5,51,&error).isEmpty()); QVERIFY(!error.isEmpty());
+    }
+    void campaignHistoryRejectsStaleAndRollsBackFailedUpdate()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("concurrent.sqlite");
+        LogDatabase first,second; QVERIFY(first.open(path)); QVERIFY(second.open(path)); dxcampaign::Campaign c;
+        c.title="Concurrent"; c.calls={"3Y0J"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,3); c.source="fixture";
+        c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; QString error;
+        QVERIFY2(dxcampaign::save(first,c,&error),qPrintable(error)); auto stale=*dxcampaign::load(second,c.id);
+        c.end=QDate(2026,1,8); QVERIFY2(dxcampaign::save(first,c,&error),qPrintable(error));
+        stale.calls << "3Y0K"; QVERIFY(!dxcampaign::save(second,stale,&error)); QCOMPARE(stale.revision,1);
+        auto page=dxcampaign::history(second,c.id,3,10,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(page.size(),1); QCOMPARE(page.first().end,QDate(2026,1,3));
+        QSqlQuery q(first.connection()); QVERIFY(q.exec("CREATE TRIGGER reject_campaign_update BEFORE UPDATE ON app_setting WHEN NEW.key LIKE 'dx_campaign.%' BEGIN SELECT RAISE(ABORT,'update fault'); END"));
+        c.end=QDate(2026,1,10); QVERIFY(!dxcampaign::save(first,c,&error)); QCOMPARE(c.revision,2);
+        page=dxcampaign::history(second,c.id,3,10,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(page.size(),1);
+        const auto saved=dxcampaign::load(second,c.id); QVERIFY(saved); QCOMPARE(saved->end,QDate(2026,1,8)); QCOMPARE(saved->revision,2);
+        QVERIFY(q.exec("DROP TRIGGER reject_campaign_update")); QVERIFY2(dxcampaign::save(first,c,&error),qPrintable(error));
+        page=dxcampaign::history(second,c.id,4,10,&error); QCOMPARE(page.size(),2); QCOMPARE(page.first().end,QDate(2026,1,8));
+    }
     void campaignRevisionsSurviveUpdatesAndRestart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("history.sqlite"); QString id;

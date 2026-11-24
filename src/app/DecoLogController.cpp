@@ -2545,6 +2545,7 @@ QVariantMap DecoLogController::dxCampaignHistory(const QString& id,int beforeRev
     if (context.isEmpty() || context!=dxCampaignReviewContext()) return {{QStringLiteral("error"),tr("The log changed; reopen the campaign review.")}};
     QString error; const auto records=dxcampaign::history(m_db,id,beforeRevision,51,&error);
     if (!error.isEmpty()) return {{QStringLiteral("error"),error}};
+    if (context!=dxCampaignReviewContext()) return {{QStringLiteral("error"),tr("The log changed; reopen the campaign review.")}};
     QVariantList rows; for (int i=0;i<qMin(50,int(records.size()));++i) rows << campaignMap(records.at(i));
     return {{QStringLiteral("rows"),rows},{QStringLiteral("hasMore"),records.size()>50}};
 }
