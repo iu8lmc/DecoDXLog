@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QByteArray>
 #include <QThreadPool>
 #include <QUrl>
 #include <QVariantList>
@@ -59,10 +60,15 @@ class RadioNet : public QObject {
 
   private:
     bool active() const;
+    bool selectedSessionCurrent() const;
+    void bindSession(qint64 id,const QString &uuid);
     bool fail(const QString &message);
     bool appendEvent(qint64 memberId, const QString &kind, const QString &detail = {});
     LogDatabase *m_db;
     qint64 m_sessionId{0};
+    quint64 m_sessionGeneration{0};
+    QString m_sessionUuid, m_sessionLogPath, m_sessionLogIdentity;
+    QByteArray m_sessionFileIdentity;
     QString m_error;
     QThreadPool m_exportPool;
     bool m_exportBusy{false};

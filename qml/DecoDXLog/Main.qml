@@ -1421,6 +1421,9 @@ RoundedWindow {
         else if (what[0] === "qslocrrevisions") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrRevisions()) }
         else if (what[0] === "qslocrhistory") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.showOcrHistory()) }
         else if (what[0] === "radioneterrorprobe") { netReminderErrorProbe.start() }
+        else if (what[0] === "radionetreplacedprobe") {
+            radioNetDialog.open(); console.warn("PROBE radionetreplaced ready " + decolog.radioNet.selectSession(1)); radioNetReplacedProbe.start()
+        }
         else if (what[0] === "radionetotherreminderprobe") {
             decolog.radioNet.start("First reminder", 0)
             netOtherReminderProbe.expectedSession = decolog.radioNet.session.id
@@ -2160,6 +2163,10 @@ RoundedWindow {
         interval: 1800
         onTriggered: radioNetDialog.probeOtherReminder(expectedSession)
     }
+    Timer { id:radioNetReplacedProbe; interval:2500; onTriggered: {
+        const accepted=decolog.radioNet.checkIn("K1ABC","Alice","")
+        console.warn("PROBE radionetreplaced result " + JSON.stringify({accepted:accepted,session:decolog.radioNet.session,sessions:decolog.radioNet.sessions.length,reminderError:!!decolog.radioNet.reminderOverview.error}))
+    } }
     Timer {
         id: netReminderProbe
         property var expectedSession: 0

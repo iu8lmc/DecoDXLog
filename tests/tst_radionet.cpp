@@ -21,6 +21,36 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void replacedLogFileRejectsRadioNetActions()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Open file replacement fixture is currently tested on Unix only");
+#else
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("log.sqlite"),copy=dir.filePath("copy.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); RadioNet net(&db); QVERIFY(net.start("Net"));
+        db.close(); QVERIFY(QFile::copy(path,copy)); QVERIFY(db.open(path)); net.load(); QVERIFY(!net.session().isEmpty());
+        QVERIFY(QFile::rename(path,dir.filePath("original.sqlite"))); QVERIFY(QFile::copy(copy,path));
+        QVERIFY(net.session().isEmpty()); QVERIFY(net.sessions().isEmpty()); QVERIFY(!net.checkIn("K1ABC","Alice",{})); QVERIFY(!net.start("Other"));
+        QVERIFY(!net.reminderOverview().value("error").toString().isEmpty()); QCOMPARE(db.qsoCount(),qint64(0));
+#endif
+    }
+    void staleSelectionCannotMutateDifferentLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto pathA=dir.filePath("a.sqlite"),pathB=dir.filePath("b.sqlite");
+        { LogDatabase b; QVERIFY(b.open(pathB)); RadioNet netB(&b); QVERIFY(netB.start("Net B")); QCOMPARE(netB.session().value("id").toLongLong(),qint64(1)); }
+        LogDatabase db; QVERIFY(db.open(pathA)); RadioNet net(&db); QVERIFY(net.start("Net A")); QCOMPARE(net.session().value("id").toLongLong(),qint64(1));
+        db.close(); QVERIFY(db.open(pathB));
+        QVERIFY2(!net.checkIn("K1ABC","Alice",{}),"A stale session ID must not add a member to another log");
+        QVERIFY(!net.clearReminder()); QVERIFY(!net.closeSession()); QVERIFY(!net.reopenSession());
+        QVERIFY(net.session().isEmpty()); QVERIFY(net.members().isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM radio_net_member")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        QVERIFY(net.selectSession(1)); QCOMPARE(net.session().value("title").toString(),QString("Net B")); QVERIFY(net.checkIn("K1ABC","Alice",{}));
+        db.close(); QVERIFY(db.open(pathB)); QVERIFY(!net.checkIn("K2ABC","Bob",{})); QVERIFY(net.session().isEmpty());
+        QVERIFY(net.selectSession(1)); QVERIFY(net.checkIn("K2ABC","Bob",{})); QCOMPARE(net.members().size(),2);
+        QSqlQuery mutate(db.connection()); QVERIFY(mutate.exec("UPDATE radio_net_session SET uuid='00000000-0000-4000-8000-000000000001' WHERE id=1"));
+        QVERIFY(net.session().isEmpty()); QVERIFY(!net.checkIn("K3ABC","Carol",{}));
+        QVERIFY(net.selectSession(1)); QVERIFY(net.checkIn("K3ABC","Carol",{})); QCOMPARE(net.members().size(),3);
+    }
     void guardedManualInsertRejectsSessionClosedByAnotherConnection()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); LogDatabase first,other; QVERIFY(first.open(path)); QVERIFY(other.open(path));

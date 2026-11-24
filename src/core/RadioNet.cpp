@@ -47,15 +47,30 @@ bool RadioNet::fail(const QString &message)
     emit changed();
     return false;
 }
+void RadioNet::bindSession(qint64 id,const QString &uuid)
+{
+    m_sessionId=id; m_sessionUuid=uuid;
+    m_sessionGeneration=m_db->openGeneration(); m_sessionLogPath=m_db->path(); m_sessionLogIdentity=m_db->identity();
+    m_sessionFileIdentity=m_db->openFileIdentity();
+}
+bool RadioNet::selectedSessionCurrent() const
+{
+    if (!m_db || !m_db->isOpen() || m_sessionId<=0 || m_sessionUuid.isEmpty() || m_sessionLogIdentity.isEmpty() ||
+        m_db->openGeneration()!=m_sessionGeneration || m_db->path()!=m_sessionLogPath || m_db->identity()!=m_sessionLogIdentity ||
+        m_db->openFileIdentity()!=m_sessionFileIdentity || !m_db->fileIdentityMatchesOpen()) return false;
+    QSqlQuery q(m_db->connection()); q.prepare(QStringLiteral("SELECT 1 FROM radio_net_session WHERE id=? AND uuid=?"));
+    q.addBindValue(m_sessionId); q.addBindValue(m_sessionUuid); return q.exec() && q.next();
+}
 void RadioNet::load()
 {
     m_sessionId = 0;
-    if (m_db && m_db->isOpen()) {
+    m_sessionUuid.clear();
+    if (m_db && m_db->isOpen() && m_db->fileIdentityMatchesOpen()) {
         QSqlQuery q(m_db->connection());
         if (q.exec(
-                QStringLiteral("SELECT id FROM radio_net_session ORDER BY (ended_at IS NULL) DESC,id DESC LIMIT 1")) &&
+                QStringLiteral("SELECT id,uuid FROM radio_net_session ORDER BY (ended_at IS NULL) DESC,id DESC LIMIT 1")) &&
             q.next())
-            m_sessionId = q.value(0).toLongLong();
+            bindSession(q.value(0).toLongLong(),q.value(1).toString());
     }
     m_error.clear();
     emit changed();
@@ -63,7 +78,7 @@ void RadioNet::load()
 QVariantList RadioNet::sessions() const
 {
     QVariantList out;
-    if (!m_db || !m_db->isOpen())
+    if (!m_db || !m_db->isOpen() || !m_db->fileIdentityMatchesOpen())
         return out;
     QSqlQuery q(m_db->connection());
     if (!q.exec(QStringLiteral("SELECT id,title,started_at,ended_at FROM radio_net_session ORDER BY id DESC")))
@@ -78,7 +93,7 @@ QVariantList RadioNet::sessions() const
 }
 QVariantMap RadioNet::session() const
 {
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return {};
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral(
@@ -97,7 +112,7 @@ QVariantMap RadioNet::session() const
 bool RadioNet::active() const { return session().value(QStringLiteral("active")).toBool(); }
 QVariantMap RadioNet::reminder() const
 {
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return {};
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral("SELECT event,detail FROM radio_net_event WHERE session_id=? AND "
@@ -126,6 +141,7 @@ QVariantMap RadioNet::reminderOverview() const
         return QVariantMap{{QStringLiteral("reminders"), rows}, {QStringLiteral("error"), error}};
     };
     if (!m_db || !m_db->isOpen()) return overview(result, {});
+    if (!m_db->fileIdentityMatchesOpen()) return overview({},tr("The log file changed; reopen it"));
     QSqlQuery q(m_db->connection());
     if (!q.exec(QStringLiteral(
             "SELECT s.id,s.title,e.detail FROM radio_net_session s JOIN radio_net_event e ON e.id=("
@@ -168,11 +184,12 @@ bool RadioNet::setReminder(int seconds)
 
 bool RadioNet::clearReminder()
 {
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return fail(tr("Radio net session not found"));
     QSqlDatabase db = m_db->connection();
     if (!db.transaction())
         return fail(db.lastError().text());
+    if (!selectedSessionCurrent()) { db.rollback(); return fail(tr("Radio net session changed; select it again")); }
     if (!appendEvent(0, QStringLiteral("reminder_clear")) || !db.commit()) {
         const QString error = db.lastError().text();
         db.rollback();
@@ -184,7 +201,7 @@ bool RadioNet::clearReminder()
 }
 QVariantMap RadioNet::summary() const
 {
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return {};
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral("SELECT COUNT(*),COALESCE(SUM(status='present'),0),COALESCE(SUM(status='waiting'),0),"
@@ -202,7 +219,7 @@ QVariantMap RadioNet::summary() const
 QVariantList RadioNet::members() const
 {
     QVariantList out;
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return out;
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral("SELECT id,call,name,notes,status,sort_order,first_seen,last_seen FROM radio_net_member "
@@ -227,7 +244,7 @@ QVariantList RadioNet::events() const
 QVariantList RadioNet::historyPage(qint64 beforeId) const
 {
     QVariantList out;
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return out;
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral(
@@ -248,7 +265,7 @@ QVariantList RadioNet::historyPage(qint64 beforeId) const
 QVariantList RadioNet::reportedQsoPage(qint64 beforeId) const
 {
     QVariantList out;
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0)
+    if (!selectedSessionCurrent())
         return out;
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral("SELECT q.id,q.uuid,q.call,q.qso_datetime_on,q.band,q.mode,q.source,"
@@ -282,21 +299,23 @@ bool RadioNet::appendEvent(qint64 memberId, const QString &kind, const QString &
 }
 bool RadioNet::selectSession(qint64 id)
 {
-    if (!m_db || !m_db->isOpen())
+    if (!m_db || !m_db->isOpen() || !m_db->fileIdentityMatchesOpen())
         return fail(tr("Log is not open"));
     QSqlQuery q(m_db->connection());
-    q.prepare(QStringLiteral("SELECT 1 FROM radio_net_session WHERE id=?"));
+    q.prepare(QStringLiteral("SELECT uuid FROM radio_net_session WHERE id=?"));
     q.addBindValue(id);
     if (!q.exec() || !q.next())
         return fail(tr("Radio net session not found"));
-    m_sessionId = id;
+    const QString uuid=q.value(0).toString();
+    if (uuid.isEmpty()) return fail(tr("Radio net session not found"));
+    bindSession(id,uuid);
     m_error.clear();
     emit changed();
     return true;
 }
 bool RadioNet::start(const QString &title, qint64 stationProfileId)
 {
-    if (!m_db || !m_db->isOpen())
+    if (!m_db || !m_db->isOpen() || !m_db->fileIdentityMatchesOpen())
         return fail(tr("Log is not open"));
     const QString label = title.trimmed();
     if (label.isEmpty() || label.size() > 160)
@@ -307,7 +326,8 @@ bool RadioNet::start(const QString &title, qint64 stationProfileId)
     QSqlQuery q(db);
     q.prepare(
         QStringLiteral("INSERT INTO radio_net_session(uuid,title,station_profile_id,started_at) VALUES(?,?,?,?)"));
-    q.addBindValue(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    const QString uuid=QUuid::createUuid().toString(QUuid::WithoutBraces);
+    q.addBindValue(uuid);
     q.addBindValue(label);
     q.addBindValue(stationProfileId > 0 ? QVariant(stationProfileId) : QVariant());
     q.addBindValue(nowUtc());
@@ -324,6 +344,7 @@ bool RadioNet::start(const QString &title, qint64 stationProfileId)
         m_sessionId = previous;
         return fail(err.isEmpty() ? tr("Cannot save session") : err);
     }
+    bindSession(m_sessionId,uuid);
     m_error.clear();
     emit changed();
     return true;
@@ -522,6 +543,7 @@ bool RadioNet::closeSession()
     QSqlDatabase db = m_db->connection();
     if (!db.transaction())
         return fail(db.lastError().text());
+    if (!active()) { db.rollback(); return fail(tr("Open an active radio net first")); }
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE radio_net_session SET ended_at=? WHERE id=? AND ended_at IS NULL"));
     q.addBindValue(nowUtc());
@@ -537,11 +559,12 @@ bool RadioNet::closeSession()
 }
 bool RadioNet::reopenSession()
 {
-    if (!m_db || !m_db->isOpen() || m_sessionId <= 0 || active())
+    if (!selectedSessionCurrent() || active())
         return fail(tr("Select a closed session"));
     QSqlDatabase db = m_db->connection();
     if (!db.transaction())
         return fail(db.lastError().text());
+    if (!selectedSessionCurrent() || active()) { db.rollback(); return fail(tr("Select a closed session")); }
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE radio_net_session SET ended_at=NULL WHERE id=? AND ended_at IS NOT NULL"));
     q.addBindValue(m_sessionId);
@@ -557,7 +580,7 @@ bool RadioNet::reopenSession()
 
 bool RadioNet::exportSession(const QUrl &file)
 {
-    if (m_exportBusy || !m_db || !m_db->isOpen() || m_sessionId <= 0 || !file.isLocalFile())
+    if (m_exportBusy || !selectedSessionCurrent() || !file.isLocalFile())
         return fail(tr("Select a session and a local export file"));
     const QString source = m_db->path();
     if (source.isEmpty() || source == QLatin1String(":memory:"))

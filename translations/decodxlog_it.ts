@@ -15562,6 +15562,8 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>decolog::core::RadioNet</name>
+    <message><source>Radio net session changed; select it again</source><translation>La sessione radio net è cambiata; selezionala nuovamente</translation></message>
+    <message><source>The log file changed; reopen it</source><translation>Il file del log è cambiato; riaprilo</translation></message>
     <message><source>Invalid radio net reminder deadline</source><translation>Scadenza del promemoria della rete radio non valida</translation></message>
     <message><source>Export saved from the original log %1; the current log or session changed.</source><translation>Export salvato dal log originale %1; il log o la sessione corrente è cambiata.</translation></message>
     <message><source>Export from the original log %1 failed: %2</source><translation>Export dal log originale %1 non riuscito: %2</translation></message>
