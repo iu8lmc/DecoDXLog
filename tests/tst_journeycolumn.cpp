@@ -83,6 +83,26 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetParticipantEditRejectsExternalCallChange()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        auto env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",dir.filePath("test.sqlite"),"--port","0","--show","radionetcallprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE participantCall ready") && timer.elapsed()<10000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE participantCall ready"),output.constData());
+        { LogDatabase external; QVERIFY(external.openExistingReadWrite(dir.filePath("test.sqlite"))); QSqlQuery q(external.connection());
+          QVERIFY2(q.exec("UPDATE radio_net_member SET call='K1BBB' WHERE call='K1AAA'"),qPrintable(q.lastError().text())); QCOMPARE(q.numRowsAffected(),qint64(1)); }
+        QVERIFY(app.waitForFinished(15000)); output+=app.readAll();
+        QVERIFY2(output.contains("PROBE participantCall rejected=true visible=true"),output.constData()); QCOMPARE(app.exitCode(),0);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); RadioNet net(&db); net.load();
+        QCOMPARE(net.members().first().toMap().value("call").toString(),QString("K1BBB"));
+        QCOMPARE(net.members().first().toMap().value("name").toString(),QString("Alice")); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+
     void radioNetParticipantEditInDesktop()
     {
         using namespace decolog::core;

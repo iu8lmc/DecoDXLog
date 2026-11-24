@@ -121,7 +121,7 @@ DialogFrame {
                         participantError.text=qsTr("The log changed; reopen the editor."); return
                     }
                     if (root.net.editParticipant(participantEditor.member.id,participantEditor.sessionUuid,
-                            participantEditor.member.name || "",participantEditor.member.notes || "",participantName.text,participantNotes.text)) participantEditor.close()
+                            participantEditor.member.call || "",participantEditor.member.name || "",participantEditor.member.notes || "",participantName.text,participantNotes.text)) participantEditor.close()
                     else participantError.text=root.net.error
                 } }
                 GlassButton { text: qsTr("Cancel"); onClicked: participantEditor.close() }
@@ -206,6 +206,19 @@ DialogFrame {
         if (!root.net.start("Edit fixture",0) || !root.net.checkIn("K1AAA","Alice","first")) { console.warn("PROBE participantEdit setup failed"); return }
         participantEditProbe.start()
     }
+    function probeParticipantCallChange() {
+        if (!root.net.start("Call change fixture",0) || !root.net.checkIn("K1AAA","Alice","first")) { console.warn("PROBE participantCall setup failed"); return }
+        participantCallPrepare.start()
+    }
+    Timer { id:participantCallPrepare; interval:300; onTriggered: {
+        const row=memberList.itemAtIndex(0)
+        if (!row) { console.warn("PROBE participantCall no row"); return }
+        row.editParticipant(); participantName.text="Wrong member"; console.warn("PROBE participantCall ready"); participantCallSubmit.start()
+    } }
+    Timer { id:participantCallSubmit; interval:1500; onTriggered: {
+        saveParticipant.clicked()
+        console.warn("PROBE participantCall rejected=" + (participantError.text.length>0) + " visible=" + participantEditor.visible)
+    } }
     Timer { id:participantEditProbe; interval:300; onTriggered: {
         const row=memberList.itemAtIndex(0)
         if (!row) { console.warn("PROBE participantEdit no row"); return }

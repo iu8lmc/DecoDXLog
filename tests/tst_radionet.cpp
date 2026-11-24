@@ -28,15 +28,19 @@ class TestRadioNet : public QObject {
         RadioNet net(&db), external(&other); QVERIFY(net.start("Net")); QVERIFY(net.checkIn("K1AAA","Alice","first note"));
         const auto session=net.session(); const auto member=net.members().first().toMap();
         const qint64 id=member.value("id").toLongLong(); const QString uuid=session.value("uuid").toString();
-        QVERIFY(net.metaObject()->indexOfMethod("editParticipant(qlonglong,QString,QString,QString,QString,QString)")>=0);
+        QVERIFY(net.metaObject()->indexOfMethod("editParticipant(qlonglong,QString,QString,QString,QString,QString,QString)")>=0);
         auto edit=[&](const QString& oldName,const QString& oldNotes,const QString& newName,const QString& newNotes) {
             bool ok=false; const bool invoked=QMetaObject::invokeMethod(&net,"editParticipant",Q_RETURN_ARG(bool,ok),
-                Q_ARG(qlonglong,id),Q_ARG(QString,uuid),Q_ARG(QString,oldName),Q_ARG(QString,oldNotes),Q_ARG(QString,newName),Q_ARG(QString,newNotes)); return invoked && ok;
+                Q_ARG(qlonglong,id),Q_ARG(QString,uuid),Q_ARG(QString,QStringLiteral("K1AAA")),Q_ARG(QString,oldName),Q_ARG(QString,oldNotes),Q_ARG(QString,newName),Q_ARG(QString,newNotes)); return invoked && ok;
         };
         QSqlQuery fault(db.connection()); QVERIFY(fault.exec("CREATE TRIGGER reject_details BEFORE INSERT ON radio_net_event WHEN NEW.event='participant_details' BEGIN SELECT RAISE(FAIL,'injected'); END"));
         QVERIFY(!edit("Alice","first note","Alicia",""));
         QCOMPARE(net.members().first().toMap().value("name").toString(),QString("Alice"));
         QVERIFY(fault.exec("DROP TRIGGER reject_details"));
+        QSqlQuery changedCall(other.connection()); QVERIFY(changedCall.exec("UPDATE radio_net_member SET call='K1BBB' WHERE call='K1AAA'"));
+        QVERIFY(!edit("Alice","first note","Wrong member",""));
+        QCOMPARE(net.members().first().toMap().value("name").toString(),QString("Alice"));
+        QVERIFY(changedCall.exec("UPDATE radio_net_member SET call='K1AAA' WHERE call='K1BBB'"));
         QVERIFY(edit("Alice","first note","Alicia",""));
         QCOMPARE(net.members().first().toMap().value("name").toString(),QString("Alicia"));
         QCOMPARE(net.members().first().toMap().value("notes").toString(),QString());

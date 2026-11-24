@@ -423,10 +423,10 @@ bool RadioNet::checkIn(const QString &rawCall, const QString &name, const QStrin
     emit changed();
     return true;
 }
-bool RadioNet::editParticipant(qint64 memberId, const QString &sessionUuid, const QString &expectedName,
+bool RadioNet::editParticipant(qint64 memberId, const QString &sessionUuid, const QString &expectedCall, const QString &expectedName,
                                const QString &expectedNotes, const QString &name, const QString &notes)
 {
-    if (memberId<=0 || sessionUuid.isEmpty() || name.size()>160 || notes.size()>4000)
+    if (memberId<=0 || sessionUuid.isEmpty() || expectedCall.isEmpty() || name.size()>160 || notes.size()>4000)
         return fail(tr("Name or notes are too long"));
     if (!active() || m_sessionUuid!=sessionUuid) return fail(tr("Radio net session changed; select it again"));
     QSqlDatabase db=m_db->connection(); QString transactionError;
@@ -435,9 +435,9 @@ bool RadioNet::editParticipant(qint64 memberId, const QString &sessionUuid, cons
     const QString newName=name.trimmed().isEmpty() ? QStringLiteral("") : name.trimmed();
     const QString newNotes=notes.trimmed().isEmpty() ? QStringLiteral("") : notes.trimmed();
     QSqlQuery q(db);
-    q.prepare(QStringLiteral("UPDATE radio_net_member SET name=?,notes=? WHERE id=? AND session_id=? AND name=? AND notes=?"));
+    q.prepare(QStringLiteral("UPDATE radio_net_member SET name=?,notes=? WHERE id=? AND session_id=? AND call=? COLLATE BINARY AND name=? AND notes=?"));
     q.addBindValue(newName); q.addBindValue(newNotes); q.addBindValue(memberId); q.addBindValue(m_sessionId);
-    q.addBindValue(expectedName); q.addBindValue(expectedNotes);
+    q.addBindValue(expectedCall); q.addBindValue(expectedName); q.addBindValue(expectedNotes);
     if (!q.exec() || q.numRowsAffected()!=1) { db.rollback(); return fail(tr("Participant changed; reopen the editor")); }
     const QString detail=QString::fromUtf8(QJsonDocument(QJsonObject{{QStringLiteral("oldName"),expectedName},
         {QStringLiteral("oldNotes"),expectedNotes},{QStringLiteral("name"),newName},{QStringLiteral("notes"),newNotes}}).toJson(QJsonDocument::Compact));

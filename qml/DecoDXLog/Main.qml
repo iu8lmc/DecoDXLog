@@ -1443,6 +1443,7 @@ RoundedWindow {
         else if (what[0] === "radioneterrorprobe") { netReminderErrorProbe.start() }
         else if (what[0] === "radionetstaledraftprobe") { radioNetDialog.open(); Qt.callLater(() => radioNetDialog.probeStaleDraft()) }
         else if (what[0] === "radioneteditprobe") { radioNetDialog.open(); Qt.callLater(() => radioNetDialog.probeParticipantEdit()) }
+        else if (what[0] === "radionetcallprobe") { radioNetDialog.open(); Qt.callLater(() => radioNetDialog.probeParticipantCallChange()) }
         else if (what[0] === "radionetreplacedprobe") {
             radioNetDialog.open(); console.warn("PROBE radionetreplaced ready " + decolog.radioNet.selectSession(1)); radioNetReplacedProbe.start()
         }
