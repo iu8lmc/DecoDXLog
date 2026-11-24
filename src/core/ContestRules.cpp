@@ -1,6 +1,7 @@
 #include "core/ContestRules.h"
 
 #include "core/Awards.h"
+#include "core/Adif.h"
 
 #include <QCoreApplication>
 #include <QRegularExpression>
@@ -154,6 +155,7 @@ Arrl10Decision arrl10EvaluateContact(const Arrl10Contact& c)
     const QString group=arrl10Mode(c.mode);
     if (group.isEmpty()) return c.mode.trimmed().isEmpty() ? review("missing_mode") : excluded("unsupported_mode");
     if (c.signalReport.trimmed().isEmpty()) return review("missing_signal_report");
+    if (c.frequencyInvalid) return review("invalid_frequency");
     if (c.frequencyHz<=0) return review("missing_frequency");
     // Treat the upper edge as outside; occupied bandwidth still needs separate review.
     if (c.frequencyHz<28000000 || c.frequencyHz>=29700000) return excluded("frequency_outside_band");
@@ -170,6 +172,37 @@ Arrl10Decision arrl10EvaluateContact(const Arrl10Contact& c)
     const QString multiplier=arrl10Multiplier(c.origin,c.exchange,c.dxcc,c.mode);
     if (multiplier.isEmpty()) return review("invalid_exchange");
     return {Arrl10Status::Usable,arrl10Points(c.mode),multiplier,{}};
+}
+
+Arrl10Contact arrl10ContactFromAdif(const AdifRecord& record)
+{
+    Arrl10Contact contact;
+    contact.call=record.value(QStringLiteral("CALL")).trimmed().toUpper();
+    contact.band=record.value(QStringLiteral("BAND")).trimmed().toLower();
+    contact.mode=record.value(QStringLiteral("MODE")).trimmed().toUpper();
+    const QString submode=record.value(QStringLiteral("SUBMODE")).trimmed().toUpper();
+    if (contact.mode==QLatin1String("MFSK") && !submode.isEmpty()) contact.mode=submode;
+    contact.signalReport=record.value(QStringLiteral("RST_RCVD")).trimmed();
+    contact.exchange=record.value(QStringLiteral("SRX_STRING")).trimmed();
+    if (contact.exchange.isEmpty()) contact.exchange=record.value(QStringLiteral("SRX")).trimmed();
+    bool dxccOk=false; const int dxcc=record.value(QStringLiteral("DXCC")).trimmed().toInt(&dxccOk);
+    if (dxccOk && dxcc>0) contact.dxcc=dxcc;
+    const QString frequency=record.value(QStringLiteral("FREQ")).trimmed();
+    if (!frequency.isEmpty()) {
+        static const QRegularExpression decimal(QStringLiteral("^([0-9]{1,3})(?:\\.([0-9]{1,12}))?$"));
+        const auto match=decimal.match(frequency);
+        contact.frequencyInvalid=true;
+        if (match.hasMatch()) {
+            const QString fraction=match.captured(2);
+            const QString tail=fraction.mid(6);
+            if (tail.isEmpty() || tail.count(QLatin1Char('0'))==tail.size()) {
+                const QString micros=fraction.left(6).leftJustified(6,QLatin1Char('0'));
+                contact.frequencyHz=match.captured(1).toLongLong()*1000000+micros.toLongLong();
+                contact.frequencyInvalid=contact.frequencyHz<=0;
+            }
+        }
+    }
+    return contact;
 }
 
 Arrl10CandidateScore arrl10ScoreCandidates(const QList<Arrl10Contact>& contacts)

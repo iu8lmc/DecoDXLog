@@ -19,6 +19,7 @@
 #include <QStringList>
 
 namespace decolog::core {
+class AdifRecord;
 
 // Il QSO come serve al conto: dove sta il corrispondente e cosa ha mandato.
 struct ContestQso {
@@ -102,11 +103,14 @@ struct Arrl10Contact {
     QString call, band, mode, exchange, signalReport; // exchange excludes the separately recorded report
     QString contestCallIdentity; // caller-reviewed identity without portable modifiers
     qint64 frequencyHz{0};
+    bool frequencyInvalid{false};
     Arrl10Origin origin{Arrl10Origin::Unspecified};
     int dxcc{0};
     bool locationReviewed{false};
     bool dxccVerified{false};
 };
+// Read only: never infers or confirms origin, DXCC eligibility or call identity.
+Arrl10Contact arrl10ContactFromAdif(const AdifRecord& record);
 struct Arrl10Decision {
     Arrl10Status status{Arrl10Status::Review};
     int points{0};

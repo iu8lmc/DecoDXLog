@@ -30,6 +30,30 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void arrl10AdifAdapterKeepsUnreviewedDataConservative()
+    {
+        using namespace decolog::core::contestrules;
+        QTemporaryDir dir; LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","contest"},{"contestId","ARRL-10"}}).isEmpty());
+        AdifRecord input{{"CALL","W1AW"},{"QSO_DATE","20261212"},{"TIME_ON","120000"},{"BAND","10m"},
+                         {"FREQ","28.025"},{"MODE","CW"},{"RST_RCVD","599"},{"SRX_STRING","CT"},{"DXCC","291"}};
+        act.applyTo(input); const auto inserted=db.insertQso(input,"fixture",{},true,0,false); QVERIFY(inserted.id>0);
+        QString error; const auto stored=db.recordChecked(inserted.id,&error); QVERIFY2(stored.has_value(),qPrintable(error));
+        auto c=arrl10ContactFromAdif(*stored); QCOMPARE(c.call,QString("W1AW")); QCOMPARE(c.frequencyHz,qint64(28025000));
+        QCOMPARE(c.exchange,QString("CT")); QCOMPARE(c.signalReport,QString("599")); QCOMPARE(c.dxcc,291);
+        QVERIFY(!c.locationReviewed && !c.dxccVerified && c.contestCallIdentity.isEmpty());
+        QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.origin=Arrl10Origin::UnitedStates; c.locationReviewed=true; c.contestCallIdentity="W1AW";
+        QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Usable);
+        QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET adif_extra=json_set(adif_extra,'$.FREQ','28.2999999') WHERE id=?"); q.addBindValue(inserted.id); QVERIFY(q.exec());
+        const auto overridden=db.recordChecked(inserted.id,&error); QVERIFY2(overridden.has_value(),qPrintable(error));
+        auto invalid=arrl10ContactFromAdif(*overridden); QVERIFY(invalid.frequencyInvalid);
+        invalid.origin=Arrl10Origin::UnitedStates; invalid.locationReviewed=true;
+        const auto decision=arrl10EvaluateContact(invalid); QCOMPARE(decision.status,Arrl10Status::Review); QCOMPARE(decision.reason,QString("invalid_frequency"));
+        QVERIFY(!act.editionRules().value("valid").toBool());
+    }
+
     void unknownCqContestDoesNotOfferVerifiedExport()
     {
         QTemporaryDir dir; LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

@@ -5,6 +5,7 @@
 // quando arriva la classifica, e allora e' tardi.
 #include "core/CallHistory.h"
 #include "core/ContestRules.h"
+#include "core/Adif.h"
 #include "core/SharedSerials.h"
 
 #include <QTest>
@@ -43,6 +44,24 @@ class TestContestRules : public QObject {
     Q_OBJECT
 
 private slots:
+    void arrl10AdifAdapterDoesNotGuessOrRound()
+    {
+        const QList<QPair<QString,qint64>> valid{{"28",28000000},{"28.025",28025000},{"28.299999000",28299999},{"29.699999",29699999}};
+        for (const auto& [frequency,hz] : valid) {
+            AdifRecord r{{"CALL","w1aw/7"},{"BAND","10m"},{"MODE","CW"},{"FREQ",frequency},{"SRX","4"},{"RST_RCVD","599"}};
+            const auto c=arrl10ContactFromAdif(r); QVERIFY(!c.frequencyInvalid); QCOMPARE(c.frequencyHz,hz);
+            QCOMPARE(c.call,QString("W1AW/7")); QCOMPARE(c.exchange,QString("4"));
+            QVERIFY(c.contestCallIdentity.isEmpty() && !c.locationReviewed && !c.dxccVerified);
+        }
+        for (const auto& frequency : {QStringLiteral("28.2999999"),QStringLiteral("28,025"),QStringLiteral("nan"),QStringLiteral("1e2"),QStringLiteral("0")}) {
+            AdifRecord r{{"FREQ",frequency}}; const auto c=arrl10ContactFromAdif(r); QVERIFY2(c.frequencyInvalid,qPrintable(frequency));
+        }
+        AdifRecord digital{{"MODE","MFSK"},{"SUBMODE","FT8"}};
+        QCOMPARE(arrl10ContactFromAdif(digital).mode,QString("FT8"));
+        AdifRecord voice{{"MODE","SSB"},{"SUBMODE","USB"},{"SRX","123"},{"SRX_STRING","CT"}};
+        const auto c=arrl10ContactFromAdif(voice); QCOMPARE(c.mode,QString("SSB")); QCOMPARE(c.exchange,QString("CT"));
+        QVERIFY(!c.frequencyInvalid && c.frequencyHz==0);
+    }
     void arrl10CandidateScoreDeduplicatesReviewedIdentities()
     {
         Arrl10Contact a; a.call="W1AW"; a.contestCallIdentity="W1AW"; a.band="10m"; a.mode="CW"; a.frequencyHz=28025000; a.signalReport="599";
