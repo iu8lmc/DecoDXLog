@@ -2315,7 +2315,7 @@ QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit) 
     QList<QList<qint64>> out;
     QSqlQuery q(connection());
     q.setForwardOnly(true);
-    if (!q.exec(QStringLiteral("SELECT id, call, band, mode, submode, strftime('%s',qso_datetime_on), IFNULL(station_profile_id, 0), qso_datetime_on "
+    if (!q.exec(QStringLiteral("SELECT id, call, band, mode, submode, qso_datetime_on, IFNULL(station_profile_id, 0) "
                                "FROM qso NOT INDEXED WHERE deleted = 0 ORDER BY call, band, julianday(qso_datetime_on), id")))
         return out;
     // Per nominativo e banda, un gruppo che si forma per ogni gruppo di modo
@@ -2342,13 +2342,13 @@ QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit) 
             forming.clear();
             current = key;
         }
-        bool validTime=false;
-        const qint64 when=q.value(5).toLongLong(&validTime);
-        if (!validTime || !parseIso(q.value(7).toString()).isValid())
+        const QDateTime instant=parseIso(q.value(5).toString());
+        if (!instant.isValid())
             continue;
+        const qint64 when=instant.toMSecsSinceEpoch();
         Forming& g = forming[adif::modeGroup(q.value(3).toString(), q.value(4).toString()) + QLatin1Char('|')
                              + q.value(6).toString()];
-        if (!g.ids.isEmpty() && when - g.last > windowSeconds)
+        if (!g.ids.isEmpty() && when - g.last > qint64(windowSeconds)*1000)
             flush(g);
         g.ids << q.value(0).toLongLong();
         g.last = when;

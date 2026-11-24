@@ -3035,3 +3035,11 @@ Duplicate-review grouping now orders QSO by their UTC instant and compares UTC e
 A/B on macOS arm64 / Qt 6.11.2: three synthetic QSO with different offsets previously produced the wrong pair; the new fixture failed against that behavior and now groups the two contacts within the window, excluding the one an hour away. It also checks invalid dates are excluded. App and test targets built; CTest database, migration and qmlpopups passed 3/3.
 
 The grouping now asks SQLite to convert and sort timestamps and validates each parsed value. Its performance and UI responsiveness on a large log have not been measured after this change; no physical desktop, Windows or Linux test was performed. The API's existing handling of query errors and transitive grouping is unchanged. G01/G13 acceptance remains open.
+
+## 2026-11-24 — G01 duplicate-window precision and synthetic load
+
+Duplicate review now compares parsed UTC timestamps in milliseconds instead of truncating to whole seconds. This prevents a 60.9-second gap being proposed within a 60-second window. SQL still orders by UTC instant, and malformed timestamps remain excluded.
+
+A/B on macOS arm64 / Qt 6.11.2: the new fractional-boundary test failed against the previous second-based implementation and now passes, alongside the offset and invalid-date cases. An opt-in synthetic file-backed 100,000-QSO benchmark produced the same 50,000 duplicate pairs for canonical UTC and mixed-offset representations: 80 ms and 84 ms respectively on this machine. This is a comparison of two datasets on the new implementation, not a timing comparison with the old code. App and test targets built; CTest database, migration and qmlpopups passed 3/3.
+
+The benchmark measures the core query only on synthetic local storage, without desktop rendering, concurrent activity, USB disk, Windows or Linux. It is not a general performance guarantee. The existing query-error and transitive grouping limitations remain; G01/G13 acceptance is open.

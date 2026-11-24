@@ -2359,6 +2359,23 @@ private slots:
         QCOMPARE(groups.first(),QList<qint64>({1,2}));
         QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2026-02-30T12:00:00Z' WHERE id IN (1,2)"));
         QVERIFY(db.duplicateGroups(60).isEmpty());
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE id WHEN 1 THEN '2026-09-10T12:00:00.000Z' WHEN 2 THEN '2026-09-10T12:01:00.900Z' ELSE '2026-09-10T15:00:00Z' END"));
+        QVERIFY(db.duplicateGroups(60).isEmpty());
+    }
+
+    void duplicateGroupsSynthetic100k()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_DUPLICATES")) QSKIP("Synthetic 100k benchmark is opt-in");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("bench.sqlite")));
+        QSqlQuery q(db.connection()); QVERIFY2(q.exec("WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<100000) "
+            "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) "
+            "SELECT printf('bench-%d',i),printf('K%05d',(i-1)/2),'2026-01-01T12:00:00Z','20m','CW','2026-01-01','2026-01-01' FROM n"),qPrintable(q.lastError().text()));
+        QElapsedTimer timer; timer.start(); const auto canonical=db.duplicateGroups(60,0); const auto canonicalMs=timer.elapsed();
+        QCOMPARE(canonical.size(),50000);
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2026-01-01T13:00:00+01:00' WHERE id%2=0"));
+        timer.restart(); const auto mixed=db.duplicateGroups(60,0); const auto mixedMs=timer.elapsed();
+        QCOMPARE(mixed.size(),canonical.size()); QCOMPARE(mixed,canonical);
+        qInfo("DUPLICATES_100K canonical_ms=%lld mixed_offset_ms=%lld groups=%lld",static_cast<long long>(canonicalMs),static_cast<long long>(mixedMs),static_cast<long long>(mixed.size()));
     }
 
     void importExportIsLossless()
