@@ -19,6 +19,47 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void skedBacklogDoesNotSpinWhenAllClaimsFail()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("SkedFailureTest"); QCoreApplication::setApplicationName("Reminders"); QSettings().setValue("net/enabled",false);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("skeds.sqlite"))); int messages=0;
+        NetController::Context ctx; ctx.db=&db; ctx.activity=[&](const QString& cat,const QString&,const QString&) { if(cat=="SKED") ++messages; };
+        NetController net(ctx); net.setIdForTests("receiver"); QVERIFY(net.configureHandoffScope("event").isEmpty()); QCoreApplication::processEvents();
+        const auto now=QDateTime::currentDateTimeUtc(); QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection()); QVERIFY(q.prepare("INSERT INTO app_setting(key,value) VALUES(?,?)"));
+        for (int i=1;i<=65;++i) {
+            const QString id=QStringLiteral("00000000-0000-0000-0000-%1").arg(i,12,16,QLatin1Char('0'));
+            contesthandoff::Offer o{id,"event","sender","receiver",QStringLiteral("K%1AAA").arg(i),14025000,now.toString(Qt::ISODate)}; o.scheduledUtc=now.addSecs(120).toString(Qt::ISODate);
+            const auto frame=contesthandoff::offerFrame(o); QVERIFY(!frame.isEmpty());
+            q.bindValue(0,"contest_handoff.in."+id); q.bindValue(1,QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact))); QVERIFY(q.exec());
+            q.bindValue(0,"contest_handoff.state."+id); q.bindValue(1,"accepted"); QVERIFY(q.exec());
+        }
+        QVERIFY(db.connection().commit()); QVERIFY(q.exec("CREATE TABLE sked_attempt_counter(n INTEGER NOT NULL)")); QVERIFY(q.exec("INSERT INTO sked_attempt_counter VALUES(0)"));
+        QVERIFY(q.exec("CREATE TRIGGER reject_all_sked BEFORE INSERT ON app_setting WHEN NEW.key LIKE 'contest_handoff.reminder.%' BEGIN UPDATE sked_attempt_counter SET n=n+1; SELECT RAISE(FAIL,'injected'); END"));
+        net.checkSkedReminders(now); QTest::qWait(250); QVERIFY(q.exec("SELECT n FROM sked_attempt_counter")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),64);
+        QCOMPARE(messages,0); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+    void skedBacklogContinuesWithoutWaitingThirtySeconds()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("SkedBacklogTest"); QCoreApplication::setApplicationName("Reminders"); QSettings().setValue("net/enabled",false);
+        LogDatabase db; QVERIFY(db.open(dir.filePath("skeds.sqlite"))); QStringList messages;
+        NetController::Context ctx; ctx.db=&db; ctx.activity=[&](const QString& cat,const QString& message,const QString&) { if(cat=="SKED") messages << message; };
+        NetController net(ctx); net.setIdForTests("receiver"); QVERIFY(net.configureHandoffScope("event").isEmpty()); QCoreApplication::processEvents();
+        const auto now=QDateTime::currentDateTimeUtc(); const auto due=now.addSecs(120).toString(Qt::ISODate);
+        QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection()); QVERIFY(q.prepare("INSERT INTO app_setting(key,value) VALUES(?,?)"));
+        for (int i=1;i<=130;++i) {
+            const QString id=QStringLiteral("00000000-0000-0000-0000-%1").arg(i,12,16,QLatin1Char('0'));
+            contesthandoff::Offer o{id,"event","sender","receiver",QStringLiteral("K%1AAA").arg(i),14025000,now.toString(Qt::ISODate)}; o.scheduledUtc=due;
+            const auto frame=contesthandoff::offerFrame(o); QVERIFY(!frame.isEmpty());
+            q.bindValue(0,"contest_handoff.in."+id); q.bindValue(1,QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact))); QVERIFY(q.exec());
+            q.bindValue(0,"contest_handoff.state."+id); q.bindValue(1,"accepted"); QVERIFY(q.exec());
+        }
+        QVERIFY(db.connection().commit()); net.checkSkedReminders(now); QCOMPARE(messages.size(),64);
+        QTRY_COMPARE_WITH_TIMEOUT(messages.size(),130,3000); QTest::qWait(100); QCOMPARE(messages.size(),130); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void benchmarkSkedReminderScan()
     {
         if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_SKED_SCAN")) QSKIP("Opt-in synthetic timing comparison");

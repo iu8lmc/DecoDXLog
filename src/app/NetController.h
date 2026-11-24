@@ -210,6 +210,7 @@ private:
     bool m_handoffInvalidated{false};
     QTimer m_handoffWatch;
     QTimer m_skedReminderTimer;
+    QTimer m_skedContinuationTimer;
     QSet<QString> m_remindedSkeds;
     QString m_skedScanCursor;
     QString m_handoffPath, m_handoffIdentity, m_handoffGroup;

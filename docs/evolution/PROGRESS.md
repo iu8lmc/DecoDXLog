@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G10 continue a sked reminder backlog in bounded slices
+
+When a scan reaches its 64-attempt limit and has successfully recorded at least one reminder, the controller schedules a single continuation 25 ms later. Each continuation uses the existing rotating cursor and revalidates the current handoff context. If an entire slice fails, it does not schedule a tight retry loop; the normal 30-second timer can try again. Reconfiguring the handoff scope cancels the pending continuation. The bounded in-memory Activity model and existing per-session duplicate suppression remain unchanged.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic controller fixture created 130 accepted skeds due shortly. Before the change, a scan emitted 64 and the remaining reminders did not appear within the test's three-second wait; after, it emitted 64 initially and all 130 within that wait, with no duplicates or QSO. A separate injected-SQL-failure fixture counted exactly 64 failed claims after 250 ms, showing no immediate retry spin when no claim succeeds. The prior failed-prefix/retry and restart cases passed; contestnet and netcontroller CTest passed 2/2, and the rebuilt offscreen app handoff fixture passed in English and Italian. git diff --check passed.
+
+The 25 ms delay is an event-loop scheduling request, not a latency guarantee. This does not make Activity durable or unlimited, guarantee that every reminder remains visible, or prove behaviour for 10,000 offers, slow storage, crashes, changes between claim and callback, live LAN, physical input, hardware or other platforms. A failure affecting an entire slice falls back to the regular timer. Full G10/G13 acceptance remains open.
+
 ## 2026-11-24 — G10 avoid repeated full sked-list reads
 
 The reminder controller now passes each already-validated offer snapshot to the claim operation instead of rereading the complete offer list for every claim. The claim still checks the stored offer bytes and accepted state in the conditional SQLite write; replay also requires that both still match. The original ID-based API remains available. A stale snapshot whose offer became completed is rejected, including when a prior reminder marker exists.

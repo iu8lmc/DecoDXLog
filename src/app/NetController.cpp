@@ -42,6 +42,8 @@ NetController::NetController(Context context, QObject* parent)
     m_skedReminderTimer.setInterval(30000);
     connect(&m_skedReminderTimer,&QTimer::timeout,this,[this] { checkSkedReminders(QDateTime::currentDateTimeUtc()); });
     m_skedReminderTimer.start();
+    m_skedContinuationTimer.setSingleShot(true); m_skedContinuationTimer.setInterval(25);
+    connect(&m_skedContinuationTimer,&QTimer::timeout,this,[this] { checkSkedReminders(QDateTime::currentDateTimeUtc()); });
     m_durablePool.setMaxThreadCount(1);
     m_qsoWirePool.setMaxThreadCount(1);
     m_qsoWireExpiry.setSingleShot(true); m_qsoWireExpiry.setInterval(300000);
@@ -1100,6 +1102,7 @@ QString NetController::configureHandoffScope(const QString& scope)
         m_ctx.db->identity().isEmpty() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()))
         return tr("Enter a valid contest scope with an open file-backed log.");
     m_handoffScope=clean;
+    m_skedContinuationTimer.stop();
     m_skedScanCursor.clear();
     m_handoffInvalidated=false;
     m_handoffPath=clean.isEmpty()?QString():m_ctx.db->path(); m_handoffIdentity=clean.isEmpty()?QString():m_ctx.db->identity();
@@ -1224,7 +1227,7 @@ void NetController::checkSkedReminders(const QDateTime& nowUtc)
         while (start<offers.size() && offers.at(start).id<=m_skedScanCursor) ++start;
         if (start==offers.size()) start=0;
     }
-    int attempts=0;
+    int attempts=0, recorded=0; bool more=false;
     for (int offset=0;offset<offers.size();++offset) {
         const auto& offer=offers.at((start+offset)%offers.size());
         if (!handoffLogCurrent()) return;
@@ -1233,13 +1236,15 @@ void NetController::checkSkedReminders(const QDateTime& nowUtc)
         const auto when=QDateTime::fromString(offer.scheduledUtc,Qt::ISODate);
         const auto elapsed=when.secsTo(nowUtc);
         if (!when.isValid() || elapsed < -300 || elapsed > 600) continue;
-        if (attempts>=64) break;
+        if (attempts>=64) { more=true; break; }
         ++attempts; m_skedScanCursor=offer.id;
         const auto claimed=contesthandoff::claimSkedReminderSnapshot(*m_ctx.db,m_handoffScope,m_id,offer,nowUtc);
         if (!claimed.ok) continue;
+        ++recorded;
         m_remindedSkeds.insert(seenKey);
         m_ctx.activity(QStringLiteral("SKED"),tr("Sked %1 at %2 UTC on %3 Hz from %4").arg(offer.call,offer.scheduledUtc,QString::number(offer.frequencyHz),offer.sender),QStringLiteral("warning"));
     }
+    if (more && recorded>0 && !m_skedContinuationTimer.isActive()) m_skedContinuationTimer.start();
 }
 
 void NetController::requestSync()
