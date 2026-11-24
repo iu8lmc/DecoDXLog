@@ -255,6 +255,7 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             result=Plan{}; result.error=QStringLiteral("Cannot read QSL status while planning: %1").arg(statusError); return result;
         }
         for (const QslState& state : std::as_const(states)) {
+            if (state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0) candidate.receivedServices.append(state.service);
             if (state.sent.compare(QLatin1String("Y"),Qt::CaseInsensitive)==0 && state.rcvd.compare(QLatin1String("Y"),Qt::CaseInsensitive)!=0) {
                 candidate.pendingServices.append(state.service);
                 candidate.pendingDetails.append(pendingSince(state,today));
@@ -338,6 +339,7 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         group.ids.append(candidate.qsoId); group.benefits.unite(paperBenefits);
     }
     QMap<QString,Group> electronic;
+    QMap<QString,Group> unverifiedElectronic;
     for (const Candidate& candidate : std::as_const(result.candidates)) {
         for (const QString& service : candidate.pendingServices) {
             if (service != QLatin1String("lotw") && service != QLatin1String("eqsl") && service != QLatin1String("qrz")) continue;
@@ -347,9 +349,19 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
             if (benefits.isEmpty()) continue;
             Group& group=electronic[service]; group.ids.append(candidate.qsoId); group.benefits.unite(benefits);
         }
+        for (const QString& service : {QStringLiteral("lotw"),QStringLiteral("eqsl"),QStringLiteral("qrz")}) {
+            if (candidate.pendingServices.contains(service) || candidate.receivedServices.contains(service)) continue;
+            QSet<QPair<QString,QString>> benefits;
+            for (const Benefit& benefit : candidate.benefits)
+                if (benefit.acceptedServices.contains(service)) benefits.insert({benefit.award,benefit.key});
+            if (benefits.isEmpty()) continue;
+            Group& group=unverifiedElectronic[service]; group.ids.append(candidate.qsoId); group.benefits.unite(benefits);
+        }
     }
     for (auto it=electronic.cbegin(); it!=electronic.cend(); ++it)
         result.pendingElectronic.append({it.key(),it->ids,int(it->benefits.size())});
+    for (auto it=unverifiedElectronic.cbegin(); it!=unverifiedElectronic.cend(); ++it)
+        result.unverifiedElectronic.append({it.key(),it->ids,int(it->benefits.size())});
     for (auto it=routes.cbegin(); it!=routes.cend(); ++it)
         result.paperRoutes.append({it.key().first,it.key().second,it->ids,int(it->benefits.size()),routeCost(db,it.key().first,it.key().second)});
     return result;

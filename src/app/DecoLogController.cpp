@@ -2746,6 +2746,11 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         for (const auto& group : plan.pendingElectronic)
             electronic << QVariantMap{{QStringLiteral("service"),group.service},{QStringLiteral("qsoCount"),group.qsoIds.size()},
                                       {QStringLiteral("uniqueBenefits"),group.uniqueBenefits}};
+        QVariantList unverifiedElectronic;
+        for (const auto& group : plan.unverifiedElectronic) {
+            unverifiedElectronic << QVariantMap{{QStringLiteral("service"),group.service},
+                {QStringLiteral("qsoCount"),group.qsoIds.size()},{QStringLiteral("uniqueBenefits"),group.uniqueBenefits}};
+        }
         QVariantList ungrouped; for (qint64 id : plan.ungroupedPaperQsoIds) ungrouped << id;
         for (const auto& candidate : plan.candidates) {
             QVariantList benefits;
@@ -2772,13 +2777,13 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
                 {QStringLiteral("manager"),candidate.manager},{QStringLiteral("managerSource"),candidate.managerSource},
                 {QStringLiteral("paperChannel"),candidate.paperChannel},
                 {QStringLiteral("managerObservedAt"),candidate.managerObservedAt.toString(Qt::ISODate)},
-                {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("pendingDetails"),pendingDetails},{QStringLiteral("benefits"),benefits},
+                {QStringLiteral("pending"),candidate.pendingServices},{QStringLiteral("received"),candidate.receivedServices},{QStringLiteral("pendingDetails"),pendingDetails},{QStringLiteral("benefits"),benefits},
                 {QStringLiteral("priorityRank"),candidate.priorityRank},{QStringLiteral("marginalBenefits"),marginal},
                 {QStringLiteral("pendingMarginalCount"),candidate.pendingMarginalCount}};
         }
         if (!self) return;
         const auto snapshot=std::make_shared<const qslplanner::Plan>(std::move(plan));
-        QMetaObject::invokeMethod(self.data(),[self,path,identity,dataVersion,openGeneration,logVersion,generation,snapshot,rows,routes,electronic,ungrouped] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,dataVersion,openGeneration,logVersion,generation,snapshot,rows,routes,electronic,unverifiedElectronic,ungrouped] {
             if (!self || generation!=self->m_qslPlanGeneration) return;
             self->m_qslPlanBusy=false;
             if (self->m_db.path()!=path || !self->m_db.fileIdentityMatchesOpen() || self->m_db.identity()!=identity || self->m_db.openGeneration()!=openGeneration ||
@@ -2788,6 +2793,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
             else { self->m_qslPlanSnapshot=snapshot; self->m_qslPlan={{QStringLiteral("error"),snapshot->error},{QStringLiteral("uniqueBenefits"),snapshot->uniqueBenefits},
                                  {QStringLiteral("logPath"),path},
                                  {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},{QStringLiteral("pendingElectronic"),electronic},
+                                 {QStringLiteral("unverifiedElectronic"),unverifiedElectronic},
                                  {QStringLiteral("ungroupedPaperQsoIds"),ungrouped},{QStringLiteral("stale"),false}}; }
             emit self->qslPlanChanged();
         },Qt::QueuedConnection);

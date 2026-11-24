@@ -111,11 +111,13 @@ DialogFrame {
     }
 
     property string plannerPendingService: ""
+    property bool plannerUnverified: false
     function plannerCandidateRows() {
         if (decolog.qslPlan.stale || plannerSelectionDirty) return []
         const rows = decolog.qslPlan.candidates || []
         if (!plannerPendingService) return rows
-        return rows.filter(c => (c.pending || []).indexOf(plannerPendingService) >= 0 &&
+        return rows.filter(c => (plannerUnverified ? (c.pending || []).indexOf(plannerPendingService) < 0 && (c.received || []).indexOf(plannerPendingService) < 0
+                                                  : (c.pending || []).indexOf(plannerPendingService) >= 0) &&
                                 (c.benefits || []).some(b => (b.services || []).indexOf(plannerPendingService) >= 0))
     }
     function schedulePlannerRefresh() {
@@ -268,12 +270,22 @@ DialogFrame {
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
             console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
             const electronic = electronicRoutes.itemAt(0)
+            console.warn("PROBE qslplan unverified notice " + unverifiedNotice.text)
             console.warn("PROBE qslplan electronic " + (electronic ? electronic.probeText : "missing"))
             if (electronic) {
                 electronic.probeFilter()
                 console.warn("PROBE qslplan filtered count=" + qslPlanCandidates.count + " id=" + (qslPlanCandidates.count ? qslPlanCandidates.model[0].id : 0))
                 root.plannerPendingService = ""
                 console.warn("PROBE qslplan all count=" + qslPlanCandidates.count)
+            }
+            for (let i=0;i<unverifiedRoutes.count;++i) {
+                const route=unverifiedRoutes.itemAt(i)
+                if (route && route.service === "lotw") {
+                    route.probeFilter()
+                    console.warn("PROBE qslplan unverified count=" + qslPlanCandidates.count + " first=" + (qslPlanCandidates.count ? qslPlanCandidates.model[0].id : 0))
+                    root.plannerPendingService=""
+                    break
+                }
             }
             const grouped = paperRoutes.itemAtIndex(0)
             console.warn("PROBE qslplan group " + (grouped ? grouped.probeText : "missing"))
@@ -415,14 +427,34 @@ DialogFrame {
                         id: electronicFilter
                         text: qsTr("Show QSO")
                         Accessible.name: qsTr("Show QSO awaiting %1").arg(modelData.service.toUpperCase())
-                        onClicked: root.plannerPendingService = modelData.service
+                        onClicked: { root.plannerUnverified=false; root.plannerPendingService = modelData.service }
                     }
+                }
+            }
+            Text {
+                id:unverifiedNotice
+                Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
+                visible: !decolog.qslPlan.stale && !root.plannerSelectionDirty && (decolog.qslPlan.unverifiedElectronic || []).length > 0
+                text:qsTr("Potential benefits without a recorded sent or received confirmation; some may be queued. Station use of these services is unknown: verify independently. Benefits can overlap across services.")
+            }
+            Repeater {
+                id:unverifiedRoutes
+                model:(decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.unverifiedElectronic || [])
+                delegate:RowLayout {
+                    required property var modelData
+                    readonly property string service:modelData.service
+                    function probeFilter() { unverifiedFilter.clicked() }
+                    Layout.fillWidth:true
+                    Text { Layout.fillWidth:true; color:Theme.textPrimary; wrapMode:Text.Wrap
+                        text:qsTr("%1: %2 QSO · %3 potential benefits").arg(modelData.service.toUpperCase()).arg(modelData.qsoCount).arg(modelData.uniqueBenefits) }
+                    GlassButton { id:unverifiedFilter; text:qsTr("Show QSO"); Accessible.name:qsTr("Show unverified QSO for %1").arg(modelData.service.toUpperCase())
+                        onClicked:{ root.plannerUnverified=true; root.plannerPendingService=modelData.service } }
                 }
             }
             RowLayout {
                 Layout.fillWidth: true
                 visible: root.plannerPendingService.length > 0
-                Text { Layout.fillWidth: true; color: Theme.textSecondary; text: qsTr("Showing QSO awaiting %1").arg(root.plannerPendingService.toUpperCase()) }
+                Text { Layout.fillWidth: true; color: Theme.textSecondary; text: root.plannerUnverified ? qsTr("Showing unverified QSO for %1").arg(root.plannerPendingService.toUpperCase()) : qsTr("Showing QSO awaiting %1").arg(root.plannerPendingService.toUpperCase()) }
                 GlassButton { text: qsTr("Show all candidates"); onClicked: root.plannerPendingService = "" }
             }
             ListView {

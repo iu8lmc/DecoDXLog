@@ -10,6 +10,18 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void unverifiedElectronicBenefitsExcludePendingAndDeduplicate()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const char* call) { return db.insertQso({{"CALL",call},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"}},"fixture").id; };
+        const auto a=add("K1AAA"), b=add("K1BBB"), pending=add("K1CCC"); QVERIFY(a>0 && b>0 && pending>0);
+        QslState state; state.service="lotw"; state.sent="Y"; QVERIFY(db.setQslState(pending,state));
+        QslState queued; queued.service="lotw"; queued.sent="Q"; QVERIFY(db.setQslState(a,queued));
+        const auto plan=qslplanner::build(db,{}, {"dxcc"}); QVERIFY2(plan.error.isEmpty(),qPrintable(plan.error));
+        bool found=false; for (const auto& group:plan.unverifiedElectronic) if (group.service=="lotw") {
+            found=true; QCOMPARE(group.qsoIds,QList<qint64>({a,b})); QCOMPARE(group.uniqueBenefits,1);
+        } QVERIFY(found);
+    }
     void rejectsMissingRouteProvenance()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

@@ -483,6 +483,9 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message><source>Potential benefits without a recorded sent or received confirmation; some may be queued. Station use of these services is unknown: verify independently. Benefits can overlap across services.</source><translation>Benefici potenziali senza conferma registrata come inviata o ricevuta; alcuni possono essere in coda. Non è noto se la stazione utilizzi questi servizi: verifica separatamente. I benefici possono sovrapporsi tra servizi.</translation></message>
+    <message><source>Show unverified QSO for %1</source><translation>Mostra QSO non verificati per %1</translation></message>
+    <message><source>Showing unverified QSO for %1</source><translation>QSO non verificati per %1</translation></message>
     <message><source> · from previously merged QSO %1</source><translation> · dal QSO %1 precedentemente unito</translation></message>
     <message>
         <source> · latest match: %1 seconds apart, station %2, LoTW update %3 (%4 contexts)</source>

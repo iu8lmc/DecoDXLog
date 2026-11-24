@@ -49,6 +49,7 @@ struct Candidate {
     QDateTime managerObservedAt;
     QString paperChannel; // B or D only when explicitly recorded
     QStringList pendingServices;
+    QStringList receivedServices;
     QList<PendingDetail> pendingDetails;
     QList<Benefit> benefits;
     int priorityRank{0}; // zero means an alternative after the greedy coverage pass
@@ -70,6 +71,7 @@ struct PendingElectronic {
 struct Plan {
     QList<Candidate> candidates;
     QList<PendingElectronic> pendingElectronic;
+    QList<PendingElectronic> unverifiedElectronic; // eligible benefits, not evidence that a station uses a service
     QList<PaperRoute> paperRoutes;
     QList<qint64> ungroupedPaperQsoIds;
     int uniqueBenefits{0};

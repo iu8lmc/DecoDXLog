@@ -16,6 +16,14 @@ A/B on macOS arm64 / Qt 6.11.2: with the shared mutation engine and controller r
 
 The observed baseline does not establish that every deletion attempt fails without the fix. The test sends one synthetic packet, uses no physical radio, and does not verify other platforms, sustained traffic, long-held locks or slow storage. The full suite was not rerun for this test-only increment.
 
+## 2026-11-24 — G03 unverified electronic possibilities
+
+The QSL planner separately groups QSO having potential award benefits accepted via LoTW, eQSL or QRZ but no status recorded as sent or received for that service. Already-sent/unconfirmed items stay in the pending group, and locally received items are excluded from this new group. A queued status can appear and the interface says so. It explicitly states that station participation in the service is unknown and benefits can overlap; it does not send a request or assert eligibility. A Show QSO filter uses the same conditions and retains the existing stale-plan protection. Italian strings are included.
+
+A/B on macOS arm64 / Qt 6.11.2: the focused fixture initially failed to compile because the new summary did not exist; afterwards two non-sent QSO for the same DXCC, one marked queued, yielded two LoTW QSO and one distinct potential benefit, excluding a third QSO marked sent. An offscreen real-app fixture with three synthetic candidates showed two under the unverified LoTW filter and one under the existing pending filter, displayed the unknown-participation notice, and continued through existing invalidation and paper-queue checks. The awards, qslplanner and qmlpopups CTest groups passed 3/3; git diff --check passed.
+
+This is a rules-based possibility, not evidence that a particular station uses a service, can provide an accepted confirmation, or that a request should be sent. The summary does not include remote account data or reconcile statuses. The fixture is programmatic and synthetic; physical UI, real services, other platforms and complete G03/G13 acceptance remain open. This increment remains in the detached worktree pending integration.
+
 ## 2026-11-24 — G04 campaign revision history foundation, not integrated
 
 In the detached worktree, campaign updates now save the previous encoded revision under a separate `app_setting` key within the same immediate SQLite transaction as the update. Failed history insertion rolls the change back, and the existing revision comparison continues to reject stale updates. A/B: the new restart fixture initially failed because no previous revision existed; after the change it found the original date and revision, retained two prior revisions after reopening, and an injected history-write failure preserved the current campaign. The complete focused dxcampaign test passed 18 cases with one opt-in benchmark skipped.
