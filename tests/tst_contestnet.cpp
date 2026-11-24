@@ -4,6 +4,7 @@
 #include "../libs/monocypher/monocypher.h"
 #include "core/ContestNetQsoTransfer.h"
 #include "core/ContestSerialProtocol.h"
+#include "core/ContestHandoff.h"
 #include "core/LogDatabase.h"
 
 #include <QSignalSpy>
@@ -20,6 +21,29 @@ class TestContestNet : public QObject {
     Q_OBJECT
 
 private slots:
+    void handoffOfferIsAddressedIdempotentAndPersistent()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("handoff.sqlite"); LogDatabase recipient; QVERIFY(recipient.open(path));
+        contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","contest-2026","node-a","node-b","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        const auto body=contesthandoff::offerFrame(offer); QVERIFY(!body.isEmpty());
+        QString from,type; QJsonObject received; const auto packet=ContestNet::pack("FIELD","node-a","handoff_offer_v1",body);
+        QVERIFY(ContestNet::unpack(packet,"FIELD",&from,&type,&received)); QCOMPARE(type,QString("handoff_offer_v1"));
+        auto first=contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,received);
+        QVERIFY2(first.ok,qPrintable(first.error)); QVERIFY(!first.replayed);
+        auto repeated=contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,received); QVERIFY(repeated.ok); QVERIFY(repeated.replayed);
+        auto changed=received; changed.insert("frequencyHz",14026000); QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,changed).ok);
+        QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-c",from,received).ok);
+        QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b","impostor",received).ok);
+        QVERIFY(!contesthandoff::receiveOffer(recipient,"other-contest","node-b",from,received).ok);
+        for (const auto &bad : {QJsonValue(-1),QJsonValue(14025000.5),QJsonValue(QStringLiteral("14025000"))}) {
+            auto invalid=received; invalid.insert("frequencyHz",bad); QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,invalid).ok);
+        }
+        auto unexpected=received; unexpected.insert("extra",true); QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,unexpected).ok);
+        recipient.close(); QVERIFY(recipient.open(path)); QString error; const auto offers=contesthandoff::incomingOffers(recipient,"contest-2026","node-b",&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(offers.size(),1); QCOMPARE(offers.first().call,QString("K1ABC")); QCOMPARE(offers.first().frequencyHz,qint64(14025000));
+        repeated=contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,received); QVERIFY(repeated.ok); QVERIFY(repeated.replayed);
+        QCOMPARE(recipient.qsoCount(),qint64(0));
+    }
     void durableSerialFramesSurviveLossReorderAndRestart()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase server,a,b,c;

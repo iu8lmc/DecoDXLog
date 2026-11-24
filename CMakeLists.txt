@@ -232,6 +232,8 @@ add_library(decolog_core STATIC
     src/core/SharedSerials.cpp
     src/core/ContestNetSecure.cpp
     src/core/ContestNetSecure.h
+    src/core/ContestHandoff.cpp
+    src/core/ContestHandoff.h
     src/core/ContestNetQsoTransfer.cpp
     src/core/ContestNetQsoTransfer.h
     src/core/ContestSerialProtocol.cpp
