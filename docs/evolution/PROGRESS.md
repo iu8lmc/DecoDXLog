@@ -1,5 +1,13 @@
 # Progress
 
+## 2026-11-24 — G09 invalidate schedule when requested count changes
+
+Changing the requested number of passes while a schedule is displayed now hides that schedule and invalidates its selected pass; changing the count with only an independent single-pass prediction displayed leaves that prediction available. No tracker or radio command is sent by changing the value.
+
+A/B on macOS arm64 / Qt 6.11.2: in the actual offscreen app and synthetic PREDICT fixture, changing the requested count after a three-pass schedule initially left the old schedule and selected pass valid (`cleared=false`). After the fix the fixture reported `cleared=true`, and a separate single-pass check confirmed it remained valid. The fixture then restored its test setup programmatically to exercise the existing elevation filter and following-pass scenarios. The predictpass and predict_ui CTest groups passed 2/2 after the final change; the fixture checks tracker command counts and that the schedule scenario creates no QSO. git diff --check passed.
+
+This is simulated tracker and programmatic offscreen UI evidence, not physical interaction, live tracker, real CAT/PTT, radio, rotor, RF, or Windows/Linux validation. Other G09 and integrated acceptance work remains open.
+
 ## 2026-11-24 — G09 invalidate displayed passes after planning-start change
 
 Extended the existing actual-app PREDICT fixture to change the UTC planning start after a schedule and a following pass have been displayed. It checks that the selected pass is invalidated, the schedule is hidden and the following-pass action becomes disabled. A/B on macOS arm64 / Qt 6.11.2: with the existing `onTextChanged` invalidation temporarily disabled the test reported `cleared=false` and failed; after restoring it the app reported `cleared=true` and the complete predictpass and predict_ui CTest groups passed 2/2. The existing fixture also verifies the expected synthetic UDP tracker requests and zero QSO in this scenario. git diff --check passed.

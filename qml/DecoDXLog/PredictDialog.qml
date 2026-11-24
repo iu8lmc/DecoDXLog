@@ -221,6 +221,11 @@ DialogFrame {
                 root.probingSchedule = false
                 if (success && root.schedule.passes.length >= 2) {
                     scheduleRepeater.itemAt(1).selectPass()
+                    scheduleCount.value = 4
+                    console.warn("PROBE schedule count changed cleared=" + (!root.passValid && !root.scheduleVisible && !nextPassButton.enabled))
+                    scheduleCount.value = 3
+                    root.scheduleVisible = true // restore the fixture to exercise the independent elevation and following-pass cases
+                    scheduleRepeater.itemAt(1).selectPass()
                     minimumElevation.value = 31
                     const cleared = !root.passValid
                     root.selectSchedulePass(1)
@@ -258,6 +263,9 @@ DialogFrame {
                 if (root.probePassCount === 1 && success) {
                     console.warn("PROBE predictPass success=" + success + " rendered=" + passSummary.visible
                                  + " max=" + (root.plannedPass.maxElevation || 0) + " old=" + (root.passAgeDays > 14))
+                    scheduleCount.value = 4
+                    console.warn("PROBE single pass count preserved=" + (root.passValid && nextPassButton.enabled))
+                    scheduleCount.value = 3
                     Qt.callLater(() => nextPassButton.clicked())
                 } else {
                     console.warn("PROBE predictPassNext success=" + success + " rendered=" + passSummary.visible)
@@ -437,7 +445,10 @@ DialogFrame {
                 }
             }
             Text { text: qsTr("Number of passes"); color: Theme.textSecondary }
-            SpinBox { id: scheduleCount; from: 1; to: 10; value: 3; editable: true; enabled: !root.schedule.busy; Accessible.name: qsTr("Number of predicted passes") }
+            SpinBox {
+                id: scheduleCount; from: 1; to: 10; value: 3; editable: true; enabled: !root.schedule.busy; Accessible.name: qsTr("Number of predicted passes")
+                onValueChanged: if (root.scheduleVisible) { root.scheduleVisible=false; root.passValid=false; root.selectedPass=({}) }
+            }
             GlassButton {
                 id: scheduleButton
                 text: qsTr("Plan passes")

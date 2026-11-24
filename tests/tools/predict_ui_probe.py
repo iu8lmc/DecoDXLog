@@ -152,7 +152,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
                    f'predictpass:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
         output = result.stdout + result.stderr
-        if result.returncode or 'PROBE predictPass success=true rendered=true max=30 old=true' not in output or 'PROBE predictPassNext success=true rendered=true' not in output:
+        if result.returncode or 'PROBE predictPass success=true rendered=true max=30 old=true' not in output or 'PROBE single pass count preserved=true' not in output or 'PROBE predictPassNext success=true rendered=true' not in output:
             raise SystemExit(f'FAIL pass: {output}; requests={server.commands}')
         if len(server.commands) != 6 or server.commands[0] != 'GET_TLE OSCAR-7' or not server.commands[1].startswith('PREDICT "OSCAR-7" ') or server.commands[2:4] != ['GET_TLE OSCAR-7', 'GET_TLE OSCAR-7'] or server.commands[4] != 'PREDICT "OSCAR-7" 1800000121' or server.commands[5] != 'GET_TLE OSCAR-7':
             raise SystemExit(f'Unexpected pass commands: {server.commands}')
@@ -184,7 +184,7 @@ for change_tle, overlap in ((False, False), (True, False), (False, True)):
             if overlap:
                 expected += '\nPROBE predictSchedule status=Incomplete schedule: Tracker returned overlapping passes'
             if not change_tle and not overlap:
-                expected += '\nPROBE schedule invalid rejected=true\nPROBE schedule start valid=1800000000 invalid=true\nPROBE schedule filter hidden=3 restored=3 cleared=true blocked=true\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200\nPROBE schedule start changed cleared=true'
+                expected += '\nPROBE schedule invalid rejected=true\nPROBE schedule start valid=1800000000 invalid=true\nPROBE schedule count changed cleared=true\nPROBE schedule filter hidden=3 restored=3 cleared=true blocked=true\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200\nPROBE schedule start changed cleared=true'
             if result.returncode or 'RangeError' in output or 'TypeError' in output or any(line not in output for line in expected.split('\n')):
                 raise SystemExit(f'FAIL schedule change_tle={change_tle}: {output}; requests={server.commands}')
             if 'PREDICT "OSCAR-7" 1800000000' not in server.commands:
