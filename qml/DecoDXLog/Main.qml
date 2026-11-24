@@ -1409,6 +1409,7 @@ RoundedWindow {
         else if (what[0] === "qslocrreview") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrReview()) }
         else if (what[0] === "qslocrrevisions") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrRevisions()) }
         else if (what[0] === "qslocrhistory") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.showOcrHistory()) }
+        else if (what[0] === "radioneterrorprobe") { netReminderErrorProbe.start() }
         else if (what[0] === "radionetotherreminderprobe") {
             decolog.radioNet.start("First reminder", 0)
             netOtherReminderProbe.expectedSession = decolog.radioNet.session.id
@@ -2118,6 +2119,14 @@ RoundedWindow {
     }
     ActivationDialog { id: activationDialog; onOpenQsoRequested: (id) => { window.openQso(id); if (startupShow === "activationopenexcludedprobe") console.warn("PROBE activation open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)); if (startupShow === "potacatalogueprobe") console.warn("PROBE potaReview open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)) } }
     RadioNetDialog { id: radioNetDialog }
+    Timer {
+        id: netReminderErrorProbe; interval: 500
+        onTriggered: {
+            console.warn("PROBE net reminder error banner=" + netReminder.visible + " text=" + netReminderButton.text)
+            netReminderButton.clicked()
+            Qt.callLater(() => radioNetDialog.probeReminderError())
+        }
+    }
     RoverDialog { id: roverDialog }
     PredictDialog { id: predictDialog }
     ContestSubmitDialog { id: submitDialog }

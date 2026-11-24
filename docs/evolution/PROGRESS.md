@@ -3123,3 +3123,11 @@ The active-reminder overview now separates a valid empty list from a database re
 A/B on macOS arm64 / Qt 6.11.2: before this change the reminder query returned an empty list on SQL failure and there was no error-aware overview, so the new test failed to compile. Afterwards an empty log, a valid reminder, an invalid deadline and an injected missing event table are distinguished. CTest radionet and qmlpopups passed 2/2; three offscreen app scenarios for ordinary reminders, other active sessions and the closed dialog passed. The final invalid-deadline assertion passed separately. App and test targets built; translation XML and git diff --check passed.
 
 Failure injection was tested at core level, not through the rendered warnings. The overview refreshes when the controller emits its existing change signal; external database changes are not independently polled. A malformed deadline suppresses the entire overview until repaired. This is not a system notification, physical UI or real-radio test; Windows/Linux and full G08/G13 acceptance remain open.
+
+## 2026-11-24 — G08 desktop reminder-error A/B
+
+An offscreen app fixture now opens an isolated log with a missing radio-net event table, checks the main-window warning and activates it, then checks the visible diagnostic in Net Manager. This addresses the desktop fault-injection gap above.
+
+A/B on macOS arm64 / Qt 6.11.2: with SQL errors temporarily treated as an empty overview, both warning controls were hidden. Restoring checked error propagation made the banner and dialog diagnostic visible; the fixture passed and CTest radionet and qmlpopups passed 2/2. The first B test run used the system's Italian locale while asserting English; it displayed the Italian warnings, and the fixture was corrected to explicitly request English before the A/B comparison. App rebuilt and git diff --check passed.
+
+The fixture is programmatic and offscreen, using a deliberately damaged synthetic database; it does not prove physical layout or interaction, external-change detection, Windows/Linux or full G08/G13 acceptance.

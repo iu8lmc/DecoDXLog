@@ -13,6 +13,9 @@ DialogFrame {
     readonly property var reminder: net.reminder
     readonly property var reminderOverview: net.reminderOverview
     readonly property var activeReminders: reminderOverview.reminders || []
+    function probeReminderError() {
+        console.warn("PROBE net reminder error dialog=" + reminderReadError.visible + " text=" + reminderReadError.text)
+    }
     property double reminderClock: Date.now()
     readonly property var otherDueReminder: {
         let first = null, earliest = Infinity
@@ -236,6 +239,7 @@ DialogFrame {
             GlassButton { text: qsTr("Cancel export"); visible: root.net.exportBusy; onClicked: root.net.cancelExport() }
         }
         Text {
+            id: reminderReadError
             Layout.fillWidth: true; visible: !!root.reminderOverview.error
             text: qsTr("Radio net reminders unavailable: %1").arg(root.reminderOverview.error || "")
             color: Theme.warningColor; wrapMode: Text.Wrap

@@ -2182,6 +2182,20 @@ private slots:
         QVERIFY(adif.contains("<band_rx:4>70cm"));
     }
 
+    void radioNetReminderReadFailureIsVisible()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); RadioNet net(&db);
+          QVERIFY(net.start("First")); QVERIFY(net.setReminder(60));
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE radio_net_event")); }
+        QByteArray output; QVERIFY2(launch(dir,"radioneterrorprobe",output,3500),output.constData());
+        QVERIFY2(output.contains("PROBE net reminder error banner=true text=Radio net reminders unavailable") &&
+                 output.contains("PROBE net reminder error dialog=true text=Radio net reminders unavailable:"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+    }
+
     void radioNetReminderVisibleWithDialogClosed()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); QByteArray output;
