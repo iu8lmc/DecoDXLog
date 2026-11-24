@@ -25,7 +25,13 @@ class EventsApi(BaseHTTPRequestHandler):
             status = 200
         else:
             status = self.server.event_status
-            value = self.server.page if status == 200 else {'error': 'event history pruned', 'prunedThrough': '7', 'highWatermark': '8'}
+            after=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('after',['0'])[0]
+            if getattr(self.server, 'gap_recovery', False):
+                status = 410 if self.server.gap_recovery == 'always' or int(after)<7 else 200
+                value = {'error':'event history pruned','prunedThrough':'7','highWatermark':'8'} if status==410 else {
+                    'log':'log-1','events':[{'sequence':'8','qsoUuid':'q8','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'8'}
+            else:
+                value = self.server.page if status == 200 else {'error': 'event history pruned', 'prunedThrough': '7', 'highWatermark': '8'}
             if status == 200 and getattr(self.server, 'dynamic', False):
                 after=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('after',['0'])[0]
                 if after == '1': value={'log':'log-1','events':[],'hasMore':False,'next':'1'}
@@ -100,6 +106,39 @@ class EventCounterTests(unittest.TestCase):
             db.execute('DROP TRIGGER injected_failure')
         result=counter.process_page(self.path,self.server.server_port,'test-token')
         self.assertEqual(result['cursor'],'2'); self.assertEqual(result['counts']['added'],2)
+
+    def test_explicit_gap_recovery_records_incomplete_history(self):
+        self.server.gap_recovery=True
+        with self.assertRaises(counter.EventGap): counter.process_page(self.path,self.server.server_port,'test-token')
+        result=counter.process_page(self.path,self.server.server_port,'test-token',accept_gap=True)
+        self.assertEqual(result['cursor'],'8'); self.assertFalse(result['noRecordedGaps']); self.assertEqual(result['gapCount'],1)
+        self.assertEqual(result['counts']['added'],1)
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(db.execute('SELECT from_cursor,pruned_through,high_watermark FROM counter_gaps').fetchall(), [('0','7','8')])
+        self.server.gap_recovery=False; self.server.page={'log':'log-1','events':[],'hasMore':False,'next':'8'}
+        again=counter.process_page(self.path,self.server.server_port,'test-token')
+        self.assertFalse(again['noRecordedGaps']); self.assertEqual(again['gapCount'],1); self.assertEqual(again['counts']['added'],1)
+
+    def test_gap_recovery_rolls_back_if_page_pruned_again(self):
+        counter.process_page(self.path,self.server.server_port,'test-token')
+        self.server.gap_recovery='always'
+        with self.assertRaises(counter.EventGap): counter.process_page(self.path,self.server.server_port,'test-token',accept_gap=True)
+        with sqlite3.connect(self.path) as db:
+            self.assertEqual(db.execute('SELECT cursor FROM counter_state').fetchone()[0],'1')
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM counter_gaps').fetchone()[0],0)
+            self.assertEqual(db.execute("SELECT count FROM counter_counts WHERE kind='added'").fetchone()[0],1)
+
+    def test_existing_counter_state_gains_gap_history_without_losing_counts(self):
+        with sqlite3.connect(self.path) as db:
+            db.execute('PRAGMA application_id=%d' % counter.APP_ID)
+            db.execute('CREATE TABLE counter_state(id INTEGER PRIMARY KEY, log_id TEXT NOT NULL, cursor TEXT NOT NULL)')
+            db.execute('CREATE TABLE counter_counts(kind TEXT PRIMARY KEY, count INTEGER NOT NULL)')
+            db.execute("INSERT INTO counter_state VALUES(1,'log-1','1')")
+            db.executemany('INSERT INTO counter_counts VALUES(?,?)', ((kind, 3 if kind=='added' else 0) for kind in counter.KINDS))
+        self.server.page={'log':'log-1','events':[],'hasMore':False,'next':'1'}
+        result=counter.process_page(self.path,self.server.server_port,'test-token')
+        self.assertEqual(result['counts']['added'],3); self.assertEqual(result['cursor'],'1')
+        self.assertTrue(result['noRecordedGaps']); self.assertEqual(result['gapCount'],0)
 
     def test_rejects_unowned_existing_database(self):
         with sqlite3.connect(self.path) as db: db.execute('CREATE TABLE user_data(value TEXT)'); db.execute("INSERT INTO user_data VALUES ('keep')")

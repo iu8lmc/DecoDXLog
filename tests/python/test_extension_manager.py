@@ -42,8 +42,14 @@ class ManagerTests(unittest.TestCase):
                     value={'apiVersion':1,'permissionModel':'extension-token','extensionId':'org.decodxlog.example.event-counter',
                            'perExtensionPermissions':True,'operations':['qso.events'],'events':True,'eventLogIdentity':'log-1'}
                 else:
-                    value={'log':'log-1','events':[], 'hasMore':False,'next':'1'} if 'after=1' in self.path else {
-                        'log':'log-1','events':[{'sequence':'1','qsoUuid':'q1','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'1'}
+                    if getattr(self.server,'gap',False) and 'after=1' in self.path:
+                        value={'error':'event history pruned','prunedThrough':'7','highWatermark':'8'}
+                        data=json.dumps(value).encode(); self.send_response(410); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data); return
+                    if getattr(self.server,'gap',False) and 'after=7' in self.path:
+                        value={'log':'log-1','events':[{'sequence':'8','qsoUuid':'q8','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'8'}
+                    else:
+                        value={'log':'log-1','events':[], 'hasMore':False,'next':'1'} if 'after=1' in self.path else {
+                            'log':'log-1','events':[{'sequence':'1','qsoUuid':'q1','revision':1,'kind':'added','recordedAt':'2026-01-01T00:00:00Z'}], 'hasMore':False,'next':'1'}
                 data=json.dumps(value).encode(); self.send_response(200); self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
         with tempfile.TemporaryDirectory() as temp:
             base=pathlib.Path(temp); root=base/'extensions'; log=base/'log.sqlite'
@@ -66,6 +72,13 @@ class ManagerTests(unittest.TestCase):
                 self.assertEqual(first['counts']['added'],1); self.assertEqual(second['counts']['added'],1)
                 self.assertEqual(second['cursor'],'1')
                 self.assertTrue((root/identity/'.event-state.sqlite').is_file())
+                server.gap=True
+                with self.assertRaises(manager.harness.ExtensionEventGap): manager.run(root,identity,'read-token',server.server_port,5)
+                cli=subprocess.run([sys.executable,str(ROOT/'tools/extension_manager.py'),'--root',str(root),'run',identity,'--port',str(server.server_port)],
+                                   env={**os.environ,'DECODXLOG_READ_TOKEN':'read-token'},capture_output=True,timeout=10)
+                self.assertNotEqual(cli.returncode,0); self.assertIn(b'Event history was pruned',cli.stderr); self.assertNotIn(b'read-token',cli.stderr)
+                recovered=manager.run(root,identity,'read-token',server.server_port,5,accept_gap=True)
+                self.assertFalse(recovered['noRecordedGaps']); self.assertEqual(recovered['gapCount'],1); self.assertEqual(recovered['cursor'],'8')
                 manager.remove(root,identity); self.assertFalse((root/identity).exists())
                 with sqlite3.connect(log) as db: self.assertEqual(db.execute('SELECT call FROM qso').fetchone()[0],'K1ABC')
             finally:

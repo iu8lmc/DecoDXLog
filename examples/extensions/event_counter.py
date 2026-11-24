@@ -19,7 +19,10 @@ MAX_SEQUENCE = (1 << 63) - 1
 
 
 class EventGap(ValueError):
-    pass
+    def __init__(self, pruned_through, high_watermark):
+        super().__init__('event history was pruned; reconcile before choosing a new cursor')
+        self.pruned_through = pruned_through
+        self.high_watermark = high_watermark
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -43,7 +46,17 @@ def _get(port, token, path):
             raw = response.read(MAX_REPLY + 1)
     except urllib.error.HTTPError as exc:
         if exc.code == 410:
-            raise EventGap('event history was pruned; reconcile before choosing a new cursor') from exc
+            try:
+                raw = exc.read(16385)
+                if len(raw) > 16384: raise ValueError('gap response too large')
+                detail = json.loads(raw)
+                if not isinstance(detail, dict): raise ValueError('invalid gap response')
+                floor = _number(detail.get('prunedThrough'))
+                high = _number(detail.get('highWatermark'))
+                if floor > high: raise ValueError('invalid gap boundary')
+            except (OSError, ValueError, UnicodeError, RecursionError) as parse_error:
+                raise ValueError('invalid event gap response') from parse_error
+            raise EventGap(floor, high) from exc
         raise ValueError('event API request failed') from exc
     except OSError as exc:
         raise ValueError('event API request failed') from exc
@@ -58,7 +71,7 @@ def _get(port, token, path):
     return result
 
 
-def process_page(state_path, port, token):
+def process_page(state_path, port, token, accept_gap=False):
     if not 1 <= port <= 65535 or not token or not token.isascii() or any(c in token for c in '\r\n'):
         raise ValueError('invalid port or extension token')
     path = pathlib.Path(state_path)
@@ -84,14 +97,24 @@ def process_page(state_path, port, token):
                 db.execute('CREATE TABLE counter_counts(kind TEXT PRIMARY KEY, count INTEGER NOT NULL CHECK(count>=0))')
                 db.execute('INSERT INTO counter_state(id,log_id,cursor) VALUES(1,?,?)', (log_id, '0'))
                 db.executemany('INSERT INTO counter_counts(kind,count) VALUES(?,0)', ((kind,) for kind in KINDS))
-            elif app_id != APP_ID or tables != {'counter_state', 'counter_counts'}:
+            elif app_id != APP_ID or tables not in ({'counter_state', 'counter_counts'}, {'counter_state', 'counter_counts', 'counter_gaps'}):
                 raise ValueError('state database is not owned by the event counter')
+            db.execute('CREATE TABLE IF NOT EXISTS counter_gaps(id INTEGER PRIMARY KEY, from_cursor TEXT NOT NULL, pruned_through TEXT NOT NULL, high_watermark TEXT NOT NULL)')
             row = db.execute('SELECT log_id,cursor FROM counter_state WHERE id=1').fetchone()
             if not row or row[0] != log_id:
                 raise ValueError('log identity changed; preserve state and reconcile')
             cursor = _number(row[1])
             query = urllib.parse.urlencode({'log': log_id, 'after': str(cursor), 'limit': str(LIMIT)})
-            page = _get(port, token, '/api/v1/events?' + query)
+            try:
+                page = _get(port, token, '/api/v1/events?' + query)
+            except EventGap as gap:
+                if not accept_gap: raise
+                if gap.pruned_through <= cursor: raise ValueError('inconsistent event gap')
+                db.execute('INSERT INTO counter_gaps(from_cursor,pruned_through,high_watermark) VALUES(?,?,?)',
+                           (str(cursor), str(gap.pruned_through), str(gap.high_watermark)))
+                cursor = gap.pruned_through
+                query = urllib.parse.urlencode({'log': log_id, 'after': str(cursor), 'limit': str(LIMIT)})
+                page = _get(port, token, '/api/v1/events?' + query)
             events = page.get('events')
             if (page.get('log') != log_id or not isinstance(events, list) or len(events) > LIMIT
                     or type(page.get('hasMore')) is not bool):
@@ -114,8 +137,10 @@ def process_page(state_path, port, token):
             db.execute('UPDATE counter_state SET cursor=? WHERE id=1', (str(last),))
             counts = dict(db.execute('SELECT kind,count FROM counter_counts'))
             if set(counts) != set(KINDS): raise ValueError('invalid counter state')
+            gap_count = db.execute('SELECT COUNT(*) FROM counter_gaps').fetchone()[0]
             db.execute('COMMIT')
-            return {'scope': 'event_counts', 'log': log_id, 'cursor': str(last), 'counts': counts, 'hasMore': page['hasMore']}
+            return {'scope': 'event_counts', 'log': log_id, 'cursor': str(last), 'counts': counts,
+                    'hasMore': page['hasMore'], 'noRecordedGaps': gap_count == 0, 'gapCount': gap_count}
         except BaseException:
             db.execute('ROLLBACK')
             raise
@@ -125,9 +150,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', type=int, required=True)
     parser.add_argument('--state', type=pathlib.Path, required=True)
+    parser.add_argument('--accept-gap', action='store_true', help='explicitly record missing history and resume at the retained boundary')
     args = parser.parse_args()
     try:
-        result = process_page(args.state, args.port, os.environ.get('DECODXLOG_READ_TOKEN', ''))
+        result = process_page(args.state, args.port, os.environ.get('DECODXLOG_READ_TOKEN', ''), accept_gap=args.accept_gap)
     except (ValueError, OSError, sqlite3.Error) as exc:
         print('Event counter unavailable: ' + type(exc).__name__, file=sys.stderr)
         return 1

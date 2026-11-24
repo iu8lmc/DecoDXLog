@@ -13,6 +13,10 @@ import time
 
 MAX_MANIFEST = 16 * 1024
 MAX_OUTPUT = 1024 * 1024
+
+
+class ExtensionEventGap(ValueError):
+    pass
 ALLOWED_PERMISSIONS = frozenset({"qso.read", "status.read", "worked.read", "tracker.read", "qso.events"})
 REQUIRED = frozenset({"schemaVersion", "apiVersion", "id", "version", "entrypoint", "permissions"})
 
@@ -96,10 +100,12 @@ def supported_scope(manifest):
     raise ValueError("the harness requires one supported example capability")
 
 
-def run_extension(manifest_path, token, port, timeout, state_path=None):
+def run_extension(manifest_path, token, port, timeout, state_path=None, accept_gap=False):
     manifest_path = pathlib.Path(manifest_path).resolve(strict=True)
     manifest = load_manifest(manifest_path)
     expected_scope = supported_scope(manifest)
+    if accept_gap and expected_scope != "event_counts":
+        raise ValueError("gap recovery requires an event extension")
     if not token or not 1 <= port <= 65535 or not 0.1 <= timeout <= 60:
         raise ValueError("invalid token, port or timeout")
     env = {k: os.environ[k] for k in ("PATH", "SYSTEMROOT", "WINDIR") if k in os.environ}
@@ -117,6 +123,7 @@ def run_extension(manifest_path, token, port, timeout, state_path=None):
                 if state.is_symlink() or (state.exists() and not state.is_file()):
                     raise ValueError("invalid extension state path")
                 command += ["--state", str(state)]
+                if accept_gap: command += ["--accept-gap"]
             process = subprocess.Popen(command, cwd=directory, env=env, stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                                        start_new_session=(os.name == "posix"))
             try:
@@ -154,6 +161,9 @@ def run_extension(manifest_path, token, port, timeout, state_path=None):
             if stdout.stat().st_size > MAX_OUTPUT or stderr.stat().st_size > MAX_OUTPUT:
                 raise ValueError("extension exceeded output limit")
             if process.returncode != 0:
+                err.seek(0)
+                if expected_scope == "event_counts" and err.read(MAX_OUTPUT + 1) == b"Event counter unavailable: EventGap\n":
+                    raise ExtensionEventGap("event history was pruned")
                 raise ValueError("extension failed")
             out.seek(0)
             raw_output = out.read(MAX_OUTPUT + 1)

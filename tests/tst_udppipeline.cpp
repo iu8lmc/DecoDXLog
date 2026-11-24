@@ -811,6 +811,22 @@ private slots:
         const auto recovered=get(QStringLiteral("/api/v1/events?log=%1&after=%2").arg(log,floor)); QCOMPARE(recovered.first,200);
         const auto ahead=get(QStringLiteral("/api/v1/events?log=%1&after=9223372036854775807").arg(log)); QCOMPARE(ahead.first,409);
         QVERIFY(!ahead.second.value("highWatermark").toString().isEmpty());
+        const QString python=QStandardPaths::findExecutable(QStringLiteral("python3")); QVERIFY(!python.isEmpty());
+        const QString script=QStringLiteral(DECODXLOG_SOURCE_DIR "/tools/extension_manager.py");
+        const QString root=m_dir.filePath(QStringLiteral("managed-gap-events"));
+        const QString identity=QStringLiteral("org.decodxlog.example.event-counter");
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert(QStringLiteral("DECODXLOG_READ_TOKEN"),QStringLiteral("22222222222222222222222222222222"));
+        QProcess process; process.setProcessEnvironment(env);
+        process.start(python,{script,QStringLiteral("--root"),root,QStringLiteral("install"),QStringLiteral(DECODXLOG_SOURCE_DIR "/examples/extensions/event_counter.manifest.json")});
+        QVERIFY(process.waitForFinished(10000)); QCOMPARE(process.exitCode(),0);
+        const QStringList args{script,QStringLiteral("--root"),root,QStringLiteral("run"),identity,QStringLiteral("--port"),QString::number(m_apiPort)};
+        process.start(python,args); QVERIFY(process.waitForFinished(10000)); QVERIFY(process.exitCode()!=0);
+        QVERIFY(process.readAllStandardError().contains("Event history was pruned"));
+        QStringList accepted=args; accepted << QStringLiteral("--accept-gap");
+        process.start(python,accepted); QVERIFY(process.waitForFinished(10000)); QVERIFY2(process.exitCode()==0,process.readAllStandardError().constData());
+        const auto result=QJsonDocument::fromJson(process.readAllStandardOutput()).object();
+        QCOMPARE(result.value("scope").toString(),QStringLiteral("event_counts"));
+        QVERIFY(!result.value("noRecordedGaps").toBool()); QCOMPARE(result.value("gapCount").toInt(),1);
     }
 
     void scopedExtensionReadsThroughApplication()

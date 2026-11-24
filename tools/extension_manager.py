@@ -265,16 +265,19 @@ def list_installed(root):
         return entries
 
 
-def run(root, identity, token, port, timeout):
+def run(root, identity, token, port, timeout, accept_gap=False):
     root = _root(root)
     with _operation_lock(root):
         manifest_path, manifest = _current(root, identity)
         _verify_credential(manifest, token, port, timeout)
-        if harness.supported_scope(manifest) == 'event_counts':
+        scope = harness.supported_scope(manifest)
+        if accept_gap and scope != 'event_counts':
+            raise ValueError('gap recovery requires an event extension')
+        if scope == 'event_counts':
             state_path = _directory(root, identity) / '.event-state.sqlite'
             if state_path.is_symlink() or (state_path.exists() and not state_path.is_file()):
                 raise ValueError('invalid extension state path')
-            return harness.run_extension(manifest_path, token, port, timeout, state_path=state_path)
+            return harness.run_extension(manifest_path, token, port, timeout, state_path=state_path, accept_gap=accept_gap)
         return harness.run_extension(manifest_path, token, port, timeout)
 
 
@@ -295,13 +298,15 @@ def main():
     add.add_argument('--timeout', type=float, default=10)
     commands.add_parser('list')
     delete = commands.add_parser('remove'); delete.add_argument('id')
-    execute = commands.add_parser('run'); execute.add_argument('id'); execute.add_argument('--port', type=int, required=True); execute.add_argument('--timeout', type=float, default=10)
+    execute = commands.add_parser('run'); execute.add_argument('id'); execute.add_argument('--port', type=int, required=True); execute.add_argument('--timeout', type=float, default=10); execute.add_argument('--accept-gap', action='store_true', help='explicitly record missing event history and resume')
     args = parser.parse_args()
     try:
         if args.command == 'install': result = install(args.root, args.manifest, os.environ.get('DECODXLOG_READ_TOKEN',''), args.verify_port, args.timeout)
         elif args.command == 'list': result = list_installed(args.root)
         elif args.command == 'remove': remove(args.root, args.id); result = {'removed':args.id}
-        else: result = run(args.root, args.id, os.environ.get('DECODXLOG_READ_TOKEN',''), args.port, args.timeout)
+        else: result = run(args.root, args.id, os.environ.get('DECODXLOG_READ_TOKEN',''), args.port, args.timeout, accept_gap=args.accept_gap)
+    except harness.ExtensionEventGap:
+        print('Event history was pruned; reconcile the missing history before explicitly using --accept-gap.', file=sys.stderr); return 1
     except (OSError, ValueError, TypeError, RecursionError, json.JSONDecodeError) as exc:
         print(f'Extension operation failed: {type(exc).__name__}', file=sys.stderr); return 1
     print(json.dumps(result, ensure_ascii=False, sort_keys=True)); return 0
