@@ -637,8 +637,30 @@ DialogFrame {
         return false
     }
     function probeMarathonReview(profile) {
-        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
-        Qt.callLater(function() { const z=marathonZoneRows.itemAtIndex(0); const e=marathonExcludedRows.itemAtIndex(0); const c=marathonEntityRows.itemAtIndex(0); console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")+" entity="+(c ? c.text : "missing")+" location="+marathonLocationSummary.text) })
+        openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"
+        marathonReviewProbeTimer.attempts = 0
+        marathonReviewProbeTimer.started = false
+        marathonReviewProbeTimer.restart()
+    }
+    Timer {
+        id: marathonReviewProbeTimer
+        property int attempts: 0
+        property bool started: false
+        interval: 50; repeat: true
+        onTriggered: {
+            if (!started || (!marathonReview.visible && root.marathonPreview.valid !== true)) {
+                started = true
+                refreshMarathon()
+                marathonReview.open()
+            }
+            const z = marathonZoneRows.itemAtIndex(0), e = marathonExcludedRows.itemAtIndex(0), c = marathonEntityRows.itemAtIndex(0)
+            const ready = marathonReview.visible && (marathonZoneRows.count === 0 || z) &&
+                          (marathonExcludedRows.count === 0 || e) && (marathonEntityRows.count === 0 || c)
+            attempts++
+            if (!ready && attempts < 30) return
+            stop()
+            console.warn("PROBE marathonReview open="+marathonReview.visible+" zone="+(z ? z.text : "missing")+" excluded="+(e ? e.text : "missing")+" entity="+(c ? c.text : "missing")+" location="+marathonLocationSummary.text)
+        }
     }
     function probeMarathonAlternatives(profile) {
         openAt("dxcc"); decolog.awardProfile=Number(profile); marathonYear=2026; marathonCategory="mixed"; refreshMarathon(); marathonReview.open()
