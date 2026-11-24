@@ -1396,9 +1396,11 @@ RoundedWindow {
         else if (what[0] === "qslocrreview") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrReview()) }
         else if (what[0] === "qslocrrevisions") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrRevisions()) }
         else if (what[0] === "qslocrhistory") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.showOcrHistory()) }
-        else if (what[0] === "radionetbackgroundprobe") {
+        else if (what[0] === "radionetbackgroundprobe" || what[0] === "radionetmultireminderprobe") {
             decolog.radioNet.start("Reminder probe", 0)
+            netReminderProbe.expectedSession = decolog.radioNet.session.id
             decolog.radioNet.setReminder(1)
+            if (what[0] === "radionetmultireminderprobe") decolog.radioNet.start("Other active net", 0)
             netReminderProbe.start()
         }
         else if (what[0] === "radionet") {
@@ -2037,18 +2039,27 @@ RoundedWindow {
                 dxToast.show(title, text, spotKey)
         }
     }
-    // Keep the radio-net reminder visible when its management dialog is closed.
+    // Reminders belong to sessions, including active sessions not currently selected.
     Timer {
         interval: 250; repeat: true
-        running: !!decolog.radioNet.reminder.scheduled
+        running: netReminder.reminders.length > 0
         onTriggered: netReminder.clock = Date.now()
     }
     Rectangle {
         id: netReminder
         property double clock: Date.now()
-        readonly property var reminder: decolog.radioNet.reminder
-        readonly property double deadline: Date.parse(reminder.deadline || "")
-        visible: !!reminder.scheduled && isFinite(deadline) && deadline <= clock && !radioNetDialog.visible
+        readonly property var reminders: decolog.radioNet.activeReminders
+        readonly property var dueReminder: {
+            let first = null, earliest = Infinity
+            for (const reminder of reminders) {
+                const when = Date.parse(reminder.deadline || "")
+                if (isFinite(when) && when <= clock && when < earliest) {
+                    earliest = when; first = reminder
+                }
+            }
+            return first
+        }
+        visible: !!dueReminder && !radioNetDialog.visible
         anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 52; z: 999
         width: netReminderButton.implicitWidth + 20; height: netReminderButton.implicitHeight + 12
@@ -2056,8 +2067,11 @@ RoundedWindow {
         Button {
             id: netReminderButton
             anchors.centerIn: parent
-            text: qsTr("Radio net reminder due — open Net Manager")
-            onClicked: radioNetDialog.open()
+            text: qsTr("Radio net reminder due: %1 — open Net Manager").arg(netReminder.dueReminder ? netReminder.dueReminder.title : "")
+            onClicked: {
+                if (netReminder.dueReminder && decolog.radioNet.selectSession(netReminder.dueReminder.sessionId))
+                    radioNetDialog.open()
+            }
         }
     }
     ActivationDialog { id: activationDialog; onOpenQsoRequested: (id) => { window.openQso(id); if (startupShow === "activationopenexcludedprobe") console.warn("PROBE activation open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)) } }
@@ -2067,12 +2081,13 @@ RoundedWindow {
     ContestSubmitDialog { id: submitDialog }
     Timer {
         id: netReminderProbe
+        property var expectedSession: 0
         interval: 1800
         onTriggered: {
             console.warn("PROBE net background due=" + netReminder.visible + " dialog=" + radioNetDialog.visible)
             netReminderButton.clicked()
             Qt.callLater(function() {
-                console.warn("PROBE net background opened=" + radioNetDialog.visible)
+                console.warn("PROBE net background opened=" + radioNetDialog.visible + " correctSession=" + (decolog.radioNet.session.id === expectedSession))
                 decolog.radioNet.clearReminder()
                 Qt.callLater(() => console.warn("PROBE net background cleared=" + !netReminder.visible))
             })

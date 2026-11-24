@@ -95,6 +95,25 @@ QVariantMap RadioNet::reminder() const
             {QStringLiteral("due"), due <= QDateTime::currentDateTimeUtc()}};
 }
 
+QVariantList RadioNet::activeReminders() const
+{
+    QVariantList result;
+    if (!m_db || !m_db->isOpen()) return result;
+    QSqlQuery q(m_db->connection());
+    if (!q.exec(QStringLiteral(
+            "SELECT s.id,s.title,e.detail FROM radio_net_session s JOIN radio_net_event e ON e.id=("
+            "SELECT id FROM radio_net_event WHERE session_id=s.id AND event IN ('reminder_set','reminder_clear') "
+            "ORDER BY id DESC LIMIT 1) WHERE s.ended_at IS NULL AND e.event='reminder_set'"))) return result;
+    while (q.next()) {
+        const QString deadline = q.value(2).toString();
+        if (!QDateTime::fromString(deadline, Qt::ISODateWithMs).isValid()) continue;
+        result << QVariantMap{{QStringLiteral("sessionId"), q.value(0)},
+                              {QStringLiteral("title"), q.value(1)},
+                              {QStringLiteral("deadline"), deadline}};
+    }
+    return result;
+}
+
 bool RadioNet::setReminder(int seconds)
 {
     if (!m_db || !m_db->isOpen() || seconds < 1 || seconds > 86400)

@@ -20,6 +20,7 @@ class RadioNet : public QObject {
     Q_PROPERTY(QVariantMap session READ session NOTIFY changed)
     Q_PROPERTY(QVariantMap summary READ summary NOTIFY changed)
     Q_PROPERTY(QVariantMap reminder READ reminder NOTIFY changed)
+    Q_PROPERTY(QVariantList activeReminders READ activeReminders NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(bool exportBusy READ exportBusy NOTIFY exportChanged)
   public:
@@ -34,6 +35,7 @@ class RadioNet : public QObject {
     QVariantMap session() const;
     QVariantMap summary() const;
     QVariantMap reminder() const;
+    QVariantList activeReminders() const;
     QString error() const { return m_error; }
     bool exportBusy() const { return m_exportBusy; }
     Q_INVOKABLE bool selectSession(qint64 id);

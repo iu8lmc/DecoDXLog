@@ -4921,8 +4921,8 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 <context>
     <name>Main</name>
     <message>
-        <source>Radio net reminder due — open Net Manager</source>
-        <translation>Promemoria rete radio scaduto — apri Net Manager</translation>
+        <source>Radio net reminder due: %1 — open Net Manager</source>
+        <translation>Promemoria rete radio scaduto: %1 — apri Net Manager</translation>
     </message>
     <message>
         <source>Choose the source, then review the file before importing</source>

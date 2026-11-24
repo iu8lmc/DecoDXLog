@@ -205,6 +205,19 @@ class TestRadioNet : public QObject {
         QCOMPARE(db.qsoCount(), 0);
     }
 
+    void activeRemindersIncludeUnselectedSessions()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); RadioNet net(&db);
+        QVERIFY(net.start("First")); const auto first=net.session().value("id").toLongLong();
+        QVERIFY(net.setReminder(60)); QVERIFY(net.start("Second"));
+        QCOMPARE(net.activeReminders().size(), 1);
+        QCOMPARE(net.activeReminders().first().toMap().value("sessionId").toLongLong(), first);
+        QVERIFY(net.setReminder(120)); QCOMPARE(net.activeReminders().size(), 2);
+        QVERIFY(net.closeSession()); QCOMPARE(net.activeReminders().size(), 1);
+        QVERIFY(net.selectSession(first)); QVERIFY(net.clearReminder()); QVERIFY(net.activeReminders().isEmpty());
+        QCOMPARE(db.qsoCount(), qint64(0));
+    }
+
     void pagesCompleteHistoryWithoutChangingRoster()
     {
         LogDatabase db;
