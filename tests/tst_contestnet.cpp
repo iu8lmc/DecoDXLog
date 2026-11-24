@@ -21,6 +21,35 @@ class TestContestNet : public QObject {
     Q_OBJECT
 
 private slots:
+    void handoffHistoryIsAtomicAndPersistent()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("history.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","event","sender","receiver","K1ABC",14025000,"2026-11-24T12:00:00Z"};
+        const auto frame=contesthandoff::offerFrame(offer); QVERIFY(contesthandoff::receiveOffer(db,"event","receiver","sender",frame).ok);
+        QString error; auto history=contesthandoff::history(db,"event","receiver",offer.id,false,&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(history.size(),1); QCOMPARE(history.first().state,QString("pending"));
+        QSqlQuery trigger(db.connection()); QVERIFY(trigger.exec("CREATE TRIGGER deny_handoff_history BEFORE INSERT ON app_setting WHEN NEW.key LIKE 'contest_handoff.history.%' BEGIN SELECT RAISE(ABORT,'history denied'); END"));
+        QVERIFY(!contesthandoff::setIncomingState(db,"event","receiver",offer.id,"accepted").ok);
+        QCOMPARE(contesthandoff::incomingOffers(db,"event","receiver").first().state,QString("pending"));
+        QVERIFY(trigger.exec("DROP TRIGGER deny_handoff_history"));
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",offer.id,"accepted").ok);
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",offer.id,"accepted").replayed);
+        QVERIFY(contesthandoff::setIncomingState(db,"event","receiver",offer.id,"completed").ok);
+        db.close(); QVERIFY(db.open(path)); history=contesthandoff::history(db,"event","receiver",offer.id,false,&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(history.size(),3);
+        QCOMPARE(history.at(0).state,QString("pending")); QCOMPARE(history.at(1).state,QString("accepted")); QCOMPARE(history.at(2).state,QString("completed"));
+        QVERIFY(contesthandoff::history(db,"other","receiver",offer.id,false,&error).isEmpty()); QVERIFY(!error.isEmpty()); QCOMPARE(db.qsoCount(),qint64(0));
+        LogDatabase sender; QVERIFY(sender.open(dir.filePath("sender.sqlite"))); QVERIFY(contesthandoff::storeOutgoing(sender,offer).ok);
+        QSqlQuery senderTrigger(sender.connection()); QVERIFY(senderTrigger.exec("CREATE TRIGGER deny_handoff_history BEFORE INSERT ON app_setting WHEN NEW.key LIKE 'contest_handoff.history.%' BEGIN SELECT RAISE(ABORT,'history denied'); END"));
+        QVERIFY(!contesthandoff::receiveRemoteState(sender,"event","sender","receiver",frame,"accepted").ok);
+        QVERIFY(contesthandoff::outgoingOffers(sender,"event","sender").first().state.isEmpty());
+        QVERIFY(senderTrigger.exec("DROP TRIGGER deny_handoff_history")); QVERIFY(contesthandoff::receiveRemoteState(sender,"event","sender","receiver",frame,"accepted").ok);
+        LogDatabase legacy; QVERIFY(legacy.open(dir.filePath("legacy.sqlite"))); QVERIFY(contesthandoff::receiveOffer(legacy,"event","receiver","sender",frame).ok);
+        QSqlQuery legacyQuery(legacy.connection()); QVERIFY(legacyQuery.exec("DELETE FROM app_setting WHERE key LIKE 'contest_handoff.history.%'"));
+        QVERIFY(contesthandoff::setIncomingState(legacy,"event","receiver",offer.id,"accepted").ok);
+        const auto legacyEvents=contesthandoff::history(legacy,"event","receiver",offer.id,false,&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(legacyEvents.size(),1); QCOMPARE(legacyEvents.first().state,QString("accepted"));
+    }
     void skedReminderIsDueAcceptedAndPersistent()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("reminders.sqlite"); LogDatabase db; QVERIFY(db.open(path));
@@ -69,6 +98,8 @@ private slots:
         auto modified=frame; modified.insert("call","K2ABC"); QVERIFY(!contesthandoff::receiveRemoteState(sender,"contest-2026","node-a","node-b",modified,"completed").ok);
         sender.close(); QVERIFY(sender.open(path)); const auto list=contesthandoff::outgoingOffers(sender,"contest-2026","node-a");
         QCOMPARE(list.size(),1); QCOMPARE(list.first().state,QString("completed")); QCOMPARE(sender.qsoCount(),qint64(0));
+        QString error; const auto events=contesthandoff::history(sender,"contest-2026","node-a",offer.id,true,&error);
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(events.size(),2); QCOMPARE(events.first().state,QString("offered")); QCOMPARE(events.last().state,QString("completed"));
     }
     void handoffOfferIsAddressedIdempotentAndPersistent()
     {

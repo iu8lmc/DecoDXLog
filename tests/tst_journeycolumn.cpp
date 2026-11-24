@@ -145,7 +145,8 @@ private slots:
           QVERIFY(contesthandoff::setIncomingState(db,"test-event","receiver",offer.id,"accepted").ok); }
         QVERIFY2(launch(dir,"nethandoffprobe",output,3500,true),output.constData());
         QVERIFY2(output.contains("PROBE nethandoff") && output.contains("\"visible\":true") && output.contains("\"scope\":\"test-event\"") &&
-                 output.contains("\"offers\":2") && output.contains("\"scheduled\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
+                 output.contains("\"offers\":2") && output.contains("\"scheduled\":1") && output.contains("\"history\":2") &&
+                 output.contains("\"historyVisible\":true") && output.contains("\"historyRows\":2") && output.contains("\"historyInvalid\":true") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
                  output.contains("\"error\":\"\"") && output.contains("\"before\":\"pending\"") && output.contains("\"after\":\"accepted\"") &&
                  output.contains("\"stateError\":\"\"") && output.contains("\"stale\":true") && output.contains("\"staleEnabled\":false") &&
                  output.contains("\"staleRows\":0") && output.contains("[activity] SKED|warning|") && output.contains("K2BBB") && !output.contains("TypeError"),output.constData());

@@ -155,6 +155,7 @@ public:
     Q_INVOKABLE QString retryHandoffOffer(const QString& id);
     Q_INVOKABLE QString setHandoffState(const QString& id,const QString& state);
     Q_INVOKABLE QString sendHandoffStatus(const QString& id);
+    Q_INVOKABLE QVariantMap handoffHistory(const QString& id,bool outgoing) const;
     void checkSkedReminders(const QDateTime& nowUtc);
     // Chiede agli altri i QSO della gara che qui mancano.
     Q_INVOKABLE void requestSync();

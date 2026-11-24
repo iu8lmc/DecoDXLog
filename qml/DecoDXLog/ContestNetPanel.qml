@@ -11,6 +11,15 @@ GlassPanel {
     id: root
 
     readonly property var net: decolog.net
+    function handoffStateName(value) {
+        if (value === "none") return qsTr("None")
+        if (value === "offered") return qsTr("Offered")
+        if (value === "pending") return qsTr("Pending")
+        if (value === "accepted") return qsTr("Accepted")
+        if (value === "declined") return qsTr("Declined")
+        if (value === "completed") return qsTr("Completed")
+        return value
+    }
     function probeHandoff() {
         root.net.setLoopbackForProbe(); root.net.enabled=true; handoffDialog.open()
         handoffScope.text="test-event"; handoffDialog.configure()
@@ -18,14 +27,20 @@ GlassPanel {
         handoffSkedTime.text="2026-11-25T18:30:00Z"; handoffDialog.sendOffer()
         const incoming=root.net.handoffInbox; const before=incoming.length ? incoming[0].state : "missing"
         const stateError=incoming.length ? root.net.setHandoffState(incoming[0].id,"accepted") : "missing"
+        if (incoming.length) handoffHistoryDialog.showHistory(incoming[0].id,false)
+        const historyVisible=handoffHistoryDialog.visible, historyRows=(handoffHistoryDialog.result.rows || []).length
         const group=root.net.group; root.net.group=group + "-TEST"; root.net.group=group
         const staleError=root.net.handoffError, staleEnabled=handoffSendButton.enabled, staleRows=root.net.handoffOutbox.length
+        const historyInvalid=(handoffHistoryDialog.result.error || "").length>0
         handoffDialog.configure()
+        handoffHistoryDialog.close()
         return {visible:handoffDialog.visible,scope:root.net.handoffScope,offers:root.net.handoffOutbox.length,
             call:root.net.handoffOutbox.length ? root.net.handoffOutbox[0].call : "",warning:handoffWarning.text,error:handoffDialog.result,
             before:before,after:root.net.handoffInbox.length ? root.net.handoffInbox[0].state : "missing",stateError:stateError,
             stale:staleError.length>0,staleEnabled:staleEnabled,staleRows:staleRows,
-            scheduled:root.net.handoffOutbox.filter(o => o.scheduledUtc === "2026-11-25T18:30:00Z").length}
+            scheduled:root.net.handoffOutbox.filter(o => o.scheduledUtc === "2026-11-25T18:30:00Z").length,
+            history:incoming.length ? (root.net.handoffHistory(incoming[0].id,false).rows || []).length : -1,
+            historyVisible:historyVisible,historyRows:historyRows,historyInvalid:historyInvalid}
     }
     function probeNetworkReviewStart(secure) {
         root.net.setLoopbackForProbe(); root.net.enabled=true; qsoWireDialog.open(); wireKey.text=secure ? "a".repeat(64) : ""
@@ -280,6 +295,7 @@ GlassPanel {
                     GlassButton { text: qsTr("Decline"); visible: modelData.state === "pending"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"declined") }
                     GlassButton { text: qsTr("Complete"); visible: modelData.state === "accepted"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"completed") }
                     GlassButton { text: qsTr("Resend status"); enabled: root.net.running && root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.sendHandoffStatus(modelData.id) }
+                    GlassButton { text: qsTr("History"); enabled: root.net.handoffAvailable; onClicked: handoffHistoryDialog.showHistory(modelData.id,false) }
                 }
             }
             Text { text: qsTr("Sent offers — reported status is unauthenticated"); color: Theme.textPrimary; font.bold: true }
@@ -293,9 +309,34 @@ GlassPanel {
                               (modelData.scheduledUtc ? " · " + qsTr("Sked: %1").arg(modelData.scheduledUtc) : "") }
                     GlassButton { text: qsTr("Retry"); enabled: root.net.running && root.net.handoffAvailable
                         onClicked: handoffDialog.result = root.net.retryHandoffOffer(modelData.id) }
+                    GlassButton { text: qsTr("History"); enabled: root.net.handoffAvailable; onClicked: handoffHistoryDialog.showHistory(modelData.id,true) }
                 }
             }
             GlassButton { text: qsTr("Close"); onClicked: handoffDialog.close() }
+        }
+    }
+
+    DialogFrame {
+        id: handoffHistoryDialog
+        transientParent: root.Window.window
+        title: qsTr("Handoff history")
+        width: 660; height: 480
+        property string offerId: ""
+        property bool outgoing: false
+        property var result: ({})
+        function reload() { result = root.net.handoffHistory(offerId,outgoing) }
+        function showHistory(id,isOutgoing) { offerId=id; outgoing=isOutgoing; reload(); open() }
+        Connections { target: root.net; function onHandoffChanged() { if (handoffHistoryDialog.visible) handoffHistoryDialog.reload() } }
+        body: ColumnLayout {
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("History begins when this feature is installed; older changes may be missing. Remote states are unauthenticated.") }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor; text: handoffHistoryDialog.result.error || "" }
+            ListView { id: handoffHistoryList; Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: handoffHistoryDialog.result.rows || []; ScrollBar.vertical: PanelScrollBar {}
+                delegate: Text { required property var modelData; width: handoffHistoryList.width; wrapMode: Text.Wrap; color: Theme.textPrimary
+                    text: qsTr("%1 UTC · %2 → %3").arg(modelData.atUtc).arg(root.handoffStateName(modelData.previous)).arg(root.handoffStateName(modelData.state)) }
+            }
+            GlassButton { text: qsTr("Close"); onClicked: handoffHistoryDialog.close() }
         }
     }
 

@@ -13,6 +13,28 @@ const QString incomingPrefix=QStringLiteral("contest_handoff.in."), outgoingPref
 const QString statePrefix=QStringLiteral("contest_handoff.state.");
 const QString remoteStatePrefix=QStringLiteral("contest_handoff.remote.");
 const QString reminderPrefix=QStringLiteral("contest_handoff.reminder.");
+const QString historyPrefix=QStringLiteral("contest_handoff.history.");
+struct Savepoint {
+    QSqlDatabase db; bool active{false}; QString error;
+    explicit Savepoint(QSqlDatabase database):db(database) { QSqlQuery q(db); active=q.exec(QStringLiteral("SAVEPOINT handoff_history")); if (!active) error=q.lastError().text(); }
+    ~Savepoint() { if (active) { QSqlQuery q(db); q.exec(QStringLiteral("ROLLBACK TO SAVEPOINT handoff_history")); q.exec(QStringLiteral("RELEASE SAVEPOINT handoff_history")); } }
+    bool commit() { QSqlQuery q(db); if (!q.exec(QStringLiteral("RELEASE SAVEPOINT handoff_history"))) { error=q.lastError().text(); return false; } active=false; return true; }
+};
+int stateOrder(const QString& state) {
+    if (state==QLatin1String("offered")) return 0;
+    if (state==QLatin1String("pending")) return 1;
+    if (state==QLatin1String("accepted") || state==QLatin1String("declined")) return 2;
+    if (state==QLatin1String("completed")) return 3;
+    return -1;
+}
+bool appendHistory(QSqlDatabase db,const QString& id,bool outgoing,const QString& previous,const QString& state,QString* error) {
+    const auto key=historyPrefix+(outgoing?QStringLiteral("out."):QStringLiteral("in."))+id+QStringLiteral(".")+QString::number(stateOrder(state))+QStringLiteral(".")+state;
+    const QJsonObject event{{QStringLiteral("previous"),previous},{QStringLiteral("state"),state},{QStringLiteral("atUtc"),QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}};
+    QSqlQuery q(db); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?)")); q.addBindValue(key);
+    q.addBindValue(QString::fromUtf8(QJsonDocument(event).toJson(QJsonDocument::Compact)));
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
+    return true;
+}
 bool identifier(const QString& value) {
     static const QRegularExpression re(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$")); return re.match(value).hasMatch();
 }
@@ -45,11 +67,17 @@ QJsonObject offerFrame(const Offer& o) {
 }
 static Result store(LogDatabase& db,const QString& prefix,const Offer& offer) {
     if (!db.isOpen() || !valid(offer)) return {false,false,QStringLiteral("Invalid handoff offer")};
+    Savepoint save(db.connection()); if (!save.active) return {false,false,save.error};
     const QString key=prefix+offer.id, value=QString::fromUtf8(QJsonDocument(offerFrame(offer)).toJson(QJsonDocument::Compact));
     QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT OR IGNORE INTO app_setting(key,value) SELECT ?,? WHERE (SELECT COUNT(*) FROM app_setting WHERE substr(key,1,?)=?)<10000"));
     q.addBindValue(key); q.addBindValue(value); q.addBindValue(prefix.size()); q.addBindValue(prefix);
     if (!q.exec()) return {false,false,q.lastError().text()};
-    if (q.numRowsAffected()==1) return {true,false,{}};
+    if (q.numRowsAffected()==1) {
+        QString error; const bool outgoing=prefix==outgoingPrefix;
+        if (!appendHistory(db.connection(),offer.id,outgoing,QStringLiteral("none"),outgoing?QStringLiteral("offered"):QStringLiteral("pending"),&error)) return {false,false,error};
+        if (!save.commit()) return {false,false,save.error};
+        return {true,false,{}};
+    }
     QSqlQuery read(db.connection()); read.prepare(QStringLiteral("SELECT value FROM app_setting WHERE key=?")); read.addBindValue(key);
     if (!read.exec()) return {false,false,read.lastError().text()};
     if (!read.next()) return {false,false,QStringLiteral("Handoff storage limit reached")};
@@ -104,6 +132,7 @@ Result setIncomingState(LogDatabase& db,const QString& scope,const QString& reci
         if (!((old==QLatin1String("pending") && (state==QLatin1String("accepted") || state==QLatin1String("declined"))) ||
               (old==QLatin1String("accepted") && state==QLatin1String("completed"))))
             return {false,false,QStringLiteral("Invalid handoff state transition")};
+        Savepoint save(db.connection()); if (!save.active) return {false,false,save.error};
         const auto value=QString::fromUtf8(QJsonDocument(offerFrame(offer)).toJson(QJsonDocument::Compact));
         QSqlQuery q(db.connection());
         q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?) AND (?='pending' OR EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?)) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE app_setting.value=?"));
@@ -111,6 +140,8 @@ Result setIncomingState(LogDatabase& db,const QString& scope,const QString& reci
         q.addBindValue(old); q.addBindValue(key); q.addBindValue(old); q.addBindValue(old);
         if (!q.exec()) return {false,false,q.lastError().text()};
         if (q.numRowsAffected()!=1) return {false,false,QStringLiteral("Handoff changed; refresh and retry")};
+        if (!appendHistory(db.connection(),id,false,old,state,&error)) return {false,false,error};
+        if (!save.commit()) return {false,false,save.error};
         return {true,false,{}};
     }
     return {false,false,QStringLiteral("Handoff offer not found")};
@@ -128,6 +159,7 @@ Result receiveRemoteState(LogDatabase& db,const QString& scope,const QString& se
         if (old==state || (!old.isEmpty() && state==QLatin1String("pending")) || (old==QLatin1String("completed") && state==QLatin1String("accepted"))) return {true,true,{}};
         if (!old.isEmpty() && !(old==QLatin1String("pending") || (old==QLatin1String("accepted") && state==QLatin1String("completed"))))
             return {false,false,QStringLiteral("Conflicting handoff status")};
+        Savepoint save(db.connection()); if (!save.active) return {false,false,save.error};
         const auto key=remoteStatePrefix+offer.id;
         const auto value=QString::fromUtf8(QJsonDocument(frame).toJson(QJsonDocument::Compact));
         QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?) AND (?='' OR EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?)) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE app_setting.value=?"));
@@ -135,9 +167,34 @@ Result receiveRemoteState(LogDatabase& db,const QString& scope,const QString& se
         q.addBindValue(old); q.addBindValue(key); q.addBindValue(old); q.addBindValue(old);
         if (!q.exec()) return {false,false,q.lastError().text()};
         if (q.numRowsAffected()!=1) return {false,false,QStringLiteral("Handoff changed; retry status")};
+        if (!appendHistory(db.connection(),offer.id,true,old.isEmpty()?QStringLiteral("offered"):old,state,&error)) return {false,false,error};
+        if (!save.commit()) return {false,false,save.error};
         return {true,false,{}};
     }
     return {false,false,QStringLiteral("Handoff offer not found")};
+}
+QList<HistoryEntry> history(const LogDatabase& db,const QString& scope,const QString& node,const QString& id,bool outgoing,QString* error) {
+    QString localError; const auto offers=outgoing?outgoingOffers(db,scope,node,&localError):incomingOffers(db,scope,node,&localError);
+    if (error) error->clear();
+    if (!localError.isEmpty()) { if (error) *error=localError; return {}; }
+    bool found=false; for (const auto& offer:offers) if (offer.id==id) { found=true; break; }
+    if (!found) { if (error) *error=QStringLiteral("Handoff offer not found"); return {}; }
+    const auto prefix=historyPrefix+(outgoing?QStringLiteral("out."):QStringLiteral("in."))+id+QStringLiteral(".");
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT key,value FROM app_setting WHERE substr(key,1,?)=? ORDER BY key LIMIT 5"));
+    q.addBindValue(prefix.size()); q.addBindValue(prefix); if (!q.exec()) { if (error) *error=q.lastError().text(); return {}; }
+    QList<HistoryEntry> entries;
+    while (q.next()) {
+        QJsonParseError pe; const auto doc=QJsonDocument::fromJson(q.value(1).toString().toUtf8(),&pe); const auto o=doc.object();
+        const auto previous=o.value("previous").toString(), state=o.value("state").toString(), at=o.value("atUtc").toString();
+        const auto dt=QDateTime::fromString(at,Qt::ISODateWithMs);
+        if (entries.size()>=4 || pe.error!=QJsonParseError::NoError || !doc.isObject() || o.size()!=3 || previous.isEmpty() || stateOrder(state)<0 ||
+            !dt.isValid() || dt.timeSpec()!=Qt::UTC || dt.toString(Qt::ISODateWithMs)!=at || q.value(0).toString()!=prefix+QString::number(stateOrder(state))+QStringLiteral(".")+state) {
+            if (error) *error=QStringLiteral("Invalid stored handoff history"); return {};
+        }
+        entries << HistoryEntry{previous,state,at};
+    }
+    if (q.lastError().isValid()) { if (error) *error=q.lastError().text(); return {}; }
+    return entries;
 }
 Result claimSkedReminder(LogDatabase& db,const QString& scope,const QString& recipient,const QString& id,const QDateTime& nowUtc) {
     if (!nowUtc.isValid() || nowUtc.timeSpec()!=Qt::UTC) return {false,false,QStringLiteral("Invalid reminder time")};

@@ -16,6 +16,7 @@ struct Offer {
     QString scheduledUtc{};
 };
 struct Result { bool ok{false}; bool replayed{false}; QString error; };
+struct HistoryEntry { QString previous, state, atUtc; };
 QJsonObject offerFrame(const Offer& offer);
 Result receiveOffer(LogDatabase& db,const QString& scope,const QString& recipient,const QString& envelopeSender,const QJsonObject& body);
 Result storeOutgoing(LogDatabase& db,const Offer& offer);
@@ -24,5 +25,6 @@ Result receiveRemoteState(LogDatabase& db,const QString& scope,const QString& se
 Result claimSkedReminder(LogDatabase& db,const QString& scope,const QString& recipient,const QString& id,const QDateTime& nowUtc);
 QList<Offer> incomingOffers(const LogDatabase& db,const QString& scope,const QString& recipient,QString* error = nullptr);
 QList<Offer> outgoingOffers(const LogDatabase& db,const QString& scope,const QString& sender,QString* error = nullptr);
+QList<HistoryEntry> history(const LogDatabase& db,const QString& scope,const QString& node,const QString& id,bool outgoing,QString* error = nullptr);
 }
 }

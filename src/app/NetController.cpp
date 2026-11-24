@@ -1128,6 +1128,15 @@ QVariantList NetController::handoffOutbox() const
     if (!handoffLogCurrent()) return {};
     return handoffRows(contesthandoff::outgoingOffers(*m_ctx.db,m_handoffScope,m_id));
 }
+QVariantMap NetController::handoffHistory(const QString& id,bool outgoing) const
+{
+    if (!handoffLogCurrent()) return {{QStringLiteral("error"),tr("Log or network changed; configure the handoff scope again.")}};
+    QString error; const auto entries=contesthandoff::history(*m_ctx.db,m_handoffScope,m_id,id,outgoing,&error);
+    if (!error.isEmpty()) return {{QStringLiteral("error"),tr("Cannot read handoff history: %1").arg(error)}};
+    QVariantList rows; for (const auto& entry:entries) rows << QVariantMap{{QStringLiteral("previous"),entry.previous},
+        {QStringLiteral("state"),entry.state},{QStringLiteral("atUtc"),entry.atUtc}};
+    return {{QStringLiteral("rows"),rows}};
+}
 QString NetController::handoffError() const
 {
     if (m_handoffScope.isEmpty()) return {};
