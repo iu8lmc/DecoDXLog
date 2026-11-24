@@ -12655,6 +12655,7 @@ Referenze aggiuntive: %7</translation></message>
         <source>Import undo finished on a log that is no longer open</source>
         <translation>L’annullamento è terminato su un log non più aperto</translation>
     </message>
+    <message><source>Import undo moved %1 QSO in the original log before its context changed; inspect that log before retrying.</source><translation>L'annullamento ha spostato %1 QSO nel log originale prima del cambio di contesto; controlla quel log prima di riprovare.</translation></message>
     <message>
         <source>Import undo cancelled; unprocessed QSO remain available for retry.</source>
         <translation>Annullamento interrotto; i QSO non elaborati restano disponibili per un nuovo tentativo.</translation>

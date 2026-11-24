@@ -494,7 +494,8 @@ public:
     // Called initially with total=-1, before each item and at completion. False cancels.
     ImportUndoResult undoLatestImport(const std::function<bool(int done, int total)>& progress = {},
                                       bool preview = false, qint64 expectedBatchId = 0,
-                                      const QString& expectedBatchUuid = {}, qint64 expectedJournalRevision = -1);
+                                      const QString& expectedBatchUuid = {}, qint64 expectedJournalRevision = -1,
+                                      const QString& expectedLogIdentity = {}, const QByteArray& expectedFileIdentity = {});
     QByteArray   exportAdif(const QString& programVersion = {}) const;
     QByteArray   exportAdif(const QList<qint64>& ids, const QString& programVersion = {}) const;
 

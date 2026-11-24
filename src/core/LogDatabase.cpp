@@ -3288,10 +3288,17 @@ ImportResult LogDatabase::importAdif(const QByteArray& data, const QString& sour
 
 ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int)>& progress,
                                               bool preview, qint64 expectedBatchId,
-                                              const QString& expectedBatchUuid, qint64 expectedJournalRevision)
+                                              const QString& expectedBatchUuid, qint64 expectedJournalRevision,
+                                              const QString& expectedLogIdentity, const QByteArray& expectedFileIdentity)
 {
     ImportUndoResult out;
     QSqlDatabase db = connection();
+    const bool guarded=!expectedLogIdentity.isEmpty() || !expectedFileIdentity.isEmpty();
+    const auto originMatches=[&] {
+        return !guarded || (!expectedLogIdentity.isEmpty() && !expectedFileIdentity.isEmpty() &&
+            isOpen() && openFileIdentity()==expectedFileIdentity && fileIdentityMatchesOpen() && identity()==expectedLogIdentity);
+    };
+    if (!originMatches()) { out.errors << QStringLiteral("Log file changed; reopen it and preview the import undo again"); return out; }
     // Allow cancellation before counting or fetching a potentially large journal.
     if (progress && !progress(0, -1)) {
         out.cancelled = true;
@@ -3382,6 +3389,7 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
         }
         for (const Item& item : std::as_const(rows)) {
             if (done >= total) break;
+            if (!originMatches()) { out.errors << QStringLiteral("Log file changed; reopen it and preview the import undo again"); membershipChanged=true; break; }
             if (progress && !progress(done, total)) {
                 out.cancelled = true;
                 break;
@@ -3401,6 +3409,7 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
                 membershipChanged = true;
                 break;
             }
+            if (!originMatches()) { db.rollback(); out.errors << QStringLiteral("Log file changed; reopen it and preview the import undo again"); membershipChanged=true; break; }
             const auto current = meta(item.id);
             if (!current || current->uuid != item.uuid) {
                 ++out.unavailable;
@@ -3446,6 +3455,7 @@ ImportUndoResult LogDatabase::undoLatestImport(const std::function<bool(int, int
                 db.rollback();
                 continue;
             }
+            if (!originMatches()) { db.rollback(); out.errors << QStringLiteral("Log file changed; reopen it and preview the import undo again"); membershipChanged=true; break; }
             if (!db.commit()) {
                 ++out.failed;
                 addIssue(item.id, QStringLiteral("failed"), true);

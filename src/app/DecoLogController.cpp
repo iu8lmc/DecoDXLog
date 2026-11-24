@@ -6533,7 +6533,9 @@ bool DecoLogController::undoLastImport(qint64 expectedBatchId, const QString& ex
                                       qint64 expectedJournalRevision)
 {
     if (expectedBatchId > 0 && (expectedBatchUuid.isEmpty()
-        || m_importUndoPreviewPath != m_db.path() || m_importUndoPreviewBatchId != expectedBatchId
+        || m_importUndoPreviewPath != m_db.path() || m_importUndoPreviewLogIdentity != m_db.identity()
+        || m_importUndoPreviewFileIdentity.isEmpty() || m_importUndoPreviewFileIdentity != m_db.openFileIdentity()
+        || m_importUndoPreviewGeneration != m_db.openGeneration() || !m_db.fileIdentityMatchesOpen() || m_importUndoPreviewBatchId != expectedBatchId
         || m_importUndoPreviewUuid != expectedBatchUuid || expectedJournalRevision < 0
         || m_importUndoPreviewJournalRevision != expectedJournalRevision)) {
         addActivity(QStringLiteral("IMPORT"), tr("The log or import changed; preview the undo again"), QStringLiteral("warning"));
@@ -6545,6 +6547,9 @@ bool DecoLogController::undoLastImport(qint64 expectedBatchId, const QString& ex
 bool DecoLogController::previewImportUndo()
 {
     m_importUndoPreviewPath.clear();
+    m_importUndoPreviewLogIdentity.clear();
+    m_importUndoPreviewFileIdentity.clear();
+    m_importUndoPreviewGeneration=0;
     m_importUndoPreviewUuid.clear();
     m_importUndoPreviewBatchId = 0;
     m_importUndoPreviewJournalRevision = -1;
@@ -6557,6 +6562,10 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
     const QString dbPath = m_db.path();
     if (m_importProgress >= 0 || !m_db.isOpen() || dbPath.isEmpty() || dbPath == QLatin1String(":memory:"))
         return false;
+    const QString logIdentity=m_db.identity(); const QByteArray fileIdentity=m_db.openFileIdentity(); const quint64 logGeneration=m_db.openGeneration();
+    if (logIdentity.isEmpty() || fileIdentity.isEmpty() || !m_db.fileIdentityMatchesOpen()) {
+        addActivity(QStringLiteral("IMPORT"),tr("The log or import changed; preview the undo again"),QStringLiteral("warning")); return false;
+    }
     m_importUndoCancel = std::make_shared<std::atomic_bool>(false);
     const auto cancel = m_importUndoCancel;
     m_importUndoRunning = true;
@@ -6564,7 +6573,7 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
     m_importProgress = 0;
     emit importChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, cancel, preview, expectedBatchId, expectedBatchUuid, expectedJournalRevision] {
+    m_importPool.start([self, dbPath, logIdentity, fileIdentity, logGeneration, cancel, preview, expectedBatchId, expectedBatchUuid, expectedJournalRevision] {
         core::ImportUndoResult result;
         core::LogDatabase db;
         if (!db.open(dbPath)) {
@@ -6584,21 +6593,27 @@ bool DecoLogController::startImportUndo(bool preview, qint64 expectedBatchId, co
                     }, Qt::QueuedConnection);
                 }
                 return !cancel->load();
-            }, preview, expectedBatchId, expectedBatchUuid, expectedJournalRevision);
+            }, preview, expectedBatchId, expectedBatchUuid, expectedJournalRevision, logIdentity, fileIdentity);
         }
-        QMetaObject::invokeMethod(self.data(), [self, dbPath, result, preview] {
+        QMetaObject::invokeMethod(self.data(), [self, dbPath, logIdentity, fileIdentity, logGeneration, result, preview] {
             if (!self) return;
             self->m_importProgress = -1;
             self->m_importUndoRunning = false;
             self->m_importUndoPreviewing = false;
             self->m_importUndoCancel.reset();
             emit self->importChanged();
-            if (!self->m_db.isOpen() || self->m_db.path() != dbPath) {
-                self->addActivity(QStringLiteral("IMPORT"), tr("Import undo finished on a log that is no longer open"), QStringLiteral("warning"));
+            if (!self->m_db.isOpen() || self->m_db.path() != dbPath || self->m_db.openGeneration()!=logGeneration ||
+                self->m_db.openFileIdentity()!=fileIdentity || !self->m_db.fileIdentityMatchesOpen() || self->m_db.identity()!=logIdentity) {
+                self->addActivity(QStringLiteral("IMPORT"), !preview && result.deleted>0
+                    ? tr("Import undo moved %1 QSO in the original log before its context changed; inspect that log before retrying.").arg(result.deleted)
+                    : tr("Import undo finished on a log that is no longer open"), QStringLiteral("warning"));
                 return;
             }
             if (preview && result.batchId > 0 && !result.cancelled && result.errors.isEmpty()) {
                 self->m_importUndoPreviewPath = dbPath;
+                self->m_importUndoPreviewLogIdentity = logIdentity;
+                self->m_importUndoPreviewFileIdentity = fileIdentity;
+                self->m_importUndoPreviewGeneration = logGeneration;
                 self->m_importUndoPreviewUuid = result.batchUuid;
                 self->m_importUndoPreviewBatchId = result.batchId;
                 self->m_importUndoPreviewJournalRevision = result.journalRevision;

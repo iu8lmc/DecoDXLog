@@ -1340,6 +1340,9 @@ private:
     bool m_importUndoRunning{false};
     bool m_importUndoPreviewing{false};
     QString m_importUndoPreviewPath;
+    QString m_importUndoPreviewLogIdentity;
+    QByteArray m_importUndoPreviewFileIdentity;
+    quint64 m_importUndoPreviewGeneration{0};
     QString m_importUndoPreviewUuid;
     qint64 m_importUndoPreviewBatchId{0};
     qint64 m_importUndoPreviewJournalRevision{-1};

@@ -1519,6 +1519,51 @@ private slots:
         QVERIFY(!db.meta(imported.insertedIds.last())->deleted);
     }
 
+    void benchmarkGuardedImportUndoPreview()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_IMPORT_UNDO_GUARD")) QSKIP("Opt-in synthetic timing comparison");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("benchmark.sqlite"))); QByteArray adif;
+        for (int i=0;i<2000;++i) { const QByteArray call="K"+QByteArray::number(i)+"AAA";
+            adif += "<CALL:"+QByteArray::number(call.size())+">"+call+"<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"; }
+        QCOMPARE(db.importAdif(adif).inserted,2000);
+        for (int i=0;i<3;++i) for (int guarded=0;guarded<2;++guarded) {
+            QElapsedTimer timer; timer.start(); const auto result=db.undoLatestImport({},true,0,{},-1,guarded?db.identity():QString(),guarded?db.openFileIdentity():QByteArray());
+            const auto elapsed=timer.elapsed(); QVERIFY2(result.errors.isEmpty(),qPrintable(result.errors.join("; "))); QCOMPARE(result.eligible,2000); QCOMPARE(db.qsoCount(),2000);
+            qInfo() << "UNDO_GUARD_BENCH guarded=" << guarded << "sample=" << i << "eligible=" << result.eligible << "elapsed_ms=" << elapsed;
+        }
+    }
+    void importUndoStopsWhenFileChangesBetweenItems()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Open-file replacement fixture requires Unix rename semantics");
+#else
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("original.sqlite"), clonePath=dir.filePath("clone.sqlite");
+        LogDatabase db; QVERIFY(db.open(path));
+        QCOMPARE(db.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>"
+                               "<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1000<BAND:3>20m<MODE:2>CW<EOR>").inserted,2);
+        const auto preview=db.undoLatestImport({},true); QCOMPARE(preview.eligible,2); const auto identity=db.identity(); const auto fileIdentity=db.openFileIdentity();
+        QSqlQuery q(db.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clonePath); QVERIFY2(q.exec(),qPrintable(q.lastError().text()));
+        bool replaced=false;
+        const auto result=db.undoLatestImport([&](int done,int total) {
+            if (done==1 && total==2 && !replaced) { replaced=QFile::rename(path,path+".old") && QFile::rename(clonePath,path); }
+            return true;
+        },false,preview.batchId,preview.batchUuid,preview.journalRevision,identity,fileIdentity);
+        QVERIFY(replaced); QCOMPARE(result.deleted,1); QVERIFY(!result.errors.isEmpty());
+#endif
+    }
+    void importUndoRejectsSameIdentityClone()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("original.sqlite"), clonePath=dir.filePath("clone.sqlite");
+        LogDatabase original; QVERIFY(original.open(path));
+        QCOMPARE(original.importAdif("<CALL:5>K1AAA<QSO_DATE:8>20260101<TIME_ON:4>0900<BAND:3>20m<MODE:2>CW<EOR>").inserted,1);
+        const auto preview=original.undoLatestImport({},true); QCOMPARE(preview.eligible,1);
+        QSqlQuery q(original.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clonePath); QVERIFY2(q.exec(),qPrintable(q.lastError().text()));
+        LogDatabase clone; QVERIFY(clone.open(clonePath)); QCOMPARE(clone.identity(),original.identity()); QVERIFY(clone.openFileIdentity()!=original.openFileIdentity());
+        const auto result=clone.undoLatestImport({},false,preview.batchId,preview.batchUuid,preview.journalRevision,original.identity(),original.openFileIdentity());
+        QCOMPARE(result.deleted,0); QVERIFY(!result.errors.isEmpty()); QCOMPARE(clone.qsoCount(),1); QCOMPARE(original.qsoCount(),1);
+        const auto ok=original.undoLatestImport({},false,preview.batchId,preview.batchUuid,preview.journalRevision,original.identity(),original.openFileIdentity());
+        QCOMPARE(ok.deleted,1); QVERIFY(ok.errors.isEmpty()); QCOMPARE(clone.qsoCount(),1);
+    }
     void undoRejectsDifferentLatestBatchAfterPreview()
     {
         LogDatabase db;

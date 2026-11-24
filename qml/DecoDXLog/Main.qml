@@ -2464,6 +2464,7 @@ RoundedWindow {
             if (typeof startupShow !== "undefined" && startupShow.indexOf("undoimport") === 0) {
                 Qt.callLater(function () {
                     if (startupShow === "undoimport:cancel") undoImportDialog.reject()
+                    else if (startupShow === "undoimport:hold") { console.warn("PROBE importUndo hold"); undoImportHold.start() }
                     else undoImportDialog.accept()
                 })
             }
@@ -2477,6 +2478,10 @@ RoundedWindow {
                 undoImportResultProbe.start()
         }
     }
+    Timer { id:undoImportHold; interval:2500; onTriggered: {
+        const p=window.importUndoPreview
+        console.warn("PROBE importUndo hold accepted=" + decolog.undoLastImport(p.batchId,p.batchUuid,p.journalRevision))
+    } }
     Timer {
         id: undoImportResultProbe
         interval: 300
