@@ -15,7 +15,7 @@ namespace lotw {
 Report parseReport(const QByteArray& data)
 {
     Report report;
-    if (!data.contains("<eoh>") && !data.contains("<EOH>") && !data.contains("<Eoh>")) {
+    if (!data.toLower().contains("<eoh>")) {
         const QByteArray lower = data.left(8192).toLower();
         if (lower.contains("password incorrect") || lower.contains("username/password"))
             report.error = QCoreApplication::translate("Lotw", "LoTW: username or password incorrect");

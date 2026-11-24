@@ -156,6 +156,15 @@ private slots:
         QVERIFY(r.error.contains("password"));
     }
 
+    void parseMixedCaseHeaderAndPreserveConfirmationGrid()
+    {
+        QByteArray mixed=kReport; mixed.replace("<eoh>","<eOh>");
+        const auto report=lotw::parseReport(mixed);
+        QVERIFY2(report.ok,qPrintable(report.error)); QCOMPARE(report.confirmations.size(),3);
+        QCOMPARE(report.confirmations.first().value("GRIDSQUARE"),QString("FN42AB"));
+        QCOMPARE(report.lastQsl,QString("2026-09-16 21:04:11"));
+    }
+
     void applyConfirmations()
     {
         LogDatabase db;

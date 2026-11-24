@@ -2831,3 +2831,11 @@ The VUCC review now states that displayed grids come from local QSO data and hav
 A/B on macOS arm64 / Qt 6.11.2: the candidate JSON previously lacked the grid-evidence field and the new assertion failed; it now supplies the explicit value. An offscreen app fixture observed both the field and the translated notice while exercising the existing own-grid exclusion. App and test targets built; CTest vucc, awards, database and qmlpopups passed 4/4.
 
 The new field does not store or verify the grid from the confirming source. The evidence model, official acceptance, account/geographical checks, physical UI and Windows/Linux remain unverified; full G02/G13 acceptance stays open.
+
+## 2026-11-24 — G02/G05 LoTW mixed-case ADIF header
+
+Inspection confirms the LoTW response parser keeps confirmation fields such as GRIDSQUARE in its intermediate records, but the existing QSL status model does not persist a separate confirmed-grid evidence record. While checking this path, a synthetic LoTW response using `<eOh>` exposed a rejection: the precheck recognized only three capitalizations. The precheck now treats the end-of-header marker case-insensitively, as specified in ADIF 3.1.8: https://www.adif.org/318/ADIF_318.htm#ADI_Header .
+
+A/B on macOS arm64 / Qt 6.11.2: the mixed-case response previously returned an unexpected-answer error; now it parses all three synthetic confirmations and retains the first grid and the sync cursor in memory. Existing normal response and login-page rejection tests pass. App and test targets built; CTest lotw, vucc, database and qmlpopups passed 4/4.
+
+This does not implement durable confirmed-grid evidence, verify LoTW matches or change VUCC candidate attribution. The fixture does not use a live LoTW account, actual confirmation, physical UI or Windows/Linux. G02, G05 and G13 acceptance remain open.
