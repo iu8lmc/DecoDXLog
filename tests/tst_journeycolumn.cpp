@@ -511,6 +511,7 @@ private slots:
         QByteArray output; QVERIFY2(launch(dir,"vuccreviewprobe",output,4500),output.constData());
         QVERIFY2(output.contains("PROBE vuccReview open=true row=EM11") && output.contains("QSO 1: invalid or inconsistent operating locator data") && !output.contains("TypeError"),output.constData());
         QVERIFY2(output.contains("FM18") && output.contains("FM18,FM19") && (output.contains("match unverified") || output.contains("abbinamento non verificato")),output.constData());
+        QVERIFY2(output.contains("different grid") || output.contains("locator diverso"),output.constData());
         QVERIFY2(output.contains("gridEvidence=local-qso-unverified") && (output.contains("their presence on the confirmation has not been verified") || output.contains("la loro presenza sulla conferma non è stata verificata")),output.constData());
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }

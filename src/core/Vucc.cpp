@@ -213,6 +213,19 @@ Result select(const QList<Entry>& entries, const Rules& rules)
             }
             Entry credited = entry;
             credited.grid = grid;
+            QJsonArray compared;
+            for (const auto& value : entry.lotwGridObservations) {
+                QJsonObject observation=value.toObject();
+                const QString observed=observation.value(QStringLiteral("grid")).toString();
+                const QString reported=observation.value(QStringLiteral("vuccGrids")).toString();
+                const QStringList observedGrids=reported.trimmed().isEmpty()
+                    ? (validLocator(observed) ? QStringList{norm(observed).left(4)} : QStringList{})
+                    : boundaryGrids(reported,observed);
+                observation.insert(QStringLiteral("comparison"), observedGrids.isEmpty() ? QStringLiteral("unusable")
+                    : observedGrids.contains(grid) ? QStringLiteral("included") : QStringLiteral("different"));
+                compared.append(observation);
+            }
+            credited.lotwGridObservations=compared;
             credited.evidence=accepted.join(QLatin1Char(',')); credited.otherEvidence=other.join(QLatin1Char(','));
             credited.classification=viaSatellite ? (satelliteName.isEmpty() ? QStringLiteral("satellite-name-missing") : QStringLiteral("satellite"))
                 : propagation.isEmpty() ? QStringLiteral("terrestrial-unreported") : QStringLiteral("terrestrial");

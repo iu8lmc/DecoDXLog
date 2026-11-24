@@ -2889,3 +2889,11 @@ The eQSL/QRZ confirmation queue now captures the same log session token used by 
 A/B on macOS arm64 / Qt 6.11.2: fake HTTP eQSL and QRZ downloads were reconciled against a second synthetic log inside a transaction and would have confirmed its matching QSO if unchecked; after rollback, the origin guard rejects the changed session and the second log remains unconfirmed. The fixture exercises the token and database flow directly, not the actual controller queue or credential callbacks. App and test targets built; CTest lotw, qsldownload, vucc, database, migration and qmlpopups passed 6/6.
 
 The check is point-in-time and cannot make live SQLite replacement safe. A multi-account desktop scenario, the asynchronous secret and cancellation interleavings, real services, physical UI and Windows/Linux remain untested. Matching and VUCC provenance limitations remain; full G02/G05/G13 acceptance is open.
+
+## 2026-11-24 — G02 compare local and observed LoTW grids
+
+VUCC candidate review now compares each displayed stored LoTW grid observation with the candidate's four-character local grid. It labels the local grid as included, different, or the observed grid data as unusable; the comparison checks the existing locator/boundary syntax and does not establish the correctness of the heuristic match or award eligibility. It never replaces the candidate grid, changes a QSO or assigns credit. The JSON includes the same per-observation comparison; Italian labels were added.
+
+A/B on macOS arm64 / Qt 6.11.2: synthetic observations previously had no comparison field; they now distinguish a matching six-character locator, a different locator, an adjacent multi-grid list and an inconsistent list, while keeping the candidate and unverified-rules flag unchanged. An offscreen app fixture displayed the different-grid label. App and test targets built; CTest lotw, vucc, awards, database, migration and qmlpopups passed 6/6.
+
+The comparison covers only the three observations shown per candidate, not its full stored history. It uses raw synthetic/local observations without account, remote ID, match distance or signed proof, and does not verify ARRL eligibility. Live LoTW, physical UI, Windows/Linux and full G02/G05/G13 acceptance remain open.

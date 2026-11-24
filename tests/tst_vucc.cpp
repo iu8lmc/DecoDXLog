@@ -11,6 +11,21 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void comparesStoredObservationsWithoutGrantingCredit()
+    {
+        Entry e{1,"EM98","6m",{},{},true,"lotw"}; e.qsoUtc="2026-01-01T12:00:00Z";
+        e.lotwGridObservations=QJsonArray{QJsonObject{{"grid","EM98AA"},{"vuccGrids",""}},
+            QJsonObject{{"grid","FM18"},{"vuccGrids",""}}, QJsonObject{{"grid","EM98"},{"vuccGrids","EM98,FM08"}},
+            QJsonObject{{"grid","EM98"},{"vuccGrids","EM98,FM09"}}};
+        e.lotwGridObservationCount=4;
+        const auto result=select({e},Rules{{},{},"6m",100}); QCOMPARE(result.eligible.size(),1);
+        const auto obs=result.toJson().object().value("eligible").toArray().first().toObject().value("lotwGridObservations").toArray();
+        QCOMPARE(obs.size(),4); QCOMPARE(obs[0].toObject().value("comparison").toString(),QString("included"));
+        QCOMPARE(obs[1].toObject().value("comparison").toString(),QString("different"));
+        QCOMPARE(obs[2].toObject().value("comparison").toString(),QString("included"));
+        QCOMPARE(obs[3].toObject().value("comparison").toString(),QString("unusable"));
+        QVERIFY(!result.officialRulesVerified);
+    }
     void initialThresholdsMatchPublishedCategories()
     {
         QCOMPARE(initialThreshold("terrestrial","6m"),100); QCOMPARE(initialThreshold("terrestrial","2m"),100);
