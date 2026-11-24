@@ -1066,6 +1066,23 @@ private slots:
         QVERIFY2(output.count("[activity] DXCAMPAIGN|highlight|")== (satisfiesGoal ? 0 : 1),output.constData());
     }
 
+    void watchedCampaignRecognizesOffsetQsoAtUtcBoundary()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        {
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto now=QDateTime::currentDateTimeUtc();
+            dxcampaign::Campaign c; c.title="UTC watch"; c.calls={"3Y0J"}; c.start=now.date(); c.end=now.date();
+            c.source="fixture"; c.verifiedAt=now; c.bands={"20m","40m","15m"}; c.modes={"CW"}; c.watched=true; c.watchGoalsOnly=true;
+            c.goals={{"20m","CW","worked"}}; QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+            auto r=db.insertQso(AdifRecord{{"CALL","3Y0J"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","2230"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false); QVERIFY(r.id>0);
+            QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET qso_datetime_on=? WHERE id=?"); q.addBindValue(now.date().addDays(1).toString(Qt::ISODate)+"T00:30:00+02:00"); q.addBindValue(r.id); QVERIFY(q.exec());
+            QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ZZZ"},{"QSO_DATE",now.date().toString("yyyyMMdd")},{"TIME_ON","1200"},{"BAND","40m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        }
+        QByteArray output; QVERIFY2(launch(dir,"dxgoalwatchprobe",output,5500,true),output.constData());
+        QVERIFY2(output.contains("PROBE dxgoalwatch done"),output.constData());
+        QVERIFY2(output.count("[activity] DXCAMPAIGN|highlight|")==0,output.constData());
+    }
+
     void watchedCampaignCanAlertOnlyForOpenGoals()
     {
         using namespace decolog::core;

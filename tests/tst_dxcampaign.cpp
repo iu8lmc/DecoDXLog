@@ -3,6 +3,7 @@
 #include "core/Spots.h"
 #include <QTimeZone>
 #include <QSqlQuery>
+#include <QSqlError>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
@@ -32,6 +33,22 @@ private slots:
         observer.close();
         QVERIFY(!dxcampaign::watchSnapshotCurrent(observer, generation, refreshed));
     }
+    void benchmarkCampaignUtcWindow()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_CAMPAIGN_UTC")) QSKIP("Opt-in synthetic benchmark");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
+        dxcampaign::Campaign c; c.title="Benchmark"; c.calls={"K1ABC"}; c.start=QDate(2027,1,1); c.end=c.start;
+        c.source="fixture"; c.verifiedAt=QDateTime::fromString("2026-12-31T12:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.goals={{"20m","CW","confirmed"}};
+        QSqlQuery q(db.connection()); QVERIFY2(q.exec("WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i+1 FROM n WHERE i<99999) "
+            "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) SELECT printf('bench-%d',i),'K1ABC', "
+            "CASE i%3 WHEN 0 THEN '2026-12-31T12:00:00Z' WHEN 1 THEN '2027-01-01T12:00:00Z' ELSE '2027-01-02T12:00:00Z' END, "
+            "'20m','CW','2027-01-01T12:00:00Z','2027-01-01T12:00:00Z' FROM n"),qPrintable(q.lastError().text()));
+        EnrichedSpot spot; spot.spot.band="20m"; spot.spot.mode="CW"; QString error; QElapsedTimer timer; timer.start();
+        const auto cells=dxcampaign::matrix(db,c,&error); const qint64 matrixMs=timer.elapsed(); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(cells.first().worked,33333);
+        timer.restart(); const auto needed=dxcampaign::goalNeeded(db,c,spot,&error); const qint64 goalMs=timer.elapsed(); QVERIFY2(needed,qPrintable(error)); QVERIFY(*needed);
+        qInfo("CAMPAIGN_UTC_BENCH qso=100000 matrix_ms=%lld goal_ms=%lld",static_cast<long long>(matrixMs),static_cast<long long>(goalMs));
+    }
+
     void campaignMatchesUtcDayAcrossOffsetBoundaries()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;
