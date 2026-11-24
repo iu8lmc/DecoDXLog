@@ -1,6 +1,7 @@
 #include "core/QslOcrSearch.h"
 #include "core/LogDatabase.h"
 #include "core/FileIdentity.h"
+#include "core/LogTime.h"
 #include <QPointer>
 #include <QDateTime>
 #include <QRegularExpression>
@@ -111,9 +112,11 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
                     } else {
                         while (!cancelled->load() && q.next()) {
                             if (matches.size() == 100) { truncated = true; break; }
+                            const QString rawAt=q.value(2).toString(); const QDateTime utc=logtime::fromStoredQso(rawAt);
+                            const QString at=utc.isValid() ? utc.toString(utc.time().msec()==0 ? Qt::ISODate : Qt::ISODateWithMs) : QString();
                             matches << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("call"), q.value(1)},
                                                    {QStringLiteral("similar"), q.value(1).toString() != call},
-                                                   {QStringLiteral("at"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
+                                                   {QStringLiteral("at"),at}, {QStringLiteral("rawAt"),rawAt}, {QStringLiteral("timeValid"),utc.isValid()}, {QStringLiteral("band"), q.value(3)},
                                                    {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)},
                                                    {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)},
                                                    {QStringLiteral("adifMode"),q.value(8)}, {QStringLiteral("adifSubmode"),q.value(9)}};

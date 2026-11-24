@@ -15937,6 +15937,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>QslOcrDialog</name>
+    <message><source>invalid recorded timestamp: %1</source><translation>data e ora registrate non valide: %1</translation></message>
     <message>
         <source>similar — verify</source>
         <translation>simile — verificare</translation>

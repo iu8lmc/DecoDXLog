@@ -262,6 +262,19 @@ class TestTesseractOcr : public QObject {
         }
     }
 
+    void candidateSearchShowsUtcAndPreservesRawTime()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("times.sqlite")));
+        for (int i=0;i<3;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260304"},{"TIME_ON",QString("14300%1").arg(i)},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE id WHEN 1 THEN '2026-03-04T15:30:00+01:00' WHEN 2 THEN '2026-03-04T14:30:00' ELSE 'invalid' END"));
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished); QVERIFY(search.start("K1ABC")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        QMap<qint64,QVariantMap> rows; for (const auto& row:search.matches()) rows.insert(row.toMap().value("id").toLongLong(),row.toMap());
+        QCOMPARE(rows.size(),3); QCOMPARE(rows[1].value("at").toString(),QString("2026-03-04T14:30:00Z"));
+        QCOMPARE(rows[1].value("rawAt").toString(),QString("2026-03-04T15:30:00+01:00"));
+        QCOMPARE(rows[2].value("at").toString(),QString("2026-03-04T14:30:00Z")); QVERIFY(!rows[3].value("timeValid").toBool());
+        QVERIFY(search.startFiltered("K1ABC","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000); QCOMPARE(search.matches().size(),2);
+    }
+
     void searchesDateAndTimeBeforeApplyingResultLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("dated.sqlite")));

@@ -3075,3 +3075,11 @@ The QSL OCR candidate search now presents the operator-facing submode when recor
 A/B on macOS arm64 / Qt 6.11.2: the new synthetic search initially returned MFSK for a stored FT4 contact and failed; it now distinguishes FT4, FT8, CW and SSB and preserves the raw MFSK/FT4 fields. CTest tesseractocr and qmlpopups passed 2/2; an offscreen app used the installed local Tesseract and a synthetic QSL image and displayed FT4 in the actual candidate row. The final added SSB assertion passed in the focused test. App and targets built.
 
 This does not establish OCR accuracy for real user cards, select or attach a QSO, validate a QSL, or exercise physical interaction or Windows/Linux. Full G12/G13 acceptance remains open.
+
+## 2026-11-24 — G12 show candidate timestamps in UTC
+
+QSL OCR candidate results now present database timestamps converted to UTC, matching the UTC date/time search filters. The original stored timestamp remains available separately in the result; invalid timestamps are explicitly labelled in the dialog. Unzoned legacy database timestamps use the established UTC wall-time convention. No QSO or confirmation is changed.
+
+A/B on macOS arm64 / Qt 6.11.2: the new synthetic test previously showed `15:30+01:00` while filtering for `14:30 UTC`; it now displays `14:30Z`, preserves the original value, handles unzoned and invalid values, and returns both matching QSO under the UTC filter. CTest tesseractocr and qmlpopups passed 2/2. An offscreen app using local Tesseract and a synthetic QSL displayed the normalized UTC time and FT4 in the candidate row; the existing selected-date/time UI fixture passed separately. The first combined UI command included a misspelled test name; the correctly named fixture was rerun successfully.
+
+The UI and OCR fixtures are synthetic and programmatic; the original operator's clock and real-card OCR accuracy are not verified. A raw timestamp remains available in the result but is not shown for valid rows. Physical UI, Windows/Linux and full G12/G13 acceptance remain open.

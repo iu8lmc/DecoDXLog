@@ -249,7 +249,8 @@ DialogFrame {
                 Text {
                     id: candidateLabel
                     Layout.fillWidth: true
-                    text: "#" + modelData.id + " · " + modelData.call + (modelData.similar ? " · " + qsTr("similar — verify") : "") + " · " + modelData.at + " · " + modelData.band + " · " + modelData.mode
+                    text: "#" + modelData.id + " · " + modelData.call + (modelData.similar ? " · " + qsTr("similar — verify") : "") + " · "
+                          + (modelData.timeValid ? modelData.at : qsTr("invalid recorded timestamp: %1").arg(modelData.rawAt || "—")) + " · " + modelData.band + " · " + modelData.mode
                     textFormat: Text.PlainText
                     color: Theme.textPrimary
                     elide: Text.ElideRight
