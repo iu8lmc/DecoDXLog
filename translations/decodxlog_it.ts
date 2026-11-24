@@ -146,7 +146,10 @@
 <context>
     <name>ActivationDialog</name>
     <message><source>POTA correspondent references to review: %1 QSO. Open a QSO to inspect its fields.</source><translation>Referenze POTA del corrispondente da verificare: %1 QSO. Apri un QSO per esaminarne i campi.</translation></message>
-    <message><source>POTA review QSO #%1 · %2 · %3</source><translation>QSO POTA da verificare #%1 · %2 · %3</translation></message>
+    <message><source>POTA review QSO #%1 · %2 · %3: %4</source><translation>QSO POTA da verificare #%1 · %2 · %3: %4</translation></message>
+    <message><source>multiple correspondent parks</source><translation>più parchi del corrispondente</translation></message>
+    <message><source>unrecognized correspondent reference</source><translation>referenza del corrispondente non riconosciuta</translation></message>
+    <message><source>SIG fields differ or are incomplete</source><translation>campi SIG discordanti o incompleti</translation></message>
     <message><source>Previous review QSO</source><translation>QSO da verificare precedenti</translation></message>
     <message><source>Next review QSO</source><translation>QSO da verificare successivi</translation></message>
     <message>

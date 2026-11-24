@@ -891,8 +891,11 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                         groups[key][QStringLiteral("potaCorrespondentReview")] = groups[key].value(QStringLiteral("potaCorrespondentReview")).toInt() + 1;
                         if (!selectedIds && !potaReviewRecorded) {
                             potaReviewRecorded = true;
+                            const QString reason = other.contains(QLatin1Char(',')) ? QStringLiteral("multipleReferences")
+                                : !singleValid ? QStringLiteral("invalidReference") : QStringLiteral("conflictingSig");
                             potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
-                                {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)}};
+                                {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)},
+                                {QStringLiteral("reason"), reason}};
                         }
                     }
                 }

@@ -233,7 +233,7 @@ DialogFrame {
                     if (group) console.warn("PROBE potaGroup status=" + group.modelData.potaSnapshotStatus + " location=" + group.modelData.potaLocationStatus + " text=" + group.probeText())
                     const row = potaReviewRepeater.itemAt(0)
                     if (row) {
-                        console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentRows.length)
+                        console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentRows.length + " reason=" + row.modelData.reason + " text=" + row.probeText())
                         if (root.partitionPreview.potaCorrespondentRows.length > 200) {
                             potaReviewNext.clicked(); potaReviewNext.clicked()
                             Qt.callLater(() => {
@@ -891,7 +891,9 @@ DialogFrame {
                 required property var modelData
                 Layout.fillWidth: true
                 function probeOpen() { openPotaReview.clicked() }
-                Note { Layout.fillWidth: true; text: qsTr("POTA review QSO #%1 · %2 · %3").arg(modelData.id).arg(modelData.call || "—").arg(modelData.at || "—") }
+                function probeText() { return potaReviewNote.text }
+                Note { id: potaReviewNote; Layout.fillWidth: true; text: qsTr("POTA review QSO #%1 · %2 · %3: %4").arg(modelData.id).arg(modelData.call || "—").arg(modelData.at || "—")
+                        .arg(modelData.reason === "multipleReferences" ? qsTr("multiple correspondent parks") : modelData.reason === "invalidReference" ? qsTr("unrecognized correspondent reference") : qsTr("SIG fields differ or are incomplete")) }
                 GlassButton { id: openPotaReview; text: qsTr("Open QSO…"); onClicked: root.openExcludedQso(modelData) }
             }
         }

@@ -2727,3 +2727,11 @@ Extended the opt-in 20,000-QSO, 20,000-QSL-row, two-park preview benchmark to co
 A/B on one macOS arm64 / Qt 6.11.2 run with `/usr/bin/time -l`: no review rows took 356 ms with 35 heartbeat callbacks, 11 ms maximum observed gap and 37,519,360 bytes peak process RSS; 20,000 review rows took 370 ms with 37 callbacks, 12 ms maximum gap and 52,215,808 bytes peak process RSS. Peak RSS includes the whole test process and fixture setup, not just the result list. Separate untimed runs measured 357 and 368 ms. Commands used `DECOLOG_BENCH_ACTIVATION_PARTITIONS=1` and additionally `DECOLOG_BENCH_POTA_REVIEW=1` for the second case. CTest activation, database, migration and qmlpopups passed 4/4.
 
 The approximately 14 MB observed peak RSS difference confirms that storing every review row has a real memory cost on this fixture; database-backed pagination remains open. These isolated warm-cache synthetic observations are not p95, do not measure actual UI rendering or interaction, concurrent writers, slow storage, larger sessions or Windows/Linux. G06/G13 acceptance remains open.
+
+## 2026-11-24 — G06 explain POTA correspondent review rows
+
+Each flagged correspondent QSO now has an explanatory reason: multiple park references, an unrecognized local reference, or SIG fields that differ or are incomplete. When multiple problems coexist, multiple references take precedence, followed by unrecognized syntax; the reason is a prompt to inspect, not a claim of official invalidity. The desktop displays translated Italian labels and leaves the stored QSO unchanged.
+
+A/B on macOS arm64 / Qt 6.11.2: the synthetic fixture previously returned no row reasons; it now distinguishes four affected QSO including an ADIF-extra override, while the existing exported-file assertions still pass. An offscreen app probe observed the multiple-parks reason and text, and the third-page probe passed. App and test targets built; CTest activation, database, migration and qmlpopups passed 4/4.
+
+Only one reason is shown per QSO even if multiple issues coexist. The test does not cover all malformed reference forms, physical input, live POTA, Windows/Linux or full G06/G13 acceptance. The unbounded in-memory review list remains as previously measured.

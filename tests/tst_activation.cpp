@@ -766,8 +766,10 @@ private slots:
         QCOMPARE(groups.first().toMap().value("potaCorrespondentReview").toInt(),4);
         const auto reviewRows=act.previewResult().value("potaCorrespondentRows").toList();
         QCOMPARE(reviewRows.size(),4);
-        QSet<QString> reviewCalls; for (const auto& row : reviewRows) { const auto item=row.toMap(); reviewCalls.insert(item.value("call").toString()); QVERIFY(!item.value("uuid").toString().isEmpty()); }
+        QSet<QString> reviewCalls; QMap<QString,QString> reasons; for (const auto& row : reviewRows) { const auto item=row.toMap(); const auto call=item.value("call").toString(); reviewCalls.insert(call); reasons[call]=item.value("reason").toString(); QVERIFY(!item.value("uuid").toString().isEmpty()); }
         QCOMPARE(reviewCalls, (QSet<QString>{"K1BBB","K1CCC","K1DDD","K1EEE"}));
+        QCOMPARE(reasons.value("K1BBB"),QString("conflictingSig")); QCOMPARE(reasons.value("K1CCC"),QString("multipleReferences"));
+        QCOMPARE(reasons.value("K1DDD"),QString("invalidReference")); QCOMPARE(reasons.value("K1EEE"),QString("multipleReferences"));
         const QString output=dir.filePath("pota.adi"); QSignalSpy done(&act,&ActivationController::partitionExportFinished);
         QVERIFY(act.startPartitionExport(groups.first().toMap(),QUrl::fromLocalFile(output)));
         QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY2(done.first().first().toBool(),qPrintable(done.first().at(1).toString()));
