@@ -24,6 +24,8 @@ A/B on macOS arm64 / Qt 6.11.2: the focused fixture initially failed to compile 
 
 This is a rules-based possibility, not evidence that a particular station uses a service, can provide an accepted confirmation, or that a request should be sent. The summary does not include remote account data or reconcile statuses. The fixture is programmatic and synthetic; physical UI, real services, other platforms and complete G03/G13 acceptance remain open. This increment remains in the detached worktree pending integration.
 
+The actual-app A/B was then repeated explicitly with the same new test: rebuilding the preceding planner/controller/dialog failed the assertion for the missing unverified filter while its existing pending filter still showed one QSO. Restoring the new implementation showed two unverified and one pending QSO and passed, along with awards, qslplanner and qmlpopups CTest 3/3 and git diff --check. The comparison uses the same synthetic fixture and offscreen programmatic interaction, not a live service.
+
 ## 2026-11-24 — G04 campaign revision history foundation, not integrated
 
 In the detached worktree, campaign updates now save the previous encoded revision under a separate `app_setting` key within the same immediate SQLite transaction as the update. Failed history insertion rolls the change back, and the existing revision comparison continues to reject stale updates. A/B: the new restart fixture initially failed because no previous revision existed; after the change it found the original date and revision, retained two prior revisions after reopening, and an injected history-write failure preserved the current campaign. The complete focused dxcampaign test passed 18 cases with one opt-in benchmark skipped.
