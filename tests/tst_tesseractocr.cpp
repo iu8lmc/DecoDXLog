@@ -203,6 +203,18 @@ class TestTesseractOcr : public QObject {
         QCOMPARE(db.qsoCount(),qint64(106));
     }
 
+    void similarSearchHandlesSingleInsertionAndDeletion()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("edits.sqlite")));
+        for (const auto* call : {"K1ABC","K1AB","K1ABCD","K1ACB","K1XYZ","K1ABC/P"})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(search.startSimilar("K1ABC","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY(done.first().first().toBool());
+        QSet<QString> calls; for (const auto &r : search.matches()) calls.insert(r.toMap().value("call").toString());
+        QCOMPARE(calls,QSet<QString>({"K1ABC","K1AB","K1ABCD","K1ACB"}));
+        QCOMPARE(db.qsoCount(),qint64(6));
+    }
+
     void similarCallSearchIsOptionalAndDateFiltered()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("similar.sqlite")));

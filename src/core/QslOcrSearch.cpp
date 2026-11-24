@@ -5,6 +5,8 @@
 #include <QDateTime>
 #include <QRegularExpression>
 #include <QSet>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -50,6 +52,16 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
                 QString v=call; v[i]=call.at(i+1); v[i+1]=call.at(i);
                 if (valid.match(v).hasMatch()) variants.insert(v);
             }
+            QString shorter=call; shorter.remove(i,1);
+            if (valid.match(shorter).hasMatch()) variants.insert(shorter);
+        }
+        if (call.size() < 15) {
+            for (qsizetype i=0; i<=call.size(); ++i) {
+                for (const QChar ch : alphabet) {
+                    QString longer=call; longer.insert(i,ch);
+                    if (valid.match(longer).hasMatch()) variants.insert(longer);
+                }
+            }
         }
     }
     const QStringList calls=variants.values();
@@ -82,14 +94,13 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
                     error = tr("The open log changed");
                 } else {
                     QSqlQuery q(sql);
-                    const QString placeholders=QStringList(calls.size(), QStringLiteral("?")).join(QLatin1Char(','));
-                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call IN (")+placeholders+QStringLiteral(") AND deleted=0");
+                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call IN (SELECT value FROM json_each(?)) AND deleted=0");
                     if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
                     if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
                     query+=similar ? QStringLiteral(" ORDER BY CASE WHEN call=? THEN 0 ELSE 1 END,id DESC LIMIT 101")
                                    : QStringLiteral(" ORDER BY id DESC LIMIT 101");
                     q.prepare(query);
-                    for (const QString& candidate : calls) q.addBindValue(candidate);
+                    q.addBindValue(QString::fromUtf8(QJsonDocument(QJsonArray::fromStringList(calls)).toJson(QJsonDocument::Compact)));
                     if (!dateUtc.isEmpty()) q.addBindValue(dateUtc);
                     if (!timeUtc.isEmpty()) q.addBindValue(timeUtc);
                     if (similar) q.addBindValue(call);

@@ -15872,12 +15872,12 @@ Referenze aggiuntive: %7</translation></message>
         <translation>simile — verificare</translation>
     </message>
     <message>
-        <source>Include similar calls (one character substitution or adjacent swap)</source>
-        <translation>Includi nominativi simili (un carattere sostituito o due adiacenti scambiati)</translation>
+        <source>Include similar calls (one character added, removed, substituted or adjacent swap)</source>
+        <translation>Includi nominativi simili (un carattere aggiunto, rimosso, sostituito o due adiacenti scambiati)</translation>
     </message>
     <message>
-        <source>Similar matches are suggestions only; verify each callsign on the image. Insertions and missing characters are not searched.</source>
-        <translation>Le corrispondenze simili sono solo suggerimenti; verifica ogni nominativo sull’immagine. Non vengono cercati caratteri aggiunti o mancanti.</translation>
+        <source>Similar matches are suggestions only; verify each callsign on the image. Slash changes are not searched.</source>
+        <translation>Le corrispondenze simili sono solo suggerimenti; verifica ogni nominativo sull’immagine. Non vengono cercate variazioni della barra.</translation>
     </message>
     <message>
         <source>similar calls</source>

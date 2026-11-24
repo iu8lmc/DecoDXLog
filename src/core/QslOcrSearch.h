@@ -6,7 +6,7 @@
 #include <memory>
 namespace decolog::core {
 class LogDatabase;
-// Advisory exact or explicitly requested one-substitution/adjacent-swap lookup.
+// Advisory exact or explicitly requested single-character edit/adjacent-swap lookup.
 // It never modifies the log or confirms a QSO.
 class QslOcrSearch : public QObject {
     Q_OBJECT

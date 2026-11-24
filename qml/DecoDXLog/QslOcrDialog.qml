@@ -187,12 +187,12 @@ DialogFrame {
         }
         CheckBox {
             id: similarCall
-            text: qsTr("Include similar calls (one character substitution or adjacent swap)")
+            text: qsTr("Include similar calls (one character added, removed, substituted or adjacent swap)")
             enabled: !root.search.busy && !root.acquisition.busy
         }
         Text {
             Layout.fillWidth: true; visible: similarCall.checked; color: Theme.warningColor; wrapMode: Text.Wrap
-            text: qsTr("Similar matches are suggestions only; verify each callsign on the image. Insertions and missing characters are not searched.")
+            text: qsTr("Similar matches are suggestions only; verify each callsign on the image. Slash changes are not searched.")
         }
         RowLayout {
             Layout.fillWidth: true

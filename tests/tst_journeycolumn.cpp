@@ -1674,11 +1674,11 @@ private slots:
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("card.png");
         QVERIFY(QFile::copy(QFINDTESTDATA("fixtures/qsl-ocr-synthetic.png"),path));
         { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
-          for (const auto* call : {"K1ABC","K1ABO","K1XYZ"})
+          for (const auto* call : {"K1ABC","K1ABO","K1AB","K1XYZ"})
             QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20260923"},{"TIME_ON","143000"},{"BAND","20m"},{"MODE","SSB"}},"fixture").id>0); }
         QByteArray output; QVERIFY2(launch(dir,QStringLiteral("qslocrsimilar:")+path,output,4500),output.constData());
-        QVERIFY2(output.contains("PROBE qslMatches success=true count=2"),output.constData());
-        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3)); QVERIFY(db.qslAttachments(1).isEmpty());
+        QVERIFY2(output.contains("PROBE qslMatches success=true count=3"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(4)); QVERIFY(db.qslAttachments(1).isEmpty());
     }
 
     void qslOcrDialogShowsNoExactMatch()
