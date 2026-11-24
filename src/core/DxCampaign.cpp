@@ -18,6 +18,18 @@ QString campaignMode(const QString& text)
     if (mode==QLatin1String("USB") || mode==QLatin1String("LSB")) return QStringLiteral("SSB");
     return mode;
 }
+// ISO timestamps with numeric offsets can be recorded on an adjacent local day.
+// Widen the indexed text range, then apply the exact UTC-day check below.
+QString lowerDateBound(const QDate& date)
+{
+    const QDate previous=date.addDays(-1);
+    return !previous.isValid() || previous.year()<1 ? QString() : previous.toString(Qt::ISODate)+QStringLiteral("T00:00:00");
+}
+QString upperDateBound(const QDate& date)
+{
+    const QDate after=date.addDays(2);
+    return !after.isValid() || after.year()>9999 ? QString(QChar(0xffff)) : after.toString(Qt::ISODate)+QStringLiteral("T00:00:00");
+}
 bool fail(QString* error,const QString& message) { if(error) *error=message; return false; }
 bool valid(const Campaign& c,QString* error)
 {
@@ -139,7 +151,7 @@ QList<Cell> matrix(const LogDatabase& db,const Campaign& c,QString* error)
     QStringList placeholders; for(int i=0;i<c.calls.size();++i) placeholders << QStringLiteral("?");
     const QString sql=QStringLiteral("SELECT band,mode,IFNULL(submode,''),qso_datetime_on,EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id=qso.id AND s.service IN ('lotw','card') AND s.rcvd='Y') FROM qso WHERE deleted=0 AND call IN (%1) AND qso_datetime_on>=? AND qso_datetime_on<? AND (?=0 OR station_profile_id=?)").arg(placeholders.join(','));
     QSqlQuery q(db.connection()); q.prepare(sql); for(const auto& call:c.calls) q.addBindValue(call);
-    q.addBindValue(c.start.toString(Qt::ISODate)+QStringLiteral("T00:00:00")); q.addBindValue(c.end.addDays(1).toString(Qt::ISODate)+QStringLiteral("T00:00:00"));
+    q.addBindValue(lowerDateBound(c.start)); q.addBindValue(upperDateBound(c.end));
     q.addBindValue(c.stationProfileId); q.addBindValue(c.stationProfileId);
     if(!q.exec()) { fail(error,q.lastError().text()); return {}; }
     while(q.next()) {
@@ -184,7 +196,7 @@ std::optional<bool> goalNeeded(const LogDatabase& db,const Campaign& c,const Enr
     QString sql=QStringLiteral("SELECT band,mode,IFNULL(submode,''),qso_datetime_on FROM qso WHERE deleted=0 AND call IN (%1) AND qso_datetime_on>=? AND qso_datetime_on<? AND (?=0 OR station_profile_id=?)").arg(placeholders.join(','));
     if (target==QLatin1String("confirmed")) sql+=QStringLiteral(" AND EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id=qso.id AND s.service IN ('lotw','card') AND s.rcvd='Y')");
     QSqlQuery q(db.connection()); q.prepare(sql); for (const auto& call : c.calls) q.addBindValue(call);
-    q.addBindValue(c.start.toString(Qt::ISODate)+QStringLiteral("T00:00:00")); q.addBindValue(c.end.addDays(1).toString(Qt::ISODate)+QStringLiteral("T00:00:00"));
+    q.addBindValue(lowerDateBound(c.start)); q.addBindValue(upperDateBound(c.end));
     q.addBindValue(c.stationProfileId); q.addBindValue(c.stationProfileId);
     if (!q.exec()) { fail(error,q.lastError().text()); return {}; }
     while (q.next()) {

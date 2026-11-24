@@ -32,6 +32,25 @@ private slots:
         observer.close();
         QVERIFY(!dxcampaign::watchSnapshotCurrent(observer, generation, refreshed));
     }
+    void campaignMatchesUtcDayAcrossOffsetBoundaries()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;
+        c.title="UTC boundary"; c.calls={"K1ABC"}; c.start=QDate(2027,1,1); c.end=c.start; c.source="fixture";
+        c.verifiedAt=QDateTime::fromString("2026-12-31T12:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.goals={{"20m","CW","worked"}};
+        QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+        auto add=[&](const QString& iso) { auto r=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20270101"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false); if(r.id>0) { QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET qso_datetime_on=? WHERE id=?"); q.addBindValue(iso); q.addBindValue(r.id); if(!q.exec()) return qint64(0); } return r.id; };
+        const auto confirmedId=add("2026-12-31T23:30:00-02:00"); QVERIFY(confirmedId>0); QVERIFY(add("2027-01-02T00:30:00+02:00")>0);
+        QVERIFY(add("2027-01-01T00:30:00+02:00")>0); QVERIFY(add("2027-01-01T23:30:00-02:00")>0);
+        EnrichedSpot spot; spot.spot.band="20m"; spot.spot.mode="CW";
+        const auto needed=dxcampaign::goalNeeded(db,c,spot,&error); QVERIFY2(needed,qPrintable(error)); QVERIFY(!*needed);
+        const auto cells=dxcampaign::matrix(db,c,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(cells.size(),1);
+        QCOMPARE(cells.first().worked,2); QVERIFY(!cells.first().needed);
+        QslState card; card.service="card"; card.rcvd="Y"; QVERIFY(db.setCardState(confirmedId,card));
+        c.goals={{"20m","CW","confirmed"}}; const auto confirmation=dxcampaign::goalNeeded(db,c,spot,&error);
+        QVERIFY2(confirmation,qPrintable(error)); QVERIFY(!*confirmation);
+        const auto confirmedCells=dxcampaign::matrix(db,c,&error); QCOMPARE(confirmedCells.first().confirmed,1); QVERIFY(!confirmedCells.first().needed);
+    }
+
     void explicitGoalsTrackWorkedAndConfirmedSeparately()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("goals.sqlite"); QString id;
