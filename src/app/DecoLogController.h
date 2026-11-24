@@ -1090,6 +1090,7 @@ private:
     core::AwardFilter m_awardFilter;
     QVariantMap m_dxCampaign;
     QString m_dxCampaignPath;
+    std::optional<core::dxcampaign::ReviewContext> m_dxCampaignContext;
     QVariantList m_dxCampaignMatrix;
     QString m_dxCampaignError;
     bool m_dxCampaignBusy{false};

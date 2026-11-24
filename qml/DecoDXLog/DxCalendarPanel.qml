@@ -180,6 +180,20 @@ GlassPanel {
     Timer { id:dateContextApply; interval:2500; onTriggered: {
         dateReview.apply(); console.warn("PROBE dxcontext result " + dateReview.visible + " " + dateReview.reviewError)
     } }
+    function probeMatrixContext() {
+        const rows=root.campaignBackend.dxCampaigns
+        if (!rows.length || !root.campaignBackend.selectDxCampaign(rows[0].id)) { console.warn("PROBE dxmatrix setup failed"); return }
+        dxMatrixContextReady.start()
+    }
+    Timer { id:dxMatrixContextReady; interval:100; repeat:true; property int tries:0; onTriggered: {
+        if (root.campaignBackend.dxCampaignBusy && ++tries<50) return
+        stop(); console.warn("PROBE dxmatrix ready " + JSON.stringify(root.campaignBackend.dxCampaignMatrix)); dxMatrixContextRefresh.start()
+    } }
+    Timer { id:dxMatrixContextRefresh; interval:2500; onTriggered: { root.campaignBackend.refreshDxCampaign(); dxMatrixContextResult.start() } }
+    Timer { id:dxMatrixContextResult; interval:100; repeat:true; property int tries:0; onTriggered: {
+        if (root.campaignBackend.dxCampaignBusy && ++tries<50) return
+        stop(); console.warn("PROBE dxmatrix result " + JSON.stringify({error:root.campaignBackend.dxCampaignError,rows:root.campaignBackend.dxCampaignMatrix}))
+    } }
     function probeDateReview() {
         calendarObserved="2026-01-09T10:00:00Z"
         visibleEntries=[{entity:"Fixture expedition",title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-10",description:"Updated dates"}]
