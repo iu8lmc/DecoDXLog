@@ -31,6 +31,28 @@ class Api(BaseHTTPRequestHandler):
 
 
 class ManagerTests(unittest.TestCase):
+    def test_installed_manifest_changes_are_detected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); src=base/'src'; src.mkdir(); root=base/'installed'
+            (src/'demo.py').write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.demo','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=src/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            installed=root/manifest['id']/manifest['version']/'manifest.json'
+            altered=json.loads(installed.read_text()); altered['permissions'].append('status.read'); installed.write_text(json.dumps(altered))
+            self.assertEqual(manager.list_installed(root),[{'id':manifest['id'],'status':'invalid'}])
+            with self.assertRaises(ValueError): manager.run(root,manifest['id'],'read-token',12345,1)
+            manager.remove(root,manifest['id']); self.assertEqual(manager.list_installed(root),[])
+
+    def test_legacy_pointer_remains_readable_and_reinstall_adds_manifest_hash(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); src=base/'src'; src.mkdir(); root=base/'installed'
+            (src/'demo.py').write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.demo','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=src/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            pointer=root/manifest['id']/'current.json'; old=json.loads(pointer.read_text()); del old['manifestSha256']; pointer.write_text(json.dumps(old))
+            self.assertEqual(manager.list_installed(root)[0]['id'],manifest['id'])
+            manager.install(root,path); self.assertIn('manifestSha256',json.loads(pointer.read_text()))
+
     def test_corrupt_extension_does_not_hide_other_installed_extensions(self):
         with tempfile.TemporaryDirectory() as temp:
             base=pathlib.Path(temp); source=base/'source'; source.mkdir(); root=base/'extensions'

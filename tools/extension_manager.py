@@ -116,7 +116,8 @@ def install(root, manifest_path, token='', port=None, timeout=10):
                 os.rename(stage, version)
             finally:
                 if stage.exists(): shutil.rmtree(stage)
-        pointer = {'version':manifest['version'], 'sha256':{name:hashlib.sha256(data).hexdigest() for name, data in files.items()}}
+        pointer = {'version':manifest['version'], 'sha256':{name:hashlib.sha256(data).hexdigest() for name, data in files.items()},
+                   'manifestSha256':hashlib.sha256(manifest_bytes).hexdigest()}
         _atomic_file(folder/'current.json', (json.dumps(pointer, sort_keys=True)+'\n').encode())
         return manifest
     except Exception:
@@ -129,7 +130,7 @@ def install(root, manifest_path, token='', port=None, timeout=10):
 def _current(root, identity):
     folder = _directory(_root(root), identity)
     pointer = json.loads(_regular(folder/'current.json', 4096))
-    if not isinstance(pointer, dict) or set(pointer) != {'version','sha256'}:
+    if not isinstance(pointer, dict) or set(pointer) not in ({'version','sha256'}, {'version','sha256','manifestSha256'}):
         raise ValueError('invalid extension pointer')
     # Validate version independently before using it as a path component.
     harness.validate_manifest({'schemaVersion':1,'apiVersion':1,'id':identity,'version':pointer['version'],
@@ -138,7 +139,9 @@ def _current(root, identity):
     if version.is_symlink() or not version.is_dir():
         raise ValueError('invalid extension version directory')
     manifest_path = version/'manifest.json'
-    _regular(manifest_path, harness.MAX_MANIFEST)
+    manifest_bytes = _regular(manifest_path, harness.MAX_MANIFEST)
+    if 'manifestSha256' in pointer and hashlib.sha256(manifest_bytes).hexdigest() != pointer['manifestSha256']:
+        raise ValueError('extension manifest changed')
     manifest = harness.load_manifest(manifest_path)
     if manifest['id'] != identity or manifest['version'] != pointer['version']:
         raise ValueError('extension identity or version changed')
