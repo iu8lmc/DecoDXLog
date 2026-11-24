@@ -1,15 +1,20 @@
-# Capability evidence
+# Desktop capability evidence
 
-| Capability | Implementation state | Local proof | macOS / Windows / Linux | Hardware / external |
-|---|---|---|---|---|
-| Marathon year UTC selection | Increment implemented | A/B unit test passed | macOS arm64 tested; Windows/Linux untested | No hardware; official rule compliance and submission not verified |
-| Generic web contest labelling | Increment implemented | A/B local HTTP test passed | macOS local server; other systems untested | No hardware; production deployment not performed |
-| VUCC preview | Partial, candidate-only implementation | A/B boundary-grid, ADIF and offscreen controller tests passed | macOS arm64 only | Official eligibility, confirmation sources, location rules and submission remain open |
-| Full desktop roadmap | In progress | Not established | Not established | See PLAN and TEST-MATRIX |
-| Radio-net roster, QSO draft and JSON export | Partial local desktop implementation | Synthetic SQLite export/cancellation and programmatic offscreen UI/restart passed | macOS arm64 tested; Windows/Linux untested | No RF or live multi-computer proof; saved-QSO association, timers and external interoperability remain open |
+Status snapshot: 24 November 2026. These rows identify implemented slices, not acceptance of a complete goal. Detailed A/B commands, datasets, failures, later superseding changes and residual requirements are in [PROGRESS.md](PROGRESS.md). The normal published v1.17.67 is a tagged snapshot; subsequent local commits are not included in that release.
 
-| Satellite manual split entry | Increment implemented, not tracker integration | Offscreen isolated app persists and exports synthetic TX 145.9 MHz / RX 435.25 MHz QSO; simulated connected UI invokes no tuning | macOS arm64 / Qt 6.11.2 only | No real tracker, Doppler, pass prediction, CAT or RF proof |
+| Stream | Implemented desktop slices | Evidence and remaining limits |
+|---|---|---|
+| Reliability and compatibility (G01) | Transactional imports, guarded import undo and duplicate review, asynchronous operations and migration checks. | Synthetic database and offscreen app tests; large-log and cross-platform cases remain open. |
+| Awards and applications (G02) | Preliminary VUCC boundary-grid and evidence review; Marathon entity and zone candidate selection and review. | Synthetic and some independently sourced rule fixtures; official eligibility, actual submissions, accounts and full rule coverage remain open. |
+| QSL planning (G03) | Snapshot-based benefit and route review, recorded source and cost information, goals and guarded paper-queue handoff. | Local synthetic tests and offscreen app; remote service integration, actual QSL decisions and complete acceptance remain open. |
+| DXpedition campaigns (G04) | Persistent calls, dates, band/mode matrices, goals, filtered spots and opt-in watch alerts. | Local synthetic spots and concurrent-write fixtures; real cluster/RF and broader synchronization remain open. |
+| Migration and synchronization (G05) | Import preview and journalled undo; QSL service outcomes and ambiguity reporting, with guarded cursor handling. | Synthetic migration, fault and fake-service tests; real producer exports, actual services and durable reconciliation workflows remain open. |
+| Multi-program activation (G06) | POTA, SOTA, WWFF and IOTA references, session history, local catalogues, grouped previews and partitioned ADIF exports. | Local synthetic and programmatic offscreen tests; official importer acceptance, real catalogues and operating validation remain open. |
+| Typed fields and reports (G07) | Typed custom fields, bounded formulas, reviewable derived values, report definitions and CSV/PDF exports. | Synthetic calculations, offscreen exports and selected PDF rendering checks; arbitrary filters, broader editing paths and large-log UI behavior remain open. |
+| Radio net manager (G08) | Persistent roster, status/order/history, visual reminders, explicit QSO drafts and saved-QSO association, browsing and JSON export. | Synthetic SQLite and offscreen tests; no real radio-net operation or OS-level notification claim. |
+| Satellite and rover (G09) | Read-only PREDICT snapshot, Doppler preview, pass planning, explicit split-frequency QSO drafts and local rover position history. | Local protocol/rig simulators and one historical PREDICT 2.2.5 sample; current orbital accuracy, CAT/rotor hardware, RF and broader platform operation remain open. |
+| Contest (G10) | Existing scoring rules, contest network and serial work, local queue, report review, session audio and comparison slices. | Synthetic network, loss/restart, audio and report tests; full rule-by-rule acceptance, real LAN/SO2R and other required contest workflows remain open. |
+| SDK and extensions (G11) | Versioned local API, experimental trusted-process harness and manager, read-only sample report and tracker adapter. | Local subprocess/fake API tests; no sandbox or independent per-extension permissions; full lifecycle, isolation and external interoperability remain open. |
+| QSL OCR and historical entry (G12) | Local Tesseract extraction, candidate review, explicit image attachment, acquisition history/undo and historical-entry mode. | Synthetic cards, local Tesseract and offscreen app; real-card accuracy and physical interaction remain open. |
 
-| PREDICT desktop snapshot | Partial, read-only | Offscreen app and local UDP fixture check active/stopped modes and old-TLE warning; actual PREDICT 2.2.5 returns OSCAR-7 sample with 2018 TLE | macOS arm64 only | No continuous tracking, current orbit validation, CAT/rotor, radio or RF proof |
-
-- G09 rover: local session and position history, manual QSO `MY_GRIDSQUARE`, and historical browsing are available. Automatic attribution for imported, contest and received contacts, cross-process synchronization and official award eligibility remain open. See [rover guide](../ROVER.md).
+Most evidence above is from macOS arm64 with Qt 6.11.2 and synthetic or programmatic fixtures; consult each progress entry for exceptions. Published assets and automated workflows do not by themselves establish clean installation, physical interaction, real RF or official award credit on Windows, Linux or macOS. Integrated G13 acceptance remains open.

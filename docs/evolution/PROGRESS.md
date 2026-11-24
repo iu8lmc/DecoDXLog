@@ -3283,3 +3283,11 @@ The desktop release-status document previously said no packages had been publish
 A/B is a factual comparison of the previous document against the live GitHub release metadata and the corrected document, not a software behavior test. At this check, `git rev-list --count v1.17.67..HEAD` returned 103 commits; the tag's commit is `a92cabb4`. The five installer sizes and upload states were checked with `gh release view`; no download or installation was repeated for this documentation correction. git diff --check passed.
 
 The public release does not establish that every roadmap goal is complete or that later local commits are published. Clean installations, hardware, services and remaining cross-platform acceptance still require their respective evidence. The separate full CTest run remained active during this documentation update.
+
+## 2026-11-24 — G00/G13 refresh desktop capability matrix
+
+Updated the desktop capability matrix to cover all eleven active product streams and distinguish implemented slices, proof levels and remaining acceptance work. The previous matrix still said radio-net QSO association was absent and described satellite entry without the subsequently implemented tracker flow. The updated matrix references this progress log for detailed evidence and explicitly separates the published v1.17.67 tag from later local work.
+
+A/B is a documentation comparison against the existing code paths and recorded tests: before, the matrix contained stale capability descriptions and only a few streams; afterwards it includes the G01 foundation and all eleven G02–G12 product streams with their limitations. No new functionality or runtime proof is claimed by the matrix itself. git diff --check passed. The full CTest run remained active on an earlier app binary while this document was updated.
+
+This is a concise status snapshot, not a requirement-by-requirement completion audit. The remaining real-service, hardware, physical UI, cross-platform and integrated G13 evidence is not supplied by this documentation change.
