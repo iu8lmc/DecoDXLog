@@ -14,10 +14,46 @@ import shutil
 import stat
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 
 import extension_harness as harness
 
 MAX_ENTRY = 1024 * 1024
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _verify_credential(manifest, token, port, timeout):
+    """Verify scoped identity and permissions before passing a token to code."""
+    if not isinstance(token, str) or not token or not token.isascii() or any(c in token for c in "\r\n") or not 1 <= port <= 65535 or not 0.1 <= timeout <= 60:
+        raise ValueError('invalid token, port or timeout')
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
+    request = urllib.request.Request(f'http://127.0.0.1:{port}/api/v1/capabilities?apiVersion=1',
+                                     headers={'X-DecoDXLog-Token': token}, method='GET')
+    try:
+        with opener.open(request, timeout=min(timeout, 5)) as response:
+            data = response.read(16385)
+        if len(data) > 16384: raise ValueError('capability response too large')
+        caps = json.loads(data)
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise ValueError('cannot verify extension credential') from exc
+    if not isinstance(caps, dict) or caps.get('apiVersion') != 1:
+        raise ValueError('unsupported API capabilities')
+    operations = caps.get('operations')
+    if (not isinstance(operations, list) or any(not isinstance(op, str) for op in operations)
+            or len(set(operations)) != len(operations) or not set(operations).issubset(harness.ALLOWED_PERMISSIONS)):
+        raise ValueError('unsupported credential permissions')
+    declared = set(manifest['permissions'])
+    if caps.get('permissionModel') == 'extension-token':
+        if (caps.get('perExtensionPermissions') is not True or caps.get('extensionId') != manifest['id']
+                or set(operations) != declared):
+            raise ValueError('extension credential does not match manifest')
+    elif caps.get('permissionModel') != 'read-only-token' or not declared.issubset(operations):
+        raise ValueError('incompatible read-only credential')
 
 
 @contextlib.contextmanager
@@ -149,6 +185,7 @@ def _install_locked(base, manifest, manifest_bytes, files, token, port, timeout)
         def preflight(directory):
             if port is None:
                 return
+            _verify_credential(manifest, token, port, timeout)
             harness.run_extension(directory/'manifest.json', token, port, timeout)
             if (_regular(directory/'manifest.json', harness.MAX_MANIFEST) != manifest_bytes or
                     any(_regular(directory/name, MAX_ENTRY) != data for name, data in files.items())):
@@ -231,7 +268,8 @@ def list_installed(root):
 def run(root, identity, token, port, timeout):
     root = _root(root)
     with _operation_lock(root):
-        manifest_path, _ = _current(root, identity)
+        manifest_path, manifest = _current(root, identity)
+        _verify_credential(manifest, token, port, timeout)
         return harness.run_extension(manifest_path, token, port, timeout)
 
 

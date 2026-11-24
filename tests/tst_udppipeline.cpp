@@ -246,7 +246,7 @@ private slots:
             ini.setValue(QStringLiteral("api/port"), m_apiPort);
             ini.setValue(QStringLiteral("api/token"), QStringLiteral("0123456789abcdef0123456789abcdef"));
             ini.setValue(QStringLiteral("api/readOnlyToken"), QStringLiteral("fedcba9876543210fedcba9876543210"));
-            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"test.report","token":"11111111111111111111111111111111","permissions":["qso.read"]}])"));
+            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"org.decodxlog.example.recent-activity","token":"11111111111111111111111111111111","permissions":["qso.read"]}])"));
             ini.setValue(QStringLiteral("watch/files"),
                          QVariantList{QVariantMap{{QStringLiteral("path"), QDir::fromNativeSeparators(fldigiLog)},
                                                   {QStringLiteral("label"), QStringLiteral("fldigi")},
@@ -728,7 +728,7 @@ private slots:
         QCOMPARE(caps.first,200);
         QCOMPARE(caps.second.value("permissionModel").toString(),QStringLiteral("extension-token"));
         QVERIFY(caps.second.value("perExtensionPermissions").toBool());
-        QCOMPARE(caps.second.value("extensionId").toString(),QStringLiteral("test.report"));
+        QCOMPARE(caps.second.value("extensionId").toString(),QStringLiteral("org.decodxlog.example.recent-activity"));
         QCOMPARE(caps.second.value("operations").toArray(),QJsonArray{QStringLiteral("qso.read")});
         QCOMPARE(request("GET",QStringLiteral("/api/v1/qsos")).first,200);
         QCOMPARE(request("GET",QStringLiteral("/api/v1/tracker")).first,403);
@@ -746,6 +746,19 @@ private slots:
         const QByteArray output = report.readAllStandardOutput();
         QVERIFY(!output.contains("11111111111111111111111111111111"));
         QCOMPARE(QJsonDocument::fromJson(output).object().value("scope").toString(),QStringLiteral("recent_sample"));
+        QProcess manager; manager.setProcessEnvironment(environment);
+        const QString managerScript = QStringLiteral(DECODXLOG_SOURCE_DIR "/tools/extension_manager.py");
+        const QString managedRoot = m_dir.filePath(QStringLiteral("managed-extensions"));
+        manager.start(python, {managerScript, QStringLiteral("--root"), managedRoot, QStringLiteral("install"),
+                               QStringLiteral(DECODXLOG_SOURCE_DIR "/examples/extensions/recent_activity.manifest.json")});
+        QVERIFY(manager.waitForFinished(10000)); QCOMPARE(manager.exitCode(),0);
+        manager.start(python, {managerScript, QStringLiteral("--root"), managedRoot, QStringLiteral("run"),
+                               QStringLiteral("org.decodxlog.example.recent-activity"), QStringLiteral("--port"), QString::number(m_apiPort)});
+        QVERIFY(manager.waitForFinished(10000));
+        const QByteArray managedOutput = manager.readAllStandardOutput();
+        QVERIFY2(manager.exitCode() == 0, manager.readAllStandardError().constData());
+        QCOMPARE(QJsonDocument::fromJson(managedOutput).object().value("scope").toString(),QStringLiteral("recent_sample"));
+        QVERIFY(!managedOutput.contains("11111111111111111111111111111111"));
     }
 
     void aBurstIsAllLogged()

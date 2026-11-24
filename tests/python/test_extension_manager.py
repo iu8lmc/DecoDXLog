@@ -34,6 +34,30 @@ class Api(BaseHTTPRequestHandler):
 
 
 class ManagerTests(unittest.TestCase):
+    def test_scoped_credential_must_match_manifest(self):
+        class ScopedApi(Api):
+            def do_GET(self):
+                value = self.server.capabilities
+                data = json.dumps(value).encode(); self.send_response(200); self.send_header('Content-Length', str(len(data))); self.end_headers(); self.wfile.write(data)
+        with tempfile.TemporaryDirectory() as temp:
+            base = pathlib.Path(temp); root = base/'extensions'; source = base/'source'; source.mkdir()
+            (source/'demo.py').write_text("print('ok')\n")
+            manifest = {'schemaVersion':1,'apiVersion':1,'id':'org.example.report','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=source/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            server=ThreadingHTTPServer(('127.0.0.1',0),ScopedApi); thread=Thread(target=server.serve_forever,daemon=True); thread.start()
+            good={'apiVersion':1,'permissionModel':'extension-token','extensionId':manifest['id'],'perExtensionPermissions':True,'operations':['qso.read']}
+            try:
+                with patch.object(manager.harness,'run_extension',return_value={'scope':'recent_sample'}) as execute:
+                    for caps in ({**good,'extensionId':'org.example.other'}, {**good,'operations':['qso.read','tracker.read']}, {**good,'operations':[]}, {**good,'perExtensionPermissions':False}):
+                        server.capabilities=caps
+                        with self.assertRaises(ValueError): manager.run(root,manifest['id'],'read-token',server.server_port,3)
+                    execute.assert_not_called()
+                    server.capabilities=good
+                    self.assertEqual(manager.run(root,manifest['id'],'read-token',server.server_port,3)['scope'],'recent_sample')
+                    execute.assert_called_once()
+            finally:
+                server.shutdown(); server.server_close(); thread.join()
+
     @unittest.skipUnless(os.name == 'posix','read-only directory lock test is POSIX-specific')
     def test_list_and_run_preserve_read_only_installation(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -44,7 +68,7 @@ class ManagerTests(unittest.TestCase):
             root.chmod(0o500)
             try:
                 self.assertEqual(manager.list_installed(root)[0]['id'],manifest['id'])
-                with patch.object(manager.harness,'run_extension',return_value={'scope':'recent_sample'}):
+                with patch.object(manager, '_verify_credential'), patch.object(manager.harness,'run_extension',return_value={'scope':'recent_sample'}):
                     self.assertEqual(manager.run(root,manifest['id'],'test',1,2),{'scope':'recent_sample'})
             finally:
                 root.chmod(0o700)
@@ -62,7 +86,7 @@ class ManagerTests(unittest.TestCase):
             def run():
                 try: outcome.append(manager.run(root,manifest['id'],'test',1,2))
                 except Exception as exc: outcome.append(exc)
-            with patch.object(manager.harness,'run_extension',side_effect=execute):
+            with patch.object(manager, '_verify_credential'), patch.object(manager.harness,'run_extension',side_effect=execute):
                 thread=Thread(target=run); thread.start()
                 if not started.wait(5): release.set(); thread.join(); self.fail('extension did not start')
                 try:
@@ -141,7 +165,7 @@ class ManagerTests(unittest.TestCase):
             def install():
                 try: outcome.append(manager.install(root,path,token='test',port=1))
                 except Exception as exc: outcome.append(exc)
-            with patch.object(manager.harness,'run_extension',side_effect=preflight):
+            with patch.object(manager, '_verify_credential'), patch.object(manager.harness,'run_extension',side_effect=preflight):
                 thread=Thread(target=install); thread.start()
                 if not started.wait(5): release.set(); thread.join(); self.fail('preflight did not start')
                 try:
