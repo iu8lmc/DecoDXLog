@@ -55,7 +55,8 @@ struct Result {
 struct ReviewAdif { QByteArray bytes; int count{0}; int invalidTimestamp{0}; QString error; };
 // Exports all recorded alternatives for one explicit station profile and UTC
 // year from a consistent read transaction; this is not an official submission.
-ReviewAdif reviewAdif(const LogDatabase& db, int year, qint64 stationProfileId, const QString& expectedIdentity = {});
+ReviewAdif reviewAdif(const LogDatabase& db, int year, qint64 stationProfileId, const QString& expectedIdentity = {},
+                      const QByteArray& expectedFileIdentity = {});
 
 Result select(const QList<Entry>& entries, const Rules& rules);
 // Replaces candidates atomically, preserving the same covered entity/zone counts.

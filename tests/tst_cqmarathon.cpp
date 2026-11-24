@@ -4,6 +4,7 @@
 #include <QJsonArray>
 #include <QSqlQuery>
 #include <QFile>
+#include <QTemporaryDir>
 #include <QTest>
 
 using namespace decolog::core::cqmarathon;
@@ -175,6 +176,30 @@ private slots:
         Entry historic=entries[1]; historic.timestamp=QDateTime(QDate(2025,3,1),QTime(12,0),QTimeZone::UTC);
         QCOMPARE(select({historic},{2025,"mixed",1}).selected.size(),1); // do not apply unverified edition rules
     }
+    void reviewAdifRejectsSameIdentityDifferentFile()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("original.sqlite"), clone=dir.filePath("clone.sqlite"); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(path)); StationProfile p; p.name="A"; p.stationCallsign="K1ABC"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,profile,false).id>0); }
+        QVERIFY(QFile::copy(path,clone));
+        LogDatabase original; QVERIFY(original.open(path)); const auto originalIdentity=original.identity(); const auto originalFile=original.openFileIdentity(); QVERIFY(!originalFile.isEmpty());
+        LogDatabase replacement; QVERIFY(replacement.open(clone)); QCOMPARE(replacement.identity(),originalIdentity); QVERIFY(replacement.openFileIdentity()!=originalFile);
+        QSqlQuery q(replacement.connection()); QVERIFY(q.exec("UPDATE qso SET call='K1BBB'"));
+        const auto right=reviewAdif(original,2026,profile,originalIdentity,originalFile); QVERIFY2(right.error.isEmpty(),qPrintable(right.error));
+        const auto wrong=reviewAdif(replacement,2026,profile,originalIdentity,originalFile);
+        QVERIFY2(!wrong.error.isEmpty(),"a cloned identity must not authorize a different physical log");
+        QVERIFY(wrong.bytes.isEmpty()); QCOMPARE(adif::parse(right.bytes).records.first().value("CALL"),QString("K1AAA"));
+#ifdef Q_OS_UNIX
+        q.finish(); replacement.close();
+        QVERIFY(QFile::rename(path,dir.filePath("old.sqlite"))); QVERIFY(QFile::rename(clone,path));
+        const auto stale=reviewAdif(original,2026,profile,originalIdentity,originalFile);
+        QVERIFY(!stale.error.isEmpty()); QVERIFY(stale.bytes.isEmpty());
+        LogDatabase newFile; QVERIFY(newFile.openReadOnly(path)); QCOMPARE(newFile.identity(),originalIdentity);
+        const auto changed=reviewAdif(newFile,2026,profile,originalIdentity,originalFile);
+        QVERIFY(!changed.error.isEmpty()); QVERIFY(changed.bytes.isEmpty());
+#endif
+    }
+
     void reviewAdifIncludesAllAlternativesAndPreservesFields()
     {
         using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:")); StationProfile p; p.name="A"; p.stationCallsign="K1ABC";

@@ -15,10 +15,13 @@
 
 namespace decolog::core::cqmarathon {
 
-ReviewAdif reviewAdif(const LogDatabase& database,int year,qint64 stationProfileId,const QString& expectedIdentity)
+ReviewAdif reviewAdif(const LogDatabase& database,int year,qint64 stationProfileId,const QString& expectedIdentity,const QByteArray& expectedFileIdentity)
 {
     ReviewAdif out;
     if (!database.isOpen() || year<1900 || year>2200 || stationProfileId<=0) { out.error=QStringLiteral("Choose a valid year and station profile"); return out; }
+    const auto fileValid = [&] { return database.fileIdentityMatchesOpen() &&
+        (expectedFileIdentity.isEmpty() || database.openFileIdentity()==expectedFileIdentity); };
+    if (!fileValid()) { out.error=QStringLiteral("Log file changed"); return out; }
     QSqlDatabase db=database.connection();
     if (!db.transaction()) { out.error=db.lastError().text(); return out; }
     if (!expectedIdentity.isEmpty() && database.identity()!=expectedIdentity) { db.rollback(); out.error=QStringLiteral("Log identity changed"); return out; }
@@ -52,7 +55,9 @@ ReviewAdif reviewAdif(const LogDatabase& database,int year,qint64 stationProfile
         for (const char* field:{"QSO_DATE","TIME_ON","CALL","BAND","MODE"})
             if (record.value(QLatin1String(field)).trimmed().isEmpty()) { db.rollback(); out.error=QStringLiteral("A selected QSO is missing an ADIF field required by the submission tool"); return out; }
     }
+    if (!fileValid()) { db.rollback(); out.error=QStringLiteral("Log file changed"); return out; }
     if (!db.rollback()) { out.error=db.lastError().text(); return out; }
+    if (!fileValid()) { out.error=QStringLiteral("Log file changed"); return out; }
     out.bytes=adif::writeDocument(parsed); out.count=ids.size(); return out;
 }
 

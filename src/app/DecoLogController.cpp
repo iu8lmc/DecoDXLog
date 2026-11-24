@@ -3491,7 +3491,9 @@ QString DecoLogController::exportCqMarathonReviewAdif(const QUrl& file,int year,
     if (m_marathonAdifBusy) return tr("A Marathon export is already running");
     if (!m_db.isOpen() || m_db.path().isEmpty() || m_db.path()==QLatin1String(":memory:") || m_db.identity().isEmpty() || year<1900 || year>2200 || stationProfileId<=0 || !m_db.stationProfile(stationProfileId))
         return tr("Choose a file-backed log, valid year and station profile");
+    if (!m_db.fileIdentityMatchesOpen() || m_db.openFileIdentity().isEmpty()) return tr("The log file changed or cannot be identified; reopen it before exporting.");
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local ADIF file");
+    const QByteArray fileIdentity=m_db.openFileIdentity();
     const QString dbPath=m_db.path(), identity=m_db.identity(), path=file.toLocalFile(); const QFileInfo target(path), source(dbPath);
     const QString targetPath=target.absoluteFilePath(), sourcePath=source.absoluteFilePath(), canonical=target.canonicalFilePath();
     for (const QString& suffix:QStringList{QString(),QStringLiteral("-wal"),QStringLiteral("-shm"),QStringLiteral("-journal")}) {
@@ -3499,18 +3501,22 @@ QString DecoLogController::exportCqMarathonReviewAdif(const QUrl& file,int year,
         if (targetPath==protectedFile.absoluteFilePath() || (!canonical.isEmpty() && canonical==protectedFile.canonicalFilePath())) return tr("Choose a file other than the log database");
     }
     m_marathonAdifBusy=true; ++m_exportsPending; emit exportBusyChanged(); QPointer<DecoLogController> self(this);
-    m_exportPool.start([self,dbPath,identity,path,year,stationProfileId] {
+    m_exportPool.start([self,dbPath,identity,fileIdentity,path,year,stationProfileId] {
         core::cqmarathon::ReviewAdif report; LogDatabase db;
         if (!db.openReadOnly(dbPath)) report.error=db.lastError();
-        else report=core::cqmarathon::reviewAdif(db,year,stationProfileId,identity);
+        else report=core::cqmarathon::reviewAdif(db,year,stationProfileId,identity,fileIdentity);
         if (report.error.isEmpty()) {
             QSaveFile output(path);
-            if (!output.open(QIODevice::WriteOnly) || output.write(report.bytes)!=report.bytes.size() || !output.commit()) report.error=output.errorString();
+            if (!output.open(QIODevice::WriteOnly) || output.write(report.bytes)!=report.bytes.size()) report.error=output.errorString();
+            else if (!db.fileIdentityMatchesOpen() || db.openFileIdentity()!=fileIdentity) report.error=QStringLiteral("Log file changed");
+            else if (!output.commit()) report.error=output.errorString();
         }
         if (!self) return;
         QMetaObject::invokeMethod(self.data(),[self,report] {
             if (!self) return; self->m_marathonAdifBusy=false; --self->m_exportsPending; emit self->exportBusyChanged();
-            emit self->cqMarathonAdifFinished(report.error.isEmpty(),report.count,report.invalidTimestamp,report.error);
+            const QString error = report.error == QLatin1String("Log file changed")
+                ? self->tr("The log file changed or cannot be identified; reopen it before exporting.") : report.error;
+            emit self->cqMarathonAdifFinished(error.isEmpty(),report.count,report.invalidTimestamp,error);
         },Qt::QueuedConnection);
     });
     return {};
