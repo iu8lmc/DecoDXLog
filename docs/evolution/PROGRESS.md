@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-11-24 — G13 full local regression after bulk-contention fixes
+
+The main checkout completed sequential offscreen CTest on code revision `fca99e1a`: 124/124 test groups passed in 1844.87 seconds on macOS arm64 / Qt 6.11.2. The subsequent `ea80a640` commit changed only roadmap documentation. Optional cases skipped within groups are not proven by the group result. This is local test evidence, not a clean installation, hardware/RF, live external-service, Windows/Linux or full desktop acceptance result. Detached campaign and planner increments developed after that revision require integration and separate verification.
+
 ## 2026-11-24 — revalidate G01 and G11 working status
 
 Updated PLAN.md to reflect the already-recorded field/tag/delete contention A/B evidence and the implemented bounded event retention, managed example counter and explicit gap acceptance. This is a documentation correction, not additional functional or platform acceptance: missing events remain unrecoverable from the journal, external side effects are not atomically acknowledged, and durable atomic API idempotency remains open. The complete CTest started separately on code revision `fca99e1a` is still running; its outcome is not yet recorded.
