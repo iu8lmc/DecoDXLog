@@ -407,9 +407,9 @@ public:
     QList<qint64> latestIds(const QString& call, int limit) const;
 
     // Il QSO (non cancellato) che ha `value` nel campo ADIF senza colonna
-    // `field` (in adif_extra), cercato vicino a `near` (un giorno prima e dopo)
+    // `field` (in adif_extra), cercato vicino a `referenceTime` (un giorno prima e dopo)
     // se l'ora e' valida: l'ID di N1MM, il numero di un altro log.
-    std::optional<qint64> findByExtra(const QString& field, const QString& value, const QDateTime& near = {}) const;
+    std::optional<qint64> findByExtra(const QString& field, const QString& value, const QDateTime& referenceTime = {}) const;
 
     // Il record ADIF completo di un QSO: colonne, stati QSL e adif_extra.
     std::optional<AdifRecord> record(qint64 id) const;

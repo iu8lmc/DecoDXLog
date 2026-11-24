@@ -934,19 +934,19 @@ std::optional<qint64> LogDatabase::findDuplicate(const QString& call, const QStr
     return std::nullopt;
 }
 
-std::optional<qint64> LogDatabase::findByExtra(const QString& field, const QString& value, const QDateTime& near) const
+std::optional<qint64> LogDatabase::findByExtra(const QString& field, const QString& value, const QDateTime& referenceTime) const
 {
     if (field.isEmpty() || value.isEmpty())
         return std::nullopt;
     QString sql = QStringLiteral("SELECT id, adif_extra FROM qso WHERE deleted = 0 AND adif_extra LIKE ?");
-    if (near.isValid())
+    if (referenceTime.isValid())
         sql += QStringLiteral(" AND qso_datetime_on BETWEEN ? AND ?");
     QSqlQuery q(connection());
     q.prepare(sql);
     q.addBindValue(QStringLiteral("%") + value + QStringLiteral("%"));
-    if (near.isValid()) {
-        q.addBindValue(near.toUTC().addDays(-1).toString(Qt::ISODate));
-        q.addBindValue(near.toUTC().addDays(1).toString(Qt::ISODate));
+    if (referenceTime.isValid()) {
+        q.addBindValue(referenceTime.toUTC().addDays(-1).toString(Qt::ISODate));
+        q.addBindValue(referenceTime.toUTC().addDays(1).toString(Qt::ISODate));
     }
     if (!q.exec())
         return std::nullopt;
