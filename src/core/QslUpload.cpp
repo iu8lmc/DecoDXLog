@@ -563,6 +563,8 @@ QslUploadResult parseEqslResponse(const QByteArray& body)
             r.message = QCoreApplication::translate("Qsl", "eQSL: already there");
             return r;
         }
+        if (!r.ok)
+            r.rejected = 1;
         r.message = QCoreApplication::translate("Qsl", "eQSL: %1").arg(text.left(120));
         return r;
     }

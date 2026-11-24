@@ -18,6 +18,7 @@
 #include <QSqlQuery>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QUrlQuery>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -100,6 +101,45 @@ class TestQsl : public QObject {
     Q_OBJECT
     QTemporaryDir m_settingsDir;
 private slots:
+    void hrdLogAntennaAndSignedReportsAB()
+    {
+        QByteArray data = qgetenv("DECODXLOG_HRDLOG_ADIF_FIXTURE");
+        if (!data.isEmpty()) {
+            QFile file(QString::fromLocal8Bit(data));
+            QVERIFY(file.open(QIODevice::ReadOnly));
+            data = file.readAll();
+        } else {
+            data = "<EOH><CALL:6>EA7HMK <RST_SENT:3>-20 <MY_ANTENNA:11>Yagi,Dipole <EOR>"
+                   "<CALL:6>EC5ALJ <RST_SENT:3>+01 <RST_RCVD:3>+18 <MY_ANTENNA:11>Yagi,Dipole <EOR>";
+        }
+        const auto doc = adif::parse(data);
+        QCOMPARE(doc.records.size(), 2);
+        QVERIFY(!doc.invalidFieldLength);
+        FakeCrx server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        server.answer = "<RobotRequest><insert>1</insert></RobotRequest>";
+        WebQslUploader web; web.setHrdLogEndpoint(server.url());
+        QSignalSpy done(&web, &WebQslUploader::finished);
+        for (const auto& original : doc.records) {
+            QCOMPARE(original.value("MY_ANTENNA"), QString("Yagi,Dipole"));
+            for (bool includeAntenna : {true, false}) {
+                auto record = original;
+                if (!includeAntenna) record.remove("MY_ANTENNA");
+                const QString adifText = adif::writeRecord(record);
+                server.request.clear(); server.body.clear();
+                const int previous = done.size();
+                web.uploadHrdLog("TESTCALL", "test-code", adifText);
+                QTRY_COMPARE_WITH_TIMEOUT(done.size(), previous + 1, 3000);
+                const auto form = QUrlQuery(QString::fromUtf8(server.body));
+                QCOMPARE(form.queryItemValue("ADIFData", QUrl::FullyDecoded), adifText);
+                if (original.value("CALL") == QLatin1String("EC5ALJ")) {
+                    QVERIFY(server.body.contains("%2B01"));
+                    QVERIFY(server.body.contains("%2B18"));
+                }
+                QCOMPARE(adifText.contains("my_antenna"), includeAntenna);
+            }
+        }
+    }
+
     void unconfiguredUploadServicesDoNotConnect()
     {
         QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
@@ -650,6 +690,14 @@ private slots:
         r = qsl::parseEqslResponse("");
         QVERIFY(!r.ok);
         QVERIFY(r.retryLater);
+    }
+
+    void eqslBadModeWithZeroResultIsRejected()
+    {
+        const auto r = qsl::parseEqslResponse("Warning: Y=2026 M=01 D=11 EG4WWA 40M Bad Mode: DATA Result: 0 out of 1 records added");
+        QVERIFY(!r.ok);
+        QCOMPARE(r.rejected, 1);
+        QVERIFY(r.message.contains("Bad Mode: DATA"));
     }
 
     void clubLogAnswers()

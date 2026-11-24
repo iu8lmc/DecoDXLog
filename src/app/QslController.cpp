@@ -325,6 +325,8 @@ QslController::QslController(Context context, QObject* parent)
         }
         const qint64 id = m_batch.takeFirst();
         markSent(id, m_busyService, result);
+        if (!result.ok && !result.message.isEmpty())
+            note(tr("QSO %1: %2").arg(id).arg(result.message), QStringLiteral("warning"));
         if (result.retryLater) {
             // Rete o servizio giu': si ferma qui, il resto resta in coda per dopo.
             note(tr("%1: stopped, %2").arg(m_busyService, result.message), QStringLiteral("warning"));

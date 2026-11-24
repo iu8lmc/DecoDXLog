@@ -1039,7 +1039,7 @@ bool DecoLogController::openDatabase(const QString& path)
         if (!rig || !rig->connected() || mhz <= 0)
             return false;
         rig->tuneTo(static_cast<qint64>(std::llround(mhz * 1e6)),
-                    mode.isEmpty() ? QString() : modes::catForClusterSpot(mode, mhz));
+                    mode.isEmpty() ? QString() : modes::catForClusterSpot(mode, mhz, rig->link()));
         return true;
     };
     m_cluster = new ClusterController(std::move(ctx), this);

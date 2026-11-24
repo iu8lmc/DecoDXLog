@@ -83,6 +83,28 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void clusterFilterPopupContainsControlsWithManyPresets()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,"clusterfilterlayoutprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE filterLayout fits=true popupFits=true count=25 chipsFit=true") &&
+                 output.contains("PROBE filterLayout lastVisible=true nameIntact=true deleted=true remaining=24") &&
+                 output.contains("PROBE filterLayout edited=true savedAndLoaded=true remaining=24") &&
+                 output.contains("PROBE filterLayout closed=true"),output.constData());
+    }
+    void clusterFilterPopupWorksWithoutPresets()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,"clusterfilteremptyprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE filterEmpty fits=true count=0 chipsFit=true") && output.contains("PROBE filterEmpty closed=true"),output.constData());
+    }
+    void clusterAlertFilterEditorStillWorks()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
+        QVERIFY2(launch(dir,"clusteralertfilterprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE alertFilter chipsFit=true toggled=true saved=true closed=true"),output.constData());
+    }
+
     void unsupportedCqContestShowsNoScoreInDesktop()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

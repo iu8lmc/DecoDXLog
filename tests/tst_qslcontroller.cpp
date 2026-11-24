@@ -271,6 +271,42 @@ private slots:
         QVERIFY(controller.m_autoServices.isEmpty());
     }
 
+    void eqslBadModeIsReportedAndRemainsPending()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto id = db.insertQso({{"CALL", "EG4WWA"}, {"QSO_DATE", "20260111"},
+                                      {"TIME_ON", "1903"}, {"BAND", "40m"}, {"MODE", "DATA"}}, "test").id;
+        QSettings().setValue("credentials/eqsl/stored", true);
+        QSettings().setValue("credentials/eqsl/account", "K1TEST");
+        CredentialStore credentials("test-only");
+        credentials.m_secretCache.insert("eqsl", "test-password");
+        QTcpServer server; QVERIFY(server.listen(QHostAddress::LocalHost));
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket* socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [socket] {
+                socket->readAll();
+                if (socket->property("answered").toBool()) return;
+                socket->setProperty("answered", true);
+                const QByteArray body = "Warning: Y=2026 M=01 D=11 EG4WWA 40M Bad Mode: DATA Result: 0 out of 1 records added";
+                socket->write("HTTP/1.1 200 OK\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
+                socket->disconnectFromHost();
+            });
+        });
+        QStringList notices;
+        QslController::Context ctx; ctx.db = &db; ctx.credentials = &credentials;
+        ctx.activity = [&](const QString&, const QString& message, const QString&) { notices << message; };
+        QslController controller(ctx);
+        controller.m_web.setEndpoints(QUrl(), QUrl(QStringLiteral("http://127.0.0.1:%1/eqsl").arg(server.serverPort())));
+        QCOMPARE(controller.uploadQsos({id}, "eqsl"), 1);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 3000);
+        QCOMPARE(db.uploadPendingCount("eqsl"), 1);
+        const auto state = db.qslStatus(id).first();
+        QCOMPARE(state.sent, QString("N"));
+        QVERIFY(state.lastError.contains("Bad Mode: DATA"));
+        QVERIFY(std::any_of(notices.cbegin(), notices.cend(), [](const QString& s) { return s.contains("Bad Mode: DATA"); }));
+        QVERIFY(controller.m_lastResult.value("eqsl").contains("1 rejected"));
+    }
+
     void eqslDuplicateAndAutomaticEditAB_data()
     {
         QTest::addColumn<bool>("legacyTrigger");

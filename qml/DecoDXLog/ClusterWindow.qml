@@ -51,6 +51,15 @@ RoundedWindow {
     }
 
     function persistPlacement() { clusterWindowSettings.sync() }
+    function probeManyFilterPresets() { spotsPanel.probeManyFilterPresets() }
+    function probeEmptyFilterPresets() { spotsPanel.probeEmptyFilterPresets() }
+    function probeAlertFilterEditor() { ruleEditor.openFor({name:"Fixture alert",filter:{},voice:false,decodium:false}); alertFilterProbe.start() }
+    Timer { id:alertFilterProbe; interval:400; onTriggered: {
+        const fits=ruleFilter.probeChipsFit(); const toggled=ruleFilter.probeToggleBand("20m")
+        ruleSave.clicked()
+        const saved=root.cluster.alertRules.some(r => r.name==="Fixture alert" && (r.filter.bands || []).indexOf("20m")>=0)
+        console.warn("PROBE alertFilter chipsFit=" + fits + " toggled=" + toggled + " saved=" + saved + " closed=" + !ruleEditor.visible)
+    } }
     Component.onDestruction: root.persistPlacement()
 
     component Section: SectionTitle { Layout.fillWidth: true }
@@ -636,6 +645,7 @@ RoundedWindow {
                 ToggleSwitch { id: ruleSound; Layout.alignment: Qt.AlignBottom; text: qsTr("Play a sound") }
             }
             SpotFilterEditor {
+                id:ruleFilter
                 Layout.fillWidth: true
                 filter: ruleEditor.editedFilter
                 onEdited: (f) => ruleEditor.editedFilter = f
@@ -645,6 +655,7 @@ RoundedWindow {
                 spacing: 8
                 GlassButton { text: qsTr("Cancel"); onClicked: ruleEditor.close() }
                 GlassButton {
+                    id:ruleSave
                     text: qsTr("Save rule")
                     tone: Theme.accentColor
                     filled: true

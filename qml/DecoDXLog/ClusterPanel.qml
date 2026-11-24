@@ -206,6 +206,43 @@ GlassPanel {
         if (name === "row") rowMenu.popupFor(root.model.get(0))
         else if (name === "filters") filterPopup.open()
     }
+    function probeManyFilterPresets() {
+        for (let i=0;i<24;++i) root.cluster.saveFilter("Fixture filter " + (i < 10 ? "0" : "") + i)
+        root.cluster.saveFilter("ZZZ " + "Long".repeat(30))
+        filterPopup.open(); filterLayoutProbe.start()
+    }
+    function probeEmptyFilterPresets() { filterPopup.open(); filterEmptyProbe.start() }
+    Timer { id:filterEmptyProbe; interval:400; onTriggered: {
+        const p=filterClose.mapToItem(filterPopup.contentItem,0,0)
+        console.warn("PROBE filterEmpty fits=" + (p.x>=0 && p.x+filterClose.width<=filterPopup.availableWidth+0.5) + " count=" + Object.keys(root.cluster.savedFilters).length + " chipsFit=" + filterEditor.probeChipsFit())
+        filterClose.clicked(); console.warn("PROBE filterEmpty closed=" + !filterPopup.visible)
+    } }
+    Timer { id:filterLayoutProbe; interval:400; onTriggered: {
+        const p=filterClose.mapToItem(filterPopup.contentItem,0,0)
+        const right=p.x+filterClose.width
+        console.warn("PROBE filterLayout fits=" + (p.x>=0 && right<=filterPopup.availableWidth+0.5) + " popupFits=" + (filterPopup.height<=root.Window.window.height) + " count=" + Object.keys(root.cluster.savedFilters).length + " chipsFit=" + filterEditor.probeChipsFit() + " right=" + right + " available=" + filterPopup.availableWidth)
+        filterScroll.contentItem.contentY=Math.max(0,filterScroll.contentItem.contentHeight-filterScroll.contentItem.height)
+        Qt.callLater(() => {
+            const last=savedFilterRepeater.itemAt(savedFilterRepeater.count-1)
+            if (!last) { console.warn("PROBE filterLayout missing preset"); return }
+            const pos=last.mapToItem(filterScroll,0,0)
+            const visible=pos.x>=-0.5 && pos.x+last.width<=filterScroll.width+0.5 && pos.y>=-0.5 && pos.y+last.height<=filterScroll.height+0.5
+            const key=last.modelData; const nameIntact=key==="ZZZ "+"Long".repeat(30)
+            last.clicked()
+            console.warn("PROBE filterLayout lastVisible=" + visible + " nameIntact=" + nameIntact + " deleted=" + (root.cluster.savedFilters[key]===undefined) + " remaining=" + Object.keys(root.cluster.savedFilters).length)
+            root.cluster.filter={bands:["40m"],text:"probe text"}
+            const toggled=filterEditor.probeToggleBand("20m")
+            const bands=root.cluster.filter.bands || []
+            const edited=toggled && bands.indexOf("40m")>=0 && bands.indexOf("20m")>=0 && root.cluster.filter.text==="probe text"
+            saveName.text="Temporary test preset"; saveFilterButton.clicked()
+            root.cluster.filter=({}); root.cluster.applySavedFilter("Temporary test preset")
+            const loaded=(root.cluster.filter.bands || []).indexOf("20m")>=0 && root.cluster.filter.text==="probe text"
+            root.cluster.deleteSavedFilter("Temporary test preset")
+            console.warn("PROBE filterLayout edited=" + edited + " savedAndLoaded=" + loaded + " remaining=" + Object.keys(root.cluster.savedFilters).length)
+            filterClose.clicked()
+            console.warn("PROBE filterLayout closed=" + !filterPopup.visible)
+        })
+    } }
 
     title: compact ? "" : qsTr("DX Cluster")
     dotColor: cluster.onlineCount > 0 ? Theme.accentColor : Theme.errorColor
@@ -316,6 +353,7 @@ GlassPanel {
         modal: true
         padding: 16
         width: Math.min(820, (Overlay.overlay ? Overlay.overlay.width : 900) - 40)
+        height: Math.min(680, Math.max(200, (Overlay.overlay ? Overlay.overlay.height : root.Window.window.height) - 40))
         background: Rectangle { color: Theme.panelColor; border.color: Theme.glassBorder; radius: 6 }
         ColumnLayout {
             anchors.fill: parent
@@ -325,29 +363,54 @@ GlassPanel {
                 Text { text: qsTr("Spot filters"); color: Theme.textPrimary; font.pixelSize: 15; font.bold: true }
                 Item { Layout.fillWidth: true }
                 GlassButton { text: qsTr("Clear all"); onClicked: root.cluster.filter = ({}) }
-                GlassButton { text: qsTr("Close"); tone: Theme.primaryColor; filled: true; onClicked: filterPopup.close() }
+                GlassButton { id:filterClose; text: qsTr("Close"); tone: Theme.primaryColor; filled: true; onClicked: filterPopup.close() }
             }
-            SpotFilterEditor {
-                Layout.fillWidth: true
-                filter: root.cluster.filter
-                onEdited: (f) => root.cluster.filter = f
-            }
-            RowLayout {
-                spacing: 8
-                StyledTextField { id: saveName; Layout.preferredWidth: 200; mono: false; placeholderText: qsTr("Name for these filters") }
-                GlassButton {
-                    text: qsTr("Save")
-                    enabled: saveName.text.trim().length > 0
-                    onClicked: { root.cluster.saveFilter(saveName.text); saveName.text = "" }
-                }
-                Repeater {
-                    model: Object.keys(root.cluster.savedFilters)
-                    Pill {
-                        required property string modelData
-                        text: modelData + "  ✕"
-                        tone: Theme.secondaryColor
-                        interactive: true
-                        onClicked: root.cluster.deleteSavedFilter(modelData)
+            ScrollView {
+                id:filterScroll
+                Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumWidth:0; Layout.minimumHeight:0
+                clip:true
+                contentWidth:availableWidth
+                ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                ColumnLayout {
+                    width:filterScroll.availableWidth
+                    spacing:10
+                    SpotFilterEditor {
+                        id:filterEditor
+                        Layout.fillWidth:true; Layout.minimumWidth:0; Layout.preferredWidth:0
+                        filter:root.cluster.filter
+                        onEdited:(f) => root.cluster.filter=f
+                    }
+                    RowLayout {
+                        Layout.fillWidth:true; Layout.minimumWidth:0; spacing:8
+                        StyledTextField { id:saveName; Layout.fillWidth:true; Layout.minimumWidth:0; mono:false; placeholderText:qsTr("Name for these filters") }
+                        GlassButton {
+                            id:saveFilterButton
+                            text:qsTr("Save")
+                            enabled:saveName.text.trim().length>0
+                            onClicked:{ root.cluster.saveFilter(saveName.text); saveName.text="" }
+                        }
+                    }
+                    Flow {
+                        id:savedFilterFlow
+                        Layout.fillWidth:true; Layout.minimumWidth:0; Layout.preferredWidth:0
+                        spacing:6
+                        Repeater {
+                            id:savedFilterRepeater
+                            model:Object.keys(root.cluster.savedFilters)
+                            Pill {
+                                required property string modelData
+                                width:Math.min(implicitWidth,savedFilterFlow.width)
+                                clip:true
+                                text:(modelData.length>30 ? modelData.slice(0,29)+"…" : modelData)+"  ✕"
+                                tone:Theme.secondaryColor
+                                interactive:true
+                                HoverHandler { id:presetHover }
+                                ToolTip.visible:presetHover.hovered && modelData.length>30
+                                ToolTip.delay:700
+                                ToolTip.text:modelData
+                                onClicked:root.cluster.deleteSavedFilter(modelData)
+                            }
+                        }
                     }
                 }
             }

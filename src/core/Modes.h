@@ -39,8 +39,8 @@ QString catFor(const QString& mode);
 // 10 MHz si parla in LSB, sopra in USB. Con mhz a zero vale il caso generale.
 QString catFor(const QString& mode, double mhz);
 
-// Cluster spots use the same CAT mode mapping as the rest of the application.
-QString catForClusterSpot(const QString& mode, double mhz);
+// OmniRig FT spots use USB audio; other connections retain their CAT mapping.
+QString catForClusterSpot(const QString& mode, double mhz, const QString& link = {});
 
 QString catForRig(const QString& mode, int model);
 

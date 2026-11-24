@@ -77,7 +77,7 @@ rotore o TX. La capacità corrispondente è `tracker.read`.
 
 ### `GET /api/v1/status`
 
-    {"app":"DecoDXLog","version":"1.17.67","log":"decodxlog","qsos":26497,
+    {"app":"DecoDXLog","version":"1.17.68","log":"decodxlog","qsos":26497,
      "station":"IU8LMC","decodium":true}
 
 ### `GET /api/v1/worked?call=K1ABC&band=20m&mode=FT8`

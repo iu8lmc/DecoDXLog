@@ -101,8 +101,14 @@ QString catFor(const QString& mode, double mhz)
     return cat;
 }
 
-QString catForClusterSpot(const QString& mode, double mhz)
+QString catForClusterSpot(const QString& mode, double mhz, const QString& link)
 {
+    const QString normalized = mode.trimmed().toUpper();
+    // OmniRig's digital-upper mode can select a radio's RTTY modem. FT uses
+    // audio on USB; retain the pre-1.17.67 behaviour for this connection.
+    if (link == QLatin1String("omnirig") &&
+        (normalized == QLatin1String("FT8") || normalized == QLatin1String("FT4") || normalized == QLatin1String("FT2")))
+        return QStringLiteral("USB");
     return catFor(mode, mhz);
 }
 

@@ -1,5 +1,9 @@
 # Storia di DecoDXLog
 
+## 1.17.68
+
+See [the detailed English and Italian release notes](RELEASE_NOTES_1.17.68.md).
+
 Le date sono quelle del lavoro, non di una pubblicazione: DecoDXLog cresce mentre lo si usa
 in stazione.
 

@@ -32,6 +32,23 @@ ColumnLayout {
         root.edited(f)
     }
     function toggleStatus(bit) { root.set("anyStatus", (root.filter.anyStatus || 0) ^ bit) }
+    function probeChipsFit() {
+        for (const repeater of [statusChips,bandChips,modeChips]) {
+            for (let i=0;i<repeater.count;++i) {
+                const chip=repeater.itemAt(i); if (!chip) return false
+                const pos=chip.mapToItem(root,0,0)
+                if (pos.x < -0.5 || pos.x+chip.width > root.width+0.5) return false
+            }
+        }
+        return true
+    }
+    function probeToggleBand(band) {
+        for (let i=0;i<bandChips.count;++i) {
+            const chip=bandChips.itemAt(i)
+            if (chip && chip.label===band) { chip.toggled(); return true }
+        }
+        return false
+    }
 
     spacing: 8
 
@@ -79,7 +96,7 @@ ColumnLayout {
         }
         Flow {
             id: flow
-            Layout.fillWidth: true
+            Layout.fillWidth: true; Layout.minimumWidth: 0; Layout.preferredWidth: 0
             spacing: 4
         }
     }
@@ -87,6 +104,7 @@ ColumnLayout {
     Row2 {
         title: qsTr("Status (any of)")
         Repeater {
+            id:statusChips
             model: decolog.cluster.statusNames
             Chip {
                 required property var modelData
@@ -100,6 +118,7 @@ ColumnLayout {
     Row2 {
         title: qsTr("Bands")
         Repeater {
+            id:bandChips
             model: root.bandList
             Chip { required property string modelData; label: modelData; on: root.has("bands", modelData); onToggled: root.toggle("bands", modelData) }
         }
@@ -107,6 +126,7 @@ ColumnLayout {
     Row2 {
         title: qsTr("Modes")
         Repeater {
+            id:modeChips
             model: root.modeList
             Chip {
                 required property string modelData
@@ -146,9 +166,10 @@ ColumnLayout {
         Chip { label: qsTr("no skimmers"); on: root.filter.skimmers === false; onToggled: root.set("skimmers", root.filter.skimmers === false) }
     }
     RowLayout {
-        Layout.fillWidth: true
+        Layout.fillWidth: true; Layout.minimumWidth: 0
         spacing: 10
         LabeledField {
+            Layout.minimumWidth: 0
             Layout.preferredWidth: 1
             Layout.horizontalStretchFactor: 5
             Layout.fillWidth: true
@@ -162,6 +183,7 @@ ColumnLayout {
             }
         }
         LabeledField {
+            Layout.minimumWidth: 0
             Layout.preferredWidth: 1
             Layout.horizontalStretchFactor: 4
             Layout.fillWidth: true
@@ -174,6 +196,7 @@ ColumnLayout {
             }
         }
         LabeledField {
+            Layout.minimumWidth: 0
             Layout.preferredWidth: 1
             Layout.horizontalStretchFactor: 2
             Layout.fillWidth: true
@@ -187,6 +210,7 @@ ColumnLayout {
             }
         }
         LabeledField {
+            Layout.minimumWidth: 0
             visible: root.showAge
             Layout.preferredWidth: 1
             Layout.horizontalStretchFactor: 2

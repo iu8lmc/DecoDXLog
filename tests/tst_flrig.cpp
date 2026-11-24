@@ -1,6 +1,7 @@
 // flrig: XML-RPC scritto e letto, modi tradotti, e un flrig finto.
 #include "core/FlrigControl.h"
 #include "core/OmniRigControl.h"
+#include "core/Modes.h"
 
 #include <QSignalSpy>
 #include <QPointer>
@@ -52,6 +53,14 @@ private slots:
         QCOMPARE(flrig::fromHamlibMode("PKTUSB", {"LSB", "USB", "DATA-U"}), QString("DATA-U"));
         QCOMPARE(omnirig::toHamlibMode(omnirig::PM_DIG_U), QString("PKTUSB"));
         QCOMPARE(omnirig::fromHamlibMode("CW"), long(omnirig::PM_CW_U));
+    }
+
+    void clusterFtOmniRigCommand()
+    {
+        for (const auto* mode : {"FT8", "FT4", "FT2"})
+            QCOMPARE(omnirig::fromHamlibMode(modes::catForClusterSpot(QLatin1String(mode), 14.074, "omnirig")), long(omnirig::PM_SSB_U));
+        QCOMPARE(omnirig::fromHamlibMode(modes::catForClusterSpot("RTTY", 14.09, "omnirig")), long(omnirig::PM_DIG_L));
+        QCOMPARE(omnirig::fromHamlibMode(modes::catForClusterSpot("RTTY-R", 14.09, "omnirig")), long(omnirig::PM_DIG_U));
     }
 
     // Con OmniRig installato e DECODXLOG_OMNIRIG_LIVE=1: legge Rig1, senza scrivere niente.

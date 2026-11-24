@@ -11,6 +11,17 @@ class TestModes : public QObject {
     Q_OBJECT
 
 private slots:
+    void clusterFtViaOmniRigUsesUsb()
+    {
+        for (const auto* mode : {"FT8", "FT4", "FT2", " ft8 "}) {
+            QCOMPARE(modes::catForClusterSpot(QLatin1String(mode), 7.074, "omnirig"), QString("USB"));
+            QCOMPARE(modes::catForClusterSpot(QLatin1String(mode), 14.074, "serial"), QString("PKTUSB"));
+        }
+        QCOMPARE(modes::catForClusterSpot("RTTY", 14.09, "omnirig"), QString("RTTY"));
+        QCOMPARE(modes::catForClusterSpot("RTTY-R", 14.09, "omnirig"), QString("RTTYR"));
+        QCOMPARE(modes::catForClusterSpot("SSB", 7.12, "omnirig"), QString("LSB"));
+        QCOMPARE(modes::catForClusterSpot("CW", 14.03, "omnirig"), QString("CW"));
+    }
     void ts50DigitalUsesUsbWithoutChangingOtherRigs()
     {
         QCOMPARE(modes::catForRig("PKTUSB", 2001), QString("USB"));
