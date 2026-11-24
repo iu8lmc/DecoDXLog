@@ -2929,3 +2929,11 @@ The general ADIF parser now reports nonnumeric or negative field lengths while k
 A/B on macOS arm64 / Qt 6.11.2: a fixture with nonnumeric QSL_RCVD field lengths previously passed the record-count and termination checks and was accepted. The new test failed on that baseline; it now rejects nonnumeric and negative lengths while accepting the intact report and confirming that generic parsing still returns its records. App and tests built; CTest adif, database, lotw, qsldownload, migration, vucc and qmlpopups passed 7/7.
 
 The check does not establish that all field values are complete or semantically valid. Real LoTW, the desktop controller failure flow and Windows/Linux remain untested; G02/G05/G13 acceptance remains open.
+
+## 2026-11-24 — G05 respect explicit station calls during LoTW matching
+
+LoTW reconciliation now excludes candidate QSOs when both the incoming own-station callsign and the QSO's explicitly stored STATION_CALLSIGN are present and differ, ignoring case and surrounding spaces. STATION_CALLSIGN in the report takes precedence over the deprecated APP_LOTW_OWNCALL fallback. Missing values retain the previous matching behavior; other services are unchanged. This applies before the nearest-time selection and before saving an observation.
+
+A/B on macOS arm64 / Qt 6.11.2: with two synthetic QSOs, the old matcher confirmed the nearest one despite its different explicit station call; the new fixture initially failed and now selects the matching station. It also checks an explicit mismatch with no alternative, deprecated-field fallback, and missing incoming or local station data. App and tests built; CTest database, lotw, qsldownload, migration, vucc and qmlpopups passed 6/6.
+
+The filter reads the callsign recorded on the QSO, not a potentially changed station profile. When a callsign is absent, the existing heuristic still applies and can select an unknown-station candidate over a known one; it does not prove identity or award eligibility. Actual LoTW data, multi-station UI flow and Windows/Linux remain untested. G02/G05/G13 acceptance remains open.

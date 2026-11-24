@@ -2815,6 +2815,12 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     }
     const QString iso = isoFromAdif(c.value(QStringLiteral("QSO_DATE")), c.value(QStringLiteral("TIME_ON")));
     const QString group = adif::modeGroup(c.value(QStringLiteral("MODE")), c.value(QStringLiteral("SUBMODE")));
+    QString lotwStation;
+    if (service == QLatin1String("lotw")) {
+        lotwStation = c.value(QStringLiteral("STATION_CALLSIGN")).trimmed().toUpper();
+        if (lotwStation.isEmpty())
+            lotwStation = c.value(QStringLiteral("APP_LOTW_OWNCALL")).trimmed().toUpper();
+    }
     res.message = QStringLiteral("%1 %2 %3 %4").arg(call, band, c.value(QStringLiteral("MODE")), iso.left(16));
     if (call.isEmpty() || band.isEmpty() || iso.isEmpty()) {
         res.status = ConfirmationResult::Status::Invalid;
@@ -2837,7 +2843,7 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     QSqlQuery q(connection());
     q.prepare(QStringLiteral(
         "SELECT id, mode, IFNULL(submode, ''), qso_datetime_on, "
-        "(SELECT rcvd FROM qsl_status s WHERE s.qso_id = qso.id AND s.service = ?) "
+        "(SELECT rcvd FROM qsl_status s WHERE s.qso_id = qso.id AND s.service = ?), adif_extra "
         "FROM qso WHERE deleted = 0 AND call = ? AND band = ? AND qso_datetime_on BETWEEN ? AND ?")
               + profiles);
     q.addBindValue(service);
@@ -2856,6 +2862,12 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     while (q.next()) {
         if (!group.isEmpty() && adif::modeGroup(q.value(1).toString(), q.value(2).toString()) != group)
             continue;
+        if (!lotwStation.isEmpty()) {
+            const auto extra = QJsonDocument::fromJson(q.value(5).toString().toUtf8()).object();
+            const QString localStation = extra.value(QStringLiteral("STATION_CALLSIGN")).toString().trimmed().toUpper();
+            if (!localStation.isEmpty() && localStation != lotwStation)
+                continue;
+        }
         const qint64 distance = qAbs(parseIso(q.value(3).toString()).secsTo(on));
         if (distance < bestDistance) {
             bestDistance = distance;

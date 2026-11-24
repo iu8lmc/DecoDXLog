@@ -278,6 +278,37 @@ private slots:
         QVERIFY(q.exec("SELECT qso_id,grid FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toLongLong(),one.id); QCOMPARE(q.value(1).toString(),QString("FN42AB")); QVERIFY(!q.next());
     }
 
+    void lotwOwnCallRejectsExplicitlyDifferentStation()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto wrong=qso("K1ABC","20m","CW","","20260910","120000","FN41");
+        wrong.set("STATION_CALLSIGN","N0OTHER");
+        auto right=qso("K1ABC","20m","CW","","20260910","120100","FN41");
+        right.set("STATION_CALLSIGN","IU8LMC");
+        const auto a=db.insertQso(wrong,"fixture",{},true,0,false);
+        const auto b=db.insertQso(right,"fixture",{},true,0,false);
+        QVERIFY(a.id>0 && b.id>0);
+        auto incoming=qso("K1ABC","20m","CW","","20260910","120000","FN42");
+        incoming.set("STATION_CALLSIGN","iu8lmc");
+        const auto result=db.applyConfirmation("lotw",incoming,1800,{}, {},true);
+        QCOMPARE(result.status,ConfirmationResult::Status::Confirmed);
+        QCOMPARE(result.id,b.id);
+        QVERIFY(db.record(a.id)->value("LOTW_QSL_RCVD").isEmpty());
+        QCOMPARE(db.record(b.id)->value("LOTW_QSL_RCVD"),QString("Y"));
+        LogDatabase other; QVERIFY(other.open(":memory:"));
+        const auto only=other.insertQso(wrong,"fixture"); QVERIFY(only.id>0);
+        QCOMPARE(other.applyConfirmation("lotw",incoming).status,ConfirmationResult::Status::NotFound);
+        QVERIFY(other.record(only.id)->value("LOTW_QSL_RCVD").isEmpty());
+        incoming.remove("STATION_CALLSIGN"); incoming.set("APP_LOTW_OWNCALL","iu8lmc");
+        QCOMPARE(other.applyConfirmation("lotw",incoming).status,ConfirmationResult::Status::NotFound);
+        incoming.remove("APP_LOTW_OWNCALL");
+        QCOMPARE(other.applyConfirmation("lotw",incoming).status,ConfirmationResult::Status::Confirmed);
+        LogDatabase unknown; QVERIFY(unknown.open(":memory:"));
+        wrong.remove("STATION_CALLSIGN"); QVERIFY(unknown.insertQso(wrong,"fixture").id>0);
+        incoming.set("STATION_CALLSIGN","IU8LMC");
+        QCOMPARE(unknown.applyConfirmation("lotw",incoming).status,ConfirmationResult::Status::Confirmed);
+    }
+
     void gridObservationHistoryPagesAndRejectsChangedQso()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("history.sqlite")));
