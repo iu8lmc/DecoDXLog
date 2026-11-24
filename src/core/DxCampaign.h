@@ -14,6 +14,7 @@ struct Campaign {
     QDate start, end; // inclusive UTC dates, as reported by the calendar
     QString source;
     QDateTime verifiedAt;
+    QDateTime supersededAt; // history only; absent for revisions saved before timestamps existed
     QStringList bands, modes;
     QList<Goal> goals; // preserved even if temporarily outside the matrix
     qint64 stationProfileId{0}; // zero = all profiles, not an award account

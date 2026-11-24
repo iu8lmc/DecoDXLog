@@ -2412,6 +2412,7 @@ QVariantMap campaignMap(const dxcampaign::Campaign& c)
     return {{QStringLiteral("id"),c.id},{QStringLiteral("title"),c.title},{QStringLiteral("calls"),c.calls},
         {QStringLiteral("start"),c.start.toString(Qt::ISODate)},{QStringLiteral("end"),c.end.toString(Qt::ISODate)},
         {QStringLiteral("source"),c.source},{QStringLiteral("observedAt"),c.verifiedAt.toUTC().toString(Qt::ISODate)},
+        {QStringLiteral("supersededAt"),c.supersededAt.isValid() ? c.supersededAt.toUTC().toString(Qt::ISODateWithMs) : QString()},
         {QStringLiteral("bands"),c.bands},{QStringLiteral("modes"),c.modes},{QStringLiteral("goals"),goals},{QStringLiteral("profileId"),c.stationProfileId},
         {QStringLiteral("archived"),c.archived},{QStringLiteral("watched"),c.watched},{QStringLiteral("watchGoalsOnly"),c.watchGoalsOnly},{QStringLiteral("revision"),c.revision}};
 }

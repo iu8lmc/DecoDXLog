@@ -419,6 +419,7 @@ GlassPanel {
                         .arg(modelData.start).arg(modelData.end).arg(modelData.source).arg(modelData.observedAt)
                         .arg(modelData.bands.join(", ")).arg(modelData.modes.join(", ")).arg(modelData.profileId)
                         .arg(modelData.archived).arg(modelData.watched).arg(JSON.stringify(modelData.goals))
+                        + "\n" + qsTr("Replaced at (UTC): %1").arg(modelData.supersededAt || qsTr("unknown"))
                 }
             }
             RowLayout {

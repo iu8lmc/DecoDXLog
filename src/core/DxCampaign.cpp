@@ -100,6 +100,11 @@ std::optional<Campaign> decode(const QString& raw)
     Campaign c; c.id=o.value("id").toString(); c.title=o.value("title").toString(); c.calls=strings(o.value("calls"));
     c.start=QDate::fromString(o.value("start").toString(),Qt::ISODate); c.end=QDate::fromString(o.value("end").toString(),Qt::ISODate);
     c.source=o.value("source").toString(); c.verifiedAt=QDateTime::fromString(o.value("verifiedAt").toString(),Qt::ISODate);
+    if (o.contains("supersededAt")) {
+        if (!o.value("supersededAt").isString()) return {};
+        c.supersededAt=QDateTime::fromString(o.value("supersededAt").toString(),Qt::ISODateWithMs);
+        if (!c.supersededAt.isValid() || c.supersededAt.timeSpec()==Qt::LocalTime) return {};
+    }
     c.bands=strings(o.value("bands")); c.modes=strings(o.value("modes"));
     if (o.contains("goals")) {
         if (!o.value("goals").isArray()) return {};
@@ -136,7 +141,9 @@ bool save(LogDatabase& db,Campaign& c,QString* error)
         QSqlQuery history(db.connection());
         history.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?)"));
         history.addBindValue(QStringLiteral("dx_campaign_revision.")+c.id+QLatin1Char('.')+QString::number(c.revision));
-        history.addBindValue(old);
+        auto snapshot=QJsonDocument::fromJson(old.toUtf8()).object();
+        snapshot.insert(QStringLiteral("supersededAt"),QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+        history.addBindValue(QString::fromUtf8(QJsonDocument(snapshot).toJson(QJsonDocument::Compact)));
         if (!history.exec()) return fail(error,history.lastError().text());
         ++next.revision;
         query.prepare(QStringLiteral("UPDATE app_setting SET value=? WHERE key=? AND value=?"));

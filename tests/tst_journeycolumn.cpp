@@ -1547,6 +1547,7 @@ private slots:
             QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistoryprobe",output,5000),output.constData());
             QVERIFY2(output.contains("PROBE dxhistory") && output.contains("\"visible\":true") && output.contains("2026-01-07") && output.contains("ZZ1AAA") && !output.contains("\"rendered\":\"\"") && !output.contains("TypeError"),output.constData());
             QVERIFY2(output.contains(QByteArray(language)=="it" ? "Revisione 1" : "Revision 1"),output.constData());
+            QVERIFY2(output.contains(QByteArray(language)=="it" ? "Sostituita il (UTC): 20" : "Replaced at (UTC): 20"),output.constData());
         }
     }
     void dxCampaignCalendarCreatesEditablePersistentMatrix()

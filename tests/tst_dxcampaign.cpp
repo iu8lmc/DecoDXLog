@@ -22,7 +22,11 @@ private slots:
         for (int i=0;i<55;++i) { c.title=QString("Page %1").arg(i); QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); }
         const auto first=dxcampaign::history(db,c.id,c.revision,51,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(first.size(),51); QCOMPARE(first.first().revision,55); QCOMPARE(first.last().revision,5);
         const auto second=dxcampaign::history(db,c.id,first.at(49).revision,51,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(second.size(),5); QCOMPARE(second.first().revision,5); QCOMPARE(second.last().revision,1);
-        QSqlQuery q(db.connection()); q.prepare("UPDATE app_setting SET value='broken' WHERE key=?"); q.addBindValue("dx_campaign_revision."+c.id+".1"); QVERIFY(q.exec());
+        QSqlQuery q(db.connection()); q.prepare("SELECT value FROM app_setting WHERE key=?"); q.addBindValue("dx_campaign_revision."+c.id+".1"); QVERIFY(q.exec()); QVERIFY(q.next());
+        auto legacy=QJsonDocument::fromJson(q.value(0).toByteArray()).object(); legacy.remove("supersededAt");
+        q.prepare("UPDATE app_setting SET value=? WHERE key=?"); q.addBindValue(QString::fromUtf8(QJsonDocument(legacy).toJson(QJsonDocument::Compact))); q.addBindValue("dx_campaign_revision."+c.id+".1"); QVERIFY(q.exec());
+        const auto oldPage=dxcampaign::history(db,c.id,2,1,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(oldPage.size(),1); QVERIFY(!oldPage.first().supersededAt.isValid());
+        q.prepare("UPDATE app_setting SET value='broken' WHERE key=?"); q.addBindValue("dx_campaign_revision."+c.id+".1"); QVERIFY(q.exec());
         QVERIFY(dxcampaign::history(db,c.id,5,51,&error).isEmpty()); QVERIFY(!error.isEmpty());
     }
     void campaignHistoryRejectsStaleAndRollsBackFailedUpdate()
@@ -55,6 +59,7 @@ private slots:
           page=dxcampaign::history(db,id,page.first().revision,1,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(page.size(),1); QCOMPARE(page.first().revision,1); QCOMPARE(page.first().calls.size(),1);
           QSqlQuery q(db.connection()); q.prepare("SELECT value FROM app_setting WHERE key=?"); q.addBindValue("dx_campaign_revision."+id+".1"); QVERIFY(q.exec()); QVERIFY(q.next());
           const auto first=QJsonDocument::fromJson(q.value(0).toByteArray()).object(); QCOMPARE(first.value("end").toString(),QStringLiteral("2026-01-03")); QCOMPARE(first.value("revision").toInt(),1);
+          const auto superseded=QDateTime::fromString(first.value("supersededAt").toString(),Qt::ISODateWithMs); QVERIFY(superseded.isValid()); QVERIFY(qAbs(superseded.secsTo(QDateTime::currentDateTimeUtc()))<60);
           QVERIFY(q.exec("CREATE TRIGGER reject_campaign_history BEFORE INSERT ON app_setting WHEN NEW.key LIKE 'dx_campaign_revision.%' BEGIN SELECT RAISE(ABORT,'history fault'); END"));
           c.end=QDate(2026,1,10); QVERIFY(!dxcampaign::save(db,c,&error)); QCOMPARE(c.revision,3);
           const auto current=dxcampaign::load(db,id); QVERIFY(current); QCOMPARE(current->end,QDate(2026,1,8)); }

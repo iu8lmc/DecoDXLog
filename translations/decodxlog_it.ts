@@ -3836,6 +3836,8 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
 <context>
     <name>DxCalendarPanel</name>
     <message><source>Campaign history</source><translation>Storico della spedizione</translation></message>
+    <message><source>Replaced at (UTC): %1</source><translation>Sostituita il (UTC): %1</translation></message>
+    <message><source>unknown</source><translation>sconosciuto</translation></message>
     <message><source>Previous saved revisions</source><translation>Revisioni precedenti salvate</translation></message>
     <message><source>Only changes saved after history was introduced are available. Older revisions cannot be recovered here.</source><translation>Sono disponibili solo le modifiche salvate dopo l'introduzione dello storico. Le revisioni precedenti non sono recuperabili qui.</translation></message>
     <message><source>Older revisions</source><translation>Revisioni meno recenti</translation></message>
