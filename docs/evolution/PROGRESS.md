@@ -3019,3 +3019,11 @@ The shared LoTW/eQSL/QRZ confirmation matcher now widens its indexed timestamp p
 A/B on macOS arm64 / Qt 6.11.2: with two synthetic QSO the previous text filter confirmed the wrong `+01:00` QSO an hour outside the window and missed the true match. The new test failed before the fix and now confirms only the correct QSO and attaches the observation to it. It also exercises eQSL outside/at the 30-minute boundary and a negative window. App and test targets built; CTest database, lotw, qsl, qsldownload, migration, vucc and qmlpopups passed 7/7.
 
 This is a synthetic database test, not live LoTW/eQSL/QRZ or full desktop reconciliation. The widened prefilter can examine more rows and has not been benchmarked on large logs. The heuristic match still cannot prove QSO identity, and invalid or non-ISO timestamps are excluded. Windows/Linux and full G05/G13 acceptance remain open.
+
+## 2026-11-24 — G01 duplicate detection by UTC instant
+
+The insertion-time duplicate check keeps a bounded indexed prefilter widened for ISO timezone offsets and compares the stored and incoming UTC instants against the existing duplicate window. An invalid stored timestamp is not treated as a match. Callsign, band, exact mode/submode and the caller's existing duplicate policy remain unchanged.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic QSO stored at `13:00+01:00` was incorrectly inserted again at `12:00Z` before the fix; the new test failed on that baseline and now detects it. It also verifies that `12:00+01:00` does not falsely block a `12:00Z` contact and that unzoned legacy UTC still matches. App and test targets built; CTest database, lotw, qsl, qsldownload, migration and qmlpopups passed 6/6.
+
+The broader indexed lookup may examine more records and has not been benchmarked on large or highly repetitive logs. This change concerns insertion-time checks; the separate duplicate-review grouping path has not yet been revalidated for offset ordering. Database lookup errors retain the existing behavior and are not surfaced by this API. No actual UDP source, physical desktop, Windows or Linux was exercised. G01/G13 acceptance remains open.

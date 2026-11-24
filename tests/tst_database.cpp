@@ -2335,6 +2335,21 @@ private slots:
         QCOMPARE(db.qsoCount(), 5);
     }
 
+    void duplicateWindowUsesUtcInstants()
+    {
+        auto run=[](const QString& stored) {
+            LogDatabase db; if (!db.open(":memory:")) return InsertResult::Status::Error;
+            AdifRecord r{{"CALL","K1ABC"},{"QSO_DATE","20260910"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}};
+            if (db.insertQso(r,"fixture").status!=InsertResult::Status::Inserted) return InsertResult::Status::Error;
+            QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET qso_datetime_on=?"); q.addBindValue(stored);
+            if (!q.exec()) return InsertResult::Status::Error;
+            return db.insertQso(r,"fixture").status;
+        };
+        QCOMPARE(run("2026-09-10T13:00:00+01:00"),InsertResult::Status::Duplicate);
+        QCOMPARE(run("2026-09-10T12:00:00+01:00"),InsertResult::Status::Inserted);
+        QCOMPARE(run("2026-09-10T12:00:00"),InsertResult::Status::Duplicate);
+    }
+
     void importExportIsLossless()
     {
         const QByteArray original =

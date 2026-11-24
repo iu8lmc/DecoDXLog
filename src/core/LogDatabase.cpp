@@ -941,12 +941,12 @@ std::optional<qint64> LogDatabase::findDuplicate(const QString& call, const QStr
                                                  const QString& mode, const QString& submode,
                                                  const QDateTime& on, int windowSeconds) const
 {
-    // Il formato ISO a lunghezza fissa si confronta come stringa: l'indice
-    // idx_qso_dedup lavora senza conversioni.
+    // Keep the indexed prefilter bounded, including ISO timezone offsets.
+    // The final window comparison uses UTC instants rather than text.
     QSqlQuery q(connection());
     q.prepare(QStringLiteral(
-        "SELECT id FROM qso WHERE deleted = 0 AND call = ? AND band = ? AND mode = ? "
-        "AND IFNULL(submode, '') = ? AND qso_datetime_on BETWEEN ? AND ? LIMIT 1"));
+        "SELECT id,qso_datetime_on FROM qso WHERE deleted = 0 AND call = ? AND band = ? AND mode = ? "
+        "AND IFNULL(submode, '') = ? AND qso_datetime_on BETWEEN ? AND ?"));
     q.addBindValue(call);
     q.addBindValue(band);
     q.addBindValue(mode);
@@ -954,10 +954,14 @@ std::optional<qint64> LogDatabase::findDuplicate(const QString& call, const QStr
     // confronto non e' mai vero, e un QSO senza sottomodo non trovava mai il
     // suo doppione — ne' da WSJT-X che rimanda, ne' importando due volte.
     q.addBindValue(submode.isEmpty() ? QStringLiteral("") : submode);
-    q.addBindValue(on.addSecs(-windowSeconds).toString(Qt::ISODate));
-    q.addBindValue(on.addSecs(windowSeconds).toString(Qt::ISODate));
-    if (q.exec() && q.next())
-        return q.value(0).toLongLong();
+    const auto lower=on.addSecs(-qint64(windowSeconds)).addDays(-1), upper=on.addSecs(qint64(windowSeconds)).addDays(1);
+    q.addBindValue(lower.isValid()?lower.toString(Qt::ISODate):QString());
+    q.addBindValue(upper.isValid()?upper.toString(Qt::ISODate):QString(QChar(0xffff)));
+    if (q.exec()) while (q.next()) {
+        const auto recorded=parseIso(q.value(1).toString());
+        if (recorded.isValid() && qAbs(recorded.msecsTo(on))<=qint64(windowSeconds)*1000)
+            return q.value(0).toLongLong();
+    }
     return std::nullopt;
 }
 
