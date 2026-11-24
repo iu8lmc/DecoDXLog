@@ -7289,7 +7289,7 @@ DecoLogController::ConfirmTally DecoLogController::applyConfirmations(const QStr
         case ConfirmationResult::Status::Invalid:
         case ConfirmationResult::Status::Error: {
             if (r.status == ConfirmationResult::Status::Error) ++t.errors; else ++t.invalid;
-            const QVariantMap m = row(c, QStringLiteral("invalid"),
+            const QVariantMap m = row(c, r.status == ConfirmationResult::Status::Error ? QStringLiteral("database_error") : QStringLiteral("invalid"),
                                       r.message.isEmpty() ? tr("call, band or date missing") : r.message, 0);
             if (!m.isEmpty())
                 t.rows << m;

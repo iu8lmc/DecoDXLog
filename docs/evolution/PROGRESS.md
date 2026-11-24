@@ -3203,3 +3203,11 @@ The bounded candidate-ID serialization is now a shared core function used by the
 A/B on macOS arm64 / Qt 6.11.2: the new download-to-summary-component fixture initially failed to compile because the former serialization was embedded privately in the controller. After extraction it passes with both matched IDs, and the limit test passes. This is a comparison of testability, not evidence that the previous inline serialization produced a different result. App and test targets built; CTest lotw, qsldownload and qmlpopups passed 3/3; git diff --check passed.
 
 The fake network, matcher and serializer are exercised together, but the app controller's full asynchronous download-to-persisted-summary flow is not. The UI fixture separately loads synthetic stored data. No real LoTW or physical UI, Windows/Linux or adjudication workflow was tested; the snapshot and truncation limitations above remain.
+
+## 2026-11-24 — G05 distinguish invalid confirmations from database errors
+
+New QSL import rows now distinguish invalid incoming records from database failures. The Errors filter includes both categories, while the run display and copied summary show their separate counts alongside ambiguous records. Existing summaries remain readable; missing count fields display zero. Italian labels were added.
+
+A/B on macOS arm64 / Qt 6.11.2: an offscreen app opened a synthetic summary containing two invalid records and three database errors. Previously the copied run summary showed two generic errors, omitted database errors and the new error filter fixture failed. Afterwards it shows both counts and the filter exposes both row types. App and test targets built; CTest lotw, qsldownload and qmlpopups passed 3/3; translation XML and git diff --check passed.
+
+Older summaries stored database-error rows under the `invalid` kind, so their individual categories cannot be reconstructed, even though a stored database-error count can be shown. The controller's new classification was compiled but the desktop fixture injects a summary rather than causing an actual database failure during download. The run-level error-message branch remains separate. No live service, physical UI, Windows/Linux or full G05/G13 acceptance was tested.

@@ -6787,6 +6787,10 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>QslImportDialog</name>
+    <message><source>database error</source><translation>errore del database</translation></message>
+    <message><source>database errors</source><translation>errori del database</translation></message>
+    <message><source>invalid</source><translation>non valido</translation></message>
+    <message><source>%1 (%2): %3 new, %4 already marked, %5 not matched, %6 invalid, %7 ambiguous, %8 database errors</source><translation>%1 (%2): %3 nuove, %4 già segnate, %5 non abbinate, %6 non valide, %7 ambigue, %8 errori del database</translation></message>
     <message><source>ambiguous</source><translation>ambiguo</translation></message>
     <message><source>Ambiguous</source><translation>Ambigui</translation></message>
     <message><source>QSO IDs: %1</source><translation>ID QSO: %1</translation></message>

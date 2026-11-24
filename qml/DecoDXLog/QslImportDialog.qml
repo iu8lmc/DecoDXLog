@@ -26,7 +26,7 @@ DialogFrame {
     readonly property var shown: {
         const f = root.search.trim().toUpperCase()
         return root.rows.filter(r => (root.labelFilter.length === 0 || r.label === root.labelFilter)
-                                     && (root.kindFilter.length === 0 || r.kind === root.kindFilter)
+                                     && (root.kindFilter.length === 0 || r.kind === root.kindFilter || (root.kindFilter === "errors" && (r.kind === "invalid" || r.kind === "database_error")))
                                      && (!root.onlyNewDxcc || r.newDxcc === true)
                                      && (f.length === 0 || String(r.call).indexOf(f) >= 0
                                          || String(r.country || "").toUpperCase().indexOf(f) >= 0))
@@ -35,6 +35,8 @@ DialogFrame {
     function probeAmbiguous() {
         root.kindFilter = "ambiguous"
         console.warn("PROBE qsl import ambiguous count=" + root.shown.length + " label=" + root.kindLabel("ambiguous") + " text=" + root.asText())
+        root.kindFilter = "errors"
+        console.warn("PROBE qsl import errors count=" + root.shown.length + " label=" + root.kindLabel("database_error") + " text=" + root.asText())
     }
 
     // La cartolina della riga scelta.
@@ -47,7 +49,7 @@ DialogFrame {
         root.cardError = ""
         root.cardKey = ""
         root.cardLoading = false
-        if (!row || row.service !== "eqsl" || row.kind === "invalid")
+        if (!row || row.service !== "eqsl" || row.kind === "invalid" || row.kind === "database_error")
             return
         root.cardLoading = true
         root.cardKey = decolog.requestEqslCard(row)
@@ -64,7 +66,7 @@ DialogFrame {
     }
 
     function kindLabel(kind) {
-        return kind === "new" ? qsTr("new") : kind === "notfound" ? qsTr("not matched") : kind === "ambiguous" ? qsTr("ambiguous") : qsTr("error")
+        return kind === "new" ? qsTr("new") : kind === "notfound" ? qsTr("not matched") : kind === "ambiguous" ? qsTr("ambiguous") : kind === "database_error" ? qsTr("database error") : qsTr("invalid")
     }
     function kindTone(kind) {
         return kind === "new" ? Theme.accentColor : (kind === "notfound" || kind === "ambiguous") ? Theme.warningColor : Theme.errorColor
@@ -80,9 +82,9 @@ DialogFrame {
         for (const run of root.runs)
             out.push((run.error || "").length > 0
                      ? "%1 (%2): %3".arg(run.label).arg(run.whenText || run.when).arg(run.error)
-                     : qsTr("%1 (%2): %3 new, %4 already marked, %5 not matched, %6 errors, %7 ambiguous")
+                     : qsTr("%1 (%2): %3 new, %4 already marked, %5 not matched, %6 invalid, %7 ambiguous, %8 database errors")
                        .arg(run.label).arg(run.whenText || run.when).arg(run.confirmed).arg(run.already)
-                       .arg(run.notFound).arg(run.invalid).arg(run.ambiguous || 0))
+                       .arg(run.notFound).arg(run.invalid || 0).arg(run.ambiguous || 0).arg(run.databaseErrors || 0))
         out.push("")
         for (const r of root.shown)
             out.push("%1; %2; %3; %4; %5; %6%7".arg(r.utc).arg(r.call).arg(r.band).arg(r.mode).arg(r.label)
@@ -138,12 +140,13 @@ DialogFrame {
                         text: (modelData.error || "").length > 0
                               ? "<b>%1</b> · %2<br><font color=\"%3\">%4</font>".arg(modelData.label)
                                     .arg(modelData.whenText || "").arg(Theme.errorColor).arg(modelData.error)
-                              : "<b>%1</b> · %2<br>%3 <font color=\"%4\">%5</font> · %6 %7 · %8 <font color=\"%9\">%10</font> · %11 %12 · %13 %14"
+                              : "<b>%1</b> · %2<br>%3 <font color=\"%4\">%5</font> · %6 %7 · %8 <font color=\"%9\">%10</font> · %11 %12 · %13 %14 · %15 %16"
                               .arg(modelData.label).arg(modelData.whenText || "")
                               .arg(qsTr("new ones")).arg(Theme.accentColor).arg(modelData.confirmed)
                               .arg(qsTr("already marked")).arg(modelData.already)
                               .arg(qsTr("not matched")).arg(Theme.warningColor).arg(modelData.notFound)
-                              .arg(qsTr("errors")).arg(modelData.invalid).arg(qsTr("ambiguous")).arg(modelData.ambiguous || 0)
+                              .arg(qsTr("invalid")).arg(modelData.invalid || 0).arg(qsTr("ambiguous")).arg(modelData.ambiguous || 0)
+                              .arg(qsTr("database errors")).arg(modelData.databaseErrors || 0)
                         color: Theme.textPrimary
                         font.pixelSize: 12
                     }
@@ -175,7 +178,7 @@ DialogFrame {
             }
             StyledComboBox {
                 Layout.preferredWidth: 170
-                readonly property var kinds: ["new", "notfound", "ambiguous", "invalid", ""]
+                readonly property var kinds: ["new", "notfound", "ambiguous", "errors", ""]
                 model: [qsTr("New confirmations"), qsTr("Not matched"), qsTr("Ambiguous"), qsTr("Errors"), qsTr("Everything")]
                 currentIndex: Math.max(0, kinds.indexOf(root.kindFilter))
                 onActivated: root.kindFilter = kinds[currentIndex]

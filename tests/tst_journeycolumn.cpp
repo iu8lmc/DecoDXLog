@@ -1365,9 +1365,10 @@ private slots:
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
         { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
         { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
-          db.setSetting("qsl.import_summary",R"({"runs":[{"label":"LoTW","when":"2026-01-01","confirmed":0,"already":0,"notFound":0,"ambiguous":1,"invalid":0,"databaseErrors":0}],"rows":[{"kind":"ambiguous","label":"LoTW","service":"lotw","call":"K1ABC","band":"20m","mode":"CW","utc":"2026-01-01","reason":"Multiple candidates","candidateIds":[1,2]}]})"); }
+          db.setSetting("qsl.import_summary",R"({"runs":[{"label":"LoTW","when":"2026-01-01","confirmed":0,"already":0,"notFound":0,"ambiguous":1,"invalid":2,"databaseErrors":3}],"rows":[{"kind":"ambiguous","label":"LoTW","service":"lotw","call":"K1ABC","band":"20m","mode":"CW","utc":"2026-01-01","reason":"Multiple candidates","candidateIds":[1,2]},{"kind":"invalid","label":"LoTW","service":"lotw","call":"K1BAD","reason":"invalid"},{"kind":"database_error","label":"LoTW","service":"lotw","call":"K1ERR","reason":"database failure"}]})"); }
         QByteArray output; QVERIFY2(launch(dir,"qslimportambiguousprobe",output,4000),output.constData());
         QVERIFY2(output.contains("PROBE qsl import ambiguous count=1 label=ambiguous") && output.contains("1 ambiguous") && output.contains("QSO IDs: 1, 2"),output.constData());
+        QVERIFY2(output.contains("PROBE qsl import errors count=2 label=database error") && output.contains("2 invalid") && output.contains("3 database errors"),output.constData());
     }
     void qslAlternativesDesktopPagesAndInvalidates()
     {
