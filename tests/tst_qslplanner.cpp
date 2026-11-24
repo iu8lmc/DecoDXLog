@@ -64,6 +64,7 @@ private slots:
         const auto deny=+[](void*,int action,const char* table,const char* column,const char*,const char*) { return action==20 && table && column && std::strcmp(table,"qsl_status")==0 && std::strcmp(column,"last_error")==0 ? 1 : 0; };
         QCOMPARE(setAuthorizer(nativeDb,deny,nullptr),0); const auto failed=qslplanner::build(db,{}, {"dxcc"}); QCOMPARE(setAuthorizer(nativeDb,nullptr,nullptr),0);
         QVERIFY(!failed.error.isEmpty()); QVERIFY(failed.candidates.isEmpty()); QVERIFY(failed.paperRoutes.isEmpty());
+        QVERIFY(failed.pendingElectronic.isEmpty()); QVERIFY(failed.unverifiedElectronic.isEmpty());
     }
     void legacyRouteCostWritesAfterLogReplacement()
     {

@@ -28,6 +28,8 @@ The actual-app A/B was then repeated explicitly with the same new test: rebuildi
 
 Follow-up recomputation check: in the same three-QSO synthetic log, recording a LoTW receipt for the pending QSO and rebuilding the plan removed the now-covered DXCC benefit and both pending and unverified groups. The focused test and git diff --check passed. Receipt was injected locally into SQLite, not obtained from LoTW, and this check does not establish the timing of a real service update.
 
+An opt-in native SQLite authorizer test also denied a QSL-status column read: the planner returned an error with no candidates, paper routes, pending groups or unverified groups. The normal unverified-group fixture passed in the same run. This verifies fail-closed behaviour for the injected read denial on macOS system SQLite, not every database failure or other platforms.
+
 ## 2026-11-24 — G04 campaign revision history foundation, not integrated
 
 In the detached worktree, campaign updates now save the previous encoded revision under a separate `app_setting` key within the same immediate SQLite transaction as the update. Failed history insertion rolls the change back, and the existing revision comparison continues to reject stale updates. A/B: the new restart fixture initially failed because no previous revision existed; after the change it found the original date and revision, retained two prior revisions after reopening, and an injected history-write failure preserved the current campaign. The complete focused dxcampaign test passed 18 cases with one opt-in benchmark skipped.
