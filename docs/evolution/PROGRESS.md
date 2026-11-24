@@ -2687,3 +2687,11 @@ POTA partition preview now counts QSO with a correspondent POTA_REF that cannot 
 A/B on macOS arm64 / Qt 6.11.2: a synthetic four-QSO preview previously returned no review count; it now reports three cases, while the single valid location-suffixed reference remains unflagged. The asynchronous export fixture confirms the corresponding preserved output. An isolated offscreen app fixture displays the warning for one multi-reference QSO. The initial app assertion expected English but the environment rendered the Italian translation; the corrected assertion accepts both. CTest activation, database, migration and qmlpopups passed 4/4 before the final extra-field precedence adjustment; the focused controller and app tests passed after rebuilding it. App and test targets built.
 
 The warning is a group count, not a per-contact review workflow or catalogue validation, and it does not assess correspondence when POTA_REF is absent. Extra-field override precedence was inspected but not independently injected in the fixture. This programmatic offscreen test is not physical UI, a live POTA upload, real activation or a Windows/Linux test. G06 and integrated acceptance remain open.
+
+## 2026-11-24 — G06 preview/export extra-field precedence verification
+
+Extended the file-backed POTA fixture with a synthetic legacy-style QSO whose structured correspondent reference is single but whose ADIF extra data overrides it with two references. The preview reports the ambiguity and the asynchronous exported ADIF preserves the two-reference value without inventing SIG fields. No production behaviour was changed.
+
+A/B on macOS arm64 / Qt 6.11.2: temporarily reading only structured columns made the preview report three cases instead of four and the test failed. Restoring extra-field precedence gave four cases and the exported-record assertions passed. CTest activation, database, migration and qmlpopups passed 4/4. The test target was rebuilt after restoration.
+
+The fixture directly injects the override into a synthetic database; it does not establish how frequently external imports produce it or cover every override field and malformed value. Live POTA, physical UI, Windows/Linux and full G06/G13 acceptance remain unverified.
