@@ -116,21 +116,32 @@ QVariantMap RadioNet::reminder() const
 
 QVariantList RadioNet::activeReminders() const
 {
+    return reminderOverview().value(QStringLiteral("reminders")).toList();
+}
+
+QVariantMap RadioNet::reminderOverview() const
+{
     QVariantList result;
-    if (!m_db || !m_db->isOpen()) return result;
+    const auto overview = [](const QVariantList &rows, const QString &error) {
+        return QVariantMap{{QStringLiteral("reminders"), rows}, {QStringLiteral("error"), error}};
+    };
+    if (!m_db || !m_db->isOpen()) return overview(result, {});
     QSqlQuery q(m_db->connection());
     if (!q.exec(QStringLiteral(
             "SELECT s.id,s.title,e.detail FROM radio_net_session s JOIN radio_net_event e ON e.id=("
             "SELECT id FROM radio_net_event WHERE session_id=s.id AND event IN ('reminder_set','reminder_clear') "
-            "ORDER BY id DESC LIMIT 1) WHERE s.ended_at IS NULL AND e.event='reminder_set'"))) return result;
+            "ORDER BY id DESC LIMIT 1) WHERE s.ended_at IS NULL AND e.event='reminder_set'")))
+        return overview({}, q.lastError().text());
     while (q.next()) {
         const QString deadline = q.value(2).toString();
-        if (!QDateTime::fromString(deadline, Qt::ISODateWithMs).isValid()) continue;
+        if (!QDateTime::fromString(deadline, Qt::ISODateWithMs).isValid())
+            return overview({}, tr("Invalid radio net reminder deadline"));
         result << QVariantMap{{QStringLiteral("sessionId"), q.value(0)},
                               {QStringLiteral("title"), q.value(1)},
                               {QStringLiteral("deadline"), deadline}};
     }
-    return result;
+    if (q.lastError().isValid()) return overview({}, q.lastError().text());
+    return overview(result, {});
 }
 
 bool RadioNet::setReminder(int seconds)

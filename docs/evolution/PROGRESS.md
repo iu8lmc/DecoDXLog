@@ -3115,3 +3115,11 @@ An offscreen desktop integration fixture now opens the QSL planner against an is
 A/B on macOS arm64 / Qt 6.11.2: with the previous planner core, the actual dialog showed one potential benefit and one candidate despite the missing table. With the checked core, the visible status reports that route provenance cannot be read and there are no candidates. The initial A run timed out before the diagnostic probe printed; after shortening its bounded wait the A result was observed, then the fixed core was restored, rebuilt and passed. CTest qslplanner and qmlpopups passed 2/2; git diff --check passed.
 
 The test uses synthetic data and programmatic offscreen interaction; it does not exercise physical UI, Windows/Linux or actual QSL services. Other unchecked enrichment callers and full G03/G13 acceptance remain open.
+
+## 2026-11-24 — G08 surface unavailable radio-net reminders
+
+The active-reminder overview now separates a valid empty list from a database read failure or invalid deadline. On failure the main window offers a warning that opens Net Manager, and the dialog displays the diagnostic. Incomplete results are discarded; the previous list API remains for existing callers. Italian messages were added.
+
+A/B on macOS arm64 / Qt 6.11.2: before this change the reminder query returned an empty list on SQL failure and there was no error-aware overview, so the new test failed to compile. Afterwards an empty log, a valid reminder, an invalid deadline and an injected missing event table are distinguished. CTest radionet and qmlpopups passed 2/2; three offscreen app scenarios for ordinary reminders, other active sessions and the closed dialog passed. The final invalid-deadline assertion passed separately. App and test targets built; translation XML and git diff --check passed.
+
+Failure injection was tested at core level, not through the rendered warnings. The overview refreshes when the controller emits its existing change signal; external database changes are not independently polled. A malformed deadline suppresses the entire overview until repaired. This is not a system notification, physical UI or real-radio test; Windows/Linux and full G08/G13 acceptance remain open.

@@ -11,7 +11,8 @@ DialogFrame {
     readonly property var current: net.session
     readonly property var summary: net.summary
     readonly property var reminder: net.reminder
-    readonly property var activeReminders: net.activeReminders
+    readonly property var reminderOverview: net.reminderOverview
+    readonly property var activeReminders: reminderOverview.reminders || []
     property double reminderClock: Date.now()
     readonly property var otherDueReminder: {
         let first = null, earliest = Infinity
@@ -233,6 +234,11 @@ DialogFrame {
             GlassButton { text: qsTr("Reopen"); enabled: !!root.current.id && !root.current.active; onClicked: root.net.reopenSession() }
             GlassButton { text: qsTr("Export JSON…"); enabled: !!root.current.id && !root.net.exportBusy; onClicked: exportDialog.open() }
             GlassButton { text: qsTr("Cancel export"); visible: root.net.exportBusy; onClicked: root.net.cancelExport() }
+        }
+        Text {
+            Layout.fillWidth: true; visible: !!root.reminderOverview.error
+            text: qsTr("Radio net reminders unavailable: %1").arg(root.reminderOverview.error || "")
+            color: Theme.warningColor; wrapMode: Text.Wrap
         }
         GlassButton {
             id: otherReminderButton

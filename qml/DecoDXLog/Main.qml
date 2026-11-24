@@ -2089,7 +2089,8 @@ RoundedWindow {
     Rectangle {
         id: netReminder
         property double clock: Date.now()
-        readonly property var reminders: decolog.radioNet.activeReminders
+        readonly property var overview: decolog.radioNet.reminderOverview
+        readonly property var reminders: overview.reminders || []
         readonly property var dueReminder: {
             let first = null, earliest = Infinity
             for (const reminder of reminders) {
@@ -2100,7 +2101,7 @@ RoundedWindow {
             }
             return first
         }
-        visible: !!dueReminder && !radioNetDialog.visible
+        visible: (!!dueReminder || !!overview.error) && !radioNetDialog.visible
         anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 52; z: 999
         width: netReminderButton.implicitWidth + 20; height: netReminderButton.implicitHeight + 12
@@ -2108,9 +2109,9 @@ RoundedWindow {
         Button {
             id: netReminderButton
             anchors.centerIn: parent
-            text: qsTr("Radio net reminder due: %1 — open Net Manager").arg(netReminder.dueReminder ? netReminder.dueReminder.title : "")
+            text: netReminder.overview.error ? qsTr("Radio net reminders unavailable — open Net Manager") : qsTr("Radio net reminder due: %1 — open Net Manager").arg(netReminder.dueReminder ? netReminder.dueReminder.title : "")
             onClicked: {
-                if (netReminder.dueReminder && decolog.radioNet.selectSession(netReminder.dueReminder.sessionId))
+                if (netReminder.overview.error || (netReminder.dueReminder && decolog.radioNet.selectSession(netReminder.dueReminder.sessionId)))
                     radioNetDialog.open()
             }
         }

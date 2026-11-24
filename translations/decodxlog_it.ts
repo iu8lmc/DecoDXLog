@@ -4990,6 +4990,7 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 </context>
 <context>
     <name>Main</name>
+    <message><source>Radio net reminders unavailable — open Net Manager</source><translation>Promemoria della rete radio non disponibili — apri Net Manager</translation></message>
     <message>
         <source>Radio net reminder due: %1 — open Net Manager</source>
         <translation>Promemoria rete radio scaduto: %1 — apri Net Manager</translation>
@@ -15236,6 +15237,7 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>RadioNetDialog</name>
+    <message><source>Radio net reminders unavailable: %1</source><translation>Promemoria della rete radio non disponibili: %1</translation></message>
     <message>
         <source>Reminder due for %1 — select session</source>
         <translation>Promemoria scaduto per %1 — seleziona la sessione</translation>
@@ -15488,6 +15490,7 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>decolog::core::RadioNet</name>
+    <message><source>Invalid radio net reminder deadline</source><translation>Scadenza del promemoria della rete radio non valida</translation></message>
     <message><source>Export saved from the original log %1; the current log or session changed.</source><translation>Export salvato dal log originale %1; il log o la sessione corrente è cambiata.</translation></message>
     <message><source>Export from the original log %1 failed: %2</source><translation>Export dal log originale %1 non riuscito: %2</translation></message>
     <message><source>The log file changed; reopen it before exporting</source><translation>Il file del log è cambiato; riaprilo prima di esportare</translation></message>

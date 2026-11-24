@@ -183,6 +183,20 @@ class TestRadioNet : public QObject {
         }
     }
 
+    void reminderReadFailureIsDistinctFromNoReminders()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); RadioNet net(&db);
+        QVERIFY(net.start("First"));
+        QVERIFY(net.reminderOverview().value("error").toString().isEmpty());
+        QVERIFY(net.reminderOverview().value("reminders").toList().isEmpty());
+        QVERIFY(net.setReminder(60)); QCOMPARE(net.reminderOverview().value("reminders").toList().size(), 1);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE radio_net_event SET detail='invalid' WHERE event='reminder_set'"));
+        QVERIFY(!net.reminderOverview().value("error").toString().isEmpty());
+        QVERIFY(q.exec("DROP TABLE radio_net_event"));
+        const auto failed=net.reminderOverview(); QVERIFY(!failed.value("error").toString().isEmpty());
+        QVERIFY(failed.value("reminders").toList().isEmpty());
+    }
+
     void remindersAreScopedToSessions()
     {
         LogDatabase db;
