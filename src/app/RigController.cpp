@@ -4,6 +4,7 @@
 
 #include "core/Bands.h"
 #include "core/CwCalls.h"
+#include "core/Modes.h"
 #include "core/QslUpload.h"
 #include "core/SerialPorts.h"
 
@@ -1971,7 +1972,7 @@ void RigController::tuneTo(qint64 hz, const QString& mode)
     if (hz > 0)
         m_rig->setFrequency(hz);
     if (!mode.isEmpty())
-        m_rig->setMode(mode);
+        m_rig->setMode(core::modes::catForRig(mode, m_link == QLatin1String("serial") ? m_rigModel : 0));
 }
 
 QString RigController::expand(const QString& text, const QVariantMap& context) const

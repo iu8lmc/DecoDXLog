@@ -206,11 +206,36 @@ private slots:
         control.setFrequency(14074000);
         control.setMode(modes::catForClusterSpot("FT8", 14.074));
         QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+F 14074000")), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M USB 0")), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M PKTUSB 0")), 5000);
         QVERIFY(!rig.received.contains(QStringLiteral("+M RTTY 0")));
 
         control.setMode(modes::catForClusterSpot("RTTY", 14.09));
         QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M RTTY 0")), 5000);
+    }
+
+    void ts50FtSendsUsbAndIcomKeepsDataMode()
+    {
+        FakeRigctld rig;
+        RigControl control;
+        control.connectTo(QStringLiteral("127.0.0.1"), rig.serverPort());
+        QTRY_VERIFY_WITH_TIMEOUT(control.connected(), 5000);
+        control.setMode(modes::catForRig(modes::catForClusterSpot("FT8", 7.074), 2001));
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M USB 0")), 5000);
+        control.setMode(modes::catForRig(modes::catForClusterSpot("FT8", 14.074), 3073));
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains(QStringLiteral("+M PKTUSB 0")), 5000);
+    }
+
+    void latePollBeforeTuneDoesNotRestorePreviousModeOrFrequency()
+    {
+        FakeRigctld rig; rig.replyDelayMs=500; rig.frequency=7030000; rig.mode="CW";
+        RigControl control; control.connectTo("127.0.0.1",rig.serverPort());
+        QTRY_VERIFY_WITH_TIMEOUT(control.connected(),5000);
+        QTRY_VERIFY_WITH_TIMEOUT(rig.received.contains("+f") && rig.received.contains("+m"),1000);
+        control.setFrequency(14074000); control.setMode("USB");
+        QTest::qWait(800);
+        QCOMPARE(control.frequencyHz(),qint64(0)); QVERIFY(control.mode().isEmpty());
+        QTRY_COMPARE_WITH_TIMEOUT(control.frequencyHz(),qint64(14074000),5000);
+        QTRY_COMPARE_WITH_TIMEOUT(control.mode(),QString("USB"),5000);
     }
 
     void readsWhereTheRadioIs()

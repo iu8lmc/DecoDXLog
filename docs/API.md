@@ -61,7 +61,7 @@ rotore o TX. La capacità corrispondente è `tracker.read`.
 
 ### `GET /api/v1/status`
 
-    {"app":"DecoDXLog","version":"1.17.66","log":"decodxlog","qsos":26497,
+    {"app":"DecoDXLog","version":"1.17.67","log":"decodxlog","qsos":26497,
      "station":"IU8LMC","decodium":true}
 
 ### `GET /api/v1/worked?call=K1ABC&band=20m&mode=FT8`
@@ -107,14 +107,15 @@ corpo restituiscono la stessa risposta senza creare un secondo QSO. Riutilizzare
 `409`. Per le nuove chiavi vengono confrontati anche il formato effettivo (JSON o ADIF) e il nome `X-App` normalizzato usato per la provenienza: una differenza restituisce `409`. Le chiavi salvate prima della migrazione conservano il confronto storico del solo corpo, perché il contesto originario non è disponibile. Anche senza la chiave, la deduplicazione normale del log impedisce che lo
 stesso contatto venga registrato due volte; contatti distinti restano distinti.
 
-Le chiavi sono persistite nel database del log, con una retention di 30 giorni;
-le voci scadute vengono rimosse alla prima consultazione. Il primo risultato
-salvato per una chiave resta immutabile; questo non rende atomiche la scrittura
-del QSO e quella del risultato. Dopo un riavvio, lo stesso retry restituisce quindi l'esito
-originale senza creare un secondo QSO, se la registrazione della risposta è riuscita.
-Il QSO e la risposta di idempotenza non sono ancora salvati nella stessa transazione:
-un arresto o errore tra le due scritture può impedire il replay della risposta
-originale. Se il registro non è consultabile prima dell’elaborazione, l’API restituisce `503` senza elaborare la richiesta. Se la registrazione della risposta fallisce dopo l'elaborazione, l'API restituisce `503` con `retrySafe: false`, un messaggio di errore e i risultati disponibili: uno o più QSO possono già essere stati salvati e vanno verificati prima di riprovare. Un arresto prima della risposta può comunque lasciare l'esito incerto. Non usare questo meccanismo come garanzia esattamente-una-volta.
+Prima di elaborare una richiesta con chiave, l'API registra una prenotazione nel database. Una richiesta concorrente o ripetuta con la stessa chiave e lo stesso contesto, mentre la prenotazione è irrisolta, riceve `503` e `retrySafe: false`: il client deve verificare il log e non ritentare automaticamente. Questo vale anche dopo il riavvio e anche se l'arresto è avvenuto prima di salvare qualsiasi QSO. Un corpo, formato o `X-App` diverso resta un conflitto `409`.
+
+Durante l'elaborazione l'app acquisisce anche un blocco locale per chiave accanto al database del log; il nome usa l'impronta della chiave e non la chiave in chiaro. Se il blocco è occupato o non disponibile, risponde `503` senza elaborare la richiesta. Questo richiede una directory del log scrivibile e non garantisce il coordinamento con versioni precedenti dell'app o percorsi distinti allo stesso file tramite hard link.
+
+Le risposte completate sono persistite per 30 giorni e rimosse alla prima consultazione dopo la scadenza. Le prenotazioni irrisolte non scadono automaticamente; l'operatore può registrare una revisione manuale nella vista locale, senza stabilire l'esito della richiesta. Se il registro o la prenotazione non sono disponibili prima dell'elaborazione, l'API restituisce `503` senza elaborare la richiesta. Se il completamento della prenotazione fallisce dopo l'elaborazione, restituisce `503`, `retrySafe: false` e i risultati disponibili; uno o più QSO possono essere già stati salvati. Il QSO, la risposta e gli effetti esterni non sono ancora atomici: non usare il meccanismo come garanzia esattamente-una-volta, né aggirare una prenotazione irrisolta con una nuova chiave senza prima riconciliare il log.
+
+In **Setup → Decodium link → Esamina richieste API irrisolte**, una vista locale mostra 50 richieste per pagina e, per ciascuna, al massimo 10 contatti estratti dalla richiesta se non supera 64 KiB. Le richieste più grandi o con più contatti sono segnalate come incomplete. La vista mostra un'impronta SHA-256 della chiave, data, sorgente e dati essenziali dei contatti; non mostra la chiave, l'identificatore interno o il corpo completo. Può includere richieste ancora in corso: confrontare con il log non è prova dell'esito remoto. Aggiorna la vista manualmente; aprire un altro log o modificarlo nasconde il risultato precedente. Le pagine non sono una fotografia immutabile: richieste completate o aggiunte mentre si naviga possono modificare i risultati. Per una richiesta con dettagli completi, l'operatore può segnare esplicitamente la revisione dopo aver controllato la richiesta originale, il log e gli eventuali effetti esterni. Il risultato originale resta sconosciuto; nessun QSO viene modificato o reinviato. Una richiesta ancora in uso o cambiata non può essere revisionata. La chiave originale resta bloccata con stato `reviewed-unknown` senza scadenza automatica; il corpo della richiesta viene sostituito logicamente da un'impronta SHA-256 per riconoscere i retry, mentre formato e sorgente restano. Questo non è una cancellazione sicura: vecchi dati possono restare in pagine SQLite, WAL o backup; impronte di contenuti prevedibili possono consentire tentativi di indovinare i dati. Le revisioni salvate da versioni precedenti possono ancora contenere il corpo originale. Non ritentare alla cieca con un'altra chiave. Le richieste con dettagli incompleti non possono essere segnate come esaminate in questa vista.
+
+Con la chiave API completa, `GET /api/v1/idempotency` e l'header `Idempotency-Key` consentono di consultare una singola chiave: lo stato è `unresolved` (con `retrySafe: false`), `reviewed-unknown` (con `retrySafe: false`) oppure `completed` (con il codice `responseStatus` originario). `recordedAt` è la data registrata per lo stato corrente. La risposta non contiene il corpo della richiesta, la risposta originale o l'identificatore interno della prenotazione. Una chiave assente restituisce `404`, un registro non disponibile `503`; la credenziale di sola lettura riceve `403`. La consultazione non modifica o sblocca la prenotazione e non dimostra se i QSO siano stati salvati.
 L'API resta spenta per impostazione predefinita e, quando attiva, ascolta solo su
 `127.0.0.1`.
 
@@ -187,6 +188,8 @@ python3 tools/extension_manager.py --root /path/to/extension-directory remove or
 ```
 
 Replace the directory, token and port with your own values; avoid putting real tokens in shell history. An update installs a new manifest version and switches the active version after files are prepared. Reinstalling identical content is idempotent; changed content requires a new version. Prior versions remain until removal, which deletes the managed extension directory, including its retained versions. The manager refuses to remove a directory without its ownership marker. Manifests may declare up to 16 local Python `dependencies`; the manager copies the entrypoint and dependencies and checks their hashes before running. Hashes detect accidental local changes, not a malicious operator able to alter both files and metadata.
+
+The `list` command reports an unreadable, invalid or unmanaged entry as `{"id": "directory-name", "status": "invalid"}` and continues listing other entries. This status does not establish that the directory belongs to the manager. `run` still rejects an invalid installation; `remove` still requires a valid ownership marker. Inspect the dedicated directory before taking action.
 
 This is experimental developer tooling for trusted code, not an in-app installer, operating-system sandbox or independent per-extension permissions. The manifest is advisory: the API's shared read-only credential remains the enforcement boundary and permits its existing read capabilities. The tool does not support arbitrary packages or assets, concurrent management by multiple processes, crash-durable transactional upgrades on all filesystems, or recovery of a partially created installation. Keep the extension directory separate from the log and backups. Its subprocess timeout and process-group cleanup follow the developer harness; they do not prevent filesystem/network access or all descendant escape. The sample report remains limited to recent QSO; the tracker example is read-only and does not control CAT, rotor or TX.
 

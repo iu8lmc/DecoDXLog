@@ -31,6 +31,22 @@ class Api(BaseHTTPRequestHandler):
 
 
 class ManagerTests(unittest.TestCase):
+    def test_corrupt_extension_does_not_hide_other_installed_extensions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); source=base/'source'; source.mkdir(); root=base/'extensions'
+            (source/'demo.py').write_text("print('ok')\n")
+            m={'schemaVersion':1,'apiVersion':1,'id':'org.example.first','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            file=source/'manifest.json'; file.write_text(json.dumps(m)); manager.install(root,file)
+            m['id']='org.example.second'; file.write_text(json.dumps(m)); manager.install(root,file)
+            (root/'org.example.first'/'current.json').write_text('{broken')
+            rows=manager.list_installed(root)
+            self.assertEqual(len(rows),2)
+            self.assertEqual(rows[0]['id'],'org.example.first')
+            self.assertEqual(rows[0]['status'],'invalid')
+            self.assertEqual(rows[1]['id'],'org.example.second')
+            self.assertEqual(rows[1]['version'],'1.0.0')
+            manager.remove(root,'org.example.first')
+            self.assertEqual(manager.list_installed(root)[0]['id'],'org.example.second')
     def test_install_update_execute_remove_preserves_log(self):
         with tempfile.TemporaryDirectory() as temp:
             root = pathlib.Path(temp); extensions = root/'extensions'; source = root/'source'; source.mkdir()
@@ -112,7 +128,7 @@ class ManagerTests(unittest.TestCase):
             self.assertTrue((folder/'recent_activity.py').is_file())
             self.assertEqual(manager.list_installed(root)[0]['id'],manifest['id'])
             (folder/'recent_activity.py').write_text('# altered')
-            with self.assertRaises(ValueError): manager.list_installed(root)
+            self.assertEqual(manager.list_installed(root),[{'id':manifest['id'],'status':'invalid'}])
             with self.assertRaises(ValueError): manager.run(root,manifest['id'],'read-token',12345,1)
             with self.assertRaises(ValueError): manager.install(root,source)
             manager.remove(root,manifest['id'])

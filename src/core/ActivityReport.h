@@ -13,7 +13,7 @@ struct Result { QVariantList rows; bool truncated{false}; QString error; };
 // The caller owns the transaction and must close it after running the report.
 bool beginVerifiedSnapshot(QSqlDatabase& db, const QString& expectedIdentity, QString* error = nullptr);
 struct Definition {
-    QString id, name, kind, band, station, aggregate;
+    QString id, name, kind, band, station, aggregate, mode;
     QStringList dimensions;
     int year{0}, revision{0};
 };
@@ -27,10 +27,11 @@ Result run(const QSqlDatabase& db, int utcYear, const QString& band);
 Result runConfirmations(const QSqlDatabase& db, int utcYear, const QString& band);
 Result runClub(const QSqlDatabase& db, int utcYear, const QString& band, const QString& station);
 QString validateCustomSpec(const QStringList& dimensions, const QString& aggregate);
-Result runCustom(const QSqlDatabase& db, int utcYear, const QString& band, const QStringList& dimensions, const QString& aggregate);
+bool validModeFilter(const QString& mode);
+Result runCustom(const QSqlDatabase& db, int utcYear, const QString& band, const QStringList& dimensions, const QString& aggregate, const QString& mode = {});
 QByteArray csv(const Result& result);
 QByteArray confirmationsCsv(const Result& result);
 QByteArray clubCsv(const Result& result);
-QByteArray customCsv(const Result& result, const QStringList& dimensions, const QString& aggregate);
+QByteArray customCsv(const Result& result, const QStringList& dimensions, const QString& aggregate, const QString& mode = {});
 bool writePdf(QIODevice* output, const QVariantMap& snapshot, QString* error = nullptr);
 }

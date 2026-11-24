@@ -306,6 +306,12 @@ public:
 
     std::optional<ApiIdempotencyRecord> apiIdempotency(const QString& key, QString* error = nullptr) const;
     bool saveApiIdempotency(const QString& key, const ApiIdempotencyRecord& record);
+    bool claimApiIdempotency(const QString& key, const ApiIdempotencyRecord& pending);
+    bool finishApiIdempotency(const QString& key, const QByteArray& owner, const ApiIdempotencyRecord& result);
+    QString apiIdempotencyLockPath(const QString& key) const;
+    QVariantMap unresolvedApiRequests(const QString& after = {}) const;
+    bool markApiRequestReviewed(const QString& rowId, const QString& reviewToken, QString* error = nullptr);
+    static bool reviewedApiRequestMatches(const QByteArray& stored, const QByteArray& body);
 
     // Finestra dei duplicati, in secondi: per i QSO dai programmi digitali e per
     // quelli scritti a mano (l'ora a mano e' approssimativa).

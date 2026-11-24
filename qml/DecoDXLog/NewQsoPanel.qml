@@ -115,6 +115,7 @@ GlassPanel {
 
     // Per le schermate di prova: apre la tendina dei modi.
     function showModes() { modeBox.popup.open() }
+    function probeSpotSnapshot() { return {call:callField.text, mode:modeBox.editText, freq:freqField.text} }
     // Per le prove: i rapporti che il modulo mette passando da un modo all'altro.
     function probeReports(modes) {
         const out = []
@@ -136,6 +137,8 @@ GlassPanel {
     // radio e senza Decodium la frequenza si scrive lo stesso nel campo.
     property var bandMemory: ({})
     property double lastQsy: 0
+    property string clusterDigitalMode: ""
+    property double clusterDigitalDial: 0
     function memoryKey(band, mode) {
         const m = ["LSB", "USB", "AM", "FM", "SSB"].indexOf(mode) >= 0 ? "SSB"
                 : mode === "CW-R" || mode === "CWR" ? "CW" : mode
@@ -160,6 +163,8 @@ GlassPanel {
             freqField.text = Number(mhz).toFixed(6)
         if (decolog.rig.connected || decolog.decoLinkClients.length > 0) {
             root.lastQsy = Date.now()
+            root.clusterDigitalMode = ["FT8", "FT4", "FT2"].indexOf(m) >= 0 && mhz > 0 ? m : ""
+            root.clusterDigitalDial = root.clusterDigitalMode ? mhz : 0
             decolog.tuneTo(mhz, m)
         }
     }
@@ -178,9 +183,17 @@ GlassPanel {
             if (Date.now() - root.lastQsy < 2500 || freqField.activeFocus)
                 return
             const f = decolog.shownFrequency || ""
+            const raw = String(decolog.shownMode || "").toUpperCase()
+            // A digital spot's CAT carrier can be USB while its log mode is
+            // FT8/FT4/FT2. Keep the signal frequency while the rig remains on
+            // the chosen dial; a different dial or mode resumes normal follow.
+            if (root.clusterDigitalMode && root.clusterDigitalDial > 0 && Number(f) > 0
+                    && Math.abs(Number(f) - root.clusterDigitalDial) < 0.000020
+                    && (raw === "USB" || raw === "PKTUSB" || raw === root.clusterDigitalMode))
+                return
+            root.clusterDigitalMode = ""; root.clusterDigitalDial = 0
             if (f.length > 0 && f !== freqField.text)
                 freqField.text = f
-            const raw = String(decolog.shownMode || "").toUpperCase()
             const m = raw === "LSB" || raw === "USB" ? "SSB" : raw === "CW-R" || raw === "CWR" ? "CW" : raw
             const i = modeBox.find(m)
             if (i >= 0 && modeBox.currentIndex !== i && !modeBox.activeFocus)
@@ -216,6 +229,7 @@ GlassPanel {
     }
 
     function clearForm() {
+        root.clusterDigitalMode = ""; root.clusterDigitalDial = 0
         callField.text = ""
         nameField.text = ""
         qthField.text = ""
@@ -321,10 +335,15 @@ GlassPanel {
         function onQsoPrepared(fields) {
             if (!fields || !fields.call)
                 return
+            if ((fields.mhz > 0 || fields.mode) && (decolog.rig.connected || decolog.clientConnected))
+                root.lastQsy = Date.now()
             if (callField.text.trim().toUpperCase() !== String(fields.call).toUpperCase()) {
                 root.clearForm()
                 callField.text = fields.call
             }
+            const spotMode=String(fields.mode || "").toUpperCase()
+            root.clusterDigitalMode = ["FT8", "FT4", "FT2"].indexOf(spotMode) >= 0 && Number(fields.dialMhz) > 0 ? spotMode : ""
+            root.clusterDigitalDial = root.clusterDigitalMode ? Number(fields.dialMhz) : 0
             if (fields.mhz > 0)
                 freqField.text = Number(fields.mhz).toFixed(6)
             if (fields.mode) {
@@ -538,7 +557,7 @@ GlassPanel {
                             id: bandBox
                             Layout.fillWidth: true
                             model: ["—"].concat(decolog.bands)
-                            onActivated: root.qsyTo(currentText, modeBox.editText, true)
+                            onActivated: { root.clusterDigitalMode=""; root.qsyTo(currentText, modeBox.editText, true) }
                         }
                     }
                     LabeledField {
@@ -553,7 +572,7 @@ GlassPanel {
                             Layout.fillWidth: true
                             editable: true
                             model: ["SSB", "CW", "FM", "AM", "RTTY", "JTTY", "FT8", "FT4", "FT2", "PSK31"]
-                            onActivated: root.qsyTo(bandBox.currentText, currentText, false)
+                            onActivated: { root.clusterDigitalMode=""; root.qsyTo(bandBox.currentText, currentText, false) }
                         }
                     }
                     LabeledField {
@@ -566,6 +585,7 @@ GlassPanel {
                             objectName: "newQsoFrequency"
                             Layout.fillWidth: true
                             text: decolog.shownFrequency
+                            onTextEdited: root.clusterDigitalMode = ""
                             onTextChanged: {
                                 const i = bandBox.find(decolog.bandForFrequency(text))
                                 if (i >= 0) bandBox.currentIndex = i

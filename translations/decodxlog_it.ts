@@ -137,6 +137,22 @@
 </context>
 <context>
     <name>ActivationDialog</name>
+    <message>
+        <source>Open QSO…</source>
+        <translation>Apri QSO…</translation>
+    </message>
+    <message>
+        <source>The log or QSO changed; recalculate the preview before opening it.</source>
+        <translation>Il log o il QSO è cambiato; ricalcola l'anteprima prima di aprirlo.</translation>
+    </message>
+    <message>
+        <source>Could not count QSO awaiting activation-period review.</source>
+        <translation>Impossibile contare i QSO in attesa di revisione del periodo di attivazione.</translation>
+    </message>
+    <message>
+        <source>%1 QSO awaiting activation-period review are excluded from session totals and exports. Identify them in the programme preview, then open each QSO for review.</source>
+        <translation>%1 QSO in attesa di revisione del periodo di attivazione sono esclusi dai totali e dalle esportazioni della sessione. Individuali nell'anteprima dei programmi, quindi apri ogni QSO per la revisione.</translation>
+    </message>
     <message><source>Excluded from grouping: %1 missing/invalid UTC date; %2 without operator programme references; %3 awaiting activation-period review. %4 groups.</source><translation>Esclusi dal raggruppamento: %1 con data UTC mancante o non valida; %2 senza referenze dell'operatore; %3 in attesa di verifica del periodo di attivazione. %4 gruppi.</translation></message>
     <message><source>activation period needs review</source><translation>periodo di attivazione da verificare</translation></message>
     <message>
@@ -4238,6 +4254,10 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
         <translation>non confermati</translation>
     </message>
     <message>
+        <source>HRDLog upload pending</source>
+        <translation>Invio HRDLog in sospeso</translation>
+    </message>
+    <message>
         <source>Logbook</source>
         <translation>Log</translation>
     </message>
@@ -5308,6 +5328,7 @@ Campi aggiuntivi trovati (controlla la mappatura dopo l’importazione): %8</tra
 </context>
 <context>
     <name>NewQsoDialog</name>
+    <message><source>Tracker snapshot received at %1. This is not confirmation of the radio frequency.</source><translation>Rilevazione del tracker ricevuta alle %1. Non conferma la frequenza della radio.</translation></message>
     <message>
         <source>New QSO</source>
         <translation>Nuovo QSO</translation>
@@ -8086,6 +8107,17 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>SetupDialog</name>
+    <message><source>Mark API request reviewed</source><translation>Segna richiesta API come esaminata</translation></message>
+    <message><source>Have you checked the original request, the log and any external effects? This records that you reviewed an unknown outcome; it does not modify or resend any QSO. The reviewed key remains blocked without automatic expiry. Do not retry blindly with another key.</source><translation>Hai controllato la richiesta originale, il log e gli eventuali effetti esterni? Questa azione registra che hai esaminato un esito sconosciuto; non modifica né reinvia alcun QSO. La chiave esaminata resta bloccata senza scadenza automatica. Non riprovare alla cieca con un'altra chiave.</translation></message>
+    <message><source>Review recorded; the original outcome remains unknown.</source><translation>Revisione registrata; l'esito originale rimane sconosciuto.</translation></message>
+    <message><source>Mark reviewed…</source><translation>Segna come esaminata…</translation></message>
+    <message><source>No unresolved requests on this page; refresh the list.</source><translation>Nessuna richiesta irrisolta in questa pagina; aggiorna l'elenco.</translation></message>
+    <message><source>No unresolved API requests found in this log.</source><translation>Nessuna richiesta API irrisolta trovata in questo log.</translation></message>
+    <message><source>Review unresolved API requests</source><translation>Esamina richieste API irrisolte</translation></message>
+    <message><source>A request may still be running or may have stopped before or after saving QSO. Check the log before any retry; this view does not clear requests. Showing at most 50 requests per page and 10 contacts each.</source><translation>Una richiesta potrebbe essere ancora in corso oppure essersi interrotta prima o dopo il salvataggio dei QSO. Controlla il log prima di riprovare; questa vista non elimina le richieste. Sono mostrate al massimo 50 richieste per pagina e 10 contatti per ciascuna.</translation></message>
+    <message><source>Request %1 · %2 · source %3</source><translation>Richiesta %1 · %2 · sorgente %3</translation></message>
+    <message><source>Contact details are incomplete; inspect the original request.</source><translation>I dettagli dei contatti sono incompleti; controlla la richiesta originale.</translation></message>
+    <message><source>More unresolved requests exist; this view shows the first 50.</source><translation>Esistono altre richieste irrisolte; questa vista mostra le prime 50.</translation></message>
     <message>
         <source>Downloading Club Log…</source>
         <translation>Scaricamento da Club Log…</translation>
@@ -10103,6 +10135,19 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>StatsWindow</name>
+    <message><source>Mode filter matches the recorded submode when present, otherwise the recorded mode; it does not expand mode families.</source><translation>Il filtro confronta il sottomodo registrato quando presente, altrimenti il modo registrato; non include automaticamente i modi della stessa famiglia.</translation></message>
+    <message><source>Recorded mode or submode (all if blank)</source><translation>Modo o sottomodo registrato (tutti se vuoto)</translation></message>
+    <message><source>Report recorded mode or submode</source><translation>Modo o sottomodo registrato nel rapporto</translation></message>
+    <message><source>Recorded mode or submode: %1</source><translation>Modo o sottomodo registrato: %1</translation></message>
+    <message><source>Distinct recorded DXCC</source><translation>DXCC registrati distinti</translation></message>
+    <message><source>Counts distinct positive DXCC numbers recorded in matching QSO; missing values are excluded. This does not validate entities, identify new ones, or establish award credit.</source><translation>Conta i numeri DXCC positivi distinti registrati nei QSO selezionati; i valori mancanti sono esclusi. Non verifica le entità, non identifica quelle nuove e non stabilisce crediti per i diplomi.</translation></message>
+    <message><source>DXCC groups use the numeric entity recorded in each QSO. Missing or zero values are grouped as not recorded; entity and award eligibility are not verified.</source><translation>I gruppi DXCC usano il numero di entità registrato in ogni QSO. I valori mancanti o zero sono raggruppati come non registrati; l’entità e la validità per i diplomi non sono verificate.</translation></message>
+    <message><source>Group recorded values by one to three dimensions and choose an aggregation. Custom fields use their stored ADIF text; missing values remain blank. Results do not establish award credit and are a read snapshot.</source><translation>Raggruppa i valori registrati per una, due o tre dimensioni e scegli un’aggregazione. I campi personalizzati usano il testo ADIF salvato; i valori mancanti restano vuoti. I risultati non stabiliscono crediti per diplomi e sono un’istantanea in lettura.</translation></message>
+    <message><source>Mean TX power (W)</source><translation>Potenza TX media (W)</translation></message>
+    <message><source>Mean TX power (W) · samples · excluded</source><translation>Potenza TX media (W) · valori utilizzati · esclusi</translation></message>
+    <message><source>Uses recorded TX power, not measured output. Missing, invalid and negative values are excluded; zero is included.</source><translation>Usa la potenza TX registrata, non quella misurata. I valori mancanti, non validi e negativi sono esclusi; lo zero è incluso.</translation></message>
+    <message><source>Distinct UTC days</source><translation>Giorni UTC distinti</translation></message>
+    <message><source>Counts distinct UTC calendar dates with at least one recorded QSO; unparseable dates are excluded. This does not measure operating duration or award eligibility.</source><translation>Conta le date UTC distinte con almeno un QSO registrato; esclude le date non interpretabili. Non misura la durata dell'attività né l'idoneità a un diploma.</translation></message>
     <message>
         <source>DecoDXLog — Statistics</source>
         <translation>DecoDXLog — Statistiche</translation>

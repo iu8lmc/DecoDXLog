@@ -37,6 +37,7 @@ class ActivationController : public QObject {
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
     Q_PROPERTY(QString title READ title NOTIFY changed)
     Q_PROPERTY(int qsoCount READ qsoCount NOTIFY changed)
+    Q_PROPERTY(int uncertainCount READ uncertainCount NOTIFY changed)
     Q_PROPERTY(int uniqueCalls READ uniqueCalls NOTIFY changed)
     Q_PROPERTY(int requiredQsos READ requiredQsos NOTIFY changed)
     Q_PROPERTY(int nextSerial READ nextSerial NOTIFY changed)
@@ -113,6 +114,7 @@ public:
     QVariantMap state() const;
     QString title() const { return m_session.title(); }
     int qsoCount() const { return m_qsoCount; }
+    int uncertainCount() const { return m_uncertainCount; }
     int uniqueCalls() const { return m_uniqueCalls; }
     int requiredQsos() const { return m_session.requiredQsos(); }
     int nextSerial() const { return m_session.nextSerial; }
@@ -280,6 +282,7 @@ private:
     Context m_ctx;
     core::Activation m_session;
     int m_qsoCount{0};
+    int m_uncertainCount{0};
     int m_uniqueCalls{0};
     QVariantList m_perBand;
     QString m_lastQso;

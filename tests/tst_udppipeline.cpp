@@ -12,6 +12,9 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QCryptographicHash>
+#include <QFileInfo>
+#include <QLockFile>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSqlDatabase>
@@ -480,6 +483,22 @@ private slots:
         QCOMPARE(secondRetry.first, 201);
         QCOMPARE(secondRetry.second, firstRetry.second);
         QCOMPARE(countCall(QStringLiteral("W8IDM")), 1);
+        const QByteArray lockedKey="locked-1";
+        const QString lockPath=QFileInfo(m_db).canonicalFilePath()+QStringLiteral(".api-idempotency-")
+            +QString::fromLatin1(QCryptographicHash::hash(lockedKey,QCryptographicHash::Sha256).toHex())+QStringLiteral(".lock");
+        QLockFile held(lockPath); QVERIFY(held.tryLock(0));
+        const QByteArray lockedBody="<CALL:6>W8LOCK<QSO_DATE:8>20260917<TIME_ON:4>0915<BAND:3>20m<MODE:3>FT8<EOR>";
+        const auto heldResult=request("POST",QStringLiteral("/api/v1/qso"),lockedBody,lockedKey);
+        QCOMPARE(heldResult.first,503); QCOMPARE(heldResult.second.value("retrySafe").toBool(true),false);
+        QCOMPARE(countCall(QStringLiteral("W8LOCK")),0);
+        held.unlock(); QCOMPARE(request("POST",QStringLiteral("/api/v1/qso"),lockedBody,lockedKey).first,201);
+        QCOMPARE(countCall(QStringLiteral("W8LOCK")),1);
+        const auto inspected = request("GET", QStringLiteral("/api/v1/idempotency"), {}, "retry-1");
+        QCOMPARE(inspected.first,200);
+        QCOMPARE(inspected.second.value("state").toString(),QStringLiteral("completed"));
+        QCOMPARE(inspected.second.value("responseStatus").toInt(),201);
+        QVERIFY(!inspected.second.contains("requestBody")); QVERIFY(!inspected.second.contains("responseBody"));
+        QCOMPARE(request("GET",QStringLiteral("/api/v1/idempotency"),{},"not-found").first,404);
         QCOMPARE(request("POST", QStringLiteral("/api/v1/qso"),
                          "<CALL:5>W8DIFF<QSO_DATE:8>20260917<TIME_ON:4>0911<BAND:3>20m<MODE:3>FT8<EOR>",
                          "retry-1").first, 409);
@@ -489,7 +508,7 @@ private slots:
             db.setDatabaseName(m_db);
             QVERIFY(db.open());
             QSqlQuery q(db);
-            QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER api_fault BEFORE INSERT ON api_idempotency BEGIN SELECT RAISE(FAIL, 'injected fault'); END")));
+            QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER api_fault BEFORE UPDATE ON api_idempotency BEGIN SELECT RAISE(FAIL, 'injected fault'); END")));
         }
         QSqlDatabase::removeDatabase(QStringLiteral("fault"));
         const QByteArray faultBody = "<CALL:5>W8ERR<QSO_DATE:8>20260917<TIME_ON:4>0920<BAND:3>20m<MODE:3>FT8<EOR>";
@@ -504,9 +523,58 @@ private slots:
             QVERIFY(q.exec(QStringLiteral("DROP TRIGGER api_fault")));
         }
         QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        m_app.terminate(); QVERIFY(m_app.waitForFinished(10000)); m_output.clear();
+        m_app.start(QStringLiteral(DECODXLOG_APP),
+                    {QStringLiteral("--settings"), m_dir.path(), QStringLiteral("--db"), m_db,
+                     QStringLiteral("--port"), QString::number(m_port), QStringLiteral("--grab"),
+                     m_dir.filePath(QStringLiteral("shot-pending-restart.png"))});
+        QVERIFY2(m_app.waitForStarted(20000), qPrintable(m_app.errorString()));
+        QVERIFY2(waitFor([&] { return restartedListening.match(QString::fromUtf8(m_output)).hasMatch(); }, 90000),
+                 m_output.right(2000).constData());
         const auto retryAfterFault = request("POST", QStringLiteral("/api/v1/qso"), faultBody, "fault-1");
-        QCOMPARE(retryAfterFault.first, 409);
+        QCOMPARE(retryAfterFault.first, 503);
+        QCOMPARE(retryAfterFault.second.value(QStringLiteral("retrySafe")).toBool(true), false);
+        const auto unresolved=request("GET",QStringLiteral("/api/v1/idempotency"),{},"fault-1");
+        QCOMPARE(unresolved.first,200); QCOMPARE(unresolved.second.value("state").toString(),QStringLiteral("unresolved"));
+        QCOMPARE(unresolved.second.value("retrySafe").toBool(true),false);
+        QVERIFY(!unresolved.second.contains("responseBody"));
         QCOMPARE(countCall(QStringLiteral("W8ERR")), 1);
+        QCOMPARE(request("POST",QStringLiteral("/api/v1/qso"),faultBody,"fault-1","text/plain","other-app").first,409);
+        {
+            LogDatabase reviewDb; QVERIFY(reviewDb.open(m_db));
+            const auto rows=reviewDb.unresolvedApiRequests().value("rows").toList(); QCOMPARE(rows.size(),1);
+            const auto row=rows.first().toMap(); QString reviewError;
+            QVERIFY2(reviewDb.markApiRequestReviewed(row.value("rowId").toString(),row.value("reviewToken").toString(),&reviewError),qPrintable(reviewError));
+            QSqlQuery age(reviewDb.connection());
+            QVERIFY(age.exec(QStringLiteral("UPDATE api_idempotency SET created_at='2020-01-01T00:00:00Z' WHERE key='fault-1'")));
+        }
+        const auto reviewed=request("GET",QStringLiteral("/api/v1/idempotency"),{},"fault-1");
+        QCOMPARE(reviewed.first,200); QCOMPARE(reviewed.second.value("state").toString(),QStringLiteral("reviewed-unknown"));
+        QCOMPARE(reviewed.second.value("retrySafe").toBool(true),false);
+        const auto afterReview=request("POST",QStringLiteral("/api/v1/qso"),faultBody,"fault-1");
+        QCOMPARE(afterReview.first,409); QCOMPARE(afterReview.second.value("retrySafe").toBool(true),false);
+        const auto changedAfterReview=request("POST",QStringLiteral("/api/v1/qso"),faultBody+" ","fault-1");
+        QCOMPARE(changedAfterReview.first,409);
+        QVERIFY(changedAfterReview.second.value("error").toString().contains("different request"));
+        QCOMPARE(countCall(QStringLiteral("W8ERR")),1);
+        // A reservation failure must occur before any QSO is processed.
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
+            db.setDatabaseName(m_db); QVERIFY(db.open()); QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("CREATE TRIGGER api_claim_fault BEFORE INSERT ON api_idempotency BEGIN SELECT RAISE(FAIL, 'injected fault'); END")));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        const QByteArray claimBody = "<CALL:7>W8CLAIM<QSO_DATE:8>20260917<TIME_ON:4>0925<BAND:3>20m<MODE:3>FT8<EOR>";
+        QCOMPARE(request("POST",QStringLiteral("/api/v1/qso"),claimBody,"claim-fault").first,503);
+        QCOMPARE(countCall(QStringLiteral("W8CLAIM")),0);
+        {
+            QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
+            db.setDatabaseName(m_db); QVERIFY(db.open()); QSqlQuery q(db);
+            QVERIFY(q.exec(QStringLiteral("DROP TRIGGER api_claim_fault")));
+        }
+        QSqlDatabase::removeDatabase(QStringLiteral("fault"));
+        QCOMPARE(request("POST",QStringLiteral("/api/v1/qso"),claimBody,"claim-fault").first,201);
+        QCOMPARE(countCall(QStringLiteral("W8CLAIM")),1);
         // A failed lookup must not be treated as an unused key.
         {
             QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), QStringLiteral("fault"));
@@ -552,6 +620,8 @@ private slots:
         QVERIFY(!capabilities.second.value("events").toBool());
         QVERIFY(capabilities.second.value("operations").toArray().contains("qso.read"));
         QVERIFY(capabilities.second.value("operations").toArray().contains("qso.write"));
+        QVERIFY(capabilities.second.value("operations").toArray().contains("idempotency.inspect"));
+        QCOMPARE(request("GET",QStringLiteral("/api/v1/idempotency")).first,400);
         QCOMPARE(request("POST", QStringLiteral("/api/v1/capabilities")).first,405);
         QCOMPARE(request("GET", QStringLiteral("/api/v1/capabilities?apiVersion=1")).first,200);
         QCOMPARE(request("GET", QStringLiteral("/api/v1/capabilities?apiVersion=2")).first,400);
@@ -570,12 +640,14 @@ private slots:
         const auto readCaps=readRequest("GET",QStringLiteral("/api/v1/capabilities"));
         QCOMPARE(readCaps.first,200); QCOMPARE(readCaps.second.value("permissionModel").toString(),QString("read-only-token"));
         QVERIFY(!readCaps.second.value("operations").toArray().contains("qso.write"));
+        QVERIFY(!readCaps.second.value("operations").toArray().contains("idempotency.inspect"));
         QVERIFY(readCaps.second.value("operations").toArray().contains("tracker.read"));
         const auto tracker=readRequest("GET",QStringLiteral("/api/v1/tracker"));
         QCOMPARE(tracker.first,200); QVERIFY(!tracker.second.value("available").toBool());
         QCOMPARE(readRequest("POST",QStringLiteral("/api/v1/tracker")).first,403);
         QCOMPARE(readRequest("GET",QStringLiteral("/api/v1/qsos")).first,200);
         QCOMPARE(readRequest("POST",QStringLiteral("/api/v1/qso")).first,403);
+        QCOMPARE(readRequest("GET",QStringLiteral("/api/v1/idempotency")).first,403);
         QCOMPARE(countCall(QStringLiteral("W1BAD")),0);
         const QString python=QStandardPaths::findExecutable(QStringLiteral("python3"));
         if (!python.isEmpty()) {

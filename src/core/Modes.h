@@ -39,8 +39,9 @@ QString catFor(const QString& mode);
 // 10 MHz si parla in LSB, sopra in USB. Con mhz a zero vale il caso generale.
 QString catFor(const QString& mode, double mhz);
 
-// Cluster FT spots use audio tones on USB. Avoid CAT data modes that some
-// Hamlib backends map to the radio's dedicated RTTY modem.
+// Cluster spots use the same CAT mode mapping as the rest of the application.
 QString catForClusterSpot(const QString& mode, double mhz);
+
+QString catForRig(const QString& mode, int model);
 
 } // namespace decolog::core::modes

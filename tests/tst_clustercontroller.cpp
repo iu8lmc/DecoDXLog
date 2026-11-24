@@ -248,7 +248,7 @@ private slots:
         // nell'audio, e una radio portata su 18101.5 non lo sentirebbe.
         QCOMPARE(radioMhz, 18.100);
         QCOMPARE(radioMode, QString("FT8"));
-        QCOMPARE(radioCatMode, QString("USB"));
+        QCOMPARE(radioCatMode, QString("PKTUSB"));
 
         // In CW il quadrante e' la frequenza dello spot, senza scarti.
         cluster.injectLine(QString("DX de F5ABC:  14025.1  3Y0J  CW 18 dB  %1Z").arg(hhmm));

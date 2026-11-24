@@ -367,7 +367,8 @@ GlassPanel {
     }
     function qslFilterLabel(key) {
         return { confirmed: qsTr("confirmed"), lotw: qsTr("LoTW confirmed"), card: qsTr("card confirmed"),
-                 eqsl: qsTr("eQSL confirmed"), unconfirmed: qsTr("not confirmed") }[key] || key
+                 eqsl: qsTr("eQSL confirmed"), unconfirmed: qsTr("not confirmed"),
+                 hrdlog_pending: qsTr("HRDLog upload pending") }[key] || key
     }
     function thisMonth() {
         const now = decolog.utcNow()
@@ -563,7 +564,7 @@ GlassPanel {
         StyledMenu {
             title: qsTr("QSL")
             Repeater {
-                model: ["confirmed", "lotw", "card", "eqsl", "unconfirmed"]
+                model: ["confirmed", "lotw", "card", "eqsl", "unconfirmed", "hrdlog_pending"]
                 StyledMenuItem {
                     required property string modelData
                     text: root.qslFilterLabel(modelData)

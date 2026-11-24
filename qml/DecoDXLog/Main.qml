@@ -1181,6 +1181,25 @@ RoundedWindow {
             window.panelItem("tabs").setTab(3)
         }
     }
+    Timer {
+        id: clusterRaceStart; interval: 50; repeat: true; property int tries: 0; property bool injected: false
+        onTriggered: {
+            const panel=window.panelItem("newqso")
+            if (!decolog.rig.connected || !panel || !panel.item) { if (++tries>120) { console.warn("PROBE cluster race no rig or panel"); stop() }; return }
+            if (!injected) { injected=true; decolog.cluster.injectLine("DX de IK1AAA: 14075.3 J51A FT8 1200Z"); return }
+            const model=decolog.cluster.spots
+            if (!model || !model.count) return
+            stop(); decolog.cluster.tune(model.get(0).spotKey); clusterRaceObserve.start(); clusterRaceCarrier.start()
+        }
+    }
+    Timer {
+        id: clusterRaceObserve; interval: 1100
+        onTriggered: { const panel=window.panelItem("newqso"); console.warn("PROBE cluster race " + JSON.stringify(panel.item.probeSpotSnapshot())) }
+    }
+    Timer {
+        id: clusterRaceCarrier; interval: 3300
+        onTriggered: { const panel=window.panelItem("newqso"); console.warn("PROBE cluster carrier " + JSON.stringify(panel.item.probeSpotSnapshot())) }
+    }
 
     Component.onCompleted: {
         if (!layout.dxCalendarIntroduced) {
@@ -1291,6 +1310,7 @@ RoundedWindow {
         else if (what[0] === "historical") historicalQsoDialog.open()
         else if (what[0] === "importguideprobe") Qt.callLater(() => importSourceGuide.probe())
         else if (what[0] === "qslplanprobe") Qt.callLater(() => awardsDialog.probeQslPlan())
+        else if (what[0] === "clusterraceprobe") clusterRaceStart.start()
         else if (what[0] === "qslstalecostprobe") Qt.callLater(() => awardsDialog.probeQslStaleCost())
         else if (what[0] === "qslcostfileprobe") Qt.callLater(() => awardsDialog.probeQslCostFile())
         else if (what[0] === "qslscopesprobe") Qt.callLater(() => awardsDialog.probeQslScopes(what[1] === "restore"))
@@ -1332,6 +1352,9 @@ RoundedWindow {
         else if (what[0] === "sotacatalogueprobe") Qt.callLater(() => activationDialog.probeSotaCatalogue())
         else if (what[0] === "exclusionprobe") Qt.callLater(() => activationDialog.probeExclusions())
         else if (what[0] === "multiprogramprobe") Qt.callLater(() => activationDialog.probeMultiProgram())
+        else if (what[0] === "activationuncertainprobe") Qt.callLater(() => activationDialog.probeUncertainCount())
+        else if (what[0] === "activationopenexcludedprobe") Qt.callLater(() => activationDialog.probeExcludedOpen())
+        else if (what[0] === "activationstaleexcludedprobe") Qt.callLater(() => { activationDialog.probeStaleExcluded = true; activationDialog.probeExcludedOpen() })
         else if (what[0] === "historicalprobe") { historicalQsoDialog.open(); Qt.callLater(() => historicalQsoDialog.probeHistoricalEntry()) }
         else if (what[0] === "satellitesplit") {
             newQsoDialog.open()
@@ -1389,6 +1412,8 @@ RoundedWindow {
         else if (what[0] === "derivedpreviewprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeDerivedPreview(startupShow.substring(startupShow.indexOf(":")+1))) }
         else if (what[0] === "profiles") profilesDialog.open()
         else if (what[0] === "lotwcheckpointprobe" || what[0] === "lotwcheckpointview") { setupDialog.page=4; setupDialog.open(); Qt.callLater(() => setupDialog.probeLotwCheckpoint(what[0] === "lotwcheckpointview")) }
+        else if (what[0] === "apipendingprobe") { setupDialog.page=2; setupDialog.open(); Qt.callLater(() => setupDialog.probeApiPendingReview()) }
+        else if (what[0] === "apireviewprobe") { setupDialog.page=2; setupDialog.probeApiMark=true; setupDialog.open(); Qt.callLater(() => setupDialog.probeApiPendingReview()) }
         else if (what[0] === "setup") { setupDialog.page = parseInt(what[1] || "3"); setupDialog.open(); if (what[2] === "end") Qt.callLater(setupDialog.scrollToBottom); else if (what[2]) { const y = parseInt(what[2]); Qt.callLater(() => setupDialog.scrollTo(y)) } }
         else if (what[0] === "menu") window.panelItem("logbook").showMenu(what[1])
         // «editcall»: il log in primo piano e il nominativo della prima riga aperto alla correzione.
@@ -1671,6 +1696,12 @@ RoundedWindow {
         }
         else if (what[0] === "stats") { openStats(); if (what[1] === "awards" && statsWindow.item) statsWindow.item.page = 1 }
         else if (what[0] === "activityreportprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "activitydaysprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "activitypowerprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "activitypowerloadprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "activitydxccprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "activitydxcccountprobe") { openStats(); activityReportProbe.start() }
+        else if (what[0] === "activitymodeprobe") { openStats(); activityReportProbe.start() }
         else if (what[0] === "ocralertprobe") ocrAlertProbe.start()
         else if (what[0] === "importsnapshotprobe" || what[0] === "importcancelprobe" || what[0] === "importcancelbusyprobe" || what[0] === "importlongprobe") importSnapshotProbe.start()
         else if (what[0] === "confirmationreportprobe") { openStats(); activityReportProbe.start() }
@@ -1807,7 +1838,7 @@ RoundedWindow {
     Timer { id: combo2Timer; interval: 900; onTriggered: newQsoDialog.showBandCombo() }
     Timer {
         id:activityReportProbe; interval:1000
-        onTriggered: { if (statsWindow.item) { const name=startupShow.split(":")[0]; if (name==="namedreportprobe") statsWindow.item.probeNamedReports(); else if (name==="namedrestoreprobe") statsWindow.item.probeNamedRestore(); else if (name==="customrestoreprobe") statsWindow.item.probeCustomRestore(); else statsWindow.item.probeReport("file://" + startupShow.split(":")[1],name==="customreportprobe" || name==="custompdfprobe" ? "custom" : name==="clubreportprobe" || name==="clubpdfprobe" ? "club" : name==="confirmationreportprobe" || name==="confirmationpdfprobe" ? "confirmation" : "activity",name.indexOf("pdfprobe")>=0) } else console.warn("PROBE activityreport missing window") }
+        onTriggered: { if (statsWindow.item) { const name=startupShow.split(":")[0]; if (name==="activitymodeprobe") statsWindow.item.probeModeFilter(startupShow.split(":")[1] ? "file://" + startupShow.split(":")[1] : ""); else if (name==="activitydxcccountprobe") statsWindow.item.probeDxccCount(); else if (name==="activitydxccprobe") statsWindow.item.probeDxcc(); else if (name==="activitypowerloadprobe") statsWindow.item.probeReportLoad(); else if (name==="activitypowerprobe") statsWindow.item.probeMeanPower(startupShow.split(":")[1] ? "file://" + startupShow.split(":")[1] : ""); else if (name==="activitydaysprobe") statsWindow.item.probeUtcDays(); else if (name==="namedreportprobe") statsWindow.item.probeNamedReports(); else if (name==="namedrestoreprobe") statsWindow.item.probeNamedRestore(); else if (name==="customrestoreprobe") statsWindow.item.probeCustomRestore(); else statsWindow.item.probeReport("file://" + startupShow.split(":")[1],name==="customreportprobe" || name==="custompdfprobe" ? "custom" : name==="clubreportprobe" || name==="clubpdfprobe" ? "club" : name==="confirmationreportprobe" || name==="confirmationpdfprobe" ? "confirmation" : "activity",name.indexOf("pdfprobe")>=0) } else console.warn("PROBE activityreport missing window") }
     }
     Timer { id:contestComparisonProbe; interval:1000; onTriggered: { if (contestWindow.item) { const parts=startupShow.split(":"); const name=parts[0]; if (name === "contestsavegoalsprobe" || name === "contestloadgoalsprobe" || name === "contestremovegoalsprobe") contestWindow.item.probeContestGoals(name === "contestsavegoalsprobe" ? "save" : name === "contestremovegoalsprobe" ? "remove" : "load"); else if (name === "contestfindingsprobe" || name === "contestfindingsstaleprobe") contestWindow.item.probeContestFindings(parts.slice(1).join(":"),name === "contestfindingsstaleprobe"); else contestWindow.item.probeContestComparison(name === "contestcomparisonstaleprobe") } else console.warn("PROBE contestComparison missing window") } }
     Timer { id:contestAudioProbe; interval:1000; onTriggered: { if (contestWindow.item) { const path="file://" + startupShow.split(":").slice(1).join(":"); if (startupShow.split(":")[0] === "contestaudioplayprobe") contestWindow.item.probeContestAudioPlayback(path); else if (startupShow.split(":")[0] === "contestaudiorecoverprobe") contestWindow.item.probeContestAudioRecovery(path); else if (startupShow.split(":")[0] === "contestaudiofindprobe") contestWindow.item.probeContestAudioFind(path); else if (startupShow.split(":")[0] === "contestaudiorestoreprobe") contestWindow.item.probeContestAudioRestore(); else if (startupShow.split(":")[0] === "contestaudiostaleprobe") contestWindow.item.probeContestAudioStale(path); else if (startupShow.split(":")[0] === "contestaudiodevicesprobe") contestWindow.item.probeContestAudioDevices(); else if (startupShow.split(":")[0] === "contestaudiopartialsprobe") contestWindow.item.probeContestAudioPartials(path); else contestWindow.item.probeContestAudio(path); } else console.warn("PROBE contestAudio missing window") } }
@@ -1999,7 +2030,7 @@ RoundedWindow {
                 dxToast.show(title, text, spotKey)
         }
     }
-    ActivationDialog { id: activationDialog }
+    ActivationDialog { id: activationDialog; onOpenQsoRequested: (id) => { window.openQso(id); if (startupShow === "activationopenexcludedprobe") console.warn("PROBE activation open QSO " + id + " visible=" + window.probeQsoDialogOpen(id)) } }
     RadioNetDialog { id: radioNetDialog }
     RoverDialog { id: roverDialog }
     PredictDialog { id: predictDialog }

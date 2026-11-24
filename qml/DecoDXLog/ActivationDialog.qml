@@ -9,6 +9,10 @@ import Decodium.UI
 
 DialogFrame {
     id: root
+    signal openQsoRequested(var id)
+    property string previewLogPath: ""
+    property bool probeOpenExcluded: false
+    property bool probeStaleExcluded: false
 
     readonly property var act: decolog.activation
     readonly property var state: act.state
@@ -126,6 +130,47 @@ DialogFrame {
         root.probeAwaitPreview = true
         previewButton.clicked()
     }
+    function probeUncertainCount() {
+        root.openDialog("pota")
+        const started = root.act.start({kind:"pota", reference:"IT-0001"})
+        const now = decolog.utcNow()
+        const logged = decolog.logManualQso({call:"K1TST", date:decolog.showDate(now.date), time:now.time, band:"20m", mode:"CW"})
+        const ids = root.act.qsoIds()
+        if (started || logged || ids.length !== 1) { console.warn("PROBE activation uncertainty setup failed " + started + " " + logged); return }
+        const id=ids[0], key="APP_DECOLOG_ACTIVATION_REVIEW"
+        let fields=decolog.qsoDetail(id).fields
+        fields[key]="PERIOD_UNCERTAIN"
+        const mark=decolog.saveQso(id,fields,-1,[key])
+        const marked={count:root.act.uncertainCount,total:root.act.qsoCount,visible:uncertaintyWarning.visible,text:uncertaintyWarning.text}
+        fields=decolog.qsoDetail(id).fields; fields[key]=""
+        const clear=decolog.saveQso(id,fields,-1,[key])
+        console.warn("PROBE activation uncertainty " + JSON.stringify({mark:mark,clear:clear,marked:marked,after:{count:root.act.uncertainCount,total:root.act.qsoCount,visible:uncertaintyWarning.visible}}))
+    }
+    function probeExcludedOpen() {
+        root.openDialog("pota")
+        const started = root.act.start({kind:"pota", reference:"IT-0001"})
+        const now = decolog.utcNow()
+        const logged = decolog.logManualQso({call:"K1TST", date:decolog.showDate(now.date), time:now.time, band:"20m", mode:"CW"})
+        const ids = root.act.qsoIds()
+        if (started || logged || ids.length !== 1) { console.warn("PROBE excluded open setup failed"); return }
+        const fields=decolog.qsoDetail(ids[0]).fields
+        fields.APP_DECOLOG_ACTIVATION_REVIEW="PERIOD_UNCERTAIN"
+        const error=decolog.saveQso(ids[0],fields,-1,["APP_DECOLOG_ACTIVATION_REVIEW"])
+        if (error) { console.warn("PROBE excluded open save failed " + error); return }
+        root.probeOpenExcluded=true
+        if (!root.act.startPartitionPreview()) console.warn("PROBE excluded open preview failed")
+    }
+    function openExcludedQso(row) {
+        const current = decolog.qsoDetail(row.id)
+        if (!root.previewLogPath || root.previewLogPath !== String(decolog.currentLogInfo().path || "")
+                || !row.uuid || current.uuid !== row.uuid || current.revision !== row.revision) {
+            root.partitionMessage = qsTr("The log or QSO changed; recalculate the preview before opening it.")
+            return false
+        }
+        root.close()
+        root.openQsoRequested(row.id)
+        return true
+    }
     Connections {
         target: root.act
         function onChanged() { root.previewShown = false; root.historyCursors = [0]; root.historyPage = 0; root.historyRows = root.act.closedRuns(0) }
@@ -162,6 +207,22 @@ DialogFrame {
             }
         }
         function onPreviewFinished(success) {
+            if (success) root.previewLogPath = String(decolog.currentLogInfo().path || "")
+            if (root.probeOpenExcluded) {
+                root.probeOpenExcluded=false
+                Qt.callLater(() => {
+                    const row=exclusionRepeater.itemAt(0)
+                    console.warn("PROBE excluded row " + !!row)
+                    if (!row) return
+                    if (root.probeStaleExcluded) {
+                        const saved=Object.assign({},row.modelData)
+                        const error=decolog.editQsoField(saved.id,"comment","Changed after preview")
+                        const opened=root.openExcludedQso(saved)
+                        console.warn("PROBE excluded stale edit=" + error + " opened=" + opened + " warning=" + root.partitionMessage)
+                    } else row.probeOpen()
+                })
+                return
+            }
             if (root.probePotaGroup) {
                 root.probePotaGroup = false
                 Qt.callLater(() => {
@@ -358,6 +419,16 @@ DialogFrame {
                 label: qsTr("Next number")
                 value: root.act.nextSerial
             }
+        }
+        Text {
+            id: uncertaintyWarning
+            Layout.fillWidth: true
+            visible: root.act.active && root.act.uncertainCount !== 0
+            color: Theme.warningColor
+            wrapMode: Text.Wrap
+            text: root.act.uncertainCount < 0
+                  ? qsTr("Could not count QSO awaiting activation-period review.")
+                  : qsTr("%1 QSO awaiting activation-period review are excluded from session totals and exports. Identify them in the programme preview, then open each QSO for review.").arg(root.act.uncertainCount)
         }
         MeterBar {
             Layout.fillWidth: true
@@ -768,11 +839,19 @@ DialogFrame {
         Repeater {
             id: exclusionRepeater
             model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.excluded || []).slice(root.excludedPage * 100, (root.excludedPage + 1) * 100) : []
-            Note {
+            RowLayout {
                 required property var modelData
-                text: qsTr("Excluded QSO #%1 · %2 · %3: %4")
+                readonly property string text: qsTr("Excluded QSO #%1 · %2 · %3: %4")
                     .arg(modelData.id).arg(modelData.call || "—").arg(modelData.at || "—")
                     .arg(modelData.reason === "missingDate" ? qsTr("missing or invalid UTC date") : modelData.reason === "uncertainPeriod" ? qsTr("activation period needs review") : qsTr("no operator programme reference"))
+                Layout.fillWidth: true
+                function probeOpen() { openExcluded.clicked() }
+                Note { Layout.fillWidth: true; text: parent.text }
+                GlassButton {
+                    id: openExcluded
+                    text: qsTr("Open QSO…")
+                    onClicked: root.openExcludedQso(modelData)
+                }
             }
         }
         RowLayout {

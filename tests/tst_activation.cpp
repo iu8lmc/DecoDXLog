@@ -24,6 +24,41 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void activeSessionExcludesUnrelatedQsosFromCountsAndExportSelection()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-1234"}}).isEmpty());
+        const auto now=QDateTime::currentDateTimeUtc().addSecs(2);
+        auto record=[&](const QString& call) { return AdifRecord{{"CALL",call},{"QSO_DATE",now.toString("yyyyMMdd")},{"TIME_ON",now.toString("hhmmss")},{"BAND","20m"},{"MODE","CW"}}; };
+        auto own=record("K1ABC"); act.applyTo(own);
+        const auto first=db.insertQso(own,"fixture",{},true); QVERIFY(first.id>0);
+        const auto other=db.insertQso(record("K2ABC"),"fixture",{},true); QVERIFY(other.id>0);
+        act.refresh();
+        QCOMPARE(act.qsoCount(),1); QCOMPARE(act.uniqueCalls(),1);
+        QCOMPARE(act.qsoIds(),QVariantList{QVariant::fromValue(first.id)});
+        QCOMPARE(act.recentQsos().size(),1);
+        QCOMPARE(act.rate().value("last10").toInt(),1);
+        QVERIFY(!act.isDuplicate("K2ABC","20m","CW"));
+        QVERIFY(act.isDuplicate("K1ABC","20m","CW"));
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        const auto path=dir.filePath("session.adi"); QVERIFY(act.exportAdif(QUrl::fromLocalFile(path)).isEmpty());
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly)); const auto exported=file.readAll();
+        QVERIFY(exported.contains("K1ABC")); QVERIFY(!exported.contains("K2ABC"));
+    }
+    void explicitlyAssignedOlderContactAppearsInTrackedSession()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-1234"}}).isEmpty());
+        AdifRecord record{{"CALL","K1OLD"},{"QSO_DATE","20200101"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(record); const auto inserted=db.insertQso(record,"fixture",{},true); QVERIFY(inserted.id>0);
+        act.refresh(); QCOMPARE(act.qsoCount(),1); QCOMPARE(act.qsoIds().size(),1);
+        QCOMPARE(act.qsoIds().first().toLongLong(),inserted.id);
+        QCOMPARE(act.partitionPreview().value("reportedCount").toInt(),1);
+        QCOMPARE(act.recentQsos().size(),1); QVERIFY(act.isDuplicate("K1OLD","20m","CW"));
+        QCOMPARE(act.rate().value("last10").toInt(),0);
+    }
     void benchmarkClosedRunHistory()
     {
         if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_ACTIVATION_HISTORY")) QSKIP("Opt-in synthetic benchmark");
@@ -78,8 +113,9 @@ private slots:
         LogDatabase db; QVERIFY(db.open(":memory:")); ActivationController::Context ctx; ctx.db=&db;
         ActivationController act(std::move(ctx)); QVERIFY(act.start({{"kind","contest"},{"contestId","CQ-WW-CW"}}).isEmpty());
         const auto at=QDateTime::currentDateTimeUtc().addSecs(2);
-        const auto id=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE",at.toString("yyyyMMdd")},{"TIME_ON",at.toString("HHmmss")},
-            {"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id; QVERIFY(id>0);
+        AdifRecord contact{{"CALL","K1ABC"},{"QSO_DATE",at.toString("yyyyMMdd")},{"TIME_ON",at.toString("HHmmss")},
+            {"BAND","20m"},{"MODE","CW"}}; act.applyTo(contact);
+        const auto id=db.insertQso(contact,"fixture",{},true).id; QVERIFY(id>0);
         const auto recent=act.recentQsos(10); QCOMPARE(recent.size(),1);
         const auto row=recent.first().toMap(); QCOMPARE(row.value("id").toLongLong(),id);
         QCOMPARE(QDateTime::fromString(row.value("utc").toString(),Qt::ISODate).toSecsSinceEpoch(),at.toSecsSinceEpoch());
@@ -374,8 +410,10 @@ private slots:
         ActivationController legacy(std::move(legacyContext)); legacy.load(); QVERIFY(legacy.active());
         QVERIFY(legacy.state().value("sessionUuid").toString().isEmpty());
         QVERIFY(!legacy.partitionPreview().value("error").toString().isEmpty());
-        AdifRecord old{{"CALL", "K1OLD"}}; legacy.session().applyTo(old, 0);
+        AdifRecord old{{"CALL", "K1OLD"},{"QSO_DATE","20261201"},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}}; legacy.session().applyTo(old, 0);
         QVERIFY(old.value("APP_DECOLOG_ACTIVATION_UUID").isEmpty());
+        QVERIFY(db.insertQso(old,"fixture",{},true).id>0); legacy.refresh();
+        QCOMPARE(legacy.qsoCount(),1); QCOMPARE(legacy.qsoIds().size(),1);
         legacy.stop(); QVERIFY(!legacy.active());
         QVERIFY(q.exec("SELECT COUNT(*) FROM activation_run")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(), 1);
     }
@@ -386,9 +424,19 @@ private slots:
         AdifRecord qso{{"CALL","K1AAA"},{"QSO_DATE","20261101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
         act.session().applyTo(qso,0); qso.set("APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN");
         const auto inserted=db.insertQso(qso,"fixture",{},true,0,false); QVERIFY(inserted.id>0);
+        act.refresh(); QCOMPARE(act.qsoCount(),0); QVERIFY(act.qsoIds().isEmpty());
+        QCOMPARE(act.property("uncertainCount").toInt(),1);
+        QVERIFY(act.recentQsos().isEmpty()); QVERIFY(!act.isDuplicate("K1AAA","20m","CW"));
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString output=dir.filePath("session.adi");
+        QVERIFY(!act.exportAdif(QUrl::fromLocalFile(output)).isEmpty()); QVERIFY(!QFile::exists(output));
         const auto pending=act.partitionPreview(); QCOMPARE(pending.value("reportedCount").toInt(),1); QVERIFY(pending.value("groups").toList().isEmpty());
         QCOMPARE(pending.value("uncertainPeriod").toInt(),1); const auto excluded=pending.value("excluded").toList(); QCOMPARE(excluded.size(),1); QCOMPARE(excluded.first().toMap().value("reason").toString(),QString("uncertainPeriod"));
+        QCOMPARE(excluded.first().toMap().value("uuid").toString(),db.meta(inserted.id)->uuid);
+        QCOMPARE(excluded.first().toMap().value("revision").toInt(),db.meta(inserted.id)->revision);
         qso.remove("APP_DECOLOG_ACTIVATION_REVIEW"); QVERIFY(db.updateQso(inserted.id,qso).status==InsertResult::Status::Inserted);
+        act.refresh(); QCOMPARE(act.qsoCount(),1); QCOMPARE(act.qsoIds().size(),1);
+        QCOMPARE(act.property("uncertainCount").toInt(),0);
+        QVERIFY(act.exportAdif(QUrl::fromLocalFile(output)).isEmpty());
         const auto reviewed=act.partitionPreview(); QCOMPARE(reviewed.value("groups").toList().size(),1); QCOMPARE(reviewed.value("uncertainPeriod").toInt(),0);
     }
     void previewGroupsReportedQsosWithoutAttributingUnrelatedContacts()

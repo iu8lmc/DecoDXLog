@@ -13,6 +13,36 @@ DialogFrame {
     id: root
 
     property int page: 3
+    property var apiPendingReview: ({})
+    property bool apiPendingShown: false
+    property var apiPendingCursors: [""]
+    property int apiPendingPage: 0
+    property string apiReviewMessage: ""
+    property string apiPendingLogPath: ""
+    property bool probeApiMark: false
+    function loadApiPending() { apiPendingLogPath=String(decolog.currentLogInfo().path || ""); apiPendingReview=decolog.unresolvedApiRequests(apiPendingCursors[apiPendingPage]); apiPendingShown=true }
+    function probeApiPendingReview() {
+        apiPendingButton.clicked()
+        Qt.callLater(() => {
+            const row=apiPendingRepeater.itemAt(0)
+            console.warn("PROBE API pending rows=" + (root.apiPendingReview.rows || []).length + " row=" + !!row
+                         + " contacts=" + (row ? (row.modelData.contacts || []).length : 0)
+                         + " call=" + (row && row.modelData.contacts.length ? row.modelData.contacts[0].call : ""))
+            if (root.probeApiMark && row) {
+                row.probeMark(); apiRequestReview.buttonClicked(MessageDialog.No,0); apiRequestReview.close()
+                console.warn("PROBE API review cancel count=" + (decolog.unresolvedApiRequests("").rows || []).length)
+                row.probeMark(); apiRequestReview.buttonClicked(MessageDialog.Yes,0)
+                console.warn("PROBE API review saved count=" + (root.apiPendingReview.rows || []).length + " message=" + root.apiReviewMessage)
+                return
+            }
+            if (apiPendingNext.enabled) {
+                apiPendingNext.clicked()
+                console.warn("PROBE API pending next rows=" + (root.apiPendingReview.rows || []).length + " page=" + root.apiPendingPage)
+                apiPendingPrevious.clicked()
+                console.warn("PROBE API pending back rows=" + (root.apiPendingReview.rows || []).length + " page=" + root.apiPendingPage)
+            }
+        })
+    }
 
     // La pillola «c'e' una versione nuova» apre la finestra dell'aggiornamento,
     // che sta in Main: da qui si chiede e basta.
@@ -30,6 +60,22 @@ DialogFrame {
     readonly property var pages: [qsTr("General"), qsTr("Theme & density"), qsTr("Decodium link"),
                                   qsTr("Sync & Cloud"), qsTr("QSL services"), qsTr("Callbook"),
                                   qsTr("Radio (CAT)"), qsTr("Rotor"), qsTr("Backup"), qsTr("Callsign lists")]
+
+    MessageDialog {
+        id: apiRequestReview
+        property string rowId: ""
+        property string reviewToken: ""
+        property string logPath: ""
+        title: qsTr("Mark API request reviewed")
+        text: qsTr("Have you checked the original request, the log and any external effects? This records that you reviewed an unknown outcome; it does not modify or resend any QSO. The reviewed key remains blocked without automatic expiry. Do not retry blindly with another key.")
+        buttons: MessageDialog.Yes | MessageDialog.No
+        onButtonClicked: function(button, role) {
+            if (button !== MessageDialog.Yes) return
+            const error=decolog.markApiRequestReviewed(rowId,reviewToken,logPath)
+            root.apiReviewMessage=error || qsTr("Review recorded; the original outcome remains unknown.")
+            root.loadApiPending()
+        }
+    }
 
     MessageDialog {
         id: lotwCheckpointReview
@@ -68,6 +114,7 @@ DialogFrame {
     }
 
     onOpened: {
+        root.apiPendingShown = false; root.apiPendingReview = ({})
         portField.text = decolog.udpPort
         groupField.text = decolog.multicastGroup
         forwardField.text = decolog.udpForward
@@ -84,6 +131,7 @@ DialogFrame {
 
     Connections {
         target: decolog
+        function onLogChanged() { root.apiPendingShown=false; root.apiPendingReview=({}) }
         function onDxccBatchFinished(historical, changed, failed) {
             ctyNote.text = qsTr("%1 QSO updated, %2 failed; previous versions remain in history.").arg(changed).arg(failed)
         }
@@ -863,6 +911,54 @@ DialogFrame {
                                      + "/api/v1/qsos?call=…&limit=…, and POST /api/v1/qso with an ADIF record to log it. "
                                      + "Only from this computer, and always with the key. Details: docs/API.md.")
                         color: decolog.apiError.length && decolog.apiPort > 0 ? Theme.errorColor : Theme.textSecondary
+                    }
+                    GlassButton {
+                        id: apiPendingButton
+                        text: qsTr("Review unresolved API requests")
+                        onClicked: { root.apiPendingCursors=[""]; root.apiPendingPage=0; root.loadApiPending() }
+                    }
+                    Note {
+                        visible: root.apiPendingShown
+                        color: Theme.warningColor
+                        text: root.apiPendingReview.error || qsTr("A request may still be running or may have stopped before or after saving QSO. Check the log before any retry; this view does not clear requests. Showing at most 50 requests per page and 10 contacts each.")
+                    }
+                    Note { visible: root.apiPendingShown && root.apiReviewMessage.length>0; text: root.apiReviewMessage; color: Theme.warningColor }
+                    Note { visible: root.apiPendingShown && !root.apiPendingReview.error && !(root.apiPendingReview.rows || []).length
+                        text: root.apiPendingPage === 0 ? qsTr("No unresolved API requests found in this log.") : qsTr("No unresolved requests on this page; refresh the list.") }
+                    Repeater {
+                        id: apiPendingRepeater
+                        model: root.apiPendingShown ? (root.apiPendingReview.rows || []) : []
+                        ColumnLayout {
+                            required property var modelData
+                            function probeMark() { markApiReview.clicked() }
+                            Layout.fillWidth: true
+                            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Theme.textPrimary
+                                text: qsTr("Request %1 · %2 · source %3").arg(modelData.fingerprint).arg(modelData.recordedAt || "—").arg(modelData.source || "—") }
+                            Repeater {
+                                model: parent.modelData.contacts || []
+                                Text { required property var modelData; Layout.fillWidth: true; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Theme.textSecondary
+                                    text: "%1 · %2 %3 UTC · %4 · %5".arg(modelData.call || "—").arg(modelData.date || "—").arg(modelData.time || "—").arg(modelData.band || "—").arg(modelData.mode || "—") }
+                            }
+                            Note { visible: modelData.truncated; text: qsTr("Contact details are incomplete; inspect the original request.") }
+                            GlassButton {
+                                id: markApiReview
+                                text: qsTr("Mark reviewed…")
+                                enabled: !!modelData.reviewToken && !modelData.truncated
+                                onClicked: {
+                                    apiRequestReview.rowId=modelData.rowId
+                                    apiRequestReview.reviewToken=modelData.reviewToken
+                                    apiRequestReview.logPath=root.apiPendingLogPath
+                                    apiRequestReview.open()
+                                }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        visible: root.apiPendingShown && !root.apiPendingReview.error && (root.apiPendingPage > 0 || root.apiPendingReview.hasMore)
+                        GlassButton { id: apiPendingPrevious; text: qsTr("Previous"); enabled: root.apiPendingPage > 0; onClicked: { root.apiPendingPage--; root.loadApiPending() } }
+                        Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.apiPendingPage+1) }
+                        GlassButton { id: apiPendingNext; text: qsTr("Next"); enabled: !!root.apiPendingReview.hasMore && !!root.apiPendingReview.nextCursor
+                            onClicked: { const cursors=root.apiPendingCursors.slice(); cursors[root.apiPendingPage+1]=root.apiPendingReview.nextCursor; root.apiPendingCursors=cursors; root.apiPendingPage++; root.loadApiPending() } }
                     }
 
                     SectionTitle { text: qsTr("DecoLink · log towards Decodium") }

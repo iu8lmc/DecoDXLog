@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """PREDICT tracker draft with a connected loopback rig; no RF hardware."""
 import datetime
+import json
 import os
 import pathlib
 import socketserver
@@ -52,6 +53,9 @@ with tempfile.TemporaryDirectory(prefix='decolog-tracker-rig-') as tmp, RigServe
         rows=db.execute('SELECT call,freq,band,freq_rx,band_rx,prop_mode,sat_name,mode FROM qso WHERE deleted=0').fetchall()
         if save:
             assert rows==[('K1AAA',145.998596,'2m',435.004184,'70cm','SAT','OSCAR-7','CW')], rows
+            extra=json.loads(db.execute('SELECT adif_extra FROM qso WHERE call=?',('K1AAA',)).fetchone()[0] or '{}')
+            at=datetime.datetime.fromisoformat(extra['APP_DECOLOG_TRACKER_SNAPSHOT_UTC'].replace('Z','+00:00'))
+            assert abs((datetime.datetime.now(datetime.timezone.utc)-at).total_seconds()) < 60, at
             assert 'PROBE predictDraftInvalid kept=true' in output and 'PROBE predictDraftSaved=true' in output, output
         else: assert not rows, rows
     if 'PROBE trackerRig selections=true tracker=true connected=true tx=145.998596 rx=435.004184' not in output:

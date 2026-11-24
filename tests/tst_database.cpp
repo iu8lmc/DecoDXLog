@@ -15,6 +15,8 @@
 #include <QUrl>
 
 #include <QSqlQuery>
+#include <QJsonObject>
+#include <QLockFile>
 #include <QSqlDriver>
 #include <QLibrary>
 #include <cstring>
@@ -1850,6 +1852,116 @@ private slots:
         QVERIFY(stored);
         QCOMPARE(stored->requestBody, QByteArray("body-a"));
         QCOMPARE(stored->responseBody, QByteArray("{\"id\":1}"));
+    }
+
+    void apiIdempotencyReservationSurvivesRestartAndHasOneOwner()
+    {
+        QTemporaryDir dir; const QString path=dir.filePath("reservation.sqlite");
+        const ApiIdempotencyRecord pending{"body",0,"application/json","owner-a", "2020-01-01T00:00:00Z",QByteArray("adif"),QByteArray("test")};
+        { LogDatabase db, other; QVERIFY(db.open(path)); QVERIFY(other.open(path)); QVERIFY(db.claimApiIdempotency("key",pending));
+          QVERIFY(!other.claimApiIdempotency("key",pending)); }
+        LogDatabase db; QVERIFY(db.open(path)); const auto found=db.apiIdempotency("key");
+        QVERIFY(found); QCOMPARE(found->status,0); QCOMPARE(found->responseBody,QByteArray("owner-a"));
+        const ApiIdempotencyRecord final{"body",201,"application/json","{\"ok\":true}",{},QByteArray("adif"),QByteArray("test")};
+        QVERIFY(!db.finishApiIdempotency("key","owner-b",final));
+        QVERIFY(db.finishApiIdempotency("key","owner-a",final));
+        QVERIFY(!db.finishApiIdempotency("key","owner-a",final));
+        QCOMPARE(db.apiIdempotency("key")->status,201);
+    }
+
+    void unresolvedApiReviewDoesNotExposeKeysOrBodies()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const QByteArray body="<CALL:5>K1ABC<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>";
+        QVERIFY(db.claimApiIdempotency("private-key",{body,0,"application/json","private-owner",{},QByteArray("adif"),QByteArray("test-app")}));
+        const auto result=db.unresolvedApiRequests(); QVERIFY(result.value("error").toString().isEmpty());
+        const auto rows=result.value("rows").toList(); QCOMPARE(rows.size(),1);
+        const auto row=rows.first().toMap(); QCOMPARE(row.value("source").toString(),QString("test-app"));
+        QCOMPARE(row.value("contacts").toList().first().toMap().value("call").toString(),QString("K1ABC"));
+        const auto json=QJsonDocument::fromVariant(result).toJson();
+        QVERIFY(!json.contains("private-key")); QVERIFY(!json.contains("private-owner")); QVERIFY(!json.contains(body));
+        const QByteArray wrapped=QJsonDocument(QJsonObject{{"adif",QString::fromUtf8(body)}}).toJson();
+        QVERIFY(db.claimApiIdempotency("json-key",{wrapped,0,"application/json","owner",{},QByteArray("json"),QByteArray("client")}));
+        const QByteArray large(65537,'x');
+        QVERIFY(db.claimApiIdempotency("large-key",{large,0,"application/json","owner",{},QByteArray("adif"),QByteArray("client")}));
+        const auto extra=db.unresolvedApiRequests().value("rows").toList(); QCOMPARE(extra.size(),3);
+        bool sawJson=false, sawLarge=false;
+        for (const auto& item:extra) { const auto entry=item.toMap();
+            if (entry.value("truncated").toBool()) { sawLarge=true; QVERIFY(entry.value("contacts").toList().isEmpty()); }
+            else if (entry.value("source").toString()=="client") { sawJson=true; QCOMPARE(entry.value("contacts").toList().first().toMap().value("call").toString(),QString("K1ABC")); }
+        }
+        QVERIFY(sawJson && sawLarge);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("ALTER TABLE api_idempotency RENAME TO api_idempotency_missing"));
+        QVERIFY(!db.unresolvedApiRequests().value("error").toString().isEmpty());
+    }
+
+    void unresolvedApiReviewSupportsStablePagination()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const ApiIdempotencyRecord pending{"<CALL:5>K1ABC<EOR>",0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")};
+        for (int i=0;i<55;++i) QVERIFY(db.claimApiIdempotency(QString("key-%1").arg(i,2,10,QLatin1Char('0')),pending));
+        const auto first=db.unresolvedApiRequests(); QCOMPARE(first.value("rows").toList().size(),50);
+        QVERIFY(first.value("hasMore").toBool()); QVERIFY(!first.value("nextCursor").toString().isEmpty());
+        const auto second=db.unresolvedApiRequests(first.value("nextCursor").toString());
+        QCOMPARE(second.value("rows").toList().size(),5); QVERIFY(!second.value("hasMore").toBool());
+        const auto firstRow=first.value("rows").toList().first().toMap().value("fingerprint").toString();
+        const auto secondRow=second.value("rows").toList().first().toMap().value("fingerprint").toString();
+        QVERIFY(!firstRow.isEmpty() && firstRow!=secondRow);
+        QCOMPARE(db.unresolvedApiRequests().value("rows").toList().first().toMap().value("fingerprint").toString(),firstRow);
+        QVERIFY(!db.unresolvedApiRequests("-1").value("error").toString().isEmpty());
+        QVERIFY(!db.unresolvedApiRequests("not-a-cursor").value("error").toString().isEmpty());
+    }
+
+    void reviewedApiReservationRequiresUnchangedUnlockedRecord()
+    {
+        QTemporaryDir dir; LogDatabase db,other; const auto path=dir.filePath("api.sqlite"); QVERIFY(db.open(path)); QVERIFY(other.open(path));
+        const QByteArray body="<CALL:5>K1ABC<QSO_DATE:8>20260101<TIME_ON:4>1200<BAND:3>20m<MODE:2>CW<EOR>";
+        QVERIFY(db.claimApiIdempotency("key",{body,0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")}));
+        const auto row=db.unresolvedApiRequests().value("rows").toList().first().toMap();
+        const QString id=row.value("rowId").toString(), token=row.value("reviewToken").toString();
+        QVERIFY(!id.isEmpty() && !token.isEmpty());
+        QLockFile flight(db.apiIdempotencyLockPath("key")); QVERIFY(flight.tryLock(0)); QString error;
+        QVERIFY(!db.markApiRequestReviewed(id,token,&error)); QVERIFY(!error.isEmpty()); flight.unlock();
+        QSqlQuery q(other.connection()); QVERIFY(q.exec("UPDATE api_idempotency SET request_app='other' WHERE key='key'"));
+        QVERIFY(!db.markApiRequestReviewed(id,token,&error));
+        const auto current=db.unresolvedApiRequests().value("rows").toList().first().toMap();
+        QVERIFY(db.markApiRequestReviewed(id,current.value("reviewToken").toString(),&error));
+        QCOMPARE(db.qsoCount(),qint64(0)); QVERIFY(db.unresolvedApiRequests().value("rows").toList().isEmpty());
+        const auto saved=db.apiIdempotency("key"); QVERIFY(saved); QCOMPARE(saved->status,-1);
+        QVERIFY(!saved->requestBody.contains(body));
+        QVERIFY(LogDatabase::reviewedApiRequestMatches(saved->requestBody,body));
+        QVERIFY(!LogDatabase::reviewedApiRequestMatches(saved->requestBody,body+"changed"));
+        QVERIFY(LogDatabase::reviewedApiRequestMatches(body,body)); // old reviewed records
+        QVERIFY(!db.markApiRequestReviewed(id,current.value("reviewToken").toString(),&error));
+        QVERIFY(q.exec("UPDATE api_idempotency SET created_at='2020-01-01T00:00:00Z' WHERE key='key'"));
+        const auto retained=db.apiIdempotency("key"); QVERIFY(retained); QCOMPARE(retained->status,-1);
+    }
+
+    void trackerSnapshotIsArchivedWhenLocalSatelliteFrequencyChanges()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const QString field="APP_DECOLOG_TRACKER_SNAPSHOT_UTC", stamp="2026-11-24T10:00:00.000Z";
+        AdifRecord qso{{"CALL","K1SAT"},{"QSO_DATE","20261124"},{"TIME_ON","100000"},{"BAND","2m"},{"MODE","CW"},
+                       {"FREQ","145.998596"},{"FREQ_RX","435.004184"},{"PROP_MODE","SAT"},{"SAT_NAME","FO-29"},{field,stamp}};
+        const auto added=db.insertQso(qso,"fixture",{},true); QVERIFY(added.id>0);
+        auto current=*db.record(added.id); current.set("COMMENT","corrected");
+        QVERIFY(db.updateQso(added.id,current).status==InsertResult::Status::Inserted);
+        QCOMPARE(db.record(added.id)->value(field),stamp);
+        current=*db.record(added.id); current.set("FREQ_RX","435.005000");
+        QVERIFY(db.updateQso(added.id,current).status==InsertResult::Status::Inserted);
+        QVERIFY(db.record(added.id)->value(field).isEmpty());
+        const auto history=db.history(added.id); QVERIFY(!history.isEmpty());
+        QCOMPARE(history.first().record.value(field),stamp);
+        current=*db.record(added.id); current.set(field,stamp); current.set("FREQ_RX","435.004184");
+        QVERIFY(db.updateQso(added.id,current,-1,"cloud").status==InsertResult::Status::Inserted);
+        QSqlQuery trigger(db.connection()); QVERIFY(trigger.exec("CREATE TRIGGER reject_sat_edit BEFORE UPDATE ON qso BEGIN SELECT RAISE(FAIL,'fault'); END"));
+        current=*db.record(added.id); current.set("FREQ","145.999000"); const auto oldHistory=db.history(added.id).size();
+        QVERIFY(db.updateQso(added.id,current).status==InsertResult::Status::Error);
+        QCOMPARE(db.record(added.id)->value(field),stamp); QCOMPARE(db.history(added.id).size(),oldHistory);
+        QVERIFY(trigger.exec("DROP TRIGGER reject_sat_edit"));
+        current=*db.record(added.id); current.set("SAT_NAME","AO-91");
+        QVERIFY(db.updateQso(added.id,current,-1,"bulk").status==InsertResult::Status::Inserted);
+        QVERIFY(db.record(added.id)->value(field).isEmpty());
     }
 
     void nestedQsoInsertFailureRollsBackOnlyItsOwnWrites()

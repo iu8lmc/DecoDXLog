@@ -103,11 +103,15 @@ QString catFor(const QString& mode, double mhz)
 
 QString catForClusterSpot(const QString& mode, double mhz)
 {
-    const QString normalized = mode.trimmed().toUpper();
-    if (normalized == QLatin1String("FT8") || normalized == QLatin1String("FT4")
-        || normalized == QLatin1String("FT2"))
-        return QStringLiteral("USB");
     return catFor(mode, mhz);
+}
+
+QString catForRig(const QString& mode, int model)
+{
+    // Hamlib TS-50S exposes USB but has no PKTUSB/data submode.
+    if (model == 2001 && mode == QLatin1String("PKTUSB"))
+        return QStringLiteral("USB");
+    return mode;
 }
 
 QString catFor(const QString& mode)

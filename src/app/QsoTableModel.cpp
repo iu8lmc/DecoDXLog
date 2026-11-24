@@ -1193,6 +1193,10 @@ QString QsoTableModel::whereSql(QVariantList& binds, bool otherLogs) const
                 where << confirmedBy.arg(QStringLiteral("IN ('lotw', 'card', 'eqsl', 'qrz')"));
             } else if (m_qsl == QLatin1String("unconfirmed")) {
                 where << QStringLiteral("NOT ") + confirmedBy.arg(QStringLiteral("IN ('lotw', 'card', 'eqsl', 'qrz')"));
+            } else if (m_qsl == QLatin1String("hrdlog_pending")) {
+                where << QStringLiteral("NOT EXISTS (SELECT 1 FROM qsl_status s WHERE s.qso_id = qso.id "
+                                        "AND s.service = 'hrdlog' AND s.sent IS NOT NULL "
+                                        "AND s.sent NOT IN ('N', 'R', 'Q', 'D'))");
             } else {
                 where << confirmedBy.arg(QStringLiteral("= ?"));
                 binds << m_qsl;
@@ -1289,8 +1293,13 @@ void QsoTableModel::refreshQslUpload(const QSet<qint64>& ids)
     if (ids.isEmpty() || m_ids.isEmpty() || columns() == 0)
         return;
 
-    // Uploads only update sent state. Confirmation filters and first-QSO
-    // categories depend on received state and contact data, respectively.
+    // A pending-upload filter depends on sent state and must be re-evaluated.
+    if (m_qsl == QLatin1String("hrdlog_pending")) {
+        reloadAfterQslUpdate();
+        return;
+    }
+    // Confirmation filters and first-QSO categories depend on received
+    // state and contact data, respectively.
     const auto* sort = extraColumn(m_sortKey);
     if (sort && !sort->sql) {
         reloadAfterQslUpdate();

@@ -149,6 +149,7 @@ private slots:
         const QList<QPair<QByteArray,QByteArray>> header{{"X-DecoDXLog-Token",readToken.toLatin1()}};
         QCOMPARE(call(m_net,"GET",base("/api/v1/status"),{},header).status,200);
         QCOMPARE(call(m_net,"GET",base("/api/v1/qso"),{},header).status,403);
+        QCOMPARE(call(m_net,"GET",base("/api/v1/idempotency"),{},header).status,403);
         QCOMPARE(call(m_net,"POST",base("/api/v1/qso"),"<EOR>",header).status,403);
         QCOMPARE(call(m_net,"GET",base("/api/v1/unknown"),{},header).status,403);
         QCOMPARE(call(m_net,"POST",base("/api/v1/qso"),"<EOR>",{{"X-DecoDXLog-Token",m_token.toLatin1()}}).status,200);

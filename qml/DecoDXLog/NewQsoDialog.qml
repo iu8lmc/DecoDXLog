@@ -22,6 +22,11 @@ DialogFrame {
     property string initialSatellite: ""
     property string initialTxMHz: ""
     property string initialRxMHz: ""
+    property string initialTrackerReceivedAt: ""
+    property string trackerReceivedAt: ""
+    property string trackerSeedSatellite: ""
+    property string trackerSeedTx: ""
+    property string trackerSeedRx: ""
     property bool trackerPrepared: false
     readonly property string enteredCallForProbe: callField.text
     readonly property string initialTxForProbe: freqField.text
@@ -309,6 +314,12 @@ DialogFrame {
             pota_ref: potaField.text, sota_ref: sotaField.text, iota: iotaField.text, wwff_ref: wwffField.text,
             dci: dciField.text,
             prop_mode: propModeBox.editText, sat_name: satNameField.text, sat_mode: satModeField.text,
+            tracker_snapshot_utc: root.trackerPrepared && root.trackerReceivedAt.length > 0
+                && root.trackerSeedTx.length > 0 && root.trackerSeedRx.length > 0
+                && satNameField.text.trim().toUpperCase() === root.trackerSeedSatellite.trim().toUpperCase()
+                && propModeBox.editText.trim().toUpperCase() === "SAT"
+                && Number(freqField.text.replace(",", ".")) === Number(root.trackerSeedTx)
+                && Number(rxFreqField.text.replace(",", ".")) === Number(root.trackerSeedRx) ? root.trackerReceivedAt : "",
             comment: commentField.text, tags: tagsField.text,
             country: countryField.text, address: addressField.text, state: stateField.text,
             cnty: cntyField.text, cont: contField.text, cqz: cqzField.text, ituz: ituzField.text,
@@ -339,6 +350,10 @@ DialogFrame {
         root.historicalLastSeconds = -1
         clearAll()
         root.trackerPrepared = root.initialSatellite.length > 0
+        root.trackerReceivedAt = root.initialTrackerReceivedAt
+        root.trackerSeedSatellite = root.initialSatellite
+        root.trackerSeedTx = root.initialTxMHz
+        root.trackerSeedRx = root.initialRxMHz
         if (root.initialCall.length > 0) callField.text = root.initialCall
         if (root.initialName.length > 0) nameField.text = root.initialName
         root.initialCall = ""
@@ -363,6 +378,7 @@ DialogFrame {
         root.initialSatellite = ""
         root.initialTxMHz = ""
         root.initialRxMHz = ""
+        root.initialTrackerReceivedAt = ""
         const pwr = root.stationProfile.defaultTxPwr
         pwrField.text = !root.historicalMode && pwr > 0 ? String(pwr) : ""
     }
@@ -409,6 +425,13 @@ DialogFrame {
             visible: root.trackerPrepared
             text: qsTr("Tracker frequencies are a fixed snapshot; review them before saving. The band follows TX frequency; changing mode or band does not tune the radio or replace the frequencies.")
             color: Theme.warningColor
+            wrapMode: Text.Wrap
+        }
+        Text {
+            Layout.fillWidth: true
+            visible: root.trackerPrepared && root.trackerReceivedAt.length > 0
+            text: qsTr("Tracker snapshot received at %1. This is not confirmation of the radio frequency.").arg(root.trackerReceivedAt)
+            color: Theme.textSecondary
             wrapMode: Text.Wrap
         }
         spacing: 12

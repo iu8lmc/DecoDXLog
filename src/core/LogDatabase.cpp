@@ -12,6 +12,8 @@
 #include <QFileInfo>
 #include <QElapsedTimer>
 #include <QCryptographicHash>
+#include <QDataStream>
+#include <QLockFile>
 #include <QSaveFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -694,7 +696,7 @@ std::optional<ApiIdempotencyRecord> LogDatabase::apiIdempotency(const QString& k
         return std::nullopt;
     }
     QSqlQuery cleanup(connection());
-    cleanup.prepare(QStringLiteral("DELETE FROM api_idempotency WHERE created_at < ?"));
+    cleanup.prepare(QStringLiteral("DELETE FROM api_idempotency WHERE status > 0 AND created_at < ?"));
     cleanup.addBindValue(QDateTime::currentDateTimeUtc().addDays(-30).toString(Qt::ISODate));
     if (!cleanup.exec()) {
         if (error) *error = cleanup.lastError().text().isEmpty() ? QStringLiteral("idempotency cleanup failed") : cleanup.lastError().text();
@@ -717,6 +719,139 @@ std::optional<ApiIdempotencyRecord> LogDatabase::apiIdempotency(const QString& k
                                 q.value(3).toByteArray(), q.value(4).toString(),
                                 q.value(5).isNull() ? std::nullopt : std::optional<QByteArray>(q.value(5).toByteArray()),
                                 q.value(6).isNull() ? std::nullopt : std::optional<QByteArray>(q.value(6).toByteArray())};
+}
+
+namespace {
+QString apiReviewToken(const QString& key, const QString& created, const QByteArray& app,
+                       const QByteArray& format, const QByteArray& body, const QByteArray& owner)
+{
+    QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly);
+    stream << key << created << app << format << body << owner;
+    return QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+}
+}
+
+QString LogDatabase::apiIdempotencyLockPath(const QString& key) const
+{
+    if (!isOpen() || key.isEmpty() || !fileIdentityMatchesOpen()) return {};
+    const QString canonical=QFileInfo(path()).canonicalFilePath();
+    if (canonical.isEmpty()) return {};
+    return canonical+QStringLiteral(".api-idempotency-")
+        +QString::fromLatin1(QCryptographicHash::hash(key.toUtf8(),QCryptographicHash::Sha256).toHex())+QStringLiteral(".lock");
+}
+
+QVariantMap LogDatabase::unresolvedApiRequests(const QString& after) const
+{
+    QVariantMap result{{QStringLiteral("rows"),QVariantList{}},{QStringLiteral("hasMore"),false}};
+    if (!isOpen()) { result[QStringLiteral("error")]=QStringLiteral("Log unavailable"); return result; }
+    bool cursorOk = after.isEmpty();
+    const qint64 cursor = after.isEmpty() ? 0 : after.toLongLong(&cursorOk);
+    if (!cursorOk || cursor < 0) { result[QStringLiteral("error")]=QStringLiteral("Invalid request cursor"); return result; }
+    QSqlQuery q(connection()); q.setForwardOnly(true);
+    q.prepare(QStringLiteral("SELECT key,created_at,request_app,request_format,length(request_body), "
+                               "CASE WHEN length(request_body)<=65536 THEN request_body END "
+                               ",rowid,CASE WHEN length(response_body)<=256 THEN response_body END "
+                               "FROM api_idempotency WHERE status=0 AND rowid>? ORDER BY rowid LIMIT 51"));
+    q.addBindValue(cursor);
+    if (!q.exec()) {
+        result[QStringLiteral("error")]=QStringLiteral("Cannot read unresolved API requests"); return result;
+    }
+    QVariantList rows;
+    while (q.next()) {
+        if (rows.size()==50) { result[QStringLiteral("hasMore")]=true; break; }
+        QVariantList contacts;
+        const bool oversized=q.value(4).toLongLong()>65536;
+        QByteArray input=q.value(5).toByteArray();
+        if (!oversized && q.value(3).toByteArray()==QByteArray("json"))
+            input=QJsonDocument::fromJson(input).object().value(QStringLiteral("adif")).toString().toUtf8();
+        const auto document=adif::parse(input);
+        for (qsizetype i=0; i<qMin(qsizetype(10),document.records.size()); ++i) {
+            const auto& record=document.records.at(i);
+            contacts << QVariantMap{{QStringLiteral("call"),record.value(QStringLiteral("CALL")).left(32)},
+                {QStringLiteral("date"),record.value(QStringLiteral("QSO_DATE")).left(16)},
+                {QStringLiteral("time"),record.value(QStringLiteral("TIME_ON")).left(16)},
+                {QStringLiteral("band"),record.value(QStringLiteral("BAND")).left(16)},
+                {QStringLiteral("mode"),record.value(QStringLiteral("MODE")).left(32)}};
+        }
+        const QByteArray owner=q.value(7).toByteArray();
+        const QString token=!oversized && !owner.isEmpty() ? apiReviewToken(q.value(0).toString(),q.value(1).toString(),q.value(2).toByteArray(),q.value(3).toByteArray(),q.value(5).toByteArray(),owner) : QString();
+        rows << QVariantMap{{QStringLiteral("fingerprint"),QString::fromLatin1(QCryptographicHash::hash(q.value(0).toString().toUtf8(),QCryptographicHash::Sha256).toHex())},
+            {QStringLiteral("recordedAt"),q.value(1).toString()}, {QStringLiteral("source"),q.value(2).toString().left(60)},
+            {QStringLiteral("contacts"),contacts}, {QStringLiteral("truncated"),oversized || document.records.size()>10},
+            {QStringLiteral("rowId"),QString::number(q.value(6).toLongLong())},{QStringLiteral("reviewToken"),token}};
+        result[QStringLiteral("nextCursor")]=QString::number(q.value(6).toLongLong());
+    }
+    if (q.lastError().isValid()) { result[QStringLiteral("error")]=QStringLiteral("Cannot read unresolved API requests"); return result; }
+    result[QStringLiteral("rows")]=rows; return result;
+}
+
+bool LogDatabase::markApiRequestReviewed(const QString& rowId, const QString& reviewToken, QString* error)
+{
+    const auto fail=[&](const QString& message) { if (error) *error=message; return false; };
+    if (error) error->clear();
+    bool valid=false; const qint64 id=rowId.toLongLong(&valid);
+    if (!isOpen() || !valid || id<=0 || reviewToken.size()!=64 || !fileIdentityMatchesOpen())
+        return fail(QStringLiteral("Cannot verify the request or open log"));
+    QSqlDatabase db=connection(); QSqlQuery lookup(db);
+    lookup.prepare(QStringLiteral("SELECT key FROM api_idempotency WHERE rowid=? AND status=0")); lookup.addBindValue(id);
+    if (!lookup.exec() || !lookup.next()) return fail(QStringLiteral("Request is no longer unresolved"));
+    const QString key=lookup.value(0).toString(); lookup.finish();
+    const QString lockPath=apiIdempotencyLockPath(key);
+    if (lockPath.isEmpty()) return fail(QStringLiteral("Cannot lock the request"));
+    QLockFile lock(lockPath); lock.setStaleLockTime(0);
+    if (!lock.tryLock(0)) return fail(QStringLiteral("Request is in use or its lock is unavailable"));
+    QSqlQuery begin(db);
+    if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) return fail(QStringLiteral("Cannot start request review"));
+    QSqlQuery check(db);
+    check.prepare(QStringLiteral("SELECT key,created_at,request_app,request_format,request_body,response_body FROM api_idempotency "
+                                 "WHERE rowid=? AND status=0 AND length(request_body)<=65536 AND length(response_body)<=256"));
+    check.addBindValue(id);
+    if (!fileIdentityMatchesOpen() || !check.exec() || !check.next() || check.value(0).toString()!=key ||
+        apiReviewToken(key,check.value(1).toString(),check.value(2).toByteArray(),check.value(3).toByteArray(),check.value(4).toByteArray(),check.value(5).toByteArray())!=reviewToken) {
+        db.rollback(); return fail(QStringLiteral("Request or log changed; reload before review"));
+    }
+    const QByteArray digest=QByteArray("sha256:")+QCryptographicHash::hash(check.value(4).toByteArray(),QCryptographicHash::Sha256).toHex();
+    check.finish(); QSqlQuery update(db);
+    update.prepare(QStringLiteral("UPDATE api_idempotency SET status=-1,response_body='',request_body=?,created_at=? WHERE rowid=? AND status=0"));
+    update.addBindValue(digest); update.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODate)); update.addBindValue(id);
+    if (!update.exec() || update.numRowsAffected()!=1 || !db.commit()) {
+        db.rollback(); return fail(QStringLiteral("Cannot save the review"));
+    }
+    return true;
+}
+
+bool LogDatabase::reviewedApiRequestMatches(const QByteArray& stored, const QByteArray& body)
+{
+    if (stored.size()==71 && stored.startsWith("sha256:"))
+        return stored == QByteArray("sha256:")+QCryptographicHash::hash(body,QCryptographicHash::Sha256).toHex();
+    // A reviewed record created by an older version still contains the body.
+    return stored == body;
+}
+
+bool LogDatabase::claimApiIdempotency(const QString& key, const ApiIdempotencyRecord& pending)
+{
+    if (!isOpen() || key.isEmpty() || pending.status != 0 || pending.responseBody.isEmpty() || !pending.requestFormat || !pending.requestApp)
+        return false;
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral("INSERT INTO api_idempotency (key,request_body,status,content_type,response_body,created_at,request_format,request_app) "
+                             "VALUES (?,?,0,?,?,?,?,?) ON CONFLICT(key) DO NOTHING"));
+    q.addBindValue(key); q.addBindValue(pending.requestBody); q.addBindValue(pending.contentType); q.addBindValue(pending.responseBody);
+    q.addBindValue(pending.createdAt.isEmpty() ? QDateTime::currentDateTimeUtc().toString(Qt::ISODate) : pending.createdAt);
+    q.addBindValue(*pending.requestFormat); q.addBindValue(*pending.requestApp);
+    return q.exec() && q.numRowsAffected() == 1;
+}
+
+bool LogDatabase::finishApiIdempotency(const QString& key, const QByteArray& owner, const ApiIdempotencyRecord& result)
+{
+    if (!isOpen() || key.isEmpty() || owner.isEmpty() || result.status <= 0 || !result.requestFormat || !result.requestApp)
+        return false;
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral("UPDATE api_idempotency SET status=?,content_type=?,response_body=?,created_at=? "
+                             "WHERE key=? AND status=0 AND response_body=? AND request_body=? AND request_format=? AND request_app=?"));
+    q.addBindValue(result.status); q.addBindValue(result.contentType); q.addBindValue(result.responseBody);
+    q.addBindValue(result.createdAt.isEmpty() ? QDateTime::currentDateTimeUtc().toString(Qt::ISODate) : result.createdAt);
+    q.addBindValue(key); q.addBindValue(owner); q.addBindValue(result.requestBody); q.addBindValue(*result.requestFormat); q.addBindValue(*result.requestApp);
+    return q.exec() && q.numRowsAffected() == 1;
 }
 
 bool LogDatabase::saveApiIdempotency(const QString& key, const ApiIdempotencyRecord& record)
@@ -1328,10 +1463,6 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
         result.message = QStringLiteral("QSO %1 not found").arg(id);
         return result;
     }
-    const auto p = prepare(input, result);
-    if (!p)
-        return result;
-
     // A savepoint protects the entire edit even within a caller's transaction.
     QSqlDatabase db = connection();
     QSqlQuery savepoint(db);
@@ -1345,6 +1476,29 @@ InsertResult LogDatabase::updateQso(qint64 id, const AdifRecord& input, qint64 s
         rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_update_qso"));
         rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_update_qso"));
     };
+
+    AdifRecord edited=input;
+    const QString trackerKey=QStringLiteral("APP_DECOLOG_TRACKER_SNAPSHOT_UTC");
+    if ((reason==QLatin1String("edit") || reason==QLatin1String("bulk")) && !edited.value(trackerKey).isEmpty()) {
+        const auto previous=record(id);
+        if (!previous) {
+            result.message=QStringLiteral("Cannot read QSO before tracker provenance update");
+            rollbackUpdate(); return result;
+        }
+        if (edited.value(trackerKey)==previous->value(trackerKey)) {
+            const auto changed=[&](const char* name, bool numeric) {
+                const QString a=previous->value(QLatin1String(name)).trimmed();
+                const QString b=edited.value(QLatin1String(name)).trimmed();
+                if (numeric) { bool okA=false,okB=false; const double x=a.toDouble(&okA),y=b.toDouble(&okB);
+                    if (okA && okB) return x!=y; }
+                return a.compare(b,Qt::CaseInsensitive)!=0;
+            };
+            if (changed("FREQ",true) || changed("FREQ_RX",true) || changed("SAT_NAME",false) || changed("PROP_MODE",false))
+                edited.remove(trackerKey);
+        }
+    }
+    const auto p=prepare(edited,result);
+    if (!p) { rollbackUpdate(); return result; }
 
     QString snapshotError;
     const QString snapshot = snapshotJson(id, &snapshotError);

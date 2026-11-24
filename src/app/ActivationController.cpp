@@ -34,6 +34,22 @@ namespace decolog::app {
 
 namespace {
 
+// Match the indexed JSON expression for tracked sessions. Legacy sessions have
+// no recorded UUID and keep their historical start-time selection.
+QString activeSessionStartPredicate(const QString& uuid)
+{
+    // Tracked sessions use their explicit association; legacy sessions have
+    // only an approximate start time. Keep one bound parameter in both paths.
+    return uuid.isEmpty() ? QStringLiteral("qso_datetime_on >= ?") : QStringLiteral("? IS NOT NULL");
+}
+
+QString activeSessionPredicate(const QString& uuid)
+{
+    if (uuid.isEmpty()) return {};
+    return QStringLiteral(" AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END) = ?"
+                          " AND COALESCE(CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_REVIEW') END, '') <> 'PERIOD_UNCERTAIN'");
+}
+
 QString normalizeReferenceList(QString value, QString* error)
 {
     value = value.trimmed().toUpper();
@@ -431,17 +447,29 @@ void ActivationController::recount()
 {
     m_score.valid = false;
     m_qsoCount = 0;
+    m_uncertainCount = 0;
     m_uniqueCalls = 0;
     m_perBand.clear();
     m_lastQso.clear();
     if (!m_session.active || !m_ctx.db || !m_ctx.db->isOpen() || !m_session.startedAt.isValid())
         return;
 
+    if (!m_session.sessionUuid.isEmpty()) {
+        QSqlQuery uncertain(m_ctx.db->connection());
+        uncertain.prepare(QStringLiteral(
+            "SELECT COUNT(*) FROM qso WHERE deleted=0 AND "
+            "(CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_UUID') END)=? "
+            "AND (CASE WHEN json_valid(adif_extra) THEN json_extract(adif_extra,'$.APP_DECOLOG_ACTIVATION_REVIEW') END)='PERIOD_UNCERTAIN'"));
+        uncertain.addBindValue(m_session.sessionUuid);
+        m_uncertainCount = uncertain.exec() && uncertain.next() ? uncertain.value(0).toInt() : -1;
+    }
+
     QSqlQuery q(m_ctx.db->connection());
     q.prepare(QStringLiteral(
         "SELECT COUNT(*), COUNT(DISTINCT call), MAX(qso_datetime_on) FROM qso "
-        "WHERE deleted = 0 AND qso_datetime_on >= ?"));
+        "WHERE deleted = 0 AND %2%1").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     q.addBindValue(m_session.startedAt.toString(Qt::ISODate));
+    if (!m_session.sessionUuid.isEmpty()) q.addBindValue(m_session.sessionUuid);
     if (q.exec() && q.next()) {
         m_qsoCount = q.value(0).toInt();
         m_uniqueCalls = q.value(1).toInt();
@@ -453,8 +481,9 @@ void ActivationController::recount()
     QSqlQuery bands(m_ctx.db->connection());
     bands.prepare(QStringLiteral(
         "SELECT band, CASE WHEN IFNULL(submode, '') = '' OR mode = 'SSB' THEN mode ELSE submode END AS m, COUNT(*) "
-        "FROM qso WHERE deleted = 0 AND qso_datetime_on >= ? GROUP BY band, m ORDER BY COUNT(*) DESC"));
+        "FROM qso WHERE deleted = 0 AND %2%1 GROUP BY band, m ORDER BY COUNT(*) DESC").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     bands.addBindValue(m_session.startedAt.toString(Qt::ISODate));
+    if (!m_session.sessionUuid.isEmpty()) bands.addBindValue(m_session.sessionUuid);
     if (bands.exec()) {
         while (bands.next()) {
             m_perBand << QVariantMap{{QStringLiteral("band"), bands.value(0).toString()},
@@ -470,12 +499,13 @@ bool ActivationController::isDuplicate(const QString& call, const QString& band,
         return false;
     QSqlQuery q(m_ctx.db->connection());
     q.prepare(QStringLiteral(
-        "SELECT COUNT(*) FROM qso WHERE deleted = 0 AND call = ? AND band = ? AND qso_datetime_on >= ? "
-        "AND (CASE WHEN IFNULL(submode, '') = '' OR mode = 'SSB' THEN mode ELSE submode END) = ?"));
+        "SELECT COUNT(*) FROM qso WHERE deleted = 0 AND call = ? AND band = ? AND %2 "
+        "AND (CASE WHEN IFNULL(submode, '') = '' OR mode = 'SSB' THEN mode ELSE submode END) = ?%1").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     q.addBindValue(call.trimmed().toUpper());
     q.addBindValue(band.trimmed().toLower());
     q.addBindValue(m_session.startedAt.toString(Qt::ISODate));
     q.addBindValue(mode.trimmed().toUpper());
+    if (!m_session.sessionUuid.isEmpty()) q.addBindValue(m_session.sessionUuid);
     return q.exec() && q.next() && q.value(0).toInt() > 0;
 }
 
@@ -756,8 +786,9 @@ QVariantList ActivationController::qsoIds() const
         return ids;
     QSqlQuery q(m_ctx.db->connection());
     q.prepare(QStringLiteral(
-        "SELECT id FROM qso WHERE deleted = 0 AND qso_datetime_on >= ? ORDER BY qso_datetime_on, id"));
+        "SELECT id FROM qso WHERE deleted = 0 AND %2%1 ORDER BY qso_datetime_on, id").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     q.addBindValue(m_session.startedAt.toString(Qt::ISODate));
+    if (!m_session.sessionUuid.isEmpty()) q.addBindValue(m_session.sessionUuid);
     if (q.exec()) {
         while (q.next())
             ids << q.value(0).toLongLong();
@@ -787,6 +818,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     QVariantList excluded;
     const auto exclude = [&](const QString& reason) {
         if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
+            {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
             {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
     };
     int count = 0, missingDate = 0, missingReference = 0, uncertainPeriod = 0;
@@ -1660,8 +1692,9 @@ QVariantList ActivationController::recentQsos(int limit) const
         "SELECT id, call, qso_datetime_on, band, "
         "CASE WHEN IFNULL(submode, '') = '' OR mode = 'SSB' THEN mode ELSE submode END, "
         "rst_sent, rst_rcvd, country FROM qso "
-        "WHERE deleted = 0 AND qso_datetime_on >= ? ORDER BY qso_datetime_on DESC, id DESC LIMIT ?"));
+        "WHERE deleted = 0 AND %2%1 ORDER BY qso_datetime_on DESC, id DESC LIMIT ?").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     q.addBindValue(m_session.startedAt.toString(Qt::ISODate));
+    if (!m_session.sessionUuid.isEmpty()) q.addBindValue(m_session.sessionUuid);
     q.addBindValue(qMax(1, limit));
     if (!q.exec())
         return out;
@@ -1693,9 +1726,10 @@ QVariantMap ActivationController::rate() const
     auto since = [this, &start](const QDateTime& from) {
         QSqlQuery q(m_ctx.db->connection());
         q.prepare(QStringLiteral(
-            "SELECT COUNT(*) FROM qso WHERE deleted = 0 AND qso_datetime_on >= ? AND qso_datetime_on >= ?"));
+            "SELECT COUNT(*) FROM qso WHERE deleted = 0 AND %2 AND qso_datetime_on >= ?%1").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
         q.addBindValue(start);
         q.addBindValue(from.toString(Qt::ISODate));
+        if (!m_session.sessionUuid.isEmpty()) q.addBindValue(m_session.sessionUuid);
         return q.exec() && q.next() ? q.value(0).toInt() : 0;
     };
     const int last10 = since(now.addSecs(-600));
@@ -1709,8 +1743,9 @@ QVariantMap ActivationController::rate() const
     QSqlQuery mult(m_ctx.db->connection());
     mult.prepare(QStringLiteral(
         "SELECT COUNT(DISTINCT dxcc), COUNT(DISTINCT substr(gridsquare, 1, 4)) FROM qso "
-        "WHERE deleted = 0 AND qso_datetime_on >= ?"));
+        "WHERE deleted = 0 AND %2%1").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     mult.addBindValue(start);
+    if (!m_session.sessionUuid.isEmpty()) mult.addBindValue(m_session.sessionUuid);
     if (mult.exec() && mult.next()) {
         out[QStringLiteral("dxcc")] = mult.value(0).toInt();
         out[QStringLiteral("grids")] = mult.value(1).toInt();
@@ -1846,8 +1881,9 @@ QList<core::ContestQso> ActivationController::sessionQsos() const
     q.prepare(QStringLiteral(
         "SELECT call, band, mode, IFNULL(submode, ''), IFNULL(dxcc, 0), IFNULL(cont, ''), "
         "IFNULL(cqz, 0), IFNULL(ituz, 0), IFNULL(adif_extra, ''), IFNULL(state, ''), qso_datetime_on "
-        "FROM qso WHERE deleted = 0 AND qso_datetime_on >= ? ORDER BY qso_datetime_on, id"));
+        "FROM qso WHERE deleted = 0 AND %2%1 ORDER BY qso_datetime_on, id").arg(activeSessionPredicate(m_session.sessionUuid), activeSessionStartPredicate(m_session.sessionUuid)));
     q.addBindValue(m_session.startedAt.toString(Qt::ISODate));
+    if (!m_session.sessionUuid.isEmpty()) q.addBindValue(m_session.sessionUuid);
     if (!q.exec())
         return out;
     while (q.next()) {

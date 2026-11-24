@@ -128,6 +128,8 @@ DialogFrame {
         satelliteQso.initialSatellite = root.sample.satellite
         satelliteQso.initialTxMHz = Number(root.correction.txMHz).toFixed(6)
         satelliteQso.initialRxMHz = Number(root.correction.rxMHz).toFixed(6)
+        const received = new Date(root.sample.receivedAt)
+        satelliteQso.initialTrackerReceivedAt = isNaN(received.getTime()) ? "" : received.toISOString()
         satelliteQso.open()
         correctionStatus.text = qsTr("Review the draft before saving; no radio command was sent.")
     }

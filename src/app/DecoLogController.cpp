@@ -50,6 +50,7 @@
 #include <QUdpSocket>
 #include <QXmlStreamWriter>
 #include <QCryptographicHash>
+#include <QLockFile>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QStandardPaths>
@@ -4025,6 +4026,21 @@ void DecoLogController::revokeApiReadOnlyToken()
     emit udpChanged();
 }
 
+QVariantMap DecoLogController::unresolvedApiRequests(const QString& after) const
+{
+    return m_db.unresolvedApiRequests(after);
+}
+
+QString DecoLogController::markApiRequestReviewed(const QString& rowId, const QString& token, const QString& logPath)
+{
+    if (logPath.isEmpty() || logPath != QDir::toNativeSeparators(m_db.path()))
+        return tr("The log changed; reload the request before review.");
+    QString error;
+    if (!m_db.markApiRequestReviewed(rowId,token,&error))
+        return tr("The request is in use, changed, or could not be reviewed; reload and try again.");
+    return {};
+}
+
 void DecoLogController::startApi()
 {
     if (m_apiPort <= 0) {
@@ -4078,7 +4094,7 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
             {QStringLiteral("permissionModel"), request.readOnly ? QStringLiteral("read-only-token") : QStringLiteral("shared-token")},
             {QStringLiteral("operations"), request.readOnly
                 ? QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read")}
-                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.write")}},
+                : QJsonArray{QStringLiteral("status.read"), QStringLiteral("worked.read"), QStringLiteral("qso.read"), QStringLiteral("tracker.read"), QStringLiteral("qso.write"), QStringLiteral("idempotency.inspect")}},
             {QStringLiteral("events"), false},
             {QStringLiteral("txControl"), false},
             {QStringLiteral("perExtensionPermissions"), false},
@@ -4147,6 +4163,21 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         return HttpResponse::json(200, QJsonObject{{QStringLiteral("qsos"), list}});
     }
 
+    if (path == QLatin1String("/api/v1/idempotency")) {
+        if (request.method != "GET") return HttpResponse::error(405, QStringLiteral("use GET"));
+        const QString key = QString::fromUtf8(request.headers.value("idempotency-key")).trimmed();
+        if (key.isEmpty() || key.size() > 128) return HttpResponse::error(400, QStringLiteral("valid idempotency key required"));
+        QString lookupError;
+        const auto entry = m_db.apiIdempotency(key, &lookupError);
+        if (!lookupError.isEmpty()) return HttpResponse::error(503, QStringLiteral("idempotency lookup unavailable"));
+        if (!entry) return HttpResponse::error(404, QStringLiteral("idempotency key not found"));
+        QJsonObject answer{{QStringLiteral("state"), entry->status == 0 ? QStringLiteral("unresolved") : entry->status == -1 ? QStringLiteral("reviewed-unknown") : QStringLiteral("completed")},
+                           {QStringLiteral("recordedAt"), entry->createdAt}};
+        if (entry->status <= 0) answer.insert(QStringLiteral("retrySafe"), false);
+        else answer.insert(QStringLiteral("responseStatus"), entry->status);
+        return HttpResponse::json(200, answer);
+    }
+
     if (path == QLatin1String("/api/v1/qso")) {
         if (request.method != "POST")
             return HttpResponse::error(405, QStringLiteral("use POST"));
@@ -4156,18 +4187,41 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const QByteArray requestFormat = request.headers.value("content-type").contains("json") ? QByteArray("json") : QByteArray("adif");
         const QString app = QString::fromUtf8(request.headers.value("x-app")).trimmed();
         const QByteArray requestApp = (app.isEmpty() ? QStringLiteral("API") : app.left(60)).toUtf8();
+        std::unique_ptr<QLockFile> flightLock;
         if (!idempotencyKey.isEmpty()) {
+            const QString lockPath=m_db.apiIdempotencyLockPath(idempotencyKey);
+            if (lockPath.isEmpty()) return HttpResponse::error(503,QStringLiteral("idempotency lock unavailable; request was not processed"));
+            flightLock=std::make_unique<QLockFile>(lockPath);
+            flightLock->setStaleLockTime(0);
+            if (!flightLock->tryLock(0)) return HttpResponse::json(503,QJsonObject{
+                {QStringLiteral("error"),QStringLiteral("request lock unavailable or in use; reconcile before retry")},
+                {QStringLiteral("retrySafe"),false}});
+        }
+        const auto priorResponse = [&]() -> std::optional<HttpResponse> {
             QString lookupError;
             const auto previous = m_db.apiIdempotency(idempotencyKey, &lookupError);
             if (!lookupError.isEmpty())
                 return HttpResponse::error(503, QStringLiteral("idempotency lookup unavailable; request was not processed"));
             if (previous) {
-                if (previous->requestBody != request.body ||
+                if ((previous->status == -1 ? !LogDatabase::reviewedApiRequestMatches(previous->requestBody,request.body)
+                                             : previous->requestBody != request.body) ||
                     (previous->requestFormat && *previous->requestFormat != requestFormat) ||
                     (previous->requestApp && *previous->requestApp != requestApp))
                     return HttpResponse::error(409, QStringLiteral("idempotency key was used with a different request"));
+                if (previous->status == 0)
+                    return HttpResponse::json(503, QJsonObject{
+                        {QStringLiteral("error"), QStringLiteral("previous request is unresolved; QSO may have been saved; reconcile before retry")},
+                        {QStringLiteral("retrySafe"), false}});
+                if (previous->status == -1)
+                    return HttpResponse::json(409, QJsonObject{
+                        {QStringLiteral("error"), QStringLiteral("request reviewed; original outcome remains unknown; do not retry blindly")},
+                        {QStringLiteral("retrySafe"), false}});
                 return HttpResponse{previous->status, previous->contentType, previous->responseBody};
             }
+            return std::nullopt;
+        };
+        if (!idempotencyKey.isEmpty()) {
+            if (const auto previous = priorResponse()) return *previous;
         }
         // ADIF nel corpo, o JSON {"adif": "..."}.
         QByteArray adifText = request.body;
@@ -4178,6 +4232,16 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const AdifDocument doc = adif::parse(adifText);
         if (doc.records.isEmpty())
             return HttpResponse::error(400, QStringLiteral("no ADIF record in the body"));
+        QByteArray owner;
+        if (!idempotencyKey.isEmpty()) {
+            owner = QUuid::createUuid().toString(QUuid::WithoutBraces).toUtf8();
+            const ApiIdempotencyRecord pending{request.body,0,"application/json",owner,
+                QDateTime::currentDateTimeUtc().toString(Qt::ISODate),requestFormat,requestApp};
+            if (!m_db.claimApiIdempotency(idempotencyKey,pending)) {
+                if (const auto previous = priorResponse()) return *previous;
+                return HttpResponse::error(503, QStringLiteral("idempotency reservation unavailable; request was not processed"));
+            }
+        }
         QJsonArray results;
         int saved = 0;
         for (AdifRecord record : doc.records) {
@@ -4195,7 +4259,7 @@ HttpResponse DecoLogController::handleApi(const HttpRequest& request)
         const HttpResponse response = HttpResponse::json(saved > 0 ? 201 : 409,
                                                           QJsonObject{{QStringLiteral("results"), results}});
         if (!idempotencyKey.isEmpty() &&
-            !m_db.saveApiIdempotency(idempotencyKey,
+            !m_db.finishApiIdempotency(idempotencyKey,owner,
                                      ApiIdempotencyRecord{request.body, response.status, response.contentType,
                                                           response.body, QDateTime::currentDateTimeUtc().toString(Qt::ISODate),
                                                           requestFormat, requestApp})) {
@@ -4518,6 +4582,12 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     r.set(QStringLiteral("PROP_MODE"), text("prop_mode").toUpper());
     r.set(QStringLiteral("SAT_NAME"), text("sat_name").toUpper());
     r.set(QStringLiteral("SAT_MODE"), text("sat_mode").toUpper());
+    const QString trackerAt=text("tracker_snapshot_utc");
+    static const QRegularExpression explicitZone(QStringLiteral("(?:Z|[+-]\\d{2}:\\d{2})$"),QRegularExpression::CaseInsensitiveOption);
+    const QDateTime trackerTime=QDateTime::fromString(trackerAt,Qt::ISODateWithMs);
+    if (text("prop_mode").compare(QStringLiteral("SAT"),Qt::CaseInsensitive)==0 &&
+        explicitZone.match(trackerAt).hasMatch() && trackerTime.isValid())
+        r.set(QStringLiteral("APP_DECOLOG_TRACKER_SNAPSHOT_UTC"),trackerTime.toUTC().toString(Qt::ISODateWithMs));
     r.set(QStringLiteral("COMMENT"), text("comment"));
     // Quello che dice il callbook e che prima si poteva scrivere solo dopo:
     // nazione, citta', zone, stato e contea entrano subito nel QSO.
@@ -5112,6 +5182,12 @@ QString DecoLogController::saveRecord(qint64 id, AdifRecord r, qint64 stationPro
     });
     if (res.status != InsertResult::Status::Inserted)
         return res.message.isEmpty() ? tr("Cannot save the QSO") : res.message;
+    if (m_activation->active()) {
+        const QString session = m_activation->session().sessionUuid;
+        const QString key = QStringLiteral("APP_DECOLOG_ACTIVATION_UUID");
+        if (session.isEmpty() || (before && before->value(key) == session) || r.value(key) == session)
+            m_activation->refresh();
+    }
     QStringList resent;
     if (callChanged) {
         for (const QString& service : m_db.markSentForResend(id))
@@ -8184,35 +8260,39 @@ void DecoLogController::requestCustomReport(int year,const QString& band,const Q
 {
     startStationReport(QStringLiteral("custom"),year,band,{},dimensions,aggregate);
 }
-void DecoLogController::startStationReport(const QString& kind,int year,const QString& requestedBand,const QString& requestedStation,const QStringList& dimensions,const QString& aggregate)
+void DecoLogController::requestCustomReportMode(int year,const QString& band,const QStringList& dimensions,const QString& aggregate,const QString& mode)
+{
+    startStationReport(QStringLiteral("custom"),year,band,{},dimensions,aggregate,mode.trimmed().toUpper());
+}
+void DecoLogController::startStationReport(const QString& kind,int year,const QString& requestedBand,const QString& requestedStation,const QStringList& dimensions,const QString& aggregate,const QString& mode)
 {
     const QString path=m_db.path(), identity=m_db.identity(), band=requestedBand.trimmed().toLower(), station=requestedStation.trimmed().toUpper(); const quint64 generation=++m_activityReportGeneration, logGeneration=m_db.openGeneration();
     m_activityReport.clear(); m_activityReportPool.clear();
-    if (!m_db.isOpen() || identity.isEmpty() || path.isEmpty() || path==QLatin1String(":memory:") || year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind==QLatin1String("custom") && !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty())) {
+    if (!m_db.isOpen() || identity.isEmpty() || path.isEmpty() || path==QLatin1String(":memory:") || year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind==QLatin1String("custom") && (!activityreport::validModeFilter(mode) || !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty()))) {
         emit activityReportReady({{QStringLiteral("error"),tr("Choose a file-backed log and valid report filters")}}); return;
     }
     QPointer<DecoLogController> self(this);
-    m_activityReportPool.start([self,path,identity,logGeneration,band,station,year,generation,kind,dimensions,aggregate] {
+    m_activityReportPool.start([self,path,identity,logGeneration,band,station,year,generation,kind,dimensions,aggregate,mode] {
         activityreport::Result report; const QString connection=QStringLiteral("activity-report-")+QUuid::createUuid().toString();
         {
             QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
             db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=250")); db.setDatabaseName(path);
             if (!db.open()) report.error=QStringLiteral("Cannot open log for report");
             else if (activityreport::beginVerifiedSnapshot(db,identity,&report.error)) {
-                report=kind==QLatin1String("custom") ? activityreport::runCustom(db,year,band,dimensions,aggregate) : kind==QLatin1String("club") ? activityreport::runClub(db,year,band,station) : kind==QLatin1String("confirmation") ? activityreport::runConfirmations(db,year,band) : activityreport::run(db,year,band);
+                report=kind==QLatin1String("custom") ? activityreport::runCustom(db,year,band,dimensions,aggregate,mode) : kind==QLatin1String("club") ? activityreport::runClub(db,year,band,station) : kind==QLatin1String("confirmation") ? activityreport::runConfirmations(db,year,band) : activityreport::run(db,year,band);
                 if (!db.rollback() && report.error.isEmpty()) { report.rows.clear(); report.error=QStringLiteral("Cannot close report snapshot"); }
             }
             db.close();
         }
         QSqlDatabase::removeDatabase(connection); if (!self) return;
         const QString generated=QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-        QMetaObject::invokeMethod(self.data(),[self,path,identity,logGeneration,band,station,year,generation,report,generated,kind,dimensions,aggregate] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,logGeneration,band,station,year,generation,report,generated,kind,dimensions,aggregate,mode] {
             if (!self || self->m_shuttingDown || generation!=self->m_activityReportGeneration) return;
             if (!self->m_db.isOpen() || self->m_db.path()!=path || self->m_db.openGeneration()!=logGeneration || self->m_db.identity()!=identity) {
                 self->m_activityReport.clear(); emit self->activityReportReady({{QStringLiteral("error"),self->tr("The open log changed")}}); return;
             }
             self->m_activityReport={{QStringLiteral("path"),path},{QStringLiteral("logIdentity"),identity},{QStringLiteral("logGeneration"),QVariant::fromValue(logGeneration)},{QStringLiteral("band"),band},{QStringLiteral("station"),station},{QStringLiteral("year"),year},{QStringLiteral("kind"),kind},
-                {QStringLiteral("dimensions"),dimensions},{QStringLiteral("aggregate"),aggregate},
+                {QStringLiteral("dimensions"),dimensions},{QStringLiteral("aggregate"),aggregate},{QStringLiteral("mode"),mode},
                 {QStringLiteral("generatedAt"),generated},{QStringLiteral("rows"),report.rows},
                 {QStringLiteral("truncated"),report.truncated},{QStringLiteral("error"),report.error}};
             emit self->activityReportReady(self->m_activityReport);
@@ -8233,12 +8313,31 @@ QString DecoLogController::saveClubReportSettings(int year,const QString& band,c
 }
 QString DecoLogController::saveCustomReportSettings(int year,const QString& rawBand,const QStringList& dimensions,const QString& aggregate)
 {
-    const QString band=rawBand.trimmed().toLower();
-    if (!m_db.isOpen() || year<0 || year>9999 || band.size()>24 || !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty()) return tr("Invalid report definition");
-    const QJsonObject object{{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),QStringLiteral("custom")},
+    return saveCustomReportModeSettings(year,rawBand,dimensions,aggregate,{});
+}
+namespace {
+bool storeReportSettings(QSqlDatabase db,const QJsonObject& object,bool extended)
+{
+    QSqlQuery q(db); if (!q.exec(QStringLiteral("SAVEPOINT report_settings_save"))) return false;
+    auto put=[&](const QString& key,const QJsonObject& value) {
+        q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
+        q.addBindValue(key); q.addBindValue(QString::fromUtf8(QJsonDocument(value).toJson(QJsonDocument::Compact))); return q.exec();
+    };
+    bool ok;
+    if (extended) ok=put(QStringLiteral("activity_report_v2"),object) && put(QStringLiteral("activity_report_v1"),QJsonObject{{QStringLiteral("kind"),QStringLiteral("mode-filter-v2")}});
+    else { q.prepare(QStringLiteral("DELETE FROM app_setting WHERE key='activity_report_v2'")); ok=q.exec() && put(QStringLiteral("activity_report_v1"),object); }
+    if (ok && q.exec(QStringLiteral("RELEASE report_settings_save"))) return true;
+    q.exec(QStringLiteral("ROLLBACK TO report_settings_save")); q.exec(QStringLiteral("RELEASE report_settings_save")); return false;
+}
+}
+QString DecoLogController::saveCustomReportModeSettings(int year,const QString& rawBand,const QStringList& dimensions,const QString& aggregate,const QString& rawMode)
+{
+    const QString band=rawBand.trimmed().toLower(), mode=rawMode.trimmed().toUpper();
+    if (!m_db.isOpen() || year<0 || year>9999 || band.size()>24 || !activityreport::validModeFilter(mode) || !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty()) return tr("Invalid report definition");
+    QJsonObject object{{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),QStringLiteral("custom")},
         {QStringLiteral("dimensions"),QJsonArray::fromStringList(dimensions)},{QStringLiteral("aggregate"),aggregate}};
-    QSqlQuery q(m_db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES('activity_report_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value"));
-    q.addBindValue(QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact))); return q.exec()?QString():tr("Cannot save report filters");
+    if (!mode.isEmpty()) object.insert(QStringLiteral("mode"),mode);
+    return storeReportSettings(m_db.connection(),object,!mode.isEmpty()) ? QString() : tr("Cannot save report filters");
 }
 QString DecoLogController::saveStationReportSettings(const QString& kind,int year,const QString& rawBand,const QString& rawStation)
 {
@@ -8246,14 +8345,13 @@ QString DecoLogController::saveStationReportSettings(const QString& kind,int yea
     if (!m_db.isOpen() || year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind!=QLatin1String("activity") && kind!=QLatin1String("confirmation") && kind!=QLatin1String("club"))) return tr("Invalid report filters");
     QJsonObject object{{QStringLiteral("year"),year},{QStringLiteral("band"),band},{QStringLiteral("kind"),kind}};
     if (kind==QLatin1String("club")) object.insert(QStringLiteral("station"),station);
-    const QString json=QString::fromUtf8(QJsonDocument(object).toJson(QJsonDocument::Compact));
-    QSqlQuery q(m_db.connection()); q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES('activity_report_v1',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value")); q.addBindValue(json);
-    return q.exec() ? QString() : tr("Cannot save report filters");
+    return storeReportSettings(m_db.connection(),object,false) ? QString() : tr("Cannot save report filters");
 }
 QVariantMap DecoLogController::activityReportSettings() const
 {
     if (!m_db.isOpen()) return {};
-    const auto doc=QJsonDocument::fromJson(m_db.setting(QStringLiteral("activity_report_v1")).toUtf8());
+    auto doc=QJsonDocument::fromJson(m_db.setting(QStringLiteral("activity_report_v1")).toUtf8());
+    if (doc.isObject() && doc.object().value(QStringLiteral("kind")).toString()==QLatin1String("mode-filter-v2")) doc=QJsonDocument::fromJson(m_db.setting(QStringLiteral("activity_report_v2")).toUtf8());
     if (!doc.isObject()) return {}; const auto o=doc.object(); const int year=o.value(QStringLiteral("year")).toInt(-1); const QString band=o.value(QStringLiteral("band")).toString();
     const QString kind=o.value(QStringLiteral("kind")).toString(QStringLiteral("activity"));
     const QString station=o.value(QStringLiteral("station")).toString();
@@ -8262,7 +8360,9 @@ QVariantMap DecoLogController::activityReportSettings() const
     if (kind==QLatin1String("club")) result.insert(QStringLiteral("station"),station);
     if (kind==QLatin1String("custom")) {
         const QStringList dims=o.value(QStringLiteral("dimensions")).toVariant().toStringList(); const QString aggregate=o.value(QStringLiteral("aggregate")).toString();
-        if (!activityreport::validateCustomSpec(dims,aggregate).isEmpty()) return {};
+        const QString mode=o.value(QStringLiteral("mode")).toString();
+        if (!activityreport::validModeFilter(mode) || !activityreport::validateCustomSpec(dims,aggregate).isEmpty()) return {};
+        if (!mode.isEmpty()) result.insert(QStringLiteral("mode"),mode);
         result.insert(QStringLiteral("dimensions"),dims); result.insert(QStringLiteral("aggregate"),aggregate);
     }
     return result;
@@ -8278,7 +8378,7 @@ QString DecoLogController::exportActivityReport(const QUrl& file)
         (!target.canonicalFilePath().isEmpty() && target.canonicalFilePath()==source.canonicalFilePath())) return tr("Choose a file other than the log database");
     activityreport::Result report; report.rows=m_activityReport.value(QStringLiteral("rows")).toList();
     const QString kind=m_activityReport.value(QStringLiteral("kind")).toString();
-    const QByteArray bytes=kind==QLatin1String("custom") ? activityreport::customCsv(report,m_activityReport.value(QStringLiteral("dimensions")).toStringList(),m_activityReport.value(QStringLiteral("aggregate")).toString()) : kind==QLatin1String("club") ? activityreport::clubCsv(report) : kind==QLatin1String("confirmation") ? activityreport::confirmationsCsv(report) : activityreport::csv(report);
+    const QByteArray bytes=kind==QLatin1String("custom") ? activityreport::customCsv(report,m_activityReport.value(QStringLiteral("dimensions")).toStringList(),m_activityReport.value(QStringLiteral("aggregate")).toString(),m_activityReport.value(QStringLiteral("mode")).toString()) : kind==QLatin1String("club") ? activityreport::clubCsv(report) : kind==QLatin1String("confirmation") ? activityreport::confirmationsCsv(report) : activityreport::csv(report);
     QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !out.commit()) return tr("Cannot write the CSV file");
     return {};
 }
@@ -8311,7 +8411,7 @@ QVariantMap reportDefinitionMap(const activityreport::Definition& d)
 {
     return {{QStringLiteral("id"),d.id},{QStringLiteral("name"),d.name},{QStringLiteral("kind"),d.kind},
         {QStringLiteral("year"),d.year},{QStringLiteral("band"),d.band},{QStringLiteral("station"),d.station},
-        {QStringLiteral("dimensions"),d.dimensions},{QStringLiteral("aggregate"),d.aggregate},{QStringLiteral("revision"),d.revision}};
+        {QStringLiteral("dimensions"),d.dimensions},{QStringLiteral("aggregate"),d.aggregate},{QStringLiteral("mode"),d.mode},{QStringLiteral("revision"),d.revision}};
 }
 }
 QVariantMap DecoLogController::savedReportDefinitions() const
@@ -8329,7 +8429,7 @@ QVariantMap DecoLogController::saveReportDefinition(const QVariantMap& values,co
     if (!yearOk) return {{QStringLiteral("error"),tr("Invalid report year")}};
     d.band=values.value(QStringLiteral("band")).toString().trimmed().toLower();
     if (d.kind==QLatin1String("club")) d.station=values.value(QStringLiteral("station")).toString().trimmed().toUpper();
-    if (d.kind==QLatin1String("custom")) { d.dimensions=values.value(QStringLiteral("dimensions")).toStringList(); d.aggregate=values.value(QStringLiteral("aggregate")).toString(); }
+    if (d.kind==QLatin1String("custom")) { d.dimensions=values.value(QStringLiteral("dimensions")).toStringList(); d.aggregate=values.value(QStringLiteral("aggregate")).toString(); d.mode=values.value(QStringLiteral("mode")).toString().trimmed().toUpper(); }
     QString error; if (!activityreport::saveDefinition(m_db,d,&error)) return {{QStringLiteral("error"),error}};
     return {{QStringLiteral("definition"),reportDefinitionMap(d)}};
 }

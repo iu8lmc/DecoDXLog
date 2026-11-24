@@ -241,15 +241,19 @@ void RigControl::setXit(int hz)
 
 void RigControl::setFrequency(qint64 hz)
 {
-    if (hz > 0)
+    if (hz > 0 && connected()) {
         send(QStringLiteral("set"), QStringLiteral("F %1").arg(hz), 0);
+        m_lastSet.insert(QStringLiteral("freq"), m_seq);
+    }
 }
 
 void RigControl::setMode(const QString& mode)
 {
     const QString clean = mode.trimmed().toUpper();
-    if (!clean.isEmpty())
+    if (!clean.isEmpty() && connected()) {
         send(QStringLiteral("set"), QStringLiteral("M %1 0").arg(clean), 0);
+        m_lastSet.insert(QStringLiteral("mode"), m_seq);
+    }
 }
 
 void RigControl::setPtt(bool on)

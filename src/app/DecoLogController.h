@@ -406,6 +406,8 @@ public:
     Q_INVOKABLE void newApiToken();
     Q_INVOKABLE void newApiReadOnlyToken();
     Q_INVOKABLE void revokeApiReadOnlyToken();
+    Q_INVOKABLE QVariantMap unresolvedApiRequests(const QString& after = {}) const;
+    Q_INVOKABLE QString markApiRequestReviewed(const QString& rowId, const QString& token, const QString& logPath);
     void startApi();
     void setMulticastGroup(const QString& group);
     bool preferLoggedAdif() const { return m_udp.prefersLoggedAdif(); }
@@ -600,11 +602,13 @@ public:
     Q_INVOKABLE void requestConfirmationReport(int year, const QString& band);
     Q_INVOKABLE void requestClubReport(int year, const QString& band, const QString& station);
     Q_INVOKABLE void requestCustomReport(int year, const QString& band, const QStringList& dimensions, const QString& aggregate);
-    void startStationReport(const QString& kind, int year, const QString& band, const QString& station = {}, const QStringList& dimensions = {}, const QString& aggregate = {});
+    Q_INVOKABLE void requestCustomReportMode(int year, const QString& band, const QStringList& dimensions, const QString& aggregate, const QString& mode);
+    void startStationReport(const QString& kind, int year, const QString& band, const QString& station = {}, const QStringList& dimensions = {}, const QString& aggregate = {}, const QString& mode = {});
     Q_INVOKABLE QString saveActivityReportSettings(int year, const QString& band);
     Q_INVOKABLE QString saveSelectedReportSettings(const QString& kind, int year, const QString& band);
     Q_INVOKABLE QString saveClubReportSettings(int year, const QString& band, const QString& station);
     Q_INVOKABLE QString saveCustomReportSettings(int year, const QString& band, const QStringList& dimensions, const QString& aggregate);
+    Q_INVOKABLE QString saveCustomReportModeSettings(int year, const QString& band, const QStringList& dimensions, const QString& aggregate, const QString& mode);
     QString saveStationReportSettings(const QString& kind, int year, const QString& band, const QString& station);
     Q_INVOKABLE QVariantMap activityReportSettings() const;
     Q_INVOKABLE QString exportActivityReport(const QUrl& file);

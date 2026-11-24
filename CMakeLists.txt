@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(DecoDXLog
-    VERSION 1.17.66
+    VERSION 1.17.67
     DESCRIPTION "Station logbook for the Decodium family"
     LANGUAGES C CXX)
 
@@ -869,6 +869,15 @@ if(DECODXLOG_BUILD_TESTS)
     add_dependencies(tst_journeycolumn decolog)
     add_test(NAME journeycolumn COMMAND tst_journeycolumn)
     if(Python3_Interpreter_FOUND)
+        find_program(DECOLOG_PDFTOTEXT_EXECUTABLE pdftotext)
+        if(DECOLOG_PDFTOTEXT_EXECUTABLE)
+            add_test(NAME activity_power_pdf COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/tools/activity_power_pdf_probe.py $<TARGET_FILE:decolog> ${DECOLOG_PDFTOTEXT_EXECUTABLE})
+            set_tests_properties(activity_power_pdf PROPERTIES TIMEOUT 45)
+        endif()
+        add_test(NAME cluster_spot_race COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/tools/cluster_spot_race_probe.py $<TARGET_FILE:decolog>)
+        set_tests_properties(cluster_spot_race PROPERTIES TIMEOUT 30)
         add_test(NAME rig_split_manual COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/rig_split_manual_probe.py $<TARGET_FILE:decolog>)
         set_tests_properties(rig_split_manual PROPERTIES TIMEOUT 30)

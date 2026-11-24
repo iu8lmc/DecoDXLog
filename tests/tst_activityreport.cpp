@@ -4,11 +4,112 @@
 #include <QSqlError>
 #include <QTemporaryDir>
 #include <QJsonDocument>
+#include <QElapsedTimer>
+#include <QLibrary>
+#include <QSqlDriver>
 #include <QTest>
 using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void customReportFiltersAndPersistsMode()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));
+        for (const auto& mode : {QStringLiteral("CW"),QStringLiteral("FT8"),QStringLiteral("FT4")}) QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE",mode}},"fixture",{},true,0,false).id>0);
+        const auto all=activityreport::runCustom(db.connection(),2026,"20m",{"band"},"qsos"); QVERIFY(all.error.isEmpty()); QCOMPARE(all.rows.first().toMap().value("value").toInt(),3);
+        const auto filtered=activityreport::runCustom(db.connection(),2026,"20m",{"band"},"qsos","FT8"); QVERIFY2(filtered.error.isEmpty(),qPrintable(filtered.error)); QCOMPARE(filtered.rows.first().toMap().value("value").toInt(),1);
+        const auto csv=activityreport::customCsv(filtered,{"band"},"qsos","FT8"); QVERIFY(csv.contains("qso_count,filter_recorded_mode\r\n\"20m\",1,\"FT8\""));
+        QVERIFY(!activityreport::customCsv(all,{"band"},"qsos").contains("filter_recorded_mode"));
+        QVERIFY(!activityreport::runCustom(db.connection(),2026,"20m",{"band"},"qsos","FT8' OR 1=1").error.isEmpty());
+        activityreport::Definition d; d.name="FT8 only"; d.kind="custom"; d.dimensions={"band"}; d.aggregate="qsos"; d.mode="FT8"; QString error; QVERIFY2(activityreport::saveDefinition(db,d,&error),qPrintable(error));
+        LogDatabase reopened; QVERIFY(reopened.open(dir.filePath("report.sqlite"))); const auto saved=activityreport::loadDefinition(reopened,d.id); QVERIFY(saved); QCOMPARE(saved->mode,QString("FT8"));
+    }
+    void customReportCountsRecordedDxcc()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));
+        for (int i=0;i<5;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL",QString("K1DX%1").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON",QString("120%1").arg(i)},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET dxcc=CASE call WHEN 'K1DX0' THEN 291 WHEN 'K1DX1' THEN 291 WHEN 'K1DX2' THEN 1 WHEN 'K1DX3' THEN 0 ELSE NULL END"));
+        const auto result=activityreport::runCustom(db.connection(),2026,"20m",{"band"},"entities"); QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.rows.first().toMap().value("value").toInt(),2);
+        QVERIFY(activityreport::customCsv(result,{"band"},"entities").contains("distinct_recorded_dxcc\r\n\"20m\",2"));
+        activityreport::Definition d; d.name="DXCC counts"; d.kind="custom"; d.dimensions={"band"}; d.aggregate="entities"; QString error; QVERIFY2(activityreport::saveDefinition(db,d,&error),qPrintable(error));
+        LogDatabase reopened; QVERIFY(reopened.open(dir.filePath("report.sqlite"))); const auto saved=activityreport::loadDefinition(reopened,d.id); QVERIFY(saved); QCOMPARE(saved->aggregate,QString("entities"));
+    }
+    void customReportGroupsRecordedDxcc()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (int i=0;i<4;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL",QString("K1DX%1").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON",QString("120%1").arg(i)},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET dxcc=CASE call WHEN 'K1DX0' THEN 291 WHEN 'K1DX1' THEN 291 WHEN 'K1DX2' THEN 0 ELSE NULL END"));
+        const auto result=activityreport::runCustom(db.connection(),2026,"20m",{"band","dxcc"},"qsos");
+        QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.rows.size(),2);
+        QCOMPARE(result.rows.at(0).toMap().value("d1").toString(),QString()); QCOMPARE(result.rows.at(0).toMap().value("value").toInt(),2);
+        QCOMPARE(result.rows.at(1).toMap().value("d1").toString(),QString("291")); QCOMPARE(result.rows.at(1).toMap().value("value").toInt(),2);
+        QVERIFY(activityreport::customCsv(result,{"band","dxcc"},"qsos").contains("\"20m\",\"291\",2"));
+    }
+    void insertDuringActiveReportQuery()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native progress hook requires verified system SQLite on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("Opt in only with verified Qt SQLite linkage");
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Progress=void (*)(void*,int,int (*)(void*),void*);
+        const auto progress=reinterpret_cast<Progress>(sqlite.resolve("sqlite3_progress_handler")); if (!progress) QSKIP("SQLite progress hook unavailable");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase reader,writer; const auto path=dir.filePath("report.sqlite"); QVERIFY(reader.open(path)); QVERIFY(writer.open(path));
+        QSqlQuery seed(reader.connection()); QVERIFY2(seed.exec("WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<100000) INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at,tx_pwr) SELECT printf('fixture-%d',i),printf('K%d',i),'2026-01-01T12:00:00Z','20m','CW','2026-01-01','2026-01-01',10 FROM n"),qPrintable(seed.lastError().text()));
+        QSqlDatabase snapshot=reader.connection(); QString error; QVERIFY2(activityreport::beginVerifiedSnapshot(snapshot,reader.identity(),&error),qPrintable(error));
+        QVariant handle=snapshot.driver()->handle(); if (QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native handle unavailable"); void* native=*static_cast<void**>(handle.data()); QVERIFY(native);
+        struct State { LogDatabase* writer; bool entered=false; bool inserted=false; } state{&writer};
+        const auto hook=+[](void* opaque) { auto* s=static_cast<State*>(opaque); if (!s->entered) { s->entered=true; s->inserted=s->writer->insertQso(AdifRecord{{"CALL","K9ACTIVE"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"TX_PWR","20"}},"fixture",{},true,0,false).id>0; } return 0; };
+        progress(native,10000,hook,&state); const auto before=activityreport::runCustom(snapshot,2026,"20m",{"band"},"mean_power"); progress(native,0,nullptr,nullptr);
+        QVERIFY(state.entered); QVERIFY(state.inserted); QVERIFY2(before.error.isEmpty(),qPrintable(before.error)); QCOMPARE(before.rows.first().toMap().value("samples").toInt(),100000); QCOMPARE(before.rows.first().toMap().value("value").toDouble(),10.0);
+        QVERIFY(snapshot.rollback()); const auto after=activityreport::runCustom(reader.connection(),2026,"20m",{"band"},"mean_power"); QVERIFY2(after.error.isEmpty(),qPrintable(after.error)); QCOMPARE(after.rows.first().toMap().value("samples").toInt(),100001); QVERIFY(qAbs(after.rows.first().toMap().value("value").toDouble()-(1000020.0/100001.0))<1e-10);
+    }
+    void largeReportSnapshotExcludesLaterInsert()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("large.sqlite"); LogDatabase reader, writer;
+        QVERIFY(reader.open(path)); QVERIFY(writer.open(path)); QSqlQuery seed(reader.connection());
+        QVERIFY2(seed.exec("WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<100000) "
+            "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at,tx_pwr) "
+            "SELECT printf('fixture-%d',i),printf('K%d',i),'2026-01-01T12:00:00Z','20m','CW','2026-01-01','2026-01-01',10 FROM n"),qPrintable(seed.lastError().text()));
+        QSqlDatabase snapshot=reader.connection(); QString error; QVERIFY2(activityreport::beginVerifiedSnapshot(snapshot,reader.identity(),&error),qPrintable(error));
+        QElapsedTimer elapsed; elapsed.start();
+        QVERIFY(writer.insertQso(AdifRecord{{"CALL","K9NEW"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"TX_PWR","20"}},"fixture",{},true,0,false).id>0);
+        const qint64 insertMs=elapsed.elapsed(); const auto before=activityreport::runCustom(snapshot,2026,"20m",{"band"},"mean_power");
+        QVERIFY2(before.error.isEmpty(),qPrintable(before.error)); QCOMPARE(before.rows.size(),1); QCOMPARE(before.rows.first().toMap().value("samples").toInt(),100000); QCOMPARE(before.rows.first().toMap().value("value").toDouble(),10.0);
+        QVERIFY(snapshot.rollback()); const auto after=activityreport::runCustom(reader.connection(),2026,"20m",{"band"},"mean_power");
+        QVERIFY2(after.error.isEmpty(),qPrintable(after.error)); QCOMPARE(after.rows.first().toMap().value("samples").toInt(),100001); QVERIFY(qAbs(after.rows.first().toMap().value("value").toDouble()-(1000020.0/100001.0))<1e-10);
+        qInfo() << "100k report fixture insert_ms" << insertMs << "total_ms" << elapsed.elapsed();
+    }
+    void customReportMeanRecordedPower()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));
+        for (int i=0;i<7;++i)
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",QString("K1AA%1").arg(i)},{"QSO_DATE","20260101"},{"TIME_ON",QString("120%1").arg(i)},{"BAND",i==5?"40m":i==6?"80m":"20m"},{"MODE","CW"}},"fixture",{},true).id>0);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("UPDATE qso SET tx_pwr=CASE call WHEN 'K1AA0' THEN 5 WHEN 'K1AA1' THEN 10 WHEN 'K1AA2' THEN 'bad' WHEN 'K1AA3' THEN -1 WHEN 'K1AA6' THEN 0 ELSE NULL END"));
+        const auto result=activityreport::runCustom(db.connection(),2026,{}, {"band"},"mean_power");
+        QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.rows.size(),3);
+        const auto a=result.rows.at(0).toMap(), b=result.rows.at(1).toMap();
+        QCOMPARE(a.value("d0").toString(),QString("20m")); QCOMPARE(a.value("value").toDouble(),7.5); QCOMPARE(a.value("samples").toInt(),2); QCOMPARE(a.value("excluded").toInt(),3);
+        QVERIFY(b.value("value").isNull()); QCOMPARE(b.value("samples").toInt(),0); QCOMPARE(b.value("excluded").toInt(),1);
+        const auto zero=result.rows.at(2).toMap(); QCOMPARE(zero.value("d0").toString(),QString("80m")); QVERIFY(!zero.value("value").isNull()); QCOMPARE(zero.value("value").toDouble(),0.0); QCOMPARE(zero.value("samples").toInt(),1); QCOMPARE(zero.value("excluded").toInt(),0);
+        const auto csv=activityreport::customCsv(result,{"band"},"mean_power"); QVERIFY(csv.contains("mean_tx_power_w,samples,excluded")); QVERIFY(csv.contains("\"20m\",7.5,2,3")); QVERIFY(csv.contains("\"40m\",,0,1")); QVERIFY(csv.contains("\"80m\",0,1,0"));
+        activityreport::Definition saved; saved.name="Power"; saved.kind="custom"; saved.dimensions={"band"}; saved.aggregate="mean_power"; QString error;
+        QVERIFY2(activityreport::saveDefinition(db,saved,&error),qPrintable(error)); LogDatabase reopened; QVERIFY(reopened.open(dir.filePath("report.sqlite"))); QCOMPARE(activityreport::loadDefinition(reopened,saved.id)->aggregate,QString("mean_power"));
+    }
+    void customReportCountsDistinctUtcDays()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));
+        for (const auto& v : {QPair<QString,QString>{"K1AAA","20260101"},{"K1BBB","20260101"},{"K1CCC","20260102"},{"K1DDD","20260102"}})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",v.first},{"QSO_DATE",v.second},{"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2026-01-02T00:15:00+01:00' WHERE call='K1DDD'"));
+        const auto days=activityreport::runCustom(db.connection(),2026,"20m",{"band"},"days");
+        QVERIFY2(days.error.isEmpty(),qPrintable(days.error)); QCOMPARE(days.rows.size(),1); QCOMPARE(days.rows.first().toMap().value("value").toInt(),2);
+        QVERIFY(activityreport::customCsv(days,{"band"},"days").contains("distinct_utc_days"));
+        activityreport::Definition saved; saved.name="Active days"; saved.kind="custom"; saved.dimensions={"band"}; saved.aggregate="days"; QString error;
+        QVERIFY2(activityreport::saveDefinition(db,saved,&error),qPrintable(error)); QCOMPARE(activityreport::loadDefinition(db,saved.id)->aggregate,QString("days"));
+        LogDatabase reopened; QVERIFY(reopened.open(dir.filePath("report.sqlite")));
+        const auto loaded=activityreport::loadDefinition(reopened,saved.id); QVERIFY(loaded); QCOMPARE(loaded->aggregate,QString("days"));
+    }
     void reportSnapshotRejectsAnotherLogAndPinsData()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase first, other;

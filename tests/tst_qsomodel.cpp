@@ -43,6 +43,24 @@ class TestQsoModel : public QObject {
     Q_OBJECT
 
 private slots:
+    void hrdlogPendingFilterFindsUnsentContacts()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto sent = db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"HRDLOG_QSO_UPLOAD_STATUS","Y"}},"fixture");
+        const auto rejected = db.insertQso({{"CALL","J51A"},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"HRDLOG_QSO_UPLOAD_STATUS","N"}},"fixture");
+        const auto missing = db.insertQso({{"CALL","K2ABC"},{"QSO_DATE","20260103"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
+        QVERIFY(sent.id > 0 && rejected.id > 0 && missing.id > 0);
+        QsoTableModel model(&db); model.setQslFilter("hrdlog_pending");
+        QCOMPARE(model.count(), 2);
+        QVERIFY(model.rowForId(rejected.id) >= 0);
+        QVERIFY(model.rowForId(missing.id) >= 0);
+        QVERIFY(model.rowForId(sent.id) < 0);
+        QslState status; status.service = "hrdlog"; status.sent = "Y";
+        QVERIFY(db.setQslState(rejected.id, status));
+        model.refreshQslUpload({rejected.id});
+        QCOMPARE(model.count(), 1);
+        QCOMPARE(model.idAt(0), missing.id);
+    }
     void callSearchDoesNotMatchAnotherStationsGrid()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

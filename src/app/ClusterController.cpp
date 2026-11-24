@@ -865,6 +865,7 @@ void ClusterController::tune(const QString& spotKey)
         m_ctx.prepareQso(QVariantMap{
             {QStringLiteral("call"), e->spot.dxCall},
             {QStringLiteral("mhz"), e->spot.freqKhz / 1000.0},
+            {QStringLiteral("dialMhz"), tuning.dialKhz / 1000.0},
             {QStringLiteral("mode"), e->spot.mode},
             {QStringLiteral("grid"), e->spot.dxGrid},
         });

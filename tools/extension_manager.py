@@ -157,8 +157,14 @@ def list_installed(root):
     for folder in sorted(root.iterdir()):
         if folder.name.startswith('.'):
             continue
-        _, manifest = _current(root, folder.name)
-        entries.append(manifest)
+        try:
+            _, manifest = _current(root, folder.name)
+            entries.append(manifest)
+        except (OSError, ValueError, TypeError, UnicodeError, RecursionError):
+            # One broken installation must not prevent the operator from
+            # inspecting or removing other extensions. Do not include file
+            # contents or exception messages in the diagnostic listing.
+            entries.append({'id': folder.name, 'status': 'invalid'})
     return entries
 
 

@@ -32,6 +32,7 @@ TestCase {
         property var callInfo: ({call: ""})
         property QtObject rig: QtObject { property bool connected: false }
         property QtObject stationProfiles: QtObject { property var activeProfile: ({defaultTxPwr: 0}) }
+        property QtObject net: QtObject { property var queuedCalls: [] }
         property QtObject activation: QtObject { property bool active: false; property var session: ({}); property var state: ({serialEnabled: false}); property string nextSerial: "" }
         property QtObject cluster: QtObject {
             property var sources: []
@@ -49,6 +50,26 @@ TestCase {
     }
     Component { id: panelComponent; NewQsoPanel { width: 580; height: 700 } }
     Component { id: dialogComponent; NewQsoDialog {} }
+
+    function test_clusterSpotIgnoresLatePreviousTuning() {
+        decolog.rig.connected = true; decolog.clientConnected = false; decolog.tuneCalls = 0
+        decolog.shownFrequency = "7.030000"; decolog.shownMode = "CW"
+        const panel = createTemporaryObject(panelComponent, testCase)
+        verify(panel !== null)
+        decolog.qsoPrepared({call: "J51A", mhz: 14.0753, dialMhz: 14.074, mode: "FT8"})
+        const mode = findChild(panel, "newQsoMode"), freq = findChild(panel, "newQsoFrequency")
+        compare(mode.editText, "FT8"); compare(freq.text, "14.075300")
+        decolog.tuningChanged()
+        compare(mode.editText, "FT8", "An old CAT notification must not replace the selected spot mode")
+        compare(freq.text, "14.075300", "An old CAT notification must not replace the selected spot frequency")
+        compare(decolog.tuneCalls, 0, "Preparing a spot must not issue a second tuning command")
+        panel.lastQsy = Date.now() - 2600; decolog.shownFrequency = "14.074000"; decolog.shownMode = "USB"; decolog.tuningChanged()
+        compare(mode.editText, "FT8", "The radio USB carrier does not mean the FT8 spot became SSB")
+        compare(freq.text, "14.075300", "Preserve the spotted signal frequency while the radio remains on its dial")
+        decolog.shownFrequency = "14.090000"; decolog.shownMode = "RTTY"; decolog.tuningChanged()
+        compare(mode.editText, "RTTY"); compare(freq.text, "14.090000")
+        decolog.rig.connected = false; decolog.shownFrequency = "50.318000"; decolog.shownMode = "FT4"
+    }
 
     function test_historicalModeDoesNotTuneOrInheritCurrentTime() {
         decolog.tuneCalls = 0
@@ -254,6 +275,27 @@ TestCase {
         verify(!decolog.submitted.iota, "A hidden island field must not add a reference")
     }
 
+    function test_trackerSnapshotTimestampOnlyForUnchangedFrequencies() {
+        const form=createTemporaryObject(dialogComponent,testCase); verify(form !== null)
+        form.initialSatellite="FO-29"; form.initialTxMHz="145.998596"; form.initialRxMHz="435.004184"
+        form.initialTrackerReceivedAt="2026-11-24T10:00:00.000Z"; form.open()
+        findChild(form,"manualCallsignField").text="K1ABC"
+        form.submit(true)
+        compare(decolog.submitted.tracker_snapshot_utc,"2026-11-24T10:00:00.000Z")
+        findChild(form,"manualCallsignField").text="K2ABC"
+        findChild(form,"manualTxFrequency").text="145.999000"
+        form.submit(true)
+        verify(!decolog.submitted.tracker_snapshot_utc)
+        findChild(form,"manualCallsignField").text="K3ABC"
+        findChild(form,"manualTxFrequency").text="145.998596"
+        findChild(form,"manualRxFrequency").text="435.005000"
+        form.submit(true); verify(!decolog.submitted.tracker_snapshot_utc)
+        findChild(form,"manualCallsignField").text="K4ABC"
+        findChild(form,"manualRxFrequency").text="435.004184"
+        findChild(form,"manualSatellite").text="AO-91"
+        form.submit(true); verify(!decolog.submitted.tracker_snapshot_utc)
+    }
+
     function test_derivedCustomFieldIsReadOnlyAndNotSubmittedAsInput() {
         decolog.newQsoCustomFields=[{name:"APP_A",label:"A",type:"number"},{name:"APP_B",label:"B",type:"number",formula:"{APP_A} * 2"}]
         const panel=createTemporaryObject(panelComponent,testCase); verify(panel !== null)
@@ -261,6 +303,31 @@ TestCase {
         verify(input !== null && derived !== null); compare(input.readOnly,false); compare(derived.readOnly,true)
         input.text="12"; const values=panel.customAdifValues(); compare(values.APP_A,"12"); verify(values.APP_B === undefined)
         decolog.newQsoCustomFields=[]
+    }
+
+    function test_selectedFtModeSurvivesUsbCarrier() {
+        const panel = createTemporaryObject(panelComponent, testCase)
+        verify(panel !== null)
+        const mode = findChild(panel, "newQsoMode")
+        const freq = findChild(panel, "newQsoFrequency")
+        decolog.rig.connected = true
+        decolog.shownFrequency = "50.318000"
+        decolog.shownMode = "CW"
+        mode.currentIndex = mode.find("FT8")
+        panel.qsyTo("6m", "FT8", false)
+        panel.lastQsy = Date.now() - 2600
+        decolog.shownFrequency = "50.313000"
+        decolog.shownMode = "USB"
+        decolog.tuningChanged()
+        compare(mode.currentText, "FT8")
+        compare(freq.text, "50.313000")
+        decolog.shownFrequency = "50.320000"
+        decolog.shownMode = "CW"
+        decolog.tuningChanged()
+        compare(mode.currentText, "CW")
+        decolog.rig.connected = false
+        decolog.shownMode = "FT4"
+        decolog.shownFrequency = "50.318000"
     }
 
     function test_disconnectedAndConnectedSources() {
