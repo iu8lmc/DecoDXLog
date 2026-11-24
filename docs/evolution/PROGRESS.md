@@ -3275,3 +3275,11 @@ The VUCC loader now examines JSON keys rather than raw text for extra-grid candi
 A/B on macOS arm64 / Qt 6.11.2: two synthetic QSO with empty structured grids and encoded/mixed-case extra keys were both omitted previously; afterwards the 2 m terrestrial and satellite previews include their respective effective grids. The full `tst_vucc` binary passed 17 cases. The first build used unsupported QJsonObject iterator names and was corrected. A separate in-memory Python SQLite comparison on 100,000 synthetic rows found 50,001 versus 50,002 candidate rows in 6.5–7.0 ms versus 8.9–9.1 ms across three warm runs; this measures only the prefilter, not the Qt loader or UI. git diff --check passed.
 
 The app was not relinked for this increment because a separate full CTest run was actively executing the existing app binary. Its results therefore refer to the earlier binary; a new app build and appropriate regression remain necessary. The benchmark is not representative of disk, cold cache, other SQLite implementations or p95. Real ADIF imports, live ARRL, physical UI, Windows/Linux and full G02/G13 acceptance remain open.
+
+## 2026-11-24 — G13 correct published-version status
+
+The desktop release-status document previously said no packages had been published. A fresh GitHub release query confirms that v1.17.67 is public and not a prerelease, with five uploaded, nonempty installers for Windows x64, Linux x86-64/ARM64 and macOS Intel/Apple Silicon. The document now distinguishes this published snapshot from subsequent local roadmap commits and states that full roadmap acceptance is still open.
+
+A/B is a factual comparison of the previous document against the live GitHub release metadata and the corrected document, not a software behavior test. At this check, `git rev-list --count v1.17.67..HEAD` returned 103 commits; the tag's commit is `a92cabb4`. The five installer sizes and upload states were checked with `gh release view`; no download or installation was repeated for this documentation correction. git diff --check passed.
+
+The public release does not establish that every roadmap goal is complete or that later local commits are published. Clean installations, hardware, services and remaining cross-platform acceptance still require their respective evidence. The separate full CTest run remained active during this documentation update.

@@ -1,8 +1,10 @@
-# Release candidate
+# Desktop release status
 
-Not prepared. Integrated acceptance across all goals, packaging, clean installs, migration, optional dependencies and Windows/macOS/Linux verification remain open. Signing/notarisation and publication require their actual identities and applicable authorisation; an ad-hoc build is not notarisation. No packages have been published.
+DecoDXLog [1.17.67](https://github.com/elisir80/DecodxLog/releases/tag/v1.17.67) is published as a normal release, with Windows x64, Linux x86-64 and ARM64, and macOS Intel and Apple Silicon installers. The published version is a snapshot at tag `v1.17.67`; later commits on the desktop roadmap branch are not thereby included in that release.
 
-A local macOS arm64 ad-hoc test DMG has been mounted and exercised with an isolated synthetic QSO; see `PROGRESS.md`. This is preliminary evidence only and does not prepare or approve a release candidate.
+The complete desktop roadmap has not been accepted or packaged as a finished deliverable. Integrated acceptance across all goals, clean installs, migrations, optional dependencies and Windows/macOS/Linux verification remain open. Signing and notarisation require their actual identities and applicable authorisation; an ad-hoc build is not notarisation.
+
+A local macOS arm64 ad-hoc test DMG has been mounted and exercised with an isolated synthetic QSO; see `PROGRESS.md`. This is preliminary evidence only and does not establish completion of the full roadmap.
 
 The common release gate passed locally on macOS arm64 (117 CTest groups, with individual opt-in and platform skips); see `PROGRESS.md` for limits. This does not replace clean packaged-platform acceptance.
 
