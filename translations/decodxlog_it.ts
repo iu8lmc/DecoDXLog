@@ -15496,6 +15496,18 @@ Referenze aggiuntive: %7</translation></message>
 <context>
     <name>PredictDialog</name>
     <message>
+        <source>Minimum sampled elevation (°)</source>
+        <translation>Elevazione minima campionata (°)</translation>
+    </message>
+    <message>
+        <source>Minimum sampled elevation in degrees</source>
+        <translation>Elevazione minima campionata in gradi</translation>
+    </message>
+    <message>
+        <source>Showing %1 of %2 predicted passes at or above the minimum sampled elevation.</source>
+        <translation>Mostrati %1 passaggi previsti su %2 alla elevazione minima campionata o superiore.</translation>
+    </message>
+    <message>
         <source>PREDICT satellite tracker</source>
         <translation>Tracker satellitare PREDICT</translation>
     </message>

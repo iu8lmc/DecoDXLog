@@ -179,8 +179,8 @@ for change_tle in (False, True):
             expected = ('PROBE predictSchedule success=false count=1 rendered=1 old=true' if change_tle
                         else 'PROBE predictSchedule success=true count=3 rendered=3 old=true')
             if not change_tle:
-                expected += '\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200'
-            if result.returncode or any(line not in output for line in expected.split('\n')):
+                expected += '\nPROBE schedule filter hidden=3 restored=3 cleared=true blocked=true\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200'
+            if result.returncode or 'RangeError' in output or 'TypeError' in output or any(line not in output for line in expected.split('\n')):
                 raise SystemExit(f'FAIL schedule change_tle={change_tle}: {output}; requests={server.commands}')
             count = 2 if change_tle else 4
             if not change_tle and server.commands[-2] != 'PREDICT "OSCAR-7" 1800000721':

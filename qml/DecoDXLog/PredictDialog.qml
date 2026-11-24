@@ -134,7 +134,8 @@ DialogFrame {
         correctionStatus.text = qsTr("Review the draft before saving; no radio command was sent.")
     }
     function selectSchedulePass(index) {
-        if (!root.scheduleVisible || root.schedule.busy || index < 0 || index >= root.schedule.passes.length)
+        if (!root.scheduleVisible || root.schedule.busy || index < 0 || index >= root.schedule.passes.length ||
+                Number(root.schedule.passes[index].maxElevation) < minimumElevation.value)
             return
         root.selectedPass = root.schedule.passes[index]
         root.passValid = true
@@ -168,8 +169,8 @@ DialogFrame {
         root.planner.cancel()
         root.schedule.cancel()
         root.scheduleVisible = false
-        root.selectedPass = ({})
         root.passValid = false
+        root.selectedPass = ({})
     }
     Timer {
         id: refreshTimer
@@ -197,6 +198,19 @@ DialogFrame {
                              (Date.now() - new Date(root.schedule.passes[0].tleEpoch).getTime()) / 86400000 > 14))
                 root.probingSchedule = false
                 if (success && root.schedule.passes.length >= 2) {
+                    scheduleRepeater.itemAt(1).selectPass()
+                    minimumElevation.value = 31
+                    const cleared = !root.passValid
+                    root.selectSchedulePass(1)
+                    const blocked = !root.passValid
+                    let hidden = 0
+                    for (let i = 0; i < scheduleRepeater.count; ++i)
+                        if (!scheduleRepeater.itemAt(i).visible) ++hidden
+                    minimumElevation.value = 30
+                    let restored = 0
+                    for (let i = 0; i < scheduleRepeater.count; ++i)
+                        if (scheduleRepeater.itemAt(i).visible) ++restored
+                    console.warn("PROBE schedule filter hidden=" + hidden + " restored=" + restored + " cleared=" + cleared + " blocked=" + blocked)
                     scheduleRepeater.itemAt(1).selectPass()
                     console.warn("PROBE selectedSchedule aos=" + root.plannedPass.aos + " next=" + nextPassButton.enabled)
                     root.probingScheduleNext = true
@@ -378,6 +392,18 @@ DialogFrame {
         }
         RowLayout {
             Layout.fillWidth: true
+            Text { text: qsTr("Minimum sampled elevation (°)"); color: Theme.textSecondary }
+            SpinBox {
+                id: minimumElevation; from: 0; to: 90; value: 0; editable: true
+                Accessible.name: qsTr("Minimum sampled elevation in degrees")
+                onValueChanged: {
+                    if (root.passValid && Number(root.plannedPass.maxElevation) < value &&
+                        root.schedule.passes.some(p => Number(p.aos) === Number(root.plannedPass.aos))) {
+                        root.passValid = false
+                        root.selectedPass = ({})
+                    }
+                }
+            }
             Text { text: qsTr("Number of passes"); color: Theme.textSecondary }
             SpinBox { id: scheduleCount; from: 1; to: 10; value: 3; editable: true; enabled: !root.schedule.busy; Accessible.name: qsTr("Number of predicted passes") }
             GlassButton {
@@ -388,8 +414,8 @@ DialogFrame {
                     autoRefresh.checked = false
                     refreshTimer.stop()
                     root.scheduleVisible = true
-                    root.selectedPass = ({})
                     root.passValid = false
+                    root.selectedPass = ({})
                     scheduleStatus.text = qsTr("Predicting passes…")
                     if (!root.schedule.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim(), Math.floor(Date.now() / 1000), scheduleCount.value)) {
                         root.scheduleVisible = false
@@ -402,6 +428,9 @@ DialogFrame {
         Text { id: scheduleStatus; Layout.fillWidth: true; visible: root.scheduleVisible && !root.schedule.busy; color: Theme.textSecondary; wrapMode: Text.Wrap }
         Text { Layout.fillWidth: true; visible: root.scheduleVisible && root.schedule.busy; color: Theme.textSecondary; wrapMode: Text.Wrap
             text: qsTr("Predicting pass %1 of %2…").arg(root.schedule.passes.length + 1).arg(scheduleCount.value) }
+        Text { Layout.fillWidth: true; visible: root.scheduleVisible && root.schedule.passes.length > 0; color: Theme.textSecondary; wrapMode: Text.Wrap
+            text: qsTr("Showing %1 of %2 predicted passes at or above the minimum sampled elevation.")
+                  .arg(root.schedule.passes.filter(p => Number(p.maxElevation) >= minimumElevation.value).length).arg(root.schedule.passes.length) }
         Text { Layout.fillWidth: true; visible: root.scheduleVisible && root.schedule.passes.length > 0; color: Theme.warningColor; wrapMode: Text.Wrap
             text: qsTr("Predictions use sampled elevations and the same TLE. Check the TLE epoch and current operating conditions before use.") }
         Repeater {
@@ -411,6 +440,7 @@ DialogFrame {
                 required property var modelData
                 required property int index
                 Layout.fillWidth: true
+                visible: Number(modelData.maxElevation) >= minimumElevation.value
                 function selectPass() { selectPassButton.clicked() }
                 Text {
                     Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
