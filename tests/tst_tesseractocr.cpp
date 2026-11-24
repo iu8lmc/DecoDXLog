@@ -187,6 +187,22 @@ class TestTesseractOcr : public QObject {
         QVERIFY(acquisition.loadReviews(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),5,5000);
         QVERIFY(done.last().first().toBool()); QCOMPARE(acquisition.reviews().size(),1);
     }
+    void similarSearchKeepsExactMatchesBeforeTheLimit()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("ranked.sqlite")));
+        auto add=[&](const char *call) { return db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id; };
+        const auto exact=add("K1ABC"); QVERIFY(exact>0);
+        for (int i=0;i<105;++i) QVERIFY(add("K1ABD")>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(search.startSimilar("K1ABC","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000);
+        QVERIFY(done.first().first().toBool()); QCOMPARE(search.matches().size(),100); QVERIFY(search.truncated());
+        QCOMPARE(search.matches().first().toMap().value("id").toLongLong(),exact);
+        QCOMPARE(search.matches().first().toMap().value("call").toString(),QString("K1ABC"));
+        QVERIFY(!search.matches().first().toMap().value("similar").toBool());
+        QVERIFY(search.matches().at(1).toMap().value("similar").toBool());
+        QCOMPARE(db.qsoCount(),qint64(106));
+    }
+
     void similarCallSearchIsOptionalAndDateFiltered()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("similar.sqlite")));

@@ -63,7 +63,7 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrSearch> self(this);
-    m_pool.start([self, path, identity, fileToken, openGeneration, calls, dateUtc, timeUtc, cancelled] {
+    m_pool.start([self, path, identity, fileToken, openGeneration, calls, call, similar, dateUtc, timeUtc, cancelled] {
         QVariantList matches;
         QString error;
         bool truncated = false;
@@ -86,17 +86,20 @@ bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, c
                     QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call IN (")+placeholders+QStringLiteral(") AND deleted=0");
                     if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
                     if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
-                    query+=QStringLiteral(" ORDER BY id DESC LIMIT 101");
+                    query+=similar ? QStringLiteral(" ORDER BY CASE WHEN call=? THEN 0 ELSE 1 END,id DESC LIMIT 101")
+                                   : QStringLiteral(" ORDER BY id DESC LIMIT 101");
                     q.prepare(query);
                     for (const QString& candidate : calls) q.addBindValue(candidate);
                     if (!dateUtc.isEmpty()) q.addBindValue(dateUtc);
                     if (!timeUtc.isEmpty()) q.addBindValue(timeUtc);
+                    if (similar) q.addBindValue(call);
                     if (!q.exec()) {
                         error = tr("Cannot search the log");
                     } else {
                         while (!cancelled->load() && q.next()) {
                             if (matches.size() == 100) { truncated = true; break; }
                             matches << QVariantMap{{QStringLiteral("id"), q.value(0)}, {QStringLiteral("call"), q.value(1)},
+                                                   {QStringLiteral("similar"), q.value(1).toString() != call},
                                                    {QStringLiteral("at"), q.value(2)}, {QStringLiteral("band"), q.value(3)},
                                                    {QStringLiteral("mode"), q.value(4)}, {QStringLiteral("source"), q.value(5)},
                                                    {QStringLiteral("uuid"), q.value(6)}, {QStringLiteral("revision"), q.value(7)}};

@@ -15868,6 +15868,10 @@ Referenze aggiuntive: %7</translation></message>
 <context>
     <name>QslOcrDialog</name>
     <message>
+        <source>similar — verify</source>
+        <translation>simile — verificare</translation>
+    </message>
+    <message>
         <source>Include similar calls (one character substitution or adjacent swap)</source>
         <translation>Includi nominativi simili (un carattere sostituito o due adiacenti scambiati)</translation>
     </message>

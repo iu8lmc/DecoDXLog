@@ -244,7 +244,7 @@ DialogFrame {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "#" + modelData.id + " · " + modelData.call + " · " + modelData.at + " · " + modelData.band + " · " + modelData.mode
+                    text: "#" + modelData.id + " · " + modelData.call + (modelData.similar ? " · " + qsTr("similar — verify") : "") + " · " + modelData.at + " · " + modelData.band + " · " + modelData.mode
                     textFormat: Text.PlainText
                     color: Theme.textPrimary
                     elide: Text.ElideRight
