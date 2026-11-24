@@ -31,6 +31,19 @@ Report parseReport(const QByteArray& data)
     bool ok = false;
     const int declared = doc.header.value(QStringLiteral("APP_LOTW_NUMREC")).trimmed().toInt(&ok);
     report.declaredRecords = ok ? declared : -1;
+    int records = 0;
+    for (const AdifRecord& r : doc.records) {
+        // LoTW's deprecated EOF marker is not an ADIF QSO record and may
+        // appear after the final EOR without another EOR.
+        if (r.fields().size() == 1 && r.contains(QStringLiteral("APP_LOTW_EOF")))
+            continue;
+        ++records;
+    }
+    if (ok && (declared < 0 || declared != records)) {
+        report.error = QCoreApplication::translate("Lotw", "LoTW: incomplete report (expected %1 records, received %2)")
+                           .arg(declared).arg(records);
+        return report;
+    }
     for (const AdifRecord& r : doc.records) {
         if (r.value(QStringLiteral("QSL_RCVD")).trimmed().toUpper() == QLatin1String("Y"))
             report.confirmations << r;

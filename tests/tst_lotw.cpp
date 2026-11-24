@@ -158,6 +158,23 @@ private slots:
         QVERIFY(r.error.contains("password"));
     }
 
+    void rejectsIncompleteReportCount()
+    {
+        QByteArray truncated=kReport.left(kReport.indexOf("<APP_LoTW_OWNCALL:6>IU8LMC", kReport.indexOf("<eoh>")+5));
+        const auto incomplete=lotw::parseReport(truncated);
+        QVERIFY(!incomplete.ok);
+        QVERIFY(incomplete.confirmations.isEmpty());
+        QVERIFY(!incomplete.error.isEmpty());
+        const auto complete=lotw::parseReport(kReport);
+        QVERIFY(complete.ok);
+        QCOMPARE(complete.confirmations.size(),3);
+        const auto eof=lotw::parseReport(kReport+"\n<APP_LoTW_EOF:1>Y");
+        QVERIFY(eof.ok);
+        QCOMPARE(eof.confirmations.size(),3);
+        QByteArray wrongCount=kReport; wrongCount.replace("<APP_LoTW_NUMREC:1>3", "<APP_LoTW_NUMREC:1>4");
+        QVERIFY(!lotw::parseReport(wrongCount).ok);
+    }
+
     void parseMixedCaseHeaderAndPreserveConfirmationGrid()
     {
         QByteArray mixed=kReport; mixed.replace("<eoh>","<eOh>");

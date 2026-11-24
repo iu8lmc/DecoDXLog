@@ -4946,6 +4946,10 @@ Aprilo una volta in DecoDXLog per aggiornarlo.</translation>
 <context>
     <name>Lotw</name>
     <message>
+        <source>LoTW: incomplete report (expected %1 records, received %2)</source>
+        <translation>LoTW: rapporto incompleto (record attesi: %1, ricevuti: %2)</translation>
+    </message>
+    <message>
         <source>LoTW: username or password incorrect</source>
         <translation>LoTW: nome utente o password sbagliati</translation>
     </message>
