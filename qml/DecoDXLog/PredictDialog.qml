@@ -77,12 +77,33 @@ DialogFrame {
         satelliteField.text = name
         firstPassButton.clicked()
     }
+    function planningStart(text) {
+        const value = String(text).trim()
+        if (!value) return Math.floor(Date.now() / 1000)
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)) return 0
+        const millis = Date.parse(value)
+        if (!isFinite(millis) || millis <= 0 || millis > 4102444800000) return 0
+        const parsed = new Date(millis)
+        if (parsed.toISOString() !== value.replace("Z", ".000Z")) return 0
+        return Math.floor(millis / 1000)
+    }
+    function requestPlanningStart() {
+        const start = planningStart(planningStartField.text)
+        if (!start) status.text = qsTr("Enter a valid UTC start in YYYY-MM-DDTHH:MM:SSZ format, or leave it empty for now.")
+        return start
+    }
     function probeSchedule(host, port, name) {
         probingSchedule = true
         hostField.text = host
         portField.text = String(port)
         satelliteField.text = name
         scheduleCount.value = 3
+        planningStartField.text = "2027-02-30T08:00:00Z"
+        scheduleButton.clicked()
+        console.warn("PROBE schedule invalid rejected=" + (!root.schedule.busy && status.text === qsTr("Enter a valid UTC start in YYYY-MM-DDTHH:MM:SSZ format, or leave it empty for now.")))
+        planningStartField.text = "2027-01-15T08:00:00Z"
+        console.warn("PROBE schedule start valid=" + planningStart(planningStartField.text) +
+                     " invalid=" + (planningStart("2027-02-30T08:00:00Z") === 0 && planningStart("2027-01-15T08:00:00+01:00") === 0))
         scheduleButton.clicked()
     }
     function probeDraft(host, port, name, save, mode, mapping) {
@@ -384,9 +405,17 @@ DialogFrame {
             GlassButton { id: prepareDraftButton; text: qsTr("Prepare QSO…"); enabled: root.resultValid && !root.tracker.busy; onClicked: root.prepareDraft() }
         }
         Text { id: correctionStatus; Layout.fillWidth: true; color: Theme.textSecondary; wrapMode: Text.Wrap }
+        StyledTextField {
+            id: planningStartField
+            Layout.fillWidth: true
+            placeholderText: qsTr("Planning start UTC: YYYY-MM-DDTHH:MM:SSZ (empty = now)")
+            Accessible.name: qsTr("Optional UTC planning start")
+            enabled: !root.planner.busy && !root.schedule.busy
+            onTextChanged: { root.passValid = false; root.scheduleVisible = false }
+        }
         RowLayout {
             Layout.fillWidth: true
-            GlassButton { id: firstPassButton; text: qsTr("Predict next pass"); enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && portField.acceptableInput; onClicked: root.requestPass(Math.floor(Date.now() / 1000)) }
+            GlassButton { id: firstPassButton; text: qsTr("Predict next pass"); enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && portField.acceptableInput; onClicked: { const start = root.requestPlanningStart(); if (start) root.requestPass(start) } }
             GlassButton { id: nextPassButton; text: qsTr("Following pass"); enabled: root.passValid && !root.tracker.busy && !root.planner.busy && !root.schedule.busy; onClicked: root.requestPass(Number(root.plannedPass.los) + 1) }
             GlassButton { text: qsTr("Cancel prediction"); visible: root.planner.busy; onClicked: root.planner.cancel() }
         }
@@ -411,13 +440,15 @@ DialogFrame {
                 text: qsTr("Plan passes")
                 enabled: !root.tracker.busy && !root.planner.busy && !root.schedule.busy && portField.acceptableInput
                 onClicked: {
+                    const start = root.requestPlanningStart()
+                    if (!start) return
                     autoRefresh.checked = false
                     refreshTimer.stop()
                     root.scheduleVisible = true
                     root.passValid = false
                     root.selectedPass = ({})
                     scheduleStatus.text = qsTr("Predicting passes…")
-                    if (!root.schedule.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim(), Math.floor(Date.now() / 1000), scheduleCount.value)) {
+                    if (!root.schedule.request(hostField.text.trim(), Number(portField.text), satelliteField.text.trim(), start, scheduleCount.value)) {
                         root.scheduleVisible = false
                         status.text = qsTr("Enter a valid server and satellite name.")
                     }

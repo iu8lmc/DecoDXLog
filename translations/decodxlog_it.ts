@@ -15496,6 +15496,18 @@ Referenze aggiuntive: %7</translation></message>
 <context>
     <name>PredictDialog</name>
     <message>
+        <source>Enter a valid UTC start in YYYY-MM-DDTHH:MM:SSZ format, or leave it empty for now.</source>
+        <translation>Inserisci una data UTC valida nel formato YYYY-MM-DDTHH:MM:SSZ, oppure lascia vuoto per usare il momento attuale.</translation>
+    </message>
+    <message>
+        <source>Planning start UTC: YYYY-MM-DDTHH:MM:SSZ (empty = now)</source>
+        <translation>Inizio pianificazione UTC: YYYY-MM-DDTHH:MM:SSZ (vuoto = adesso)</translation>
+    </message>
+    <message>
+        <source>Optional UTC planning start</source>
+        <translation>Inizio UTC facoltativo della pianificazione</translation>
+    </message>
+    <message>
         <source>Minimum sampled elevation (°)</source>
         <translation>Elevazione minima campionata (°)</translation>
     </message>
