@@ -30,6 +30,41 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void sessionExportProtectsLogSidecar_data()
+    {
+        QTest::addColumn<bool>("cabrillo");
+        QTest::newRow("ADIF") << false;
+        QTest::newRow("Cabrillo") << true;
+    }
+    void sessionExportProtectsLogSidecar()
+    {
+        QFETCH(bool, cabrillo);
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db = &db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind", "pota"}, {"reference", "IT-0001"}}).isEmpty());
+        AdifRecord qso{{"CALL", "K1ABC"}, {"QSO_DATE", "20261124"}, {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "CW"}};
+        act.applyTo(qso); QVERIFY(db.insertQso(qso, "fixture", {}, true, 0, false).id > 0);
+        const auto exportTo = [&](const QString& path) {
+            return cabrillo ? act.exportCabrillo(QUrl::fromLocalFile(path), {{"contest", "TEST"}, {"callsign", "K1ABC"}})
+                            : act.exportAdif(QUrl::fromLocalFile(path));
+        };
+        const QString normal = dir.filePath("normal.out");
+        QVERIFY2(exportTo(normal).isEmpty(), "Ordinary session export failed");
+        QVERIFY(QFileInfo(normal).size() > 0);
+        QVERIFY(!exportTo(dir.filePath("log.sqlite")).isEmpty());
+#ifdef Q_OS_UNIX
+        const QString alias = dir.filePath("database-alias");
+        QVERIFY(QFile::link(dir.filePath("log.sqlite"), alias));
+        QVERIFY(!exportTo(alias).isEmpty());
+#endif
+        const QString sidecar = dir.filePath("log.sqlite-journal");
+        QVERIFY(!QFile::exists(sidecar));
+        QVERIFY(!exportTo(sidecar).isEmpty());
+        QVERIFY(!QFile::exists(sidecar));
+        QCOMPARE(db.qsoCount(), qint64(1));
+    }
+
     void activeSessionExcludesUnrelatedQsosFromCountsAndExportSelection()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

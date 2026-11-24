@@ -1681,11 +1681,14 @@ QString ActivationController::exportCabrillo(const QUrl& url, const QVariantMap&
         return error.isEmpty() ? tr("Nothing to write") : error;
 
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    if (!safeContestReportDestination(path, m_ctx.db->path()))
+        return tr("Choose a file other than the log database and its SQLite files.");
+    QSaveFile file(path);
+    file.setDirectWriteFallback(false);
+    if (!file.open(QIODevice::WriteOnly))
         return tr("Cannot write %1").arg(path);
-    file.write(text_out);
-    file.close();
+    if (file.write(text_out) != text_out.size()) { file.cancelWriting(); return file.errorString(); }
+    if (!file.commit()) return file.errorString();
     if (m_ctx.activity) {
         m_ctx.activity(QStringLiteral("ACT"),
                        tr("Cabrillo written: %1 (%n QSO)", nullptr, static_cast<int>(records.size())).arg(path),
@@ -1775,10 +1778,15 @@ QString ActivationController::exportAdif(const QUrl& url)
     for (const QVariant& v : ids)
         list << v.toLongLong();
     const QString path = url.isLocalFile() ? url.toLocalFile() : url.toString();
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    if (!safeContestReportDestination(path, m_ctx.db->path()))
+        return tr("Choose a file other than the log database and its SQLite files.");
+    const QByteArray data = m_ctx.db->exportAdif(list, QCoreApplication::applicationVersion());
+    QSaveFile file(path);
+    file.setDirectWriteFallback(false);
+    if (!file.open(QIODevice::WriteOnly))
         return file.errorString();
-    file.write(m_ctx.db->exportAdif(list, QCoreApplication::applicationVersion()));
+    if (file.write(data) != data.size()) { file.cancelWriting(); return file.errorString(); }
+    if (!file.commit()) return file.errorString();
     if (m_ctx.activity)
         m_ctx.activity(QStringLiteral("ACT"), tr("%n QSO of the session → %1", nullptr, static_cast<int>(list.size())).arg(path),
                        QStringLiteral("success"));

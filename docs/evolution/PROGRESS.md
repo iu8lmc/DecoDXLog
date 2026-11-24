@@ -2663,3 +2663,11 @@ Activation partition export now checks the resolved parent directory as well as 
 A/B on macOS arm64 / Qt 6.11.2: an isolated synthetic activation test selected the absent log.sqlite-journal through a symbolic directory alias. Before the change the export was accepted; afterwards it was rejected, and the same fixture successfully exported normal POTA, WWFF, SOTA and IOTA partitions. CTest activation, database, migration and qmlpopups passed 4/4; the application and activation test target built.
 
 This is a point-in-time path check, not protection against replacement after validation; the second check narrows but does not eliminate that race. The alias fixture runs on Unix only; physical UI, Windows/Linux, real activations and official importers were not exercised. G06 and integrated acceptance remain open.
+
+## 2026-11-24 — G06 protect full-session exports
+
+Full-session ADIF and Cabrillo exports now reject the current database and its SQLite sidecar paths using the existing resolved-path and file-equivalence guard. Both use QSaveFile with direct-write fallback disabled, check the write and commit results, and report success only after commit. This prevents direct truncation of the log if it is selected as the output and avoids reporting a successful short write.
+
+A/B on macOS arm64 / Qt 6.11.2: a file-backed synthetic fixture selected an absent SQLite journal path. Both export methods accepted it before the fix and rejected it afterwards; both also rejected the database path and a symbolic link to it, while producing a nonempty ordinary export. CTest activation, database, migration and qmlpopups passed 4/4; the application and test targets built. The link case is Unix-only.
+
+The tests call the controller programmatically and do not simulate short writes or a filesystem change between validation and commit. QSaveFile does not guarantee durability across power loss. Windows/Linux, physical UI, real activations and official importers remain unverified; G06 and integrated acceptance remain open.
