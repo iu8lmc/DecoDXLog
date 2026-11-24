@@ -1452,6 +1452,26 @@ ContestNetChangePage LogDatabase::contestNetChangesAfter(qint64 sequence, int li
     return page;
 }
 
+ExtensionQsoEventPage LogDatabase::extensionEventsAfter(const QString& logIdentity, qint64 sequence, int limit) const
+{
+    ExtensionQsoEventPage page;
+    if (!isOpen()) { page.error=QStringLiteral("database not open"); return page; }
+    if (logIdentity.isEmpty() || sequence<0 || limit<1 || limit>500) { page.error=QStringLiteral("invalid event cursor or page size"); return page; }
+    if (!fileIdentityMatchesOpen() || identity()!=logIdentity) { page.error=QStringLiteral("log changed"); return page; }
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral("SELECT sequence,qso_uuid,previous_qso_uuid,revision,kind,service,recorded_at FROM extension_qso_event WHERE sequence>? ORDER BY sequence LIMIT ?"));
+    q.addBindValue(sequence); q.addBindValue(limit+1);
+    if (!q.exec()) { page.error=q.lastError().text(); return page; }
+    while (q.next()) {
+        if (page.events.size()==limit) { page.hasMore=true; break; }
+        page.events.append({q.value(0).toLongLong(),q.value(1).toString(),q.value(2).toString(),q.value(3).toInt(),q.value(4).toString(),q.value(5).toString(),q.value(6).toString()});
+    }
+    if (q.lastError().isValid()) { page.events.clear(); page.error=q.lastError().text(); return page; }
+    if (!fileIdentityMatchesOpen() || identity()!=logIdentity) { page.events.clear(); page.error=QStringLiteral("log changed"); return page; }
+    page.ok=true;
+    return page;
+}
+
 QString LogDatabase::snapshotJson(qint64 id, QString* error) const
 {
     const auto r = recordChecked(id, error);

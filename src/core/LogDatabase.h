@@ -36,6 +36,23 @@ struct RoverInsertGuard {
     QString grid;
 };
 
+struct ExtensionQsoEvent {
+    qint64 sequence{0};
+    QString qsoUuid;
+    QString previousQsoUuid;
+    int revision{0};
+    QString kind;
+    QString service;
+    QString recordedAt;
+};
+
+struct ExtensionQsoEventPage {
+    bool ok{false};
+    bool hasMore{false};
+    QList<ExtensionQsoEvent> events;
+    QString error;
+};
+
 struct ContestNetChange {
     qint64 sequence{0};
     QString qsoUuid;
@@ -353,6 +370,7 @@ public:
     // Metadata only, from schema 28 onwards. Existing QSO need an initial
     // inventory; the sequence is local to this database, not a peer ACK.
     ContestNetChangePage contestNetChangesAfter(qint64 sequence, int limit) const;
+    ExtensionQsoEventPage extensionEventsAfter(const QString& logIdentity, qint64 sequence, int limit) const;
 
     // Riscrive un QSO: la versione precedente va in qso_history, revision sale di
     // uno, dirty torna a 1. `stationProfileId` < 0 lascia il profilo com'e'.

@@ -94,6 +94,38 @@ private slots:
         QCOMPARE(services.at(2),QString("lotw"));
     }
 
+    void extensionEventPagesAreReplayableAndLogBound()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("events.sqlite")));
+        const QString identity=db.identity(); QVERIFY(!identity.isEmpty());
+        for (const auto& call : {QStringLiteral("K1AAA"),QStringLiteral("K1BBB"),QStringLiteral("K1CCC")})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        const auto page=db.extensionEventsAfter(identity,0,2); QVERIFY(page.ok); QVERIFY(page.hasMore); QCOMPARE(page.events.size(),2);
+        QCOMPARE(page.events.at(0).kind,QString("added")); QVERIFY(page.events.at(0).sequence<page.events.at(1).sequence);
+        const auto repeat=db.extensionEventsAfter(identity,0,2); QVERIFY(repeat.ok); QCOMPARE(repeat.events.at(0).sequence,page.events.at(0).sequence); QCOMPARE(repeat.events.at(1).qsoUuid,page.events.at(1).qsoUuid);
+        const auto next=db.extensionEventsAfter(identity,page.events.last().sequence,2); QVERIFY(next.ok); QVERIFY(!next.hasMore); QCOMPARE(next.events.size(),1);
+        QVERIFY(!db.extensionEventsAfter(QStringLiteral("wrong-log"),0,2).ok);
+        QVERIFY(!db.extensionEventsAfter(identity,-1,2).ok); QVERIFY(!db.extensionEventsAfter(identity,0,0).ok); QVERIFY(!db.extensionEventsAfter(identity,0,501).ok);
+    }
+
+    void extensionEventInsertBenchmark()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_EXTENSION_EVENTS")) QSKIP("opt-in synthetic event benchmark");
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        for (int enabled=0; enabled<2; ++enabled) {
+            LogDatabase db; const QString path=dir.filePath(QString::number(enabled)+".sqlite"); QVERIFY(db.open(path)); QSqlQuery q(db.connection());
+            if (!enabled) QVERIFY(q.exec("DROP TRIGGER extension_qso_insert"));
+            QVERIFY(db.connection().transaction());
+            QVERIFY(q.prepare("INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) VALUES(?,?,'2026-01-01T12:00:00Z','20m','CW','2026-01-01T12:00:00Z','2026-01-01T12:00:00Z')"));
+            QElapsedTimer timer; timer.start();
+            for (int i=0;i<10000;++i) { q.bindValue(0,QStringLiteral("event-%1").arg(i)); q.bindValue(1,QStringLiteral("K%1AAA").arg(i)); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); }
+            QVERIFY(db.connection().commit()); const auto elapsed=timer.elapsed();
+            QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),enabled ? 10000 : 0);
+            QCOMPARE(db.qsoCount(),qint64(10000));
+            qInfo().noquote() << "EVENT_BENCH enabled=" << enabled << "count=10000 insert_commit_ms=" << elapsed;
+        }
+    }
+
     void extensionEventMigrationPreservesExistingQsos()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("legacy.sqlite");
