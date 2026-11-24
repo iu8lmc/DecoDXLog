@@ -30,8 +30,18 @@ class TrackerAdapterTests(unittest.TestCase):
                 self.assertEqual(fetch.call_args_list[1].args[1], "/api/v1/tracker")
                 self.assertEqual(fetch.call_count, 2)
 
+    def test_scoped_tracker_credential(self):
+        scoped = {**self.caps, "permissionModel": "extension-token", "perExtensionPermissions": True}
+        with patch.object(tracker, "fetch_json", side_effect=[scoped, self.state]):
+            self.assertTrue(tracker.read_tracker(12345, "secret")["freshForReview"])
+        with patch.object(tracker, "fetch_json", return_value={**scoped, "operations": ["qso.read"]}) as fetch:
+            with self.assertRaises(ValueError): tracker.read_tracker(12345, "secret")
+            self.assertEqual(fetch.call_count, 1)
+
     def test_rejects_privileged_or_malformed_status(self):
         for caps in ({**self.caps, "permissionModel": "shared-token"}, {**self.caps, "apiVersion": 2},
+                     {**self.caps, "permissionModel": "extension-token", "perExtensionPermissions": False},
+                     {**self.caps, "operations": ["tracker.read", {}]},
                      {**self.caps, "operations": ["tracker.read", "qso.write"]}):
             with self.subTest(caps=caps), patch.object(tracker, "fetch_json", return_value=caps) as fetch:
                 with self.assertRaises(ValueError): tracker.read_tracker(12345, "read-only")

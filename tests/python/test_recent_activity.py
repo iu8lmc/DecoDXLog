@@ -25,9 +25,19 @@ class RecentActivityTests(unittest.TestCase):
         self.assertEqual(fetch.call_count, 2)
         self.assertEqual(fetch.call_args_list[1].args[1], "/api/v1/qsos?limit=10")
 
+    def test_scoped_qso_credential(self):
+        scoped = {**self.caps, "permissionModel": "extension-token", "perExtensionPermissions": True, "operations": ["qso.read"]}
+        with patch.object(report, "fetch_json", side_effect=[scoped, {"qsos": []}]):
+            self.assertEqual(report.build_report(12345, 10, "secret")["sampleSize"], 0)
+        with patch.object(report, "fetch_json", return_value={**scoped, "operations": ["tracker.read"]}) as fetch:
+            with self.assertRaises(ValueError): report.build_report(12345, 10, "secret")
+            self.assertEqual(fetch.call_count, 1)
+
     def test_rejects_full_token_and_incompatible_capabilities_before_read(self):
         for caps in ({**self.caps, "permissionModel": "shared-token"},
                      {**self.caps, "apiVersion": 2},
+                     {**self.caps, "permissionModel": "extension-token", "perExtensionPermissions": False},
+                     {**self.caps, "operations": ["qso.read", {}]},
                      {**self.caps, "operations": ["qso.read", "qso.write"]}):
             with self.subTest(caps=caps), patch.object(report, "fetch_json", return_value=caps) as fetch:
                 with self.assertRaises(ValueError):

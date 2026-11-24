@@ -15,8 +15,10 @@ def read_tracker(port, token):
         raise ValueError("invalid port or read-only token")
     caps = fetch_json(port, "/api/v1/capabilities?apiVersion=1", token)
     operations = caps.get("operations")
-    if (caps.get("apiVersion") != 1 or caps.get("permissionModel") != "read-only-token"
-            or not isinstance(operations, list) or "tracker.read" not in operations or "qso.write" in operations):
+    if (caps.get("apiVersion") != 1 or (caps.get("permissionModel") not in ("read-only-token", "extension-token")
+                or (caps.get("permissionModel") == "extension-token" and caps.get("perExtensionPermissions") is not True))
+            or not isinstance(operations, list) or "tracker.read" not in operations or any(not isinstance(operation, str) for operation in operations)
+            or not set(operations).issubset({"qso.read", "status.read", "worked.read", "tracker.read"})):
         raise ValueError("compatible read-only tracker access is required")
     state = fetch_json(port, "/api/v1/tracker", token)
     if state.get("source") != "predict_udp" or any(type(state.get(k)) is not bool for k in ("available", "fresh", "orbitalFresh", "busy")):

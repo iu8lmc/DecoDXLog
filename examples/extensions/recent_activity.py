@@ -40,9 +40,11 @@ def build_report(port, limit, token):
         raise ValueError("a read-only token is required in DECODXLOG_READ_TOKEN")
     caps = fetch_json(port, "/api/v1/capabilities?apiVersion=1", token)
     operations = caps.get("operations")
-    if (caps.get("apiVersion") != 1 or caps.get("permissionModel") != "read-only-token"
+    if (caps.get("apiVersion") != 1 or (caps.get("permissionModel") not in ("read-only-token", "extension-token")
+                or (caps.get("permissionModel") == "extension-token" and caps.get("perExtensionPermissions") is not True))
             or not isinstance(operations, list) or "qso.read" not in operations
-            or "qso.write" in operations):
+            or any(not isinstance(operation, str) for operation in operations)
+            or not set(operations).issubset({"qso.read", "status.read", "worked.read", "tracker.read"})):
         raise ValueError("the API did not confirm a compatible read-only credential")
     data = fetch_json(port, f"/api/v1/qsos?limit={limit}", token)
     qsos = data.get("qsos")
