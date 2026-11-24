@@ -2751,3 +2751,11 @@ Radio-net export now captures the open file identity, persistent log identity an
 A/B on macOS arm64 / Qt 6.11.2: in a temporary fixture, replacing the log path with a different database before scheduling previously allowed export to start; it now rejects the operation without producing an output. Normal history export and hard-link rejection also passed; app and test targets built, and CTest radionet, database, migration and qmlpopups passed 4/4.
 
 The replacement fixture changes the path before scheduling, not between worker checkpoints. These point-in-time checks cannot make live SQLite file replacement safe or remove every race; an already-open snapshot and a later filesystem swap need separate testing. Physical UI, Windows/Linux, actual radio operations and full G08/G13 acceptance remain open.
+
+## 2026-11-24 — G08 report export after changing log
+
+The asynchronous radio-net export completion now checks the original open generation, file identity, path and selected session. If the current context changed, a successful completion explicitly says the file came from the original log; failure also identifies the original log. The success flag still reflects whether the file was actually saved, and the dialog now displays the success message when supplied. Italian translations were added.
+
+A/B on macOS arm64 / Qt 6.11.2: the test waited for an actual JSON export to appear without processing its queued completion, opened a different temporary log and then delivered the callback. Previously success had no indication of origin; now it reports the original log and the JSON contains the original session. Normal export also passed. App and test targets built; CTest radionet, database, migration and qmlpopups passed 4/4.
+
+The fixture exercises a log switch after writing, not a session-only switch or every failure ordering; the message branch for session change is not separately tested. The UI success-message binding was built but not observed in physical UI. The result does not make filesystem replacement safe. Windows/Linux, real radio operations and full G08/G13 acceptance remain open.

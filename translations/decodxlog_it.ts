@@ -15449,6 +15449,8 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>decolog::core::RadioNet</name>
+    <message><source>Export saved from the original log %1; the current log or session changed.</source><translation>Export salvato dal log originale %1; il log o la sessione corrente è cambiata.</translation></message>
+    <message><source>Export from the original log %1 failed: %2</source><translation>Export dal log originale %1 non riuscito: %2</translation></message>
     <message><source>The log file changed; reopen it before exporting</source><translation>Il file del log è cambiato; riaprilo prima di esportare</translation></message>
     <message>
         <source>Log is not open</source>

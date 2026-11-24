@@ -105,7 +105,7 @@ DialogFrame {
         target: root.net
         function onChanged() { root.refreshHistory(); root.refreshReportedQsos() }
         function onExportFinished(success, message) {
-            exportMessage.text = success ? qsTr("Session exported.") : qsTr("Export failed: %1").arg(message)
+            exportMessage.text = success ? (message || qsTr("Session exported.")) : qsTr("Export failed: %1").arg(message)
         }
     }
     Connections {

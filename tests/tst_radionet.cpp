@@ -399,6 +399,22 @@ class TestRadioNet : public QObject {
         QCOMPARE(db.qsoCount(), 0);
     }
 
+    void exportReportsLogSwitchAfterWriting()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("first.sqlite")));
+        RadioNet net(&db); QVERIFY(net.start("Original net"));
+        const QString output=dir.filePath("net.json"); QSignalSpy finished(&net,&RadioNet::exportFinished);
+        QVERIFY(net.exportSession(QUrl::fromLocalFile(output)));
+        QElapsedTimer timer; timer.start();
+        while (!QFile::exists(output) && timer.elapsed()<5000) QThread::msleep(1);
+        QVERIFY(QFile::exists(output)); QVERIFY(db.open(dir.filePath("second.sqlite")));
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000);
+        QVERIFY(finished.first().at(0).toBool());
+        QVERIFY(finished.first().at(1).toString().contains("original log",Qt::CaseInsensitive));
+        QFile file(output); QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(QJsonDocument::fromJson(file.readAll()).object().value("session").toObject().value("title").toString(),QString("Original net"));
+    }
+
     void exportRejectsReplacedLogFile()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");

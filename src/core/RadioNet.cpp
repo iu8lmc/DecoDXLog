@@ -553,6 +553,7 @@ bool RadioNet::exportSession(const QUrl &file)
         return fail(tr("A file-backed log is required for export"));
     const QByteArray sourceFile = m_db->openFileIdentity();
     const QString sourceIdentity = m_db->identity();
+    const quint64 sourceGeneration = m_db->openGeneration();
     if (sourceFile.isEmpty() || sourceIdentity.isEmpty() || !m_db->fileIdentityMatchesOpen())
         return fail(tr("The log file changed; reopen it before exporting"));
     QSqlQuery selected(m_db->connection());
@@ -573,7 +574,7 @@ bool RadioNet::exportSession(const QUrl &file)
     emit changed();
     emit exportChanged();
     QPointer<RadioNet> self(this);
-    m_exportPool.start([self, source, sourceFile, sourceIdentity, sessionUuid, destination, sessionId, cancel] {
+    m_exportPool.start([self, source, sourceFile, sourceIdentity, sourceGeneration, sessionUuid, destination, sessionId, cancel] {
         QString error;
         bool success = false;
         {
@@ -704,13 +705,19 @@ bool RadioNet::exportSession(const QUrl &file)
         }
         QMetaObject::invokeMethod(
             self.data(),
-            [self, success, error] {
+            [self, success, error, source, sourceFile, sourceGeneration, sessionId] {
                 if (!self)
                     return;
                 self->m_exportBusy = false;
                 self->m_exportCancel.reset();
                 emit self->exportChanged();
-                emit self->exportFinished(success, error);
+                const bool changed = !self->m_db || !self->m_db->isOpen() || self->m_db->path() != source
+                    || self->m_db->openGeneration() != sourceGeneration || self->m_db->openFileIdentity() != sourceFile
+                    || self->m_sessionId != sessionId;
+                const QString message = changed && success
+                    ? tr("Export saved from the original log %1; the current log or session changed.").arg(source)
+                    : changed ? tr("Export from the original log %1 failed: %2").arg(source, error) : error;
+                emit self->exportFinished(success, message);
             },
             Qt::QueuedConnection);
     });
