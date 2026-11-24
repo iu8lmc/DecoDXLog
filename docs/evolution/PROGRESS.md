@@ -3516,3 +3516,9 @@ The local API now retains the configured extension ID with each scoped credentia
 A/B on macOS arm64 / Qt 6.11.2: the real-app scoped credential fixture initially received an empty extensionId; after the change it received the configured `test.report` identity, retained QSO-only access, denied tracker and QSO writes, and ran the read-only example. The focused app fixture and complete localapi CTest passed after rebuilding. git diff --check passed.
 
 The extension manager does not yet compare the returned identity or permissions to its manifest, and identity assignment is still a manual operator action. Tokens remain plaintext in settings and the code is not sandboxed. Other platforms and full G11/G13 acceptance remain open. This increment is in the detached worktree; the main checkout full CTest was still running separately.
+
+## 2026-11-24 — G13 full regression and integration of Radio Net and extension increments
+
+The sequential offscreen full CTest on main-checkout revision `702014b` passed 123/123 groups in 1798.89 seconds. This includes `journeycolumn`, whose earlier run on revision `1e8b4479` had failed intermittently; the prior failure remains recorded above. Individual platform and opt-in skips in the suite are not converted into passes by the group result.
+
+After that run, the separately developed Radio Net draft/session guards, forced race tests, local extension operation coordination and scoped extension credential increments were cherry-picked onto the main branch through revision `73b5cf16`. The rebuilt main checkout passed localapi, radionet and four extension CTest groups 6/6; the focused real-app scoped credential fixture and offscreen setup key creation/revocation fixture also passed. These focused checks do not replace a complete full-suite run of `73b5cf16` or prove external services, physical UI, hardware, clean installation or other platforms. Full G00–G13 acceptance remains open.
