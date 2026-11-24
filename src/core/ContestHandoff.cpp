@@ -10,6 +10,7 @@
 namespace decolog::core::contesthandoff {
 namespace {
 const QString incomingPrefix=QStringLiteral("contest_handoff.in."), outgoingPrefix=QStringLiteral("contest_handoff.out.");
+const QString statePrefix=QStringLiteral("contest_handoff.state.");
 bool identifier(const QString& value) {
     static const QRegularExpression re(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$")); return re.match(value).hasMatch();
 }
@@ -57,15 +58,22 @@ Result storeOutgoing(LogDatabase& db,const Offer& offer) { return store(db,outgo
 static QList<Offer> list(const LogDatabase& db,const QString& prefix,const QString& scope,const QString& node,bool outgoing,QString* error) {
     if (error) error->clear(); QList<Offer> out;
     if (!db.isOpen() || !identifier(scope) || !identifier(node)) { if (error) *error=QStringLiteral("Invalid handoff listing"); return {}; }
-    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT key,value FROM app_setting WHERE substr(key,1,?)=? ORDER BY key LIMIT 10001"));
+    QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT a.key,a.value,s.value FROM app_setting a LEFT JOIN app_setting s ON s.key=? || substr(a.key,?) WHERE substr(a.key,1,?)=? ORDER BY a.key LIMIT 10001"));
+    q.addBindValue(outgoing ? QStringLiteral("contest_handoff.unused.") : statePrefix); q.addBindValue(prefix.size()+1);
     q.addBindValue(prefix.size()); q.addBindValue(prefix); if (!q.exec()) { if (error) *error=q.lastError().text(); return {}; }
     int count=0;
     while(q.next()) {
         if (++count>10000) { if (error) *error=QStringLiteral("Too many handoff offers"); return {}; }
         QJsonParseError parseError; const auto doc=QJsonDocument::fromJson(q.value(1).toString().toUtf8(),&parseError);
-        const auto offer=doc.isObject()?parse(doc.object()):std::nullopt;
+        auto offer=doc.isObject()?parse(doc.object()):std::nullopt;
         if (parseError.error!=QJsonParseError::NoError || !offer || prefix+offer->id!=q.value(0).toString()) {
             if (error) *error=QStringLiteral("Invalid stored handoff offer"); return {};
+        }
+        if (!outgoing) {
+            offer->state=q.value(2).isNull()?QStringLiteral("pending"):q.value(2).toString();
+            if (offer->state!=QLatin1String("pending") && offer->state!=QLatin1String("accepted") && offer->state!=QLatin1String("declined") && offer->state!=QLatin1String("completed")) {
+                if (error) *error=QStringLiteral("Invalid stored handoff state"); return {};
+            }
         }
         if (offer->scope==scope && (outgoing ? offer->sender : offer->recipient)==node) out << *offer;
     }
@@ -74,4 +82,24 @@ static QList<Offer> list(const LogDatabase& db,const QString& prefix,const QStri
 }
 QList<Offer> incomingOffers(const LogDatabase& db,const QString& scope,const QString& recipient,QString* error) { return list(db,incomingPrefix,scope,recipient,false,error); }
 QList<Offer> outgoingOffers(const LogDatabase& db,const QString& scope,const QString& sender,QString* error) { return list(db,outgoingPrefix,scope,sender,true,error); }
+Result setIncomingState(LogDatabase& db,const QString& scope,const QString& recipient,const QString& id,const QString& state) {
+    QString error; const auto offers=incomingOffers(db,scope,recipient,&error);
+    if (!error.isEmpty()) return {false,false,error};
+    for (const auto& offer : offers) if (offer.id==id) {
+        const auto old=offer.state;
+        if (old==state) return {true,true,{}};
+        if (!((old==QLatin1String("pending") && (state==QLatin1String("accepted") || state==QLatin1String("declined"))) ||
+              (old==QLatin1String("accepted") && state==QLatin1String("completed"))))
+            return {false,false,QStringLiteral("Invalid handoff state transition")};
+        const auto value=QString::fromUtf8(QJsonDocument(offerFrame(offer)).toJson(QJsonDocument::Compact));
+        QSqlQuery q(db.connection());
+        q.prepare(QStringLiteral("INSERT INTO app_setting(key,value) SELECT ?,? WHERE EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?) AND (?='pending' OR EXISTS(SELECT 1 FROM app_setting WHERE key=? AND value=?)) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE app_setting.value=?"));
+        const auto key=statePrefix+id; q.addBindValue(key); q.addBindValue(state); q.addBindValue(incomingPrefix+id); q.addBindValue(value);
+        q.addBindValue(old); q.addBindValue(key); q.addBindValue(old); q.addBindValue(old);
+        if (!q.exec()) return {false,false,q.lastError().text()};
+        if (q.numRowsAffected()!=1) return {false,false,QStringLiteral("Handoff changed; refresh and retry")};
+        return {true,false,{}};
+    }
+    return {false,false,QStringLiteral("Handoff offer not found")};
+}
 }

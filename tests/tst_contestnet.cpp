@@ -29,8 +29,20 @@ private slots:
         QString from,type; QJsonObject received; const auto packet=ContestNet::pack("FIELD","node-a","handoff_offer_v1",body);
         QVERIFY(ContestNet::unpack(packet,"FIELD",&from,&type,&received)); QCOMPARE(type,QString("handoff_offer_v1"));
         auto first=contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,received);
+        QCOMPARE(contesthandoff::incomingOffers(recipient,"contest-2026","node-b").first().state,QString("pending"));
+        QVERIFY(!contesthandoff::setIncomingState(recipient,"other-contest","node-b",offer.id,"accepted").ok);
+        QVERIFY(!contesthandoff::setIncomingState(recipient,"contest-2026","node-b",offer.id,"completed").ok);
+        QVERIFY(contesthandoff::setIncomingState(recipient,"contest-2026","node-b",offer.id,"accepted").ok);
+        QCOMPARE(contesthandoff::incomingOffers(recipient,"contest-2026","node-b").first().state,QString("accepted"));
+        QVERIFY(contesthandoff::setIncomingState(recipient,"contest-2026","node-b",offer.id,"completed").ok);
+        QVERIFY(!contesthandoff::setIncomingState(recipient,"contest-2026","node-b",offer.id,"declined").ok);
         QVERIFY2(first.ok,qPrintable(first.error)); QVERIFY(!first.replayed);
         auto repeated=contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,received); QVERIFY(repeated.ok); QVERIFY(repeated.replayed);
+        QCOMPARE(contesthandoff::incomingOffers(recipient,"contest-2026","node-b").first().state,QString("completed"));
+        auto other=offer; other.id=QStringLiteral("8f3b7450-8e62-4dbd-8671-001122334456");
+        QVERIFY(contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,contesthandoff::offerFrame(other)).ok);
+        QVERIFY(contesthandoff::setIncomingState(recipient,"contest-2026","node-b",other.id,"declined").ok);
+        QVERIFY(!contesthandoff::setIncomingState(recipient,"contest-2026","node-b",other.id,"accepted").ok);
         auto changed=received; changed.insert("frequencyHz",14026000); QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,changed).ok);
         QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-c",from,received).ok);
         QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b","impostor",received).ok);
@@ -40,7 +52,8 @@ private slots:
         }
         auto unexpected=received; unexpected.insert("extra",true); QVERIFY(!contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,unexpected).ok);
         recipient.close(); QVERIFY(recipient.open(path)); QString error; const auto offers=contesthandoff::incomingOffers(recipient,"contest-2026","node-b",&error);
-        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(offers.size(),1); QCOMPARE(offers.first().call,QString("K1ABC")); QCOMPARE(offers.first().frequencyHz,qint64(14025000));
+        QCOMPARE(offers.first().state,QString("completed")); QCOMPARE(offers.last().state,QString("declined"));
+        QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(offers.size(),2); QCOMPARE(offers.first().call,QString("K1ABC")); QCOMPARE(offers.first().frequencyHz,qint64(14025000));
         repeated=contesthandoff::receiveOffer(recipient,"contest-2026","node-b",from,received); QVERIFY(repeated.ok); QVERIFY(repeated.replayed);
         QCOMPARE(recipient.qsoCount(),qint64(0));
     }

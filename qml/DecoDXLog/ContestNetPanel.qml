@@ -15,8 +15,11 @@ GlassPanel {
         root.net.setLoopbackForProbe(); root.net.enabled=true; handoffDialog.open()
         handoffScope.text="test-event"; handoffDialog.configure()
         handoffRecipient.text="other"; handoffCall.text="K1ABC"; handoffFrequency.text="14025000"; handoffDialog.sendOffer()
+        const incoming=root.net.handoffInbox; const before=incoming.length ? incoming[0].state : "missing"
+        const stateError=incoming.length ? root.net.setHandoffState(incoming[0].id,"accepted") : "missing"
         return {visible:handoffDialog.visible,scope:root.net.handoffScope,offers:root.net.handoffOutbox.length,
-            call:root.net.handoffOutbox.length ? root.net.handoffOutbox[0].call : "",warning:handoffWarning.text,error:handoffDialog.result}
+            call:root.net.handoffOutbox.length ? root.net.handoffOutbox[0].call : "",warning:handoffWarning.text,error:handoffDialog.result,
+            before:before,after:root.net.handoffInbox.length ? root.net.handoffInbox[0].state : "missing",stateError:stateError}
     }
     function probeNetworkReviewStart(secure) {
         root.net.setLoopbackForProbe(); root.net.enabled=true; qsoWireDialog.open(); wireKey.text=secure ? "a".repeat(64) : ""
@@ -224,6 +227,8 @@ GlassPanel {
             spacing: 7
             Text { id: handoffWarning; Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
                 text: qsTr("Station identities are not authenticated and delivery is not confirmed. Agree the same contest scope with the other station. This station ID: %1").arg(root.net.nodeId) }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textSecondary
+                text: qsTr("Received offer status is local to this log and is not sent to the other station.") }
             RowLayout {
                 Layout.fillWidth: true
                 LabeledField { label: qsTr("Contest scope"); Layout.fillWidth: true
@@ -249,8 +254,14 @@ GlassPanel {
             ListView {
                 id: handoffInboxList; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 100
                 clip: true; model: root.net.handoffInbox; ScrollBar.vertical: PanelScrollBar {}
-                delegate: Text { required property var modelData; width: handoffInboxList.width; wrapMode: Text.Wrap
-                    color: Theme.textPrimary; text: qsTr("%1 · %2 Hz · from %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.sender).arg(modelData.createdUtc) }
+                delegate: RowLayout { required property var modelData; width: handoffInboxList.width
+                    Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
+                        text: qsTr("%1 · %2 Hz · from %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.sender).arg(modelData.createdUtc) + " · " +
+                              (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : qsTr("Completed")) }
+                    GlassButton { text: qsTr("Accept"); visible: modelData.state === "pending"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"accepted") }
+                    GlassButton { text: qsTr("Decline"); visible: modelData.state === "pending"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"declined") }
+                    GlassButton { text: qsTr("Complete"); visible: modelData.state === "accepted"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"completed") }
+                }
             }
             Text { text: qsTr("Sent offers — delivery unconfirmed"); color: Theme.textPrimary; font.bold: true }
             ListView {

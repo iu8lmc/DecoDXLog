@@ -1100,7 +1100,7 @@ static QVariantList handoffRows(const QList<contesthandoff::Offer>& offers)
     QVariantList rows;
     for (const auto& o : offers) rows << QVariantMap{{QStringLiteral("id"),o.id},{QStringLiteral("scope"),o.scope},
         {QStringLiteral("sender"),o.sender},{QStringLiteral("recipient"),o.recipient},{QStringLiteral("call"),o.call},
-        {QStringLiteral("frequencyHz"),o.frequencyHz},{QStringLiteral("createdUtc"),o.createdUtc}};
+        {QStringLiteral("frequencyHz"),o.frequencyHz},{QStringLiteral("createdUtc"),o.createdUtc},{QStringLiteral("state"),o.state}};
     return rows;
 }
 QVariantList NetController::handoffInbox() const
@@ -1153,6 +1153,13 @@ QString NetController::retryHandoffOffer(const QString& id)
         m_handoffStatus=tr("Offer transmission attempted; delivery is not confirmed."); emit handoffChanged(); return {};
     }
     return tr("Handoff offer not found in this log and scope.");
+}
+QString NetController::setHandoffState(const QString& id,const QString& state)
+{
+    if (!handoffLogCurrent()) return tr("Log or network changed; configure the handoff scope again.");
+    const auto result=contesthandoff::setIncomingState(*m_ctx.db,m_handoffScope,m_id,id,state);
+    if (!result.ok) return tr("Cannot change handoff state: %1").arg(result.error);
+    emit handoffChanged(); return {};
 }
 
 void NetController::requestSync()

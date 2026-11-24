@@ -14,6 +14,7 @@
 #include <QTest>
 #include "core/LogDatabase.h"
 #include "core/ContestNet.h"
+#include "core/ContestHandoff.h"
 #include "core/ContestNetSecure.h"
 #include "core/ContestNetQsoTransfer.h"
 #include "core/CqMarathon.h"
@@ -135,11 +136,17 @@ private slots:
     {
         QFETCH(QString,language); QFETCH(QByteArray,warning);
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QByteArray output;
-        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.sync(); }
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language",language); settings.setValue("net/id","receiver"); settings.sync(); }
+        { using namespace decolog::core; LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          contesthandoff::Offer offer{"8f3b7450-8e62-4dbd-8671-001122334455","test-event","sender","receiver","K1AAA",14025000,"2026-11-24T12:00:00Z"};
+          QVERIFY(contesthandoff::receiveOffer(db,"test-event","receiver","sender",contesthandoff::offerFrame(offer)).ok); }
         QVERIFY2(launch(dir,"nethandoffprobe",output,3500),output.constData());
         QVERIFY2(output.contains("PROBE nethandoff") && output.contains("\"visible\":true") && output.contains("\"scope\":\"test-event\"") &&
                  output.contains("\"offers\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
-                 output.contains("\"error\":\"\"") && !output.contains("TypeError"),output.constData());
+                 output.contains("\"error\":\"\"") && output.contains("\"before\":\"pending\"") && output.contains("\"after\":\"accepted\"") &&
+                 output.contains("\"stateError\":\"\"") && !output.contains("TypeError"),output.constData());
+        { using namespace decolog::core; LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const auto offers=contesthandoff::incomingOffers(db,"test-event","receiver"); QCOMPARE(offers.size(),1); QCOMPARE(offers.first().state,QString("accepted")); }
     }
     void stationNetworkExperimentalQsoDialog_data()
     {

@@ -2389,6 +2389,14 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestNetPanel</name>
+    <message><source>Received offer status is local to this log and is not sent to the other station.</source><translation>Lo stato delle proposte ricevute è locale a questo log e non viene inviato all'altra stazione.</translation></message>
+    <message><source>Pending</source><translation>In attesa</translation></message>
+    <message><source>Accepted</source><translation>Accettata</translation></message>
+    <message><source>Declined</source><translation>Rifiutata</translation></message>
+    <message><source>Completed</source><translation>Completata</translation></message>
+    <message><source>Accept</source><translation>Accetta</translation></message>
+    <message><source>Decline</source><translation>Rifiuta</translation></message>
+    <message><source>Complete</source><translation>Completa</translation></message>
     <message><source>Multiplier handoff…</source><translation>Passaggio moltiplicatori…</translation></message>
     <message><source>Multiplier handoff</source><translation>Passaggio moltiplicatori</translation></message>
     <message><source>Experimental station network</source><translation>Rete di stazione sperimentale</translation></message>
@@ -13049,6 +13057,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::NetController</name>
+    <message><source>Cannot change handoff state: %1</source><translation>Impossibile cambiare lo stato della proposta: %1</translation></message>
     <message><source>Log or network changed; configure the handoff scope again.</source><translation>Il log o la rete sono cambiati; configura nuovamente l'ambito dei passaggi.</translation></message>
     <message><source>Enter a valid contest scope with an open file-backed log.</source><translation>Inserisci un ambito contest valido con un log su file aperto.</translation></message>
     <message><source>Handoff offers are unauthenticated; delivery is not confirmed.</source><translation>Le proposte non sono autenticate; la consegna non è confermata.</translation></message>

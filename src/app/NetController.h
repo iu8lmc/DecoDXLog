@@ -151,6 +151,7 @@ public:
     Q_INVOKABLE QString configureHandoffScope(const QString& scope);
     Q_INVOKABLE QString sendHandoffOffer(const QString& recipient,const QString& call,qint64 frequencyHz);
     Q_INVOKABLE QString retryHandoffOffer(const QString& id);
+    Q_INVOKABLE QString setHandoffState(const QString& id,const QString& state);
     // Chiede agli altri i QSO della gara che qui mancano.
     Q_INVOKABLE void requestSync();
     // Per i test: invece del broadcast, a questo indirizzo.
