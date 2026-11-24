@@ -754,6 +754,8 @@ if(DECODXLOG_BUILD_TESTS)
             ${CMAKE_SOURCE_DIR}/tests/python/test_extension_manager.py)
         add_test(NAME recent_activity_extension COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/python/test_recent_activity.py)
+        add_test(NAME event_counter_extension COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/tests/python/test_event_counter.py)
         add_test(NAME clublog_live50_simulation COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/test_clublog_live50_simulation.py
             $<TARGET_FILE:clublog_live50> $<TARGET_FILE:clublog_stage_existing>)

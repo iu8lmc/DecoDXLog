@@ -246,7 +246,7 @@ private slots:
             ini.setValue(QStringLiteral("api/port"), m_apiPort);
             ini.setValue(QStringLiteral("api/token"), QStringLiteral("0123456789abcdef0123456789abcdef"));
             ini.setValue(QStringLiteral("api/readOnlyToken"), QStringLiteral("fedcba9876543210fedcba9876543210"));
-            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"org.decodxlog.example.recent-activity","token":"11111111111111111111111111111111","permissions":["qso.read"]},{"id":"test.events","token":"22222222222222222222222222222222","permissions":["qso.events"]}])"));
+            ini.setValue(QStringLiteral("api/extensionCredentials"), QStringLiteral(R"([{"id":"org.decodxlog.example.recent-activity","token":"11111111111111111111111111111111","permissions":["qso.read"]},{"id":"org.decodxlog.example.event-counter","token":"22222222222222222222222222222222","permissions":["qso.events"]}])"));
             ini.setValue(QStringLiteral("watch/files"),
                          QVariantList{QVariantMap{{QStringLiteral("path"), QDir::fromNativeSeparators(fldigiLog)},
                                                   {QStringLiteral("label"), QStringLiteral("fldigi")},
@@ -749,6 +749,23 @@ private slots:
         QCOMPARE(request("GET",QStringLiteral("/api/v1/events?log=%1&after=-1").arg(logId),eventToken).first,400);
         QCOMPARE(request("GET",path,QByteArray("fedcba9876543210fedcba9876543210")).first,403);
         QCOMPARE(request("POST",path,eventToken).first,403);
+        const QString python=QStandardPaths::findExecutable(QStringLiteral("python3")); QVERIFY(!python.isEmpty());
+        const QString statePath=m_dir.filePath(QStringLiteral("event-counter.sqlite"));
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert(QStringLiteral("DECODXLOG_READ_TOKEN"),QString::fromLatin1(eventToken));
+        auto runCounter=[&]() {
+            QProcess process; process.setProcessEnvironment(env);
+            process.start(python,{QStringLiteral(DECODXLOG_SOURCE_DIR "/examples/extensions/event_counter.py"),QStringLiteral("--port"),QString::number(m_apiPort),QStringLiteral("--state"),statePath});
+            if (!process.waitForFinished(10000) || process.exitCode()!=0) return QJsonObject{};
+            const QByteArray output=process.readAllStandardOutput();
+            if (output.contains(eventToken)) return QJsonObject{};
+            return QJsonDocument::fromJson(output).object();
+        };
+        QJsonObject counter=runCounter(); QVERIFY(!counter.isEmpty());
+        for (int i=0; counter.value("hasMore").toBool() && i<10; ++i) counter=runCounter();
+        QVERIFY(!counter.isEmpty()); QVERIFY(!counter.value("hasMore").toBool());
+        QVERIFY(counter.value("counts").toObject().value("added").toInt()>=2);
+        const auto replay=runCounter(); QCOMPARE(replay.value("counts").toObject(),counter.value("counts").toObject());
+        QCOMPARE(replay.value("cursor").toString(),counter.value("cursor").toString());
     }
 
     void scopedQsoEventsReportRetentionGap()
