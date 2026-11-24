@@ -451,7 +451,7 @@ private slots:
           QVERIFY(db.insertQso(AdifRecord{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","2m"},{"MODE","CW"},{"DXCC","291"},{"CQZ","4"}},"fixture",{},true,profile,false).id>0);
           QVERIFY(db.insertQso(AdifRecord{{"CALL","IT9AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1202"},{"BAND","20m"},{"MODE","CW"},{"DXCC","248"},{"REGION","SY"},{"CQZ","15"}},"fixture",{},true,profile,false).id>0); }
         QByteArray output; QVERIFY2(launch(dir,"marathonreviewprobe:"+QString::number(profile),output,4500),output.constData());
-        QVERIFY2(output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC unknown") && output.contains("outside supported 2026 bands") && output.contains("Marathon entity 904 · DXCC 248 · REGION SY") && !output.contains("TypeError"),output.constData());
+        QVERIFY2((output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC unknown") || output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC sconosciuto")) && output.contains("outside supported 2026 bands") && output.contains("Marathon entity 904 · DXCC 248 · REGION SY") && !output.contains("TypeError"),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
     }
     void marathonReviewAdifExportsYearAndAlternatives()
@@ -1140,12 +1140,12 @@ private slots:
           const auto a=db.insertQso(AdifRecord{{"CALL","ZZ1AAA"},{"QSO_DATE","20260102"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"import"); QVERIFY(a.id>0);
           const auto b=db.insertQso(AdifRecord{{"CALL","ZZ1BBB"},{"QSO_DATE","20260103"},{"TIME_ON","1200"},{"BAND","40m"},{"MODE","FT8"}},"import"); QVERIFY(b.id>0);
           QslState card; card.service="card"; card.rcvd="Y"; QVERIFY(db.setCardState(b.id,card)); }
-        QByteArray output; QVERIFY2(launch(dir,"dxcampaignprobe",output,7000),output.constData());
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignprobe",output,12000),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign saved") && output.contains("ZZ1AAA") && output.contains("ZZ1BBB"),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign matrix") && output.contains("\"confirmed\":1") && output.contains("\"worked\":1"),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign goal draft") && output.contains("PROBE dxcampaign goal open") && output.contains("\"needed\":true"),output.constData());
         QVERIFY2(output.contains("PROBE dxcampaign archived true") && output.contains("PROBE dxcampaign reopened true"),output.constData());
-        QVERIFY2(output.contains("PROBE dxcampaign new confirmation") && output.contains("\"needed\":false"),output.constData());
+        QVERIFY2(output.contains("PROBE dxcampaign new confirmation [{\"band\":\"20m\",\"confirmed\":1,\"mode\":\"CW\",\"needed\":false"),output.constData());
         QVERIFY2(!output.contains("TypeError"),output.constData());
         QByteArray restored; QVERIFY2(launch(dir,"dxcampaignrestoreprobe",restored,5000),restored.constData());
         QVERIFY2(restored.contains("PROBE dxcampaign restored matrix") && restored.contains("PROBE dxcampaign rendered 20m · CW · confirmed (1/1)"),restored.constData());

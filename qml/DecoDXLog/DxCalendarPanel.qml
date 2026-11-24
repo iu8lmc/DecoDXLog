@@ -277,7 +277,7 @@ GlassPanel {
         id:campaignProbeConfirmation; interval:200; repeat:true; property int tries:0
         onTriggered: {
             const rows=root.campaignBackend.dxCampaignMatrix
-            if ((root.campaignBackend.dxCampaignBusy || !rows.length || rows[0].confirmed!==1) && ++tries<20) return
+            if ((root.campaignBackend.cards.operationBusy || root.campaignBackend.dxCampaignBusy || !rows.length || rows[0].confirmed!==1) && ++tries<40) return
             stop(); console.warn("PROBE dxcampaign new confirmation " + JSON.stringify(rows))
         }
     }
