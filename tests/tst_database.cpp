@@ -6,6 +6,8 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QCryptographicHash>
+#include <QDataStream>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QNetworkAccessManager>
@@ -2193,6 +2195,36 @@ private slots:
         QCOMPARE(db.unresolvedApiRequests().value("rows").toList().first().toMap().value("fingerprint").toString(),firstRow);
         QVERIFY(!db.unresolvedApiRequests("-1").value("error").toString().isEmpty());
         QVERIFY(!db.unresolvedApiRequests("not-a-cursor").value("error").toString().isEmpty());
+    }
+
+    void incompleteApiReviewCannotBeMarkedReviewed()
+    {
+        QTemporaryDir dir; LogDatabase db; QVERIFY(db.open(dir.filePath("api.sqlite")));
+        QByteArray body;
+        for (int i=0;i<11;++i) body+="<CALL:5>K1ABC<EOR>";
+        QVERIFY(db.claimApiIdempotency("eleven",{body,0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")}));
+        const auto row=db.unresolvedApiRequests().value("rows").toList().first().toMap();
+        QVERIFY(row.value("truncated").toBool());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT key,created_at,request_app,request_format,request_body,response_body FROM api_idempotency WHERE key='eleven'")); QVERIFY(q.next());
+        QByteArray tokenBytes; QDataStream stream(&tokenBytes,QIODevice::WriteOnly);
+        stream << q.value(0).toString() << q.value(1).toString() << q.value(2).toByteArray()
+               << q.value(3).toByteArray() << q.value(4).toByteArray() << q.value(5).toByteArray();
+        const QString oldToken=QString::fromLatin1(QCryptographicHash::hash(tokenBytes,QCryptographicHash::Sha256).toHex());
+        QString error; QVERIFY(!db.markApiRequestReviewed(row.value("rowId").toString(),oldToken,&error));
+        QVERIFY(row.value("reviewToken").toString().isEmpty());
+        QVERIFY(!error.isEmpty()); QCOMPARE(db.apiIdempotency("eleven")->status,0);
+        QVERIFY(db.claimApiIdempotency("incomplete",{"<CALL:5>K1ABC<EOR><CALL:5>K2",0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")}));
+        const auto entries=db.unresolvedApiRequests().value("rows").toList(); QCOMPARE(entries.size(),2);
+        const auto malformed=entries.last().toMap();
+        QVERIFY(malformed.value("truncated").toBool()); QVERIFY(malformed.value("reviewToken").toString().isEmpty());
+        QCOMPARE(db.apiIdempotency("incomplete")->status,0);
+        const QByteArray ten=body.left(body.size()-QByteArray("<CALL:5>K1ABC<EOR>").size());
+        QVERIFY(db.claimApiIdempotency("ten",{ten,0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")}));
+        const auto valid=db.unresolvedApiRequests().value("rows").toList().last().toMap();
+        QVERIFY(!valid.value("truncated").toBool()); QCOMPARE(valid.value("contacts").toList().size(),10);
+        QVERIFY(!valid.value("reviewToken").toString().isEmpty());
+        QVERIFY2(db.markApiRequestReviewed(valid.value("rowId").toString(),valid.value("reviewToken").toString(),&error),qPrintable(error));
+        QCOMPARE(db.apiIdempotency("ten")->status,-1);
     }
 
     void reviewedApiReservationRequiresUnchangedUnlockedRecord()

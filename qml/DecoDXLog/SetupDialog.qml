@@ -52,7 +52,8 @@ DialogFrame {
             const row=apiPendingRepeater.itemAt(0)
             console.warn("PROBE API pending rows=" + (root.apiPendingReview.rows || []).length + " row=" + !!row
                          + " contacts=" + (row ? (row.modelData.contacts || []).length : 0)
-                         + " call=" + (row && row.modelData.contacts.length ? row.modelData.contacts[0].call : ""))
+                         + " call=" + (row && row.modelData.contacts.length ? row.modelData.contacts[0].call : "")
+                         + " truncated=" + (row ? !!row.modelData.truncated : false) + " canMark=" + (row ? row.probeCanMark() : false))
             if (root.probeApiMark && row) {
                 row.probeMark(); apiRequestReview.buttonClicked(MessageDialog.No,0); apiRequestReview.close()
                 console.warn("PROBE API review cancel count=" + (decolog.unresolvedApiRequests("").rows || []).length)
@@ -1007,6 +1008,7 @@ DialogFrame {
                         ColumnLayout {
                             required property var modelData
                             function probeMark() { markApiReview.clicked() }
+                            function probeCanMark() { return markApiReview.enabled }
                             Layout.fillWidth: true
                             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Theme.textPrimary
                                 text: qsTr("Request %1 · %2 · source %3").arg(modelData.fingerprint).arg(modelData.recordedAt || "—").arg(modelData.source || "—") }

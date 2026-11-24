@@ -83,6 +83,21 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void incompleteApiReviewIsDisabledInDesktop()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        {
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QByteArray body;
+            for (int i=0;i<11;++i) body+="<CALL:5>K1ABC<EOR>";
+            QVERIFY(db.claimApiIdempotency("eleven",{body,0,"application/json","owner",{},QByteArray("adif"),QByteArray("fixture")}));
+        }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("apipendingprobe"),output),output.constData());
+        QVERIFY2(output.contains("PROBE API pending rows=1 row=true contacts=10 call=K1ABC truncated=true canMark=false"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto entry=db.apiIdempotency("eleven");
+        QVERIFY(entry); QCOMPARE(entry->status,0); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+
     void extensionKeysUiCreatesAndRevokes()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir, "", true); QByteArray output;

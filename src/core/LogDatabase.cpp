@@ -784,6 +784,19 @@ QString apiReviewToken(const QString& key, const QString& created, const QByteAr
     stream << key << created << app << format << body << owner;
     return QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
 }
+
+bool apiReviewDocument(const QByteArray& body, const QByteArray& format, AdifDocument* document)
+{
+    QByteArray input=body;
+    if (format==QByteArray("json")) {
+        QJsonParseError error; const auto json=QJsonDocument::fromJson(body,&error);
+        if (error.error!=QJsonParseError::NoError || !json.isObject() || !json.object().value(QStringLiteral("adif")).isString()) return false;
+        input=json.object().value(QStringLiteral("adif")).toString().toUtf8();
+    } else if (format!=QByteArray("adif")) return false;
+    *document=adif::parse(input);
+    return !document->records.isEmpty() && document->records.size()<=10 &&
+        !document->unterminatedRecord && !document->unterminatedTag && !document->invalidFieldLength;
+}
 }
 
 QString LogDatabase::apiIdempotencyLockPath(const QString& key) const
@@ -816,10 +829,8 @@ QVariantMap LogDatabase::unresolvedApiRequests(const QString& after) const
         if (rows.size()==50) { result[QStringLiteral("hasMore")]=true; break; }
         QVariantList contacts;
         const bool oversized=q.value(4).toLongLong()>65536;
-        QByteArray input=q.value(5).toByteArray();
-        if (!oversized && q.value(3).toByteArray()==QByteArray("json"))
-            input=QJsonDocument::fromJson(input).object().value(QStringLiteral("adif")).toString().toUtf8();
-        const auto document=adif::parse(input);
+        AdifDocument document;
+        const bool complete=!oversized && apiReviewDocument(q.value(5).toByteArray(),q.value(3).toByteArray(),&document);
         for (qsizetype i=0; i<qMin(qsizetype(10),document.records.size()); ++i) {
             const auto& record=document.records.at(i);
             contacts << QVariantMap{{QStringLiteral("call"),record.value(QStringLiteral("CALL")).left(32)},
@@ -829,10 +840,10 @@ QVariantMap LogDatabase::unresolvedApiRequests(const QString& after) const
                 {QStringLiteral("mode"),record.value(QStringLiteral("MODE")).left(32)}};
         }
         const QByteArray owner=q.value(7).toByteArray();
-        const QString token=!oversized && !owner.isEmpty() ? apiReviewToken(q.value(0).toString(),q.value(1).toString(),q.value(2).toByteArray(),q.value(3).toByteArray(),q.value(5).toByteArray(),owner) : QString();
+        const QString token=complete && !owner.isEmpty() ? apiReviewToken(q.value(0).toString(),q.value(1).toString(),q.value(2).toByteArray(),q.value(3).toByteArray(),q.value(5).toByteArray(),owner) : QString();
         rows << QVariantMap{{QStringLiteral("fingerprint"),QString::fromLatin1(QCryptographicHash::hash(q.value(0).toString().toUtf8(),QCryptographicHash::Sha256).toHex())},
             {QStringLiteral("recordedAt"),q.value(1).toString()}, {QStringLiteral("source"),q.value(2).toString().left(60)},
-            {QStringLiteral("contacts"),contacts}, {QStringLiteral("truncated"),oversized || document.records.size()>10},
+            {QStringLiteral("contacts"),contacts}, {QStringLiteral("truncated"),!complete},
             {QStringLiteral("rowId"),QString::number(q.value(6).toLongLong())},{QStringLiteral("reviewToken"),token}};
         result[QStringLiteral("nextCursor")]=QString::number(q.value(6).toLongLong());
     }
@@ -864,6 +875,10 @@ bool LogDatabase::markApiRequestReviewed(const QString& rowId, const QString& re
     if (!fileIdentityMatchesOpen() || !check.exec() || !check.next() || check.value(0).toString()!=key ||
         apiReviewToken(key,check.value(1).toString(),check.value(2).toByteArray(),check.value(3).toByteArray(),check.value(4).toByteArray(),check.value(5).toByteArray())!=reviewToken) {
         db.rollback(); return fail(QStringLiteral("Request or log changed; reload before review"));
+    }
+    AdifDocument document;
+    if (check.value(5).toByteArray().isEmpty() || !apiReviewDocument(check.value(4).toByteArray(),check.value(3).toByteArray(),&document)) {
+        db.rollback(); return fail(QStringLiteral("Request details are incomplete; inspect the original request"));
     }
     const QByteArray digest=QByteArray("sha256:")+QCryptographicHash::hash(check.value(4).toByteArray(),QCryptographicHash::Sha256).toHex();
     check.finish(); QSqlQuery update(db);
