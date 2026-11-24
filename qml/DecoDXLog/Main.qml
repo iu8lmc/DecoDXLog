@@ -15,6 +15,15 @@ RoundedWindow {
     function probeLocalFileUrl(path) { const p=String(path).replace(/\\/g,"/"); return "file://" + (p.startsWith("/") ? "" : "/") + encodeURI(p).replace(/#/g,"%23").replace(/\?/g,"%3F") }
 
     Timer {
+        id: marathonAdifContextProbe
+        interval: 4500
+        repeat: false
+        property string outputPath: ""
+        property string profileId: ""
+        onTriggered: awardsDialog.probeMarathonAdif(outputPath,profileId)
+    }
+
+    Timer {
         id: rigSplitProbeTimer
         interval: 100
         repeat: true
@@ -1400,6 +1409,12 @@ RoundedWindow {
         else if (what[0] === "vuccboundary") Qt.callLater(() => console.warn("PROBE vuccBoundary " + JSON.stringify(decolog.vuccPreview("6m", "", "", 100))))
         else if (what[0] === "vuccreviewprobe" || what[0] === "vuccsatelliteprobe") Qt.callLater(() => awardsDialog.probeVuccReview(what[0] === "vuccsatelliteprobe"))
         else if (what[0] === "vuccthresholdprobe") Qt.callLater(() => awardsDialog.probeVuccThreshold())
+        else if (what[0] === "marathonadifcontextprobe") {
+            marathonAdifContextProbe.outputPath=what.slice(1,-1).join(":")
+            marathonAdifContextProbe.profileId=what[what.length-1]
+            console.warn("PROBE marathon context ready")
+            marathonAdifContextProbe.start()
+        }
         else if (what[0] === "marathonadifprobe") Qt.callLater(() => awardsDialog.probeMarathonAdif(what.slice(1,-1).join(":"),what[what.length-1]))
         else if (what[0] === "marathonreviewprobe") Qt.callLater(() => awardsDialog.probeMarathonReview(what[1]))
         else if (what[0] === "marathonalternativeprobe") Qt.callLater(() => awardsDialog.probeMarathonAlternatives(what[1]))

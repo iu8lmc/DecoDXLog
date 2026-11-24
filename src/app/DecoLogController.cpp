@@ -3489,9 +3489,11 @@ QVariantMap DecoLogController::loadReviewedCqMarathonExport(const QUrl& file, in
 QString DecoLogController::exportCqMarathonReviewAdif(const QUrl& file,int year,qint64 stationProfileId)
 {
     if (m_marathonAdifBusy) return tr("A Marathon export is already running");
-    if (!m_db.isOpen() || m_db.path().isEmpty() || m_db.path()==QLatin1String(":memory:") || m_db.identity().isEmpty() || year<1900 || year>2200 || stationProfileId<=0 || !m_db.stationProfile(stationProfileId))
+    if (!m_db.isOpen() || m_db.path().isEmpty() || m_db.path()==QLatin1String(":memory:"))
         return tr("Choose a file-backed log, valid year and station profile");
     if (!m_db.fileIdentityMatchesOpen() || m_db.openFileIdentity().isEmpty()) return tr("The log file changed or cannot be identified; reopen it before exporting.");
+    if (m_db.identity().isEmpty() || year<1900 || year>2200 || stationProfileId<=0 || !m_db.stationProfile(stationProfileId))
+        return tr("Choose a file-backed log, valid year and station profile");
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local ADIF file");
     const QByteArray fileIdentity=m_db.openFileIdentity();
     const QString dbPath=m_db.path(), identity=m_db.identity(), path=file.toLocalFile(); const QFileInfo target(path), source(dbPath);

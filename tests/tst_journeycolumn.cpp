@@ -510,6 +510,33 @@ private slots:
         QVERIFY2((output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC unknown") || output.contains("PROBE marathonReview open=true zone=QSO 1 · K1AAA · CQ zone 5 · DXCC sconosciuto")) && output.contains("outside supported 2026 bands") && output.contains("Marathon entity 904 · DXCC 248 · REGION SY") && !output.contains("TypeError"),output.constData());
         LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(3));
     }
+    void marathonReviewAdifRejectsReplacedOpenLog()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Replacing a live SQLite file is exercised on Unix");
+#else
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        const QString path=dir.filePath("test.sqlite"), clone=dir.filePath("clone.sqlite"), outputPath=dir.filePath("review.adi"); qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(path)); StationProfile p; p.name="Marathon"; p.stationCallsign="K1ABC"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,profile,false).id>0); }
+        QVERIFY(QFile::copy(path,clone));
+        { LogDatabase replacement; QVERIFY(replacement.open(clone)); QSqlQuery q(replacement.connection()); QVERIFY(q.exec("UPDATE qso SET call='K1BBB'")); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","8500");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show",
+                  "marathonadifcontextprobe:"+outputPath+":"+QString::number(profile),"--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE marathon context ready") && timer.elapsed()<12000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE marathon context ready"),output.constData());
+        QVERIFY(QFile::rename(path,dir.filePath("old.sqlite"))); QVERIFY(QFile::rename(clone,path));
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains("PROBE marathonAdif start=The log file changed or cannot be identified; reopen it before exporting."),output.constData());
+        QVERIFY(!QFile::exists(outputPath));
+#endif
+    }
+
     void marathonReviewAdifExportsYearAndAlternatives()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); qint64 profile=0;
