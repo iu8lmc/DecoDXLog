@@ -109,6 +109,29 @@ private slots:
         db.close(); QByteArray again; QVERIFY2(runProbe(dir,"paperqsl",again,maxGap,elapsed,rows),again.constData()); QCOMPARE(rows,32);
         QVERIFY2((again.contains("Changed: 0") && again.contains("unchanged: 32")) || (again.contains("Modificati: 0") && again.contains("invariati: 32")),again.constData());
     }
+    void paperQslBulkEventJournalAB()
+    {
+        for (int enabled=0; enabled<2; ++enabled) {
+            QTemporaryDir dir; QVERIFY(dir.isValid());
+            QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+            { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+              for (int i=0;i<32;++i) { const QString time=QString("%1%2").arg(i/60,2,10,QLatin1Char('0')).arg(i%60,2,10,QLatin1Char('0'));
+                  QVERIFY(db.insertQso({{"CALL","J51A"},{"QSO_DATE","20260228"},{"TIME_ON",time},{"BAND","20m"},{"MODE","CW"}},"fixture",{},false,0,false).id>0); }
+              QVERIFY(db.insertQso({{"CALL","ZY0SAT"},{"QSO_DATE","20260301"},{"TIME_ON","2035"},{"BAND","20m"},{"MODE","SSB"},{"GRIDSQUARE","HJ51AM"}},"fixture").id>0);
+              QSqlQuery q(db.connection());
+              if (!enabled) { QVERIFY(q.exec("DROP TRIGGER extension_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER extension_qsl_update")); } }
+            QByteArray output; qint64 gap=0,elapsed=0; int rows=0;
+            for (int attempt=0;attempt<2;++attempt) {
+                QVERIFY2(runProbe(dir,"paperqsl",output,gap,elapsed,rows),output.constData()); QCOMPARE(rows,32);
+                LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+                QVERIFY(q.exec("SELECT COUNT(*) FROM qsl_status WHERE service='card' AND rcvd='Y'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),32);
+                QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event WHERE kind='confirmed' AND service='card'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),enabled ? 32 : 0);
+                QCOMPARE(db.qsoCount(),qint64(33)); const auto other=db.record(db.latestIds("ZY0SAT",1).first()); QVERIFY(other); QVERIFY(other->value("QSL_RCVD").isEmpty());
+                qInfo() << "QSL_EVENT_AB enabled=" << enabled << "attempt=" << attempt << "max_gap_ms=" << gap << "elapsed_ms=" << elapsed;
+            }
+        }
+    }
+
     void deepScrollSingleBulkAndNoop()
     {
         if (qEnvironmentVariableIsSet("DECODXLOG_FOCUSED_FIXTURE")) QSKIP("running focused USB checks");
