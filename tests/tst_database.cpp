@@ -2363,6 +2363,14 @@ private slots:
         QVERIFY(db.duplicateGroups(60).isEmpty());
     }
 
+    void duplicateSearchReportsDatabaseFailure()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); QString error;
+        QVERIFY(db.duplicateGroups(60,5000,&error).isEmpty()); QVERIFY(error.isEmpty());
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE qso"));
+        QVERIFY(db.duplicateGroups(60,5000,&error).isEmpty()); QVERIFY(!error.isEmpty());
+    }
+
     void duplicateGroupsSynthetic100k()
     {
         if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_DUPLICATES")) QSKIP("Synthetic 100k benchmark is opt-in");

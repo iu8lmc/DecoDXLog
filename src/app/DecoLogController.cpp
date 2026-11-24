@@ -5751,10 +5751,11 @@ namespace {
 
 // I gruppi di doppioni come li mostra la finestra, con quello che conviene
 // tenere: il piu' confermato, poi quello con piu' campi, poi il primo.
-QVariantList describeDuplicates(const LogDatabase& db, int windowSeconds, bool* limited)
+QVariantList describeDuplicates(const LogDatabase& db, int windowSeconds, bool* limited, QString* error)
 {
     constexpr int kLimit = 2000;
-    const QList<QList<qint64>> groups = db.duplicateGroups(windowSeconds, kLimit);
+    const QList<QList<qint64>> groups = db.duplicateGroups(windowSeconds, kLimit, error);
+    if (error && !error->isEmpty()) return {};
     if (limited)
         *limited = groups.size() >= kLimit;
     QVariantList out;
@@ -5815,17 +5816,18 @@ void DecoLogController::findDuplicates(int windowMinutes)
     m_duplicates = {{QStringLiteral("busy"), true}, {QStringLiteral("windowMinutes"), minutes},
                     {QStringLiteral("groups"), QVariantList{}}};
     emit duplicatesChanged();
-    auto done = [this, minutes](const QVariantList& groups, bool limited) {
+    auto done = [this, minutes](const QVariantList& groups, bool limited, const QString& error) {
         m_duplicates = {{QStringLiteral("busy"), false}, {QStringLiteral("windowMinutes"), minutes},
-                        {QStringLiteral("searched"), true}, {QStringLiteral("limited"), limited},
+                        {QStringLiteral("searched"), error.isEmpty()}, {QStringLiteral("limited"), limited}, {QStringLiteral("error"), error},
                         {QStringLiteral("groups"), groups}};
         emit duplicatesChanged();
     };
     const QString dbPath = m_db.path();
     if (dbPath.isEmpty() || dbPath == QLatin1String(":memory:")) {
         bool limited = false;
-        const QVariantList groups = describeDuplicates(m_db, minutes * 60, &limited);
-        done(groups, limited);
+        QString error;
+        const QVariantList groups = describeDuplicates(m_db, minutes * 60, &limited, &error);
+        done(groups, limited, error);
         return;
     }
     // Su un milione di QSO si legge tutto il log: su un altro filo.
@@ -5834,12 +5836,14 @@ void DecoLogController::findDuplicates(int windowMinutes)
         LogDatabase db;
         QVariantList groups;
         bool limited = false;
+        QString error;
         if (db.open(dbPath))
-            groups = describeDuplicates(db, minutes * 60, &limited);
+            groups = describeDuplicates(db, minutes * 60, &limited, &error);
+        else error=db.lastError();
         QMetaObject::invokeMethod(
-            self.data(), [self, groups, limited, done] {
+            self.data(), [self, groups, limited, error, done] {
                 if (self)
-                    done(groups, limited);
+                    done(groups, limited, error);
             },
             Qt::QueuedConnection);
     });

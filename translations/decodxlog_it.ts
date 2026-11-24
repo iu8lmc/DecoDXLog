@@ -3645,6 +3645,7 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
 </context>
 <context>
     <name>DuplicatesDialog</name>
+    <message><source>Duplicate search failed: %1</source><translation>Ricerca dei duplicati non riuscita: %1</translation></message>
     <message>
         <source>DUPLICATE QSO</source>
         <translation>QSO DOPPI</translation>

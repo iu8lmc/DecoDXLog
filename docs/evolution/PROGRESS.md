@@ -3043,3 +3043,11 @@ Duplicate review now compares parsed UTC timestamps in milliseconds instead of t
 A/B on macOS arm64 / Qt 6.11.2: the new fractional-boundary test failed against the previous second-based implementation and now passes, alongside the offset and invalid-date cases. An opt-in synthetic file-backed 100,000-QSO benchmark produced the same 50,000 duplicate pairs for canonical UTC and mixed-offset representations: 80 ms and 84 ms respectively on this machine. This is a comparison of two datasets on the new implementation, not a timing comparison with the old code. App and test targets built; CTest database, migration and qmlpopups passed 3/3.
 
 The benchmark measures the core query only on synthetic local storage, without desktop rendering, concurrent activity, USB disk, Windows or Linux. It is not a general performance guarantee. The existing query-error and transitive grouping limitations remain; G01/G13 acceptance is open.
+
+## 2026-11-24 — G01 duplicate-search failures are visible
+
+The duplicate search now returns a database error instead of presenting a failed query as an empty result. The desktop dialog shows the error, and a background failure to open the log is also reported. A normal empty search still shows no duplicates. An Italian message was added.
+
+A/B on macOS arm64 / Qt 6.11.2: the new fixture initially failed to compile because the API could not return a search error. It now distinguishes an empty valid log from an isolated synthetic database whose QSO table was removed. App and tests built; CTest database, migration and qmlpopups passed 3/3.
+
+The error propagation was tested at database level and compiled into the controller/dialog, not fault-injected through the actual desktop flow. The asynchronous duplicate preview and merge still require stronger guards against log replacement and changes after review; this work does not claim that safety. Large-log behavior, Windows/Linux and full G01/G13 acceptance remain open.

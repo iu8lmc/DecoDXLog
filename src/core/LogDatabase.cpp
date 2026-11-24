@@ -2310,14 +2310,17 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
     return out;
 }
 
-QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit) const
+QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit, QString* error) const
 {
+    if (error) error->clear();
     QList<QList<qint64>> out;
     QSqlQuery q(connection());
     q.setForwardOnly(true);
     if (!q.exec(QStringLiteral("SELECT id, call, band, mode, submode, qso_datetime_on, IFNULL(station_profile_id, 0) "
-                               "FROM qso NOT INDEXED WHERE deleted = 0 ORDER BY call, band, julianday(qso_datetime_on), id")))
+                               "FROM qso NOT INDEXED WHERE deleted = 0 ORDER BY call, band, julianday(qso_datetime_on), id"))) {
+        if (error) *error=q.lastError().text();
         return out;
+    }
     // Per nominativo e banda, un gruppo che si forma per ogni gruppo di modo
     // e profilo: un FT8 e un CW nella stessa ora non sono doppioni.
     struct Forming {
@@ -2353,6 +2356,7 @@ QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit) 
         g.ids << q.value(0).toLongLong();
         g.last = when;
     }
+    if (q.lastError().isValid()) { if (error) *error=q.lastError().text(); return {}; }
     for (Forming& g : forming)
         flush(g);
     if (limit > 0 && out.size() > limit)
