@@ -43,6 +43,32 @@ class TestContestRules : public QObject {
     Q_OBJECT
 
 private slots:
+    void arrl10MultiplierFoundationUsesOfficialCategories()
+    {
+        using Origin=Arrl10Origin;
+        QCOMPARE(arrl10Points("CW"),4); QCOMPARE(arrl10Points("SSB"),2);
+        QCOMPARE(arrl10Points("FM"),2); QCOMPARE(arrl10Points("FT8"),0);
+        const auto ct=arrl10Multiplier(Origin::UnitedStates,"CT",0,"SSB");
+        QVERIFY(!ct.isEmpty()); QCOMPARE(arrl10Multiplier(Origin::UnitedStates,"ct",0,"USB"),ct);
+        QVERIFY(arrl10Multiplier(Origin::UnitedStates,"CT",0,"CW")!=ct);
+        QVERIFY(!arrl10Multiplier(Origin::UnitedStates,"AK",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::UnitedStates,"HI",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::UnitedStates,"DC",0,"CW").isEmpty());
+        QVERIFY(arrl10Multiplier(Origin::UnitedStates,"PR",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::Canada,"LB",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::Canada,"NT",0,"CW").isEmpty());
+        QVERIFY(arrl10Multiplier(Origin::Canada,"NWT",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::Mexico,"CMX",0,"CW").isEmpty());
+        QVERIFY(arrl10Multiplier(Origin::Mexico,"CT",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::Dx,"",248,"CW").isEmpty());
+        QVERIFY(arrl10Multiplier(Origin::Dx,"",0,"CW").isEmpty());
+        QVERIFY(!arrl10Multiplier(Origin::Maritime,"2",0,"CW").isEmpty());
+        QVERIFY(arrl10Multiplier(Origin::Maritime,"4",0,"CW").isEmpty());
+        QVERIFY(arrl10Multiplier(Origin::UnitedStates,"CT",0,"FT8").isEmpty());
+        QCOMPARE(1305*arrl10Points("SSB")+930*arrl10Points("CW"),6330);
+        QCOMPARE((1305*arrl10Points("SSB")+930*arrl10Points("CW"))*140,886200);
+        QVERIFY(!forId("ARRL-10").valid); // the full rule and desktop workflow are not implemented yet
+    }
     void aContestWithoutRulesSaysSo()
     {
         // Duecentocinquanta contest hanno un identificativo, dieci hanno le

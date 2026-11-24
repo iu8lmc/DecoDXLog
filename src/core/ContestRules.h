@@ -91,6 +91,13 @@ struct OperatingTime {
 
 namespace contestrules {
 
+// ARRL 10-Meter building blocks only: the caller supplies the operator-reviewed
+// category and must independently verify DXCC, location and QSO eligibility.
+// These helpers do not make ARRL-10 a supported scoring/export rule sheet.
+enum class Arrl10Origin { UnitedStates, Canada, Mexico, Dx, Maritime };
+int arrl10Points(const QString& mode);
+QString arrl10Multiplier(Arrl10Origin origin, const QString& areaOrRegion, int dxcc, const QString& mode);
+
 // La scheda di un contest, o una scheda vuota (valid = false) se non c'e'.
 ContestRules forId(const QString& contestId);
 

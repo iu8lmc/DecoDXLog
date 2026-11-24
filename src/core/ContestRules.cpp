@@ -104,6 +104,45 @@ QString modeGroup(const QString& mode)
 
 } // namespace
 
+namespace {
+QString arrl10Mode(const QString& value)
+{
+    const QString mode=value.trimmed().toUpper();
+    if (mode==QLatin1String("CW")) return QStringLiteral("CW");
+    if (mode==QLatin1String("SSB") || mode==QLatin1String("USB") || mode==QLatin1String("LSB") ||
+        mode==QLatin1String("AM") || mode==QLatin1String("FM") || mode==QLatin1String("PH")) return QStringLiteral("PH");
+    return {};
+}
+}
+
+int arrl10Points(const QString& mode)
+{
+    const QString group=arrl10Mode(mode);
+    return group==QLatin1String("CW") ? 4 : group==QLatin1String("PH") ? 2 : 0;
+}
+
+QString arrl10Multiplier(Arrl10Origin origin, const QString& areaOrRegion, int dxcc, const QString& mode)
+{
+    // ARRL multiplier tables v1.2.0 (2023-05-12); aliases are deliberately not inferred.
+    static const QStringList usa=QStringLiteral("AL AK AZ AR CA CO CT DC DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY").split(QLatin1Char(' '));
+    static const QStringList canada=QStringLiteral("AB BC LB MB NB NF NS NT NU ON PE QC SK YT").split(QLatin1Char(' '));
+    static const QStringList mexico=QStringLiteral("AGS BAC BCS CAM CHI CHH CMX COA COL DGO EMX GTO GRO HGO JAL MIC MOR NAY NLE OAX PUE QRO QUI SLP SIN SON TAB TAM TLX VER YUC ZAC").split(QLatin1Char(' '));
+    const QString group=arrl10Mode(mode), value=areaOrRegion.trimmed().toUpper();
+    if (group.isEmpty()) return {};
+    QString category, code;
+    switch (origin) {
+    case Arrl10Origin::UnitedStates: if (!usa.contains(value)) return {}; category=QStringLiteral("US"); code=value; break;
+    case Arrl10Origin::Canada: if (!canada.contains(value)) return {}; category=QStringLiteral("CA"); code=value; break;
+    case Arrl10Origin::Mexico: if (!mexico.contains(value)) return {}; category=QStringLiteral("MX"); code=value; break;
+    case Arrl10Origin::Dx: if (dxcc<=0) return {}; category=QStringLiteral("DXCC"); code=QString::number(dxcc); break;
+    case Arrl10Origin::Maritime:
+        if (value!=QLatin1String("1") && value!=QLatin1String("2") && value!=QLatin1String("3")) return {};
+        category=QStringLiteral("ITU-REGION"); code=value; break;
+    default: return {};
+    }
+    return category+QLatin1Char('|')+code+QLatin1Char('|')+group;
+}
+
 ContestRules forId(const QString& contestId)
 {
     const QString id = contestId.trimmed().toUpper();
