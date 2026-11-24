@@ -19,6 +19,15 @@
 namespace decolog::core {
 namespace {
 QString nowUtc() { return QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs); }
+bool beginNetWrite(QSqlDatabase db,QString *error)
+{
+    // Acquire the SQLite write reservation before reading session state. A
+    // deferred read transaction can otherwise fail to upgrade after a
+    // concurrent commit, even when busy_timeout is configured.
+    QSqlQuery query(db);
+    if (!query.exec(QStringLiteral("BEGIN IMMEDIATE"))) { if (error) *error=query.lastError().text(); return false; }
+    return true;
+}
 bool safeNetExportDestination(const QString &destination, const QString &source)
 {
     if (destination.isEmpty()) return false;
@@ -165,8 +174,9 @@ bool RadioNet::setReminder(int seconds)
     if (!m_db || !m_db->isOpen() || seconds < 1 || seconds > 86400)
         return fail(tr("Enter a reminder duration from 1 to 86400 seconds"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!active()) {
         db.rollback();
         return fail(tr("Open an active radio net first"));
@@ -187,8 +197,9 @@ bool RadioNet::clearReminder()
     if (!selectedSessionCurrent())
         return fail(tr("Radio net session not found"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!selectedSessionCurrent()) { db.rollback(); return fail(tr("Radio net session changed; select it again")); }
     if (!appendEvent(0, QStringLiteral("reminder_clear")) || !db.commit()) {
         const QString error = db.lastError().text();
@@ -321,8 +332,9 @@ bool RadioNet::start(const QString &title, qint64 stationProfileId)
     if (label.isEmpty() || label.size() > 160)
         return fail(tr("Enter a session name (up to 160 characters)"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     QSqlQuery q(db);
     q.prepare(
         QStringLiteral("INSERT INTO radio_net_session(uuid,title,station_profile_id,started_at) VALUES(?,?,?,?)"));
@@ -360,8 +372,9 @@ bool RadioNet::checkIn(const QString &rawCall, const QString &name, const QStrin
     if (name.size() > 160 || notes.size() > 4000)
         return fail(tr("Name or notes are too long"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!active()) {
         db.rollback();
         return fail(tr("Open an active radio net first"));
@@ -418,8 +431,9 @@ bool RadioNet::setStatus(qint64 memberId, const QString &status)
              .contains(status))
         return fail(tr("Invalid participant status"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!active()) {
         db.rollback();
         return fail(tr("Open an active radio net first"));
@@ -449,8 +463,9 @@ bool RadioNet::nextTurn()
     if (!active())
         return fail(tr("Open an active radio net first"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!active()) {
         db.rollback();
         return fail(tr("Open an active radio net first"));
@@ -487,8 +502,9 @@ bool RadioNet::moveMember(qint64 memberId, int direction)
     if (direction != -1 && direction != 1)
         return fail(tr("Invalid movement"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!active()) {
         db.rollback();
         return fail(tr("Open an active radio net first"));
@@ -541,8 +557,9 @@ bool RadioNet::closeSession()
     if (!active())
         return fail(tr("Open an active radio net first"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!active()) { db.rollback(); return fail(tr("Open an active radio net first")); }
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE radio_net_session SET ended_at=? WHERE id=? AND ended_at IS NULL"));
@@ -562,8 +579,9 @@ bool RadioNet::reopenSession()
     if (!selectedSessionCurrent() || active())
         return fail(tr("Select a closed session"));
     QSqlDatabase db = m_db->connection();
-    if (!db.transaction())
-        return fail(db.lastError().text());
+    QString transactionError;
+    if (!beginNetWrite(db,&transactionError))
+        return fail(transactionError);
     if (!selectedSessionCurrent() || active()) { db.rollback(); return fail(tr("Select a closed session")); }
     QSqlQuery q(db);
     q.prepare(QStringLiteral("UPDATE radio_net_session SET ended_at=NULL WHERE id=? AND ended_at IS NOT NULL"));

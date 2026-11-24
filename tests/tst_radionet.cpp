@@ -21,6 +21,37 @@ using namespace decolog::core;
 class TestRadioNet : public QObject {
     Q_OBJECT
   private slots:
+    void checkInSurvivesConcurrentWriterAfterSessionRead()
+    {
+#ifndef Q_OS_MACOS
+        QSKIP("Native authorizer fixture requires the verified system SQLite driver on macOS");
+#endif
+        if (!qEnvironmentVariableIsSet("DECOLOG_TEST_SYSTEM_SQLITE_AUTHORIZER")) QSKIP("Explicit opt-in required for verified system SQLite driver");
+        QLibrary sqlite(QStringLiteral("sqlite3")); using Authorizer=int (*)(void*,int,const char*,const char*,const char*,const char*); using SetAuthorizer=int (*)(void*,Authorizer,void*);
+        const auto setAuthorizer=reinterpret_cast<SetAuthorizer>(sqlite.resolve("sqlite3_set_authorizer")); if (!setAuthorizer) QSKIP("SQLite native authorizer unavailable");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("race.sqlite"); LogDatabase db; QVERIFY(db.open(path));
+        QSqlQuery wal(db.connection()); QVERIFY(wal.exec("PRAGMA journal_mode=WAL")); QVERIFY(wal.next()); QCOMPARE(wal.value(0).toString().toLower(),QString("wal")); wal.finish();
+        RadioNet net(&db); QVERIFY(net.start("Net")); QVariant handle=db.connection().driver()->handle();
+        if (QByteArray(handle.typeName())!="sqlite3*" || !handle.data()) QSKIP("SQLite native handle unavailable");
+        void* native=*static_cast<void**>(handle.data()); QVERIFY(native);
+        struct Gate { std::atomic_bool ready{false},entered{false},done{false},wrote{false},timedOut{false}; } gate;
+        const auto hook=+[](void* opaque,int action,const char* table,const char*,const char*,const char*) {
+            auto* g=static_cast<Gate*>(opaque); if (action==18 && table && std::strcmp(table,"radio_net_member")==0 && !g->entered.exchange(true)) {
+                QElapsedTimer timer; timer.start(); while (!g->done.load() && timer.elapsed()<5000) QThread::msleep(1); if (!g->done.load()) g->timedOut=true;
+            } return 0;
+        };
+        std::thread writer([&] { LogDatabase other; if (other.openExistingReadWrite(path)) { QSqlQuery q(other.connection()); q.exec("PRAGMA busy_timeout=0"); gate.ready=true;
+            QElapsedTimer timer; timer.start(); while (!gate.entered.load() && timer.elapsed()<5000) QThread::msleep(1);
+            if (gate.entered.load()) gate.wrote=q.exec("INSERT INTO app_setting(key,value) VALUES('race.writer','1')"); } gate.done=true; });
+        QElapsedTimer ready; ready.start(); while (!gate.ready.load() && !gate.done.load() && ready.elapsed()<5000) QThread::msleep(1);
+        if (!gate.ready.load()) { gate.done=true; writer.join(); QFAIL("Competing connection did not open"); }
+        const int installed=setAuthorizer(native,hook,&gate); if (installed!=0) { gate.done=true; writer.join(); QFAIL("Cannot install SQLite authorizer"); }
+        const bool checkedIn=net.checkIn("K1ABC","Alice",{}); const QString error=net.error();
+        const int removed=setAuthorizer(native,nullptr,nullptr); writer.join(); QCOMPARE(removed,0);
+        qInfo("RADIO_NET_WRITE_RACE competitor_committed=%d checkin=%d",gate.wrote.load()?1:0,checkedIn?1:0);
+        QVERIFY(!gate.timedOut.load()); QVERIFY(gate.entered.load()); QVERIFY2(checkedIn,qPrintable(error));
+        QVERIFY(!gate.wrote.load()); QCOMPARE(net.members().size(),1); QCOMPARE(net.members().first().toMap().value("call").toString(),QString("K1ABC"));
+    }
     void replacedLogFileRejectsRadioNetActions()
     {
 #ifndef Q_OS_UNIX
