@@ -170,6 +170,16 @@ GlassPanel {
                              observedAt:root.calendarObserved, bands:["20m","40m","15m","10m"], modes:["CW","SSB","FT8"], profileId:0, archived:false, revision:0})
     }
     function reviewCampaignDates(event) { dateReview.review(event) }
+    function probeDateReviewContext() {
+        calendarObserved="2026-01-09T10:00:00Z"
+        dateReview.review({title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-10"})
+        dateReview.choose(root.campaignBackend.dxCampaigns.findIndex(c => c.title === "Spring"))
+        console.warn("PROBE dxcontext ready " + !!dateReview.selected.id)
+        dateContextApply.start()
+    }
+    Timer { id:dateContextApply; interval:2500; onTriggered: {
+        dateReview.apply(); console.warn("PROBE dxcontext result " + dateReview.visible + " " + dateReview.reviewError)
+    } }
     function probeDateReview() {
         calendarObserved="2026-01-09T10:00:00Z"
         visibleEntries=[{entity:"Fixture expedition",title:"Fixture expedition (ZZ1AAA)",call:"ZZ1AAA",start:"2026-01-01",end:"2026-01-10",description:"Updated dates"}]
@@ -292,10 +302,12 @@ GlassPanel {
         property var selected: ({})
         property string observedAt: ""
         property string logPath: ""
+        property var logContext: ({})
         property string reviewError: ""
         function review(event) {
             announcement={title:event.title || "",call:event.call || "",start:event.start || "",end:event.end || ""}
             observedAt=root.calendarObserved; logPath=root.campaignBackend.currentLogInfo().path || ""
+            logContext=root.campaignBackend.dxCampaignReviewContext()
             selected=({}); campaignChoice.currentIndex=-1; reviewError=""; open()
         }
         function choose(index) {
@@ -307,7 +319,7 @@ GlassPanel {
             if (!selected.id) { reviewError=qsTr("Choose a campaign first."); return }
             if (!logPath || logPath!==root.campaignBackend.currentLogInfo().path) { reviewError=qsTr("The open log changed; review again."); return }
             if (!observedAt) { reviewError=qsTr("The calendar observation time is unavailable. Update the calendar and review again."); return }
-            const updated=Object.assign({},selected,{start:announcement.start,end:announcement.end,source:root.feedUrl,observedAt:observedAt})
+            const updated=Object.assign({},selected,{start:announcement.start,end:announcement.end,source:root.feedUrl,observedAt:observedAt,_reviewContext:logContext})
             if (!root.campaignBackend.saveDxCampaign(updated)) { reviewError=root.campaignBackend.dxCampaignError; return }
             close()
         }
@@ -352,9 +364,10 @@ GlassPanel {
         property var goalDraft: []
         property bool goalsDirty: false
         property string logPath: ""
+        property var logContext: ({})
         property string editorError: ""
         function edit(c) {
-            draft=c || ({}); logPath=root.campaignBackend.currentLogInfo().path || ""
+            draft=c || ({}); logPath=root.campaignBackend.currentLogInfo().path || ""; logContext=root.campaignBackend.dxCampaignReviewContext()
             goalDraft=(draft.goals || []).map(g => ({band:g.band,mode:g.mode,target:g.target})); goalsDirty=false
             titleField.text=draft.title || ""; callsField.text=(draft.calls || []).join(", ")
             startField.text=draft.start || ""; endField.text=draft.end || ""; sourceField.text=draft.source || ""
@@ -379,7 +392,7 @@ GlassPanel {
             const data={id:draft.id || "", revision:draft.revision || 0, title:titleField.text, calls:splitValues(callsField.text),
                 start:startField.text, end:endField.text, source:sourceField.text, observedAt:observedField.text,
                 bands:splitValues(bandsField.text), modes:splitValues(modesField.text), goals:goalDraft, profileId:profileField.ids[profileField.currentIndex] || 0,
-                archived:archivedField.checked, watched:watchedField.checked, watchGoalsOnly:watchGoalsOnlyField.checked}
+                archived:archivedField.checked, watched:watchedField.checked, watchGoalsOnly:watchGoalsOnlyField.checked,_reviewContext:logContext}
             if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; goalsDirty=false; editorError="" }
             else editorError=root.campaignBackend.dxCampaignError
         }

@@ -1331,6 +1331,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignprobe") { window.showPanel("dxcalendar"); dxCampaignProbe.start() }
         else if (what[0] === "dxcampaignrestoreprobe") { window.showPanel("dxcalendar"); dxCampaignRestoreProbe.start() }
         else if (what[0] === "dxdatesprobe") { window.showPanel("dxcalendar"); dxDatesProbe.start() }
+        else if (what[0] === "dxdatescontextprobe") { window.showPanel("dxcalendar"); dxDatesContextProbe.start() }
         else if (what[0] === "dxcampaignspotprobe") { window.showPanel("dxcalendar"); dxCampaignSpotProbe.start() }
         else if (what[0] === "dxcampaignwatchprobe") dxCampaignWatchProbe.start()
         else if (what[0] === "dxgoalwatchprobe") dxGoalWatchProbe.start()
@@ -1797,6 +1798,7 @@ RoundedWindow {
     Timer { id:dxCampaignProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaign(); else console.warn("PROBE dxcampaign missing panel") } }
     Timer { id:dxCampaignRestoreProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaignRestore(); else console.warn("PROBE dxcampaign missing panel") } }
     Timer { id:dxDatesProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeDateReview(); else console.warn("PROBE dxdates missing panel") } }
+    Timer { id:dxDatesContextProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeDateReviewContext(); else console.warn("PROBE dxcontext missing panel") } }
     Timer { id:dxCampaignSpotProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeCampaignSpots(); else console.warn("PROBE dxspots missing panel") } }
     Timer { id:dxExternalWatchReady; interval:1000; onTriggered: { console.warn("PROBE dxexternal ready"); dxExternalWatchSpot.start() } }
     Timer { id:duplicateGuardStart; interval:1000; onTriggered: { duplicateGuardProbe.waiting=true; decolog.findDuplicates(5) } }

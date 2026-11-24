@@ -4,6 +4,7 @@
 #include <QTimeZone>
 #include <QSqlQuery>
 #include <QSqlError>
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTemporaryDir>
@@ -13,6 +14,15 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void campaignReviewContextRejectsReopenAndReplacement()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("review.sqlite"), copy=dir.filePath("copy.sqlite");
+        LogDatabase db; QVERIFY(db.open(path)); auto first=dxcampaign::captureReviewContext(db); QVERIFY(first); QVERIFY(dxcampaign::reviewContextCurrent(db,*first));
+        db.close(); QVERIFY(QFile::copy(path,copy)); QVERIFY(db.open(path)); QCOMPARE(db.path(),first->path); QVERIFY(!dxcampaign::reviewContextCurrent(db,*first));
+        auto reopened=dxcampaign::captureReviewContext(db); QVERIFY(reopened); QVERIFY(dxcampaign::reviewContextCurrent(db,*reopened));
+        QVERIFY(QFile::rename(path,dir.filePath("original.sqlite"))); QVERIFY(QFile::copy(copy,path));
+        QCOMPARE(db.path(),reopened->path); QVERIFY(!dxcampaign::reviewContextCurrent(db,*reopened)); QVERIFY(!dxcampaign::captureReviewContext(db));
+    }
     void damagedCampaignDoesNotHideHealthyCampaign()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;

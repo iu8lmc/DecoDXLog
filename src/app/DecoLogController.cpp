@@ -2522,8 +2522,23 @@ void DecoLogController::emitDxCampaignAlert(const dxcampaign::Campaign& campaign
         .arg(campaign.title,spot.spot.dxCall,spot.spot.band,spot.spot.mode,QString::number(spot.spot.freqKhz,'f',1)),QStringLiteral("highlight"));
 }
 
+QVariantMap DecoLogController::dxCampaignReviewContext() const
+{
+    const auto context=dxcampaign::captureReviewContext(m_db);
+    if (!context) return {};
+    return {{QStringLiteral("path"),context->path},{QStringLiteral("identity"),context->identity},
+        {QStringLiteral("fileIdentity"),QString::fromLatin1(context->fileIdentity.toHex())},
+        {QStringLiteral("generation"),QString::number(context->generation)}};
+}
 bool DecoLogController::saveDxCampaign(const QVariantMap& values)
 {
+    if (values.contains(QStringLiteral("_reviewContext"))) {
+        const auto expected=values.value(QStringLiteral("_reviewContext")).toMap();
+        const auto current=dxCampaignReviewContext();
+        if (expected.isEmpty() || current.isEmpty() || expected!=current) {
+            m_dxCampaignError=tr("The log changed; reopen the campaign review."); emit dxCampaignChanged(); return false;
+        }
+    }
     dxcampaign::Campaign c;
     c.id=values.value(QStringLiteral("id")).toString(); c.title=values.value(QStringLiteral("title")).toString().trimmed();
     c.calls=values.value(QStringLiteral("calls")).toStringList();

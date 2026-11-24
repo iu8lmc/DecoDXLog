@@ -1347,6 +1347,31 @@ private slots:
         QVERIFY2(output.contains("PROBE dxspots rendered 3Y0K") && output.contains("PROBE dxspots filtered []"),output.constData());
         QVERIFY2(!output.contains("\"call\":\"K1XYZ\"") && !output.contains("TypeError"),output.constData());
     }
+    void dxCampaignDateReviewRejectsReplacedLog()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("This fixture replaces an open file and is currently tested on Unix only");
+#else
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        const auto path=dir.filePath("test.sqlite"), copy=dir.filePath("copy.sqlite"), moved=dir.filePath("original.sqlite"); QString id;
+        { LogDatabase db; QVERIFY(db.open(path)); dxcampaign::Campaign c; c.title="Spring"; c.calls={"ZZ1AAA"};
+          c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"};
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); id=c.id; }
+        QVERIFY(QFile::copy(path,copy)); QProcessEnvironment env=QProcessEnvironment::systemEnvironment();
+        env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software"); env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","dxdatescontextprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE dxcontext ready") && timer.elapsed()<15000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE dxcontext ready true"),output.constData());
+        QVERIFY(QFile::rename(path,moved)); QVERIFY(QFile::copy(copy,path));
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains("PROBE dxcontext result true") && output.contains("The log changed; reopen the campaign review.") && !output.contains("TypeError"),output.constData());
+        LogDatabase reopened; QVERIFY(reopened.open(path)); const auto campaign=dxcampaign::load(reopened,id); QVERIFY(campaign); QCOMPARE(campaign->end,QDate(2026,1,7));
+#endif
+    }
     void dxCampaignDateReviewChangesOnlyChosenExpedition()
     {
         using namespace decolog::core;

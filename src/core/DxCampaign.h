@@ -23,6 +23,9 @@ struct Campaign {
     int revision{0};
 };
 struct Cell { QString band, mode; int worked{0}, confirmed{0}; QString target; bool needed{false}; };
+struct ReviewContext { QString path, identity; QByteArray fileIdentity; quint64 generation{0}; };
+std::optional<ReviewContext> captureReviewContext(const LogDatabase& db);
+bool reviewContextCurrent(const LogDatabase& db,const ReviewContext& context);
 bool save(LogDatabase& db, Campaign& campaign, QString* error = nullptr);
 std::optional<Campaign> load(const LogDatabase& db, const QString& id, QString* error = nullptr);
 QList<Campaign> list(const LogDatabase& db, QString* error = nullptr, int* invalidCount = nullptr);

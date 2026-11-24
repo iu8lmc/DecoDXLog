@@ -11,6 +11,17 @@
 #include <limits>
 
 namespace decolog::core::dxcampaign {
+std::optional<ReviewContext> captureReviewContext(const LogDatabase& db)
+{
+    if (!db.isOpen() || db.path().isEmpty() || db.identity().isEmpty() || db.openFileIdentity().isEmpty() || !db.fileIdentityMatchesOpen()) return {};
+    return ReviewContext{db.path(),db.identity(),db.openFileIdentity(),db.openGeneration()};
+}
+bool reviewContextCurrent(const LogDatabase& db,const ReviewContext& context)
+{
+    const auto current=captureReviewContext(db);
+    return current && current->path==context.path && current->identity==context.identity &&
+        current->fileIdentity==context.fileIdentity && current->generation==context.generation;
+}
 namespace {
 const QString prefix=QStringLiteral("dx_campaign.");
 QString campaignMode(const QString& text)
