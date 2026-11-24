@@ -25,8 +25,13 @@ DialogFrame {
     property int probeExportStep: 0
     property bool probeClosedMode: false
     property bool probeExclusionMode: false
+    property bool probeExclusionNavigation: false
     property int previewPage: 0
     property int excludedPage: 0
+    property var excludedRows: []
+    property var excludedCursors: [0]
+    property bool excludedHasMore: false
+    property int excludedPendingPage: 0
     property int potaReviewPage: 0
     property var potaReviewRows: []
     property var potaReviewCursors: [0]
@@ -205,6 +210,21 @@ DialogFrame {
             root.potaReviewRows = []
         }
     }
+    function requestExcludedPage(page) {
+        if (root.act.potaPageBusy || page < 0) return
+        let cursors=root.excludedCursors.slice()
+        if (page > root.excludedPage) {
+            if (!root.excludedHasMore || !root.excludedRows.length) return
+            cursors=cursors.slice(0,page)
+            cursors.push(root.excludedRows[root.excludedRows.length-1].id)
+        }
+        if (page >= cursors.length) return
+        root.excludedPendingPage=page; root.excludedCursors=cursors
+        if (!root.act.requestExcludedPage(cursors[page])) {
+            root.partitionMessage=qsTr("The log or QSO changed; recalculate the preview before opening it.")
+            root.excludedRows=[]
+        }
+    }
     Connections {
         target: root.act
         function onChanged() { root.previewShown = false; root.historyCursors = [0]; root.historyPage = 0; root.historyRows = root.act.closedRuns(0) }
@@ -214,11 +234,34 @@ DialogFrame {
                 root.previewShown = Object.keys(root.partitionPreview).length > 0
                 root.previewPage = 0
                 root.excludedPage = 0
+                root.excludedRows = root.partitionPreview.excluded || []
+                root.excludedHasMore = !!root.partitionPreview.excludedHasMore
+                root.excludedCursors = [0]
                 root.potaReviewPage = 0
                 root.potaReviewRows = root.partitionPreview.potaCorrespondentRows || []
                 root.potaReviewHasMore = !!root.partitionPreview.potaCorrespondentHasMore
                 root.potaReviewCursors = [0]
             }
+        }
+        function onExcludedPageFinished(result) {
+            if (result.error) {
+                root.excludedRows=[]; root.excludedHasMore=false; root.partitionMessage=result.error
+                return
+            }
+            root.excludedRows=result.excluded || []
+            root.excludedHasMore=!!result.excludedHasMore
+            root.excludedPage=root.excludedPendingPage
+            if (root.probeExclusionNavigation) Qt.callLater(() => {
+                const item=exclusionRepeater.itemAt(0)
+                if (!item) return
+                if (root.excludedPage === 1) {
+                    console.warn("PROBE exclusions next=" + item.modelData.call + " reason=" + item.modelData.reason + " page=" + root.excludedPage + " text=" + item.text)
+                    exclusionPrevious.clicked()
+                } else {
+                    console.warn("PROBE exclusions back=" + item.modelData.call + " page=" + root.excludedPage)
+                    root.probeExclusionNavigation=false
+                }
+            })
         }
         function onPotaReviewPageFinished(result) {
             if (result.error) {
@@ -332,18 +375,9 @@ DialogFrame {
                     if (group) console.warn("PROBE referenceWarning text=" + group.probeText())
                     const first = exclusionRepeater.itemAt(0)
                     if (!first) return
-                    console.warn("PROBE exclusions total=" + root.partitionPreview.excluded.length + " first=" + first.modelData.call + " reason=" + first.modelData.reason + " text=" + first.text)
+                    console.warn("PROBE exclusions total=" + root.partitionPreview.excludedTotal + " first=" + first.modelData.call + " reason=" + first.modelData.reason + " text=" + first.text)
+                    root.probeExclusionNavigation=true
                     exclusionNext.clicked()
-                    Qt.callLater(() => {
-                        const next = exclusionRepeater.itemAt(0)
-                        if (!next) return
-                        console.warn("PROBE exclusions next=" + next.modelData.call + " reason=" + next.modelData.reason + " page=" + root.excludedPage + " text=" + next.text)
-                        exclusionPrevious.clicked()
-                        Qt.callLater(() => {
-                            const back = exclusionRepeater.itemAt(0)
-                            if (back) console.warn("PROBE exclusions back=" + back.modelData.call + " page=" + root.excludedPage)
-                        })
-                    })
                 })
                 return
             }
@@ -925,7 +959,7 @@ DialogFrame {
         }
         Repeater {
             id: exclusionRepeater
-            model: root.previewShown && !root.partitionPreview.error ? (root.partitionPreview.excluded || []).slice(root.excludedPage * 100, (root.excludedPage + 1) * 100) : []
+            model: root.previewShown && !root.partitionPreview.error ? root.excludedRows : []
             RowLayout {
                 required property var modelData
                 readonly property string text: qsTr("Excluded QSO #%1 · %2 · %3: %4")
@@ -942,10 +976,10 @@ DialogFrame {
             }
         }
         RowLayout {
-            visible: root.previewShown && (root.partitionPreview.excluded || []).length > 100
-            GlassButton { id: exclusionPrevious; text: qsTr("Previous exclusions"); enabled: root.excludedPage > 0; onClicked: root.excludedPage-- }
+            visible: root.previewShown && (root.partitionPreview.excludedTotal || 0) > 100
+            GlassButton { id: exclusionPrevious; text: qsTr("Previous exclusions"); enabled: !root.act.potaPageBusy && root.excludedPage > 0; onClicked: root.requestExcludedPage(root.excludedPage - 1) }
             Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.excludedPage + 1) }
-            GlassButton { id: exclusionNext; text: qsTr("Next exclusions"); enabled: (root.excludedPage + 1) * 100 < (root.partitionPreview.excluded || []).length; onClicked: root.excludedPage++ }
+            GlassButton { id: exclusionNext; text: qsTr("Next exclusions"); enabled: !root.act.potaPageBusy && root.excludedHasMore; onClicked: root.requestExcludedPage(root.excludedPage + 1) }
         }
         Note {
             visible: root.previewShown && (root.partitionPreview.potaCorrespondentTotal || 0) > 0

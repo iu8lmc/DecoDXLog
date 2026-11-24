@@ -769,6 +769,28 @@ private slots:
         qInfo("ACTIVATION_PARTITION_BENCH qso=20000 qsl=20000 groups=2 review=%d elapsed_ms=%lld ticks=%d max_gap_ms=%lld",reviews,static_cast<long long>(elapsed),ticks,static_cast<long long>(maxGap));
     }
 
+    void benchmarkPagedActivationExclusions()
+    {
+        if (!qEnvironmentVariableIsSet("DECOLOG_BENCH_ACTIVATION_EXCLUSIONS")) QSKIP("Opt-in synthetic benchmark");
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("large.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001"}}).isEmpty());
+        const QString session=act.state().value("sessionUuid").toString();
+        const QString json=QString::fromUtf8(QJsonDocument(QJsonObject{{"APP_DECOLOG_ACTIVATION_UUID",session},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}}).toJson(QJsonDocument::Compact));
+        QSqlQuery seed(db.connection()); QVERIFY(seed.prepare("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<20000) "
+            "INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at,adif_extra) "
+            "SELECT printf('exclude-%d',i),'K1ABC','2027-01-01T12:00:00Z','20m','CW','2027-01-01T12:00:00Z','2027-01-01T12:00:00Z',? FROM n"));
+        seed.addBindValue(json); QVERIFY2(seed.exec(),qPrintable(seed.lastError().text()));
+        const bool paged=qEnvironmentVariable("DECOLOG_BENCH_ACTIVATION_EXCLUSIONS")==QLatin1String("paged");
+        QSignalSpy finished(&act,&ActivationController::previewFinished); QElapsedTimer timer; timer.start();
+        QVERIFY(paged ? act.startPagedRunPartitionPreview(session) : act.startRunPartitionPreview(session));
+        QVERIFY(finished.wait(30000)); QVERIFY(finished.first().first().toBool());
+        const auto result=act.previewResult(); QCOMPARE(result.value("excludedTotal").toLongLong(),qint64(20000));
+        QCOMPARE(result.value("excluded").toList().size(),paged ? 100 : 20000);
+        QCOMPARE(result.value("excludedHasMore").toBool(),paged);
+        qInfo("ACTIVATION_EXCLUSIONS_BENCH qso=20000 paged=%d elapsed_ms=%lld",paged,static_cast<long long>(timer.elapsed()));
+    }
+
     void asynchronousPreviewCanCompleteCancelAndInvalidate()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid());
@@ -850,6 +872,22 @@ private slots:
         QVERIFY(act.startPagedRunPartitionPreview(act.state().value("sessionUuid").toString()));
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(finished.first().first().toBool());
         QCOMPARE(act.previewResult().value("potaCorrespondentRows").toList().size(),100);
+        QCOMPARE(act.previewResult().value("excluded").toList().size(),100);
+        QCOMPARE(act.previewResult().value("excludedTotal").toLongLong(),qint64(300));
+        const auto allExcluded=result.value("excluded").toList();
+        auto exclusions=act.previewResult().value("excluded").toList();
+        QSignalSpy exclusionDone(&act,&ActivationController::excludedPageFinished);
+        for (int page=1; page<3; ++page) {
+            const auto after=exclusions.last().toMap().value("id").toLongLong();
+            QVERIFY(act.requestExcludedPage(after));
+            QTRY_COMPARE_WITH_TIMEOUT(exclusionDone.size(),1,5000);
+            const auto part=exclusionDone.takeFirst().first().toMap();
+            QVERIFY(part.value("error").toString().isEmpty());
+            const auto current=part.value("excluded").toList(); QCOMPARE(current.size(),100);
+            QCOMPARE(part.value("excludedHasMore").toBool(),page==1);
+            exclusions.append(current);
+        }
+        QCOMPARE(exclusions,allExcluded);
         QSignalSpy pageDone(&act,&ActivationController::potaReviewPageFinished);
         const auto firstPage=act.previewResult().value("potaCorrespondentRows").toList();
         const qint64 firstCursor=firstPage.last().toMap().value("id").toLongLong();
@@ -862,6 +900,11 @@ private slots:
         QCOMPARE(second.value("uncertainPeriod").toInt(),300);
         QSqlQuery changedExclusion(db.connection());
         QVERIFY(changedExclusion.exec("UPDATE qso SET comment='changed exclusion' WHERE call='N0000'"));
+        QVERIFY(act.requestExcludedPage(exclusions.at(99).toMap().value("id").toLongLong()));
+        QTRY_COMPARE_WITH_TIMEOUT(exclusionDone.size(),1,5000);
+        const auto staleExclusion=exclusionDone.takeFirst().first().toMap();
+        QVERIFY(!staleExclusion.value("error").toString().isEmpty());
+        QVERIFY(staleExclusion.value("excluded").toList().isEmpty());
         QVERIFY(act.requestPotaReviewPage(firstCursor));
         QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
         const auto rejectedExclusion=pageDone.takeFirst().first().toMap();

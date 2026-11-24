@@ -85,6 +85,7 @@ public:
     bool potaPageBusy() const { return m_potaPageBusy; }
     Q_INVOKABLE bool startPagedRunPartitionPreview(const QString& uuid);
     Q_INVOKABLE bool requestPotaReviewPage(qint64 afterId);
+    Q_INVOKABLE bool requestExcludedPage(qint64 afterId);
     bool contestReportBusy() const { return m_contestReportBusy; }
     Q_INVOKABLE bool startContestReportPreview(const QUrl& file);
     Q_INVOKABLE bool startContestFindings(const QUrl &a, const QUrl &b, const QString &contest, const QString &fromA, const QString &toA, const QString &fromB, const QString &toB);
@@ -228,10 +229,12 @@ signals:
     void previewFinished(bool success);
     void potaPageBusyChanged();
     void potaReviewPageFinished(const QVariantMap& result);
+    void excludedPageFinished(const QVariantMap& result);
     void partitionExportChanged();
     void partitionExportFinished(bool success, const QString& message);
 
 private:
+    bool requestActivationReviewPage(qint64 afterId, bool exclusions);
     void invalidatePreview();
     core::SotaCatalogue* m_sotaCatalogue{nullptr};
     core::PotaCatalogue* m_potaCatalogue{nullptr};

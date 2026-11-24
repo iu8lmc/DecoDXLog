@@ -807,7 +807,8 @@ namespace {
 QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled,
                                  bool ownsTransaction = true, const QString& selectedKey = {}, QList<qint64>* selectedIds = nullptr,
                                  const QString& cataloguePath = {}, const QString& potaCataloguePath = {},
-                                 qint64 reviewAfterId = 0, int reviewLimit = -1, bool collectExcluded = true)
+                                 qint64 reviewAfterId = 0, int reviewLimit = -1, bool collectExcluded = true,
+                                 qint64 excludedAfterId = 0, int excludedLimit = -1)
 {
     QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
     const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
@@ -831,16 +832,22 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     qint64 potaCorrespondentTotal = 0;
     bool potaCorrespondentHasMore = false;
     QByteArray excludedFingerprint;
+    qint64 excludedTotal=0; bool excludedHasMore=false;
     const auto exclude = [&](const QString& reason) {
         if (!selectedIds) {
+            ++excludedTotal;
             QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_0);
             stream << reason;
             for (int column=6; column<q.record().count(); ++column) stream << q.value(column);
             if (stream.status()!=QDataStream::Ok) return false;
             excludedFingerprint=QCryptographicHash::hash(excludedFingerprint + QCryptographicHash::hash(bytes,QCryptographicHash::Sha256),QCryptographicHash::Sha256);
-            if (collectExcluded) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
-                {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
-                {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
+            if (collectExcluded && q.value(2).toLongLong()>excludedAfterId) {
+                if (excludedLimit<0 || excluded.size()<excludedLimit)
+                    excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
+                        {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
+                        {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
+                else excludedHasMore=true;
+            }
         }
         return true;
     };
@@ -988,6 +995,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     result[QStringLiteral("missingDate")] = missingDate; result[QStringLiteral("missingReference")] = missingReference;
     result[QStringLiteral("uncertainPeriod")] = uncertainPeriod;
     result[QStringLiteral("excluded")] = excluded;
+    result[QStringLiteral("excludedTotal")] = excludedTotal;
+    result[QStringLiteral("excludedHasMore")] = excludedHasMore;
     result[QStringLiteral("excludedFingerprint")] = QString::fromLatin1(excludedFingerprint.toHex());
     result[QStringLiteral("potaCorrespondentRows")] = potaCorrespondentRows;
     result[QStringLiteral("potaCorrespondentTotal")] = potaCorrespondentTotal;
@@ -1573,7 +1582,7 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
                 const auto matches=[&] { QSqlQuery check(db); return core::fileidentity::read(path)==fileIdentity && check.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && check.next() && check.value(0).toString()==logIdentity; };
                 if (!matches()) result[QStringLiteral("error")]=tr("The log or session changed; recalculate the preview.");
                 else {
-                    result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath, potaCataloguePath, 0, paged ? 100 : -1);
+                    result = scanPartitionPreview(db, uuid, cancelled, true, {}, nullptr, cataloguePath, potaCataloguePath, 0, paged ? 100 : -1, true, 0, paged ? 100 : -1);
                     if (!matches()) result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
                 }
             }
@@ -1598,6 +1607,16 @@ bool ActivationController::startRunPartitionPreview(const QString& requestedUuid
 }
 
 bool ActivationController::requestPotaReviewPage(qint64 afterId)
+{
+    return requestActivationReviewPage(afterId,false);
+}
+
+bool ActivationController::requestExcludedPage(qint64 afterId)
+{
+    return requestActivationReviewPage(afterId,true);
+}
+
+bool ActivationController::requestActivationReviewPage(qint64 afterId, bool exclusions)
 {
     if (afterId < 0 || m_potaPageBusy || m_previewBusy || m_previewSessionUuid.isEmpty() ||
         m_previewResult.contains(QStringLiteral("error")) || !m_ctx.db || !m_ctx.db->isOpen() ||
@@ -1626,7 +1645,7 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
     m_potaPageCancel=std::make_shared<std::atomic_bool>(false); const auto cancelled=m_potaPageCancel;
     m_potaPageBusy=true; emit potaPageBusyChanged();
     QPointer<ActivationController> self(this);
-    m_potaPagePool.start([self,path,identity,uuid,fileIdentity,generation,logGeneration,afterId,dataVersion,expected,expectedExcluded,expectedTotal,cancelled,signature] {
+    m_potaPagePool.start([self,path,identity,uuid,fileIdentity,generation,logGeneration,afterId,dataVersion,expected,expectedExcluded,expectedTotal,cancelled,signature,exclusions] {
         QVariantMap result;
         const QString connection=QStringLiteral("activation-pota-page-")+QUuid::createUuid().toString();
         {
@@ -1635,7 +1654,7 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
             const auto matches=[&] { QSqlQuery q(db); return core::fileidentity::read(path)==fileIdentity && q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && q.next() && q.value(0).toString()==identity; };
             if (!db.open() || !matches()) result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
             else {
-                result=scanPartitionPreview(db,uuid,cancelled,true,{},nullptr,{},{},afterId,100,false);
+                result=scanPartitionPreview(db,uuid,cancelled,true,{},nullptr,{},{},exclusions ? 0 : afterId,exclusions ? 0 : 100,exclusions,exclusions ? afterId : 0,exclusions ? 100 : -1);
                 if (!matches() || (result.value(QStringLiteral("error")).toString().isEmpty() &&
                     (signature(result)!=expected || result.value(QStringLiteral("excludedFingerprint")).toString()!=expectedExcluded || result.value(QStringLiteral("potaCorrespondentTotal")).toLongLong()!=expectedTotal)))
                     result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
@@ -1644,7 +1663,7 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
         }
         QSqlDatabase::removeDatabase(connection);
         if (!self) return;
-        QMetaObject::invokeMethod(self.data(),[self,path,identity,uuid,fileIdentity,generation,logGeneration,dataVersion,cancelled,result] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,uuid,fileIdentity,generation,logGeneration,dataVersion,cancelled,result,exclusions] {
             if (!self) return;
             self->m_potaPageBusy=false; self->m_potaPageCancel.reset(); emit self->potaPageBusyChanged();
             if (self->m_previewGeneration!=generation) return;
@@ -1653,7 +1672,9 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
                 self->m_ctx.db->openFileIdentity()==fileIdentity && self->m_ctx.db->fileIdentityMatchesOpen();
             bool sameVersion=false;
             if (same) { QSqlQuery q(self->m_ctx.db->connection()); sameVersion=q.exec(QStringLiteral("PRAGMA data_version")) && q.next() && q.value(0).toLongLong()==dataVersion; }
-            emit self->potaReviewPageFinished(same && sameVersion ? result : QVariantMap{{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}});
+            const auto delivered=same && sameVersion ? result : QVariantMap{{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
+            if (exclusions) emit self->excludedPageFinished(delivered);
+            else emit self->potaReviewPageFinished(delivered);
         },Qt::QueuedConnection);
     });
     return true;
