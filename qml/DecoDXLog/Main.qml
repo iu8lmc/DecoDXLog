@@ -1458,6 +1458,7 @@ RoundedWindow {
         else if (what[0] === "derivedpreviewprobe") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeDerivedPreview(startupShow.substring(startupShow.indexOf(":")+1))) }
         else if (what[0] === "profiles") profilesDialog.open()
         else if (what[0] === "lotwcheckpointprobe" || what[0] === "lotwcheckpointview") { setupDialog.page=4; setupDialog.open(); Qt.callLater(() => setupDialog.probeLotwCheckpoint(what[0] === "lotwcheckpointview")) }
+        else if (what[0] === "extensionkeysprobe") { setupDialog.page=2; setupDialog.open(); Qt.callLater(() => setupDialog.probeExtensionKeys()) }
         else if (what[0] === "apipendingprobe") { setupDialog.page=2; setupDialog.open(); Qt.callLater(() => setupDialog.probeApiPendingReview()) }
         else if (what[0] === "apireviewprobe") { setupDialog.page=2; setupDialog.probeApiMark=true; setupDialog.open(); Qt.callLater(() => setupDialog.probeApiPendingReview()) }
         else if (what[0] === "setup") { setupDialog.page = parseInt(what[1] || "3"); setupDialog.open(); if (what[2] === "end") Qt.callLater(setupDialog.scrollToBottom); else if (what[2]) { const y = parseInt(what[2]); Qt.callLater(() => setupDialog.scrollTo(y)) } }

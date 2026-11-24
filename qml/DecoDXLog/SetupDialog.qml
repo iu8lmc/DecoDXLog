@@ -20,6 +20,31 @@ DialogFrame {
     property string apiReviewMessage: ""
     property string apiPendingLogPath: ""
     property bool probeApiMark: false
+    function probeExtensionKeys() {
+        extensionId.text = "org.example.probe"
+        extQso.checked = true; extTracker.checked = false
+        extensionCreate.clicked()
+        Qt.callLater(() => {
+            const row = extensionKeys.itemAt(0), grants = decolog.apiExtensionCredentials
+            console.warn("PROBE extension create=" + (grants.length === 1 && !!row && grants[0].permissions.indexOf("qso.read") >= 0) + " error=" + extensionError.text.length)
+            if (!row || !grants.length) return
+            const token = grants[0].token
+            function query(path, callback) {
+                const req = new XMLHttpRequest()
+                req.onreadystatechange = function() { if (req.readyState === XMLHttpRequest.DONE) callback(req.status) }
+                req.open("GET", "http://127.0.0.1:" + decolog.apiPort + path)
+                req.setRequestHeader("X-DecoDXLog-Token", token)
+                req.send()
+            }
+            query("/api/v1/qsos", qsoStatus => query("/api/v1/tracker", trackerStatus => {
+                row.revokeKey()
+                query("/api/v1/qsos", revokedStatus => {
+                    console.warn("PROBE extension access=" + qsoStatus + "," + trackerStatus + "," + revokedStatus)
+                    console.warn("PROBE extension revoke=" + (decolog.apiExtensionCredentials.length === 0) + " error=" + extensionError.text.length)
+                })
+            }))
+        })
+    }
     function loadApiPending() { apiPendingLogPath=String(decolog.currentLogInfo().path || ""); apiPendingReview=decolog.unresolvedApiRequests(apiPendingCursors[apiPendingPage]); apiPendingShown=true }
     function probeApiPendingReview() {
         apiPendingButton.clicked()
@@ -904,6 +929,55 @@ DialogFrame {
                         }
                         GlassButton { Layout.alignment: Qt.AlignBottom; text: decolog.apiReadOnlyToken.length ? qsTr("Replace read-only key") : qsTr("Create read-only key"); onClicked: decolog.newApiReadOnlyToken() }
                         GlassButton { Layout.alignment: Qt.AlignBottom; visible: decolog.apiReadOnlyToken.length > 0; text: qsTr("Revoke"); onClicked: decolog.revokeApiReadOnlyToken() }
+                    }
+                    SectionTitle { text: qsTr("Extension read-only keys") }
+                    Note { text: qsTr("Keys are stored in local settings. Give each trusted extension only the reads it needs; removing an extension does not revoke its key automatically.") }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        LabeledField {
+                            Layout.fillWidth: true; label: qsTr("Extension ID")
+                            StyledTextField { id: extensionId; Layout.fillWidth: true; placeholderText: "org.example.report" }
+                        }
+                        GlassButton {
+                            id: extensionCreate
+                            Layout.alignment: Qt.AlignBottom; text: qsTr("Create extension key")
+                            onClicked: {
+                                let permissions = []
+                                if (extQso.checked) permissions.push("qso.read")
+                                if (extTracker.checked) permissions.push("tracker.read")
+                                if (extWorked.checked) permissions.push("worked.read")
+                                if (extStatus.checked) permissions.push("status.read")
+                                extensionError.text = decolog.createApiExtensionCredential(extensionId.text, permissions)
+                                if (!extensionError.text.length) extensionId.text = ""
+                            }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        ToggleSwitch { id: extQso; text: qsTr("QSO"); checked: true }
+                        ToggleSwitch { id: extTracker; text: qsTr("Tracker") }
+                        ToggleSwitch { id: extWorked; text: qsTr("Worked status") }
+                        ToggleSwitch { id: extStatus; text: qsTr("App status") }
+                    }
+                    Note { id: extensionError; visible: text.length > 0; color: Theme.errorColor }
+                    Repeater {
+                        id: extensionKeys
+                        model: decolog.apiExtensionCredentials
+                        delegate: RowLayout {
+                            required property var modelData
+                            function revokeKey() { revokeExtensionKey.clicked() }
+                            Layout.fillWidth: true
+                            LabeledField {
+                                Layout.fillWidth: true
+                                label: modelData.id + " (" + modelData.permissions.join(", ") + ")"
+                                StyledTextField { Layout.fillWidth: true; readOnly: true; selectByMouse: true; text: modelData.token }
+                            }
+                            GlassButton {
+                                id: revokeExtensionKey
+                                Layout.alignment: Qt.AlignBottom; text: qsTr("Revoke")
+                                onClicked: extensionError.text = decolog.revokeApiExtensionCredential(modelData.id)
+                            }
+                        }
                     }
                     Note {
                         text: decolog.apiError.length && decolog.apiPort > 0 ? decolog.apiError

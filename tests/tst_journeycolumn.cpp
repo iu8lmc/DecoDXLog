@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QTcpServer>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QRegularExpression>
@@ -82,6 +83,19 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void extensionKeysUiCreatesAndRevokes()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir, "", true); QByteArray output;
+        QTcpServer port; QVERIFY(port.listen(QHostAddress::LocalHost, 0)); const auto apiPort = port.serverPort(); port.close();
+        { QSettings settings(iniPath(dir), QSettings::IniFormat); settings.setValue(QStringLiteral("api/port"), apiPort); settings.sync(); }
+        QVERIFY2(launch(dir, QStringLiteral("extensionkeysprobe"), output, 5000), output.constData());
+        QVERIFY2(output.contains("PROBE extension create=true error=0"), output.constData());
+        QVERIFY2(output.contains("PROBE extension revoke=true error=0"), output.constData());
+        QVERIFY2(output.contains("PROBE extension access=200,403,401"), output.constData());
+        QVERIFY2(!output.contains("TypeError") && !output.contains("ReferenceError"), output.constData());
+        QSettings settings(iniPath(dir), QSettings::IniFormat);
+        QCOMPARE(QJsonDocument::fromJson(settings.value(QStringLiteral("api/extensionCredentials")).toByteArray()).array().size(),0);
+    }
     void initTestCase()
     {
 #ifdef Q_OS_WIN

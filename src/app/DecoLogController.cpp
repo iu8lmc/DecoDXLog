@@ -4108,6 +4108,53 @@ void DecoLogController::revokeApiReadOnlyToken()
     emit udpChanged();
 }
 
+QVariantList DecoLogController::apiExtensionCredentials() const
+{
+    const QByteArray raw = QSettings().value(QStringLiteral("api/extensionCredentials")).toByteArray();
+    QHash<QString, QSet<QString>> parsed;
+    if (!LocalApiServer::parseExtensionCredentials(raw, &parsed) || raw.isEmpty()) return {};
+    return QJsonDocument::fromJson(raw).array().toVariantList();
+}
+
+QString DecoLogController::createApiExtensionCredential(const QString& id, const QStringList& permissions)
+{
+    QSettings settings;
+    const QByteArray raw = settings.value(QStringLiteral("api/extensionCredentials")).toByteArray();
+    QHash<QString, QSet<QString>> parsed;
+    if (!LocalApiServer::parseExtensionCredentials(raw, &parsed)) return tr("Extension credential configuration is invalid.");
+    QJsonArray entries = raw.isEmpty() ? QJsonArray{} : QJsonDocument::fromJson(raw).array();
+    for (const auto& entry : entries)
+        if (entry.toObject().value(QStringLiteral("id")).toString() == id) return tr("An extension with this ID already has a key.");
+    QString token;
+    do { token = LocalApiServer::newToken(); } while (token == m_apiToken || token == m_apiReadOnlyToken || parsed.contains(token));
+    QJsonArray grants; for (const auto& permission : permissions) grants.append(permission);
+    entries.append(QJsonObject{{QStringLiteral("id"), id}, {QStringLiteral("token"), token}, {QStringLiteral("permissions"), grants}});
+    const QByteArray updated = QJsonDocument(entries).toJson(QJsonDocument::Compact);
+    if (!LocalApiServer::parseExtensionCredentials(updated, &parsed)) return tr("Invalid extension ID or permissions.");
+    settings.setValue(QStringLiteral("api/extensionCredentials"), updated); settings.sync();
+    if (settings.status() != QSettings::NoError) return tr("Could not save extension credentials.");
+    m_api.setExtensionCredentials(parsed); emit udpChanged(); return {};
+}
+
+QString DecoLogController::revokeApiExtensionCredential(const QString& id)
+{
+    QSettings settings;
+    const QByteArray raw = settings.value(QStringLiteral("api/extensionCredentials")).toByteArray();
+    QHash<QString, QSet<QString>> parsed;
+    if (!LocalApiServer::parseExtensionCredentials(raw, &parsed)) return tr("Extension credential configuration is invalid.");
+    QJsonArray entries; bool found = false;
+    for (const auto& entry : QJsonDocument::fromJson(raw).array()) {
+        if (entry.toObject().value(QStringLiteral("id")).toString() == id) found = true;
+        else entries.append(entry);
+    }
+    if (!found) return tr("Extension key was not found.");
+    const QByteArray updated = QJsonDocument(entries).toJson(QJsonDocument::Compact);
+    if (!LocalApiServer::parseExtensionCredentials(updated, &parsed)) return tr("Extension credential configuration is invalid.");
+    settings.setValue(QStringLiteral("api/extensionCredentials"), updated); settings.sync();
+    if (settings.status() != QSettings::NoError) return tr("Could not save extension credentials.");
+    m_api.setExtensionCredentials(parsed); emit udpChanged(); return {};
+}
+
 QVariantMap DecoLogController::unresolvedApiRequests(const QString& after) const
 {
     return m_db.unresolvedApiRequests(after);

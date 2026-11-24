@@ -138,6 +138,7 @@ class DecoLogController : public QObject {
     Q_PROPERTY(int apiPort READ apiPort WRITE setApiPort NOTIFY udpChanged)
     Q_PROPERTY(QString apiToken READ apiToken NOTIFY udpChanged)
     Q_PROPERTY(QString apiReadOnlyToken READ apiReadOnlyToken NOTIFY udpChanged)
+    Q_PROPERTY(QVariantList apiExtensionCredentials READ apiExtensionCredentials NOTIFY udpChanged)
     Q_PROPERTY(bool apiListening READ apiListening NOTIFY udpChanged)
     Q_PROPERTY(QString apiError READ apiError NOTIFY udpChanged)
     Q_PROPERTY(bool preferLoggedAdif READ preferLoggedAdif WRITE setPreferLoggedAdif NOTIFY udpChanged)
@@ -407,6 +408,9 @@ public:
     Q_INVOKABLE void newApiToken();
     Q_INVOKABLE void newApiReadOnlyToken();
     Q_INVOKABLE void revokeApiReadOnlyToken();
+    QVariantList apiExtensionCredentials() const;
+    Q_INVOKABLE QString createApiExtensionCredential(const QString& id, const QStringList& permissions);
+    Q_INVOKABLE QString revokeApiExtensionCredential(const QString& id);
     Q_INVOKABLE QVariantMap unresolvedApiRequests(const QString& after = {}) const;
     Q_INVOKABLE QString markApiRequestReviewed(const QString& rowId, const QString& token, const QString& logPath);
     void startApi();
