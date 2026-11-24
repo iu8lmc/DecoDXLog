@@ -1292,6 +1292,28 @@ private slots:
         QVERIFY(!object.contains("path") && !object.contains("logIdentity"));
     }
 
+    void reportExportRejectsSameIdentityReplacement()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Open-file replacement fixture requires Unix rename semantics");
+#else
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        const QString path=dir.filePath("test.sqlite"), clone=dir.filePath("clone.sqlite"), outputBase=dir.filePath("report");
+        { LogDatabase db; QVERIFY(db.open(path)); QVERIFY(db.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clone); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show",QStringLiteral("activityreplacementprobe:")+outputBase,"--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE report replacement ready error=\n") && timer.elapsed()<15000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE report replacement ready error=\n"),output.constData());
+        QVERIFY(QFile::rename(path,path+".old")); QVERIFY(QFile::rename(clone,path));
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains("PROBE report replacement csv=true context=true pdf=true"),output.constData());
+        QVERIFY(!QFile::exists(outputBase+".csv")); QVERIFY(!QFile::exists(outputBase+".json")); QVERIFY(!QFile::exists(outputBase+".pdf"));
+#endif
+    }
     void customReportRestoresUtcDayAndHour()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

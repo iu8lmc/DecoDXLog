@@ -1,5 +1,15 @@
 # Progress
 
+## 2026-11-24 — G07 bind report snapshots and exports to the open file
+
+The asynchronous activity, confirmation, club and custom reports now capture the open log's physical file identity in addition to the logical UUID and generation. The worker checks it before and after establishing its SQLite snapshot and after reading; the controller rechecks before publishing. CSV, context JSON and PDF export check the captured source identity, with another check before committing output. Filesystems that cannot supply a file identity are refused for this workflow. No log data is changed by these checks.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic SQLite clone retained the original log UUID but contained an additional QSO. Before the change, the report snapshot helper accepted the clone for the original log and the new test failed; afterwards it rejected the clone and the original snapshot still produced the original one-QSO result. A real offscreen app fixture also replaced the file after a report was built and checked that CSV, context and PDF output were refused. That same app fixture passed with the previous controller too, because SQLite/the existing checks already rejected this particular ordering; it is not evidence that the old app exported the replacement. The unchanged normal custom report/export fixture, focused snapshot checks and activityreport/qmlpopups CTest 2/2 passed; git diff --check passed.
+
+The path identity checks are not atomic with file opening or output commit; rapid replacement and restoration at unforced points, hard filesystem races and every worker ordering remain unproven. The helper retains its legacy identity-only call for existing non-controller uses; the report controller supplies the physical identity. The rename fixture is Unix-only, uses synthetic files and programmatic offscreen interaction, not Windows/Linux, physical UI or production logs. Full G07/G13 acceptance remains open.
+
+The existing activity power and UTC report PDF integration groups were also rerun on the corrected build and passed 2/2; these exercise normal PDF output, not replacement at every point in PDF rendering.
+
 ## 2026-11-24 — G09 invalidate schedule when requested count changes
 
 Changing the requested number of passes while a schedule is displayed now hides that schedule and invalidates its selected pass; changing the count with only an independent single-pass prediction displayed leaves that prediction available. No tracker or radio command is sent by changing the value.

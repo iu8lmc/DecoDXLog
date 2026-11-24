@@ -8624,32 +8624,36 @@ void DecoLogController::requestCustomReportMode(int year,const QString& band,con
 }
 void DecoLogController::startStationReport(const QString& kind,int year,const QString& requestedBand,const QString& requestedStation,const QStringList& dimensions,const QString& aggregate,const QString& mode)
 {
-    const QString path=m_db.path(), identity=m_db.identity(), band=requestedBand.trimmed().toLower(), station=requestedStation.trimmed().toUpper(); const quint64 generation=++m_activityReportGeneration, logGeneration=m_db.openGeneration();
+    const QString path=m_db.path(), identity=m_db.identity(), band=requestedBand.trimmed().toLower(), station=requestedStation.trimmed().toUpper(); const QByteArray fileIdentity=m_db.openFileIdentity(); const quint64 generation=++m_activityReportGeneration, logGeneration=m_db.openGeneration();
     m_activityReport.clear(); m_activityReportPool.clear();
     if (!m_db.isOpen() || identity.isEmpty() || path.isEmpty() || path==QLatin1String(":memory:") || year<0 || year>9999 || band.size()>24 || station.size()>24 || (kind==QLatin1String("custom") && (!activityreport::validModeFilter(mode) || !activityreport::validateCustomSpec(dimensions,aggregate).isEmpty()))) {
         emit activityReportReady({{QStringLiteral("error"),tr("Choose a file-backed log and valid report filters")}}); return;
     }
+    if (fileIdentity.isEmpty() || !m_db.fileIdentityMatchesOpen()) {
+        emit activityReportReady({{QStringLiteral("error"),tr("The log file changed or cannot be identified; reopen it before exporting.")}}); return;
+    }
     QPointer<DecoLogController> self(this);
-    m_activityReportPool.start([self,path,identity,logGeneration,band,station,year,generation,kind,dimensions,aggregate,mode] {
+    m_activityReportPool.start([self,path,identity,fileIdentity,logGeneration,band,station,year,generation,kind,dimensions,aggregate,mode] {
         activityreport::Result report; const QString connection=QStringLiteral("activity-report-")+QUuid::createUuid().toString();
         {
             QSqlDatabase db=QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),connection);
             db.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY;QSQLITE_BUSY_TIMEOUT=250")); db.setDatabaseName(path);
             if (!db.open()) report.error=QStringLiteral("Cannot open log for report");
-            else if (activityreport::beginVerifiedSnapshot(db,identity,&report.error)) {
+            else if (activityreport::beginVerifiedSnapshot(db,identity,&report.error,fileIdentity)) {
                 report=kind==QLatin1String("custom") ? activityreport::runCustom(db,year,band,dimensions,aggregate,mode) : kind==QLatin1String("club") ? activityreport::runClub(db,year,band,station) : kind==QLatin1String("confirmation") ? activityreport::runConfirmations(db,year,band) : activityreport::run(db,year,band);
+                if (core::fileidentity::read(path)!=fileIdentity) { report.rows.clear(); report.error=QStringLiteral("Log file changed"); }
                 if (!db.rollback() && report.error.isEmpty()) { report.rows.clear(); report.error=QStringLiteral("Cannot close report snapshot"); }
             }
             db.close();
         }
         QSqlDatabase::removeDatabase(connection); if (!self) return;
         const QString generated=QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-        QMetaObject::invokeMethod(self.data(),[self,path,identity,logGeneration,band,station,year,generation,report,generated,kind,dimensions,aggregate,mode] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,fileIdentity,logGeneration,band,station,year,generation,report,generated,kind,dimensions,aggregate,mode] {
             if (!self || self->m_shuttingDown || generation!=self->m_activityReportGeneration) return;
-            if (!self->m_db.isOpen() || self->m_db.path()!=path || self->m_db.openGeneration()!=logGeneration || self->m_db.identity()!=identity) {
+            if (!self->m_db.isOpen() || self->m_db.path()!=path || self->m_db.openGeneration()!=logGeneration || self->m_db.identity()!=identity || self->m_db.openFileIdentity()!=fileIdentity || !self->m_db.fileIdentityMatchesOpen()) {
                 self->m_activityReport.clear(); emit self->activityReportReady({{QStringLiteral("error"),self->tr("The open log changed")}}); return;
             }
-            self->m_activityReport={{QStringLiteral("path"),path},{QStringLiteral("logIdentity"),identity},{QStringLiteral("logGeneration"),QVariant::fromValue(logGeneration)},{QStringLiteral("band"),band},{QStringLiteral("station"),station},{QStringLiteral("year"),year},{QStringLiteral("kind"),kind},
+            self->m_activityReport={{QStringLiteral("path"),path},{QStringLiteral("logIdentity"),identity},{QStringLiteral("fileIdentity"),fileIdentity},{QStringLiteral("logGeneration"),QVariant::fromValue(logGeneration)},{QStringLiteral("band"),band},{QStringLiteral("station"),station},{QStringLiteral("year"),year},{QStringLiteral("kind"),kind},
                 {QStringLiteral("dimensions"),dimensions},{QStringLiteral("aggregate"),aggregate},{QStringLiteral("mode"),mode},
                 {QStringLiteral("generatedAt"),generated},{QStringLiteral("rows"),report.rows},
                 {QStringLiteral("truncated"),report.truncated},{QStringLiteral("error"),report.error}};
@@ -8747,20 +8751,25 @@ QByteArray activityReportCsvBytes(const QVariantMap& snapshot)
     const QString kind=snapshot.value(QStringLiteral("kind")).toString();
     return kind==QLatin1String("custom") ? activityreport::customCsv(report,snapshot.value(QStringLiteral("dimensions")).toStringList(),snapshot.value(QStringLiteral("aggregate")).toString(),snapshot.value(QStringLiteral("mode")).toString()) : kind==QLatin1String("club") ? activityreport::clubCsv(report) : kind==QLatin1String("confirmation") ? activityreport::confirmationsCsv(report) : activityreport::csv(report);
 }
+bool activityReportSourceMatches(const QVariantMap& snapshot)
+{
+    const QByteArray expected=snapshot.value(QStringLiteral("fileIdentity")).toByteArray();
+    return !expected.isEmpty() && core::fileidentity::read(snapshot.value(QStringLiteral("path")).toString())==expected;
+}
 }
 QString DecoLogController::exportActivityReport(const QUrl& file)
 {
-    if (m_activityReport.isEmpty() || !m_db.isOpen() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() || m_activityReport.value(QStringLiteral("logIdentity")).toString()!=m_db.identity() || m_activityReport.value(QStringLiteral("logGeneration")).toULongLong()!=m_db.openGeneration() ||
+    if (m_activityReport.isEmpty() || !m_db.isOpen() || !m_db.fileIdentityMatchesOpen() || !activityReportSourceMatches(m_activityReport) || m_activityReport.value(QStringLiteral("fileIdentity")).toByteArray()!=m_db.openFileIdentity() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() || m_activityReport.value(QStringLiteral("logIdentity")).toString()!=m_db.identity() || m_activityReport.value(QStringLiteral("logGeneration")).toULongLong()!=m_db.openGeneration() ||
         !m_activityReport.value(QStringLiteral("error")).toString().isEmpty() || m_activityReport.value(QStringLiteral("truncated")).toBool()) return tr("Run a complete report for the current log first");
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local CSV file");
     if (reportDestinationIsProtected(file.toLocalFile(),m_db.path())) return tr("Choose a file other than the log database");
     const QByteArray bytes=activityReportCsvBytes(m_activityReport);
-    QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !out.commit()) return tr("Cannot write the CSV file");
+    QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !activityReportSourceMatches(m_activityReport) || !out.commit()) return tr("Cannot write the CSV file");
     return {};
 }
 QString DecoLogController::exportActivityReportContext(const QUrl& file)
 {
-    if (m_activityReport.isEmpty() || !m_db.isOpen() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() || m_activityReport.value(QStringLiteral("logIdentity")).toString()!=m_db.identity() || m_activityReport.value(QStringLiteral("logGeneration")).toULongLong()!=m_db.openGeneration() ||
+    if (m_activityReport.isEmpty() || !m_db.isOpen() || !m_db.fileIdentityMatchesOpen() || !activityReportSourceMatches(m_activityReport) || m_activityReport.value(QStringLiteral("fileIdentity")).toByteArray()!=m_db.openFileIdentity() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() || m_activityReport.value(QStringLiteral("logIdentity")).toString()!=m_db.identity() || m_activityReport.value(QStringLiteral("logGeneration")).toULongLong()!=m_db.openGeneration() ||
         !m_activityReport.value(QStringLiteral("error")).toString().isEmpty() || m_activityReport.value(QStringLiteral("truncated")).toBool()) return tr("Run a complete report for the current log first");
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local JSON file");
     if (reportDestinationIsProtected(file.toLocalFile(),m_db.path())) return tr("Choose a file other than the log database");
@@ -8778,13 +8787,13 @@ QString DecoLogController::exportActivityReportContext(const QUrl& file)
         {QStringLiteral("rows"),int(m_activityReport.value(QStringLiteral("rows")).toList().size())},
         {QStringLiteral("csvSha256"),QString::fromLatin1(QCryptographicHash::hash(csv,QCryptographicHash::Sha256).toHex())}};
     const QByteArray bytes=QJsonDocument(object).toJson(QJsonDocument::Indented);
-    QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !out.commit()) return tr("Cannot write the report context");
+    QSaveFile out(file.toLocalFile()); if (!out.open(QIODevice::WriteOnly) || out.write(bytes)!=bytes.size() || !activityReportSourceMatches(m_activityReport) || !out.commit()) return tr("Cannot write the report context");
     return {};
 }
 QString DecoLogController::exportActivityReportPdf(const QUrl& file)
 {
     if (m_activityPdfBusy) return tr("A report PDF is already being exported");
-    if (m_activityReport.isEmpty() || !m_db.isOpen() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() || m_activityReport.value(QStringLiteral("logIdentity")).toString()!=m_db.identity() || m_activityReport.value(QStringLiteral("logGeneration")).toULongLong()!=m_db.openGeneration() ||
+    if (m_activityReport.isEmpty() || !m_db.isOpen() || !m_db.fileIdentityMatchesOpen() || !activityReportSourceMatches(m_activityReport) || m_activityReport.value(QStringLiteral("fileIdentity")).toByteArray()!=m_db.openFileIdentity() || m_activityReport.value(QStringLiteral("path")).toString()!=m_db.path() || m_activityReport.value(QStringLiteral("logIdentity")).toString()!=m_db.identity() || m_activityReport.value(QStringLiteral("logGeneration")).toULongLong()!=m_db.openGeneration() ||
         !m_activityReport.value(QStringLiteral("error")).toString().isEmpty() || m_activityReport.value(QStringLiteral("truncated")).toBool()) return tr("Run a complete report for the current log first");
     if (!file.isLocalFile() || file.toLocalFile().isEmpty()) return tr("Choose a local PDF file");
     if (reportDestinationIsProtected(file.toLocalFile(),m_db.path())) return tr("Choose a file other than the log database");
@@ -8794,6 +8803,7 @@ QString DecoLogController::exportActivityReportPdf(const QUrl& file)
         QString error; QSaveFile output(path);
         if (!output.open(QIODevice::WriteOnly)) error=output.errorString();
         else if (!activityreport::writePdf(&output,snapshot,&error)) output.cancelWriting();
+        else if (!activityReportSourceMatches(snapshot)) { output.cancelWriting(); error=QStringLiteral("Log file changed"); }
         else if (!output.commit()) error=output.errorString();
         if (!self) return;
         QMetaObject::invokeMethod(self.data(),[self,error] {

@@ -11,7 +11,7 @@ namespace decolog::core::activityreport {
 struct Result { QVariantList rows; bool truncated{false}; QString error; };
 // Starts a read transaction and pins it by verifying the expected log identity.
 // The caller owns the transaction and must close it after running the report.
-bool beginVerifiedSnapshot(QSqlDatabase& db, const QString& expectedIdentity, QString* error = nullptr);
+bool beginVerifiedSnapshot(QSqlDatabase& db, const QString& expectedIdentity, QString* error = nullptr, const QByteArray& expectedFileIdentity = {});
 struct Definition {
     QString id, name, kind, band, station, aggregate, mode;
     QStringList dimensions;

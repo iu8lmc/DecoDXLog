@@ -2,6 +2,7 @@
 #include "core/NewQsoFields.h"
 #include "core/LogDatabase.h"
 #include "core/LogTime.h"
+#include "core/FileIdentity.h"
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariantMap>
@@ -24,13 +25,15 @@
 #include <cmath>
 
 namespace decolog::core::activityreport {
-bool beginVerifiedSnapshot(QSqlDatabase& db,const QString& expectedIdentity,QString* error)
+bool beginVerifiedSnapshot(QSqlDatabase& db,const QString& expectedIdentity,QString* error,const QByteArray& expectedFileIdentity)
 {
     if (error) error->clear();
     if (!db.isOpen() || expectedIdentity.isEmpty()) { if (error) *error=QStringLiteral("Invalid log identity"); return false; }
+    if (!expectedFileIdentity.isEmpty() && fileidentity::read(db.databaseName())!=expectedFileIdentity) { if (error) *error=QStringLiteral("Log file changed"); return false; }
     if (!db.transaction()) { if (error) *error=db.lastError().text(); return false; }
     QSqlQuery q(db);
-    if (!q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) || !q.next() || q.value(0).toString()!=expectedIdentity) {
+    if (!q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) || !q.next() || q.value(0).toString()!=expectedIdentity ||
+        (!expectedFileIdentity.isEmpty() && fileidentity::read(db.databaseName())!=expectedFileIdentity)) {
         if (error) *error=QStringLiteral("The log identity changed; run the report again.");
         db.rollback(); return false;
     }

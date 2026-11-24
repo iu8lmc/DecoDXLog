@@ -12,6 +12,21 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void reportSnapshotRejectsSameIdentityClone()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("source.sqlite"), clonePath=dir.filePath("clone.sqlite");
+        LogDatabase source; QVERIFY(source.open(path));
+        QVERIFY(source.insertQso({{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QSqlQuery q(source.connection()); q.prepare("VACUUM INTO ?"); q.addBindValue(clonePath); QVERIFY2(q.exec(),qPrintable(q.lastError().text()));
+        LogDatabase clone; QVERIFY(clone.open(clonePath)); QCOMPARE(clone.identity(),source.identity()); QVERIFY(clone.openFileIdentity()!=source.openFileIdentity());
+        QVERIFY(clone.insertQso({{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QString error; QSqlDatabase db=clone.connection();
+        const bool accepted=activityreport::beginVerifiedSnapshot(db,source.identity(),&error,source.openFileIdentity());
+        if (accepted) db.rollback();
+        QVERIFY2(!accepted,"same-identity clone was accepted for the original report");
+        QSqlDatabase original=source.connection(); QVERIFY2(activityreport::beginVerifiedSnapshot(original,source.identity(),&error,source.openFileIdentity()),qPrintable(error));
+        const auto result=activityreport::run(original,2026,"20m"); QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.rows.first().toMap().value("count").toInt(),1); QVERIFY(original.rollback());
+    }
     void distinctCallsNormalizeCaseAndWhitespace()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));

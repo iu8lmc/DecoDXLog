@@ -21,6 +21,15 @@ RoundedWindow {
     property int page: 0
     property var activityReport: ({})
     property bool activityBusy:false
+    property bool reportReplacementProbe:false
+    property string reportReplacementBase:""
+    function probeReportReplacement(path) { reportReplacementProbe=true; reportReplacementBase=path; decolog.requestActivityReport(2026,"20m") }
+    Timer { id:reportReplacementTimer; interval:2500; onTriggered: {
+        const csv=decolog.exportActivityReport(root.probeLocalFileUrl(root.reportReplacementBase+".csv"))
+        const context=decolog.exportActivityReportContext(root.probeLocalFileUrl(root.reportReplacementBase+".json"))
+        const pdf=decolog.exportActivityReportPdf(root.probeLocalFileUrl(root.reportReplacementBase+".pdf"))
+        console.warn("PROBE report replacement csv=" + !!csv + " context=" + !!context + " pdf=" + !!pdf)
+    } }
     property string reportMessage:""
     property url reportProbePath:""
     property bool reportProbeAlias: false
@@ -243,6 +252,7 @@ RoundedWindow {
         }
         function onActivityReportReady(result) {
             root.activityBusy=false; root.activityReport=result
+            if (root.reportReplacementProbe) { root.reportReplacementProbe=false; console.warn("PROBE report replacement ready error=" + (result.error || "")); reportReplacementTimer.start() }
             root.reportMessage=result.error || ""
             if (root.loadProbe) { const now=Date.now(); root.loadMaxGap=Math.max(root.loadMaxGap,now-root.loadLast); loadProbeTimer.stop(); root.loadProbe=false; console.warn("PROBE reportload " + JSON.stringify({elapsed:now-root.loadStart,ticks:root.loadTicks,maxgap:root.loadMaxGap,rows:result.rows,error:result.error || ""})) }
             if (root.daysProbe) { root.daysProbe=false; console.warn("PROBE days result " + JSON.stringify({aggregate:result.aggregate,rows:result.rows,error:result.error || ""})) }
