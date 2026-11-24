@@ -34,7 +34,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 30;
+constexpr int kSchemaVersion = 31;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -1843,6 +1843,18 @@ private slots:
         }
     }
 
+    void lotwGridObservationMigrationPreservesExistingLog()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("legacy.sqlite");
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+            QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE lotw_grid_observation")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=31"));
+        }
+        LogDatabase db; QVERIFY2(db.open(path),qPrintable(db.lastError())); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),qint64(1));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+    }
+
     void apiIdempotencyMigrationPreservesLegacyAndRequestContext()
     {
         QTemporaryDir dir;
@@ -1854,7 +1866,7 @@ private slots:
             QSqlQuery q(db.connection());
             QVERIFY(q.exec(QStringLiteral("ALTER TABLE api_idempotency DROP COLUMN request_format")));
             QVERIFY(q.exec(QStringLiteral("ALTER TABLE api_idempotency DROP COLUMN request_app")));
-            QVERIFY(q.exec(QStringLiteral("DELETE FROM schema_version WHERE version=30")));
+            QVERIFY(q.exec(QStringLiteral("DELETE FROM schema_version WHERE version>=30")));
         }
         {
             LogDatabase db; QVERIFY2(db.open(path), qPrintable(db.lastError()));

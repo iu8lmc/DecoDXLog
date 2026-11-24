@@ -2839,3 +2839,11 @@ Inspection confirms the LoTW response parser keeps confirmation fields such as G
 A/B on macOS arm64 / Qt 6.11.2: the mixed-case response previously returned an unexpected-answer error; now it parses all three synthetic confirmations and retains the first grid and the sync cursor in memory. Existing normal response and login-page rejection tests pass. App and test targets built; CTest lotw, vucc, database and qmlpopups passed 4/4.
 
 This does not implement durable confirmed-grid evidence, verify LoTW matches or change VUCC candidate attribution. The fixture does not use a live LoTW account, actual confirmation, physical UI or Windows/Linux. G02, G05 and G13 acceptance remain open.
+
+## 2026-11-24 — G02/G05 separate LoTW grid observation storage
+
+Added schema migration 31 and a core storage method for retaining a grid and VUCC-grid list separately from the QSO, keyed to the local QSO. Repeated identical observations are idempotent, distinct observations can coexist, and the operation participates in the caller's transaction. Empty or excessively long observations and missing/deleted QSO are refused. This is a storage foundation only: no download path calls it yet, no origin or match is certified, and VUCC still uses the local QSO grid as explicitly labelled.
+
+A/B on macOS arm64 / Qt 6.11.2: the new fixture initially failed to build because the storage method did not exist. Afterwards it stored a synthetic observation twice as one row, rolled back another, reopened the log and verified the original QSO grid remained unchanged. A simulated schema-30 log migrated to schema 31 with its QSO intact; the existing schema-30 API migration fixture was adjusted to remove all later version markers. App and test targets built; CTest lotw, vucc, database, migration and qmlpopups passed 5/5.
+
+The schema records raw values and local observation time, not source account, matching distance, remote confirmation ID or verified provenance. It has no UI or download integration and is not evidence of ARRL credit; concurrency and actual LoTW data are untested. The new schema migrates existing logs and older applications may not understand the added table. G02/G05/G13 acceptance remains open.

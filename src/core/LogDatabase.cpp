@@ -547,6 +547,10 @@ bool LogDatabase::migrate()
               "INSERT INTO contest_net_change(qso_uuid,revision,deleted,recorded_at) SELECT uuid,revision,deleted,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=OLD.qso_id; END")}, nullptr},
         {30, {QStringLiteral("ALTER TABLE api_idempotency ADD COLUMN request_format BLOB"),
               QStringLiteral("ALTER TABLE api_idempotency ADD COLUMN request_app BLOB")}, nullptr},
+        {31, {QStringLiteral("CREATE TABLE IF NOT EXISTS lotw_grid_observation ("
+              "id INTEGER PRIMARY KEY, qso_id INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE, "
+              "grid TEXT NOT NULL, vucc_grids TEXT NOT NULL, observed_at TEXT NOT NULL, "
+              "UNIQUE(qso_id, grid, vucc_grids))")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -2723,6 +2727,22 @@ InsertResult LogDatabase::restoreRevision(qint64 id, qint64 historyId)
     InsertResult r;
     r.message = QStringLiteral("revision not found");
     return r;
+}
+
+bool LogDatabase::recordLotwGridObservation(qint64 qsoId, const QString& grid, const QString& vuccGrids, QString* error)
+{
+    if (error) error->clear();
+    const auto current = meta(qsoId);
+    if (!current || current->deleted || (grid.trimmed().isEmpty() && vuccGrids.trimmed().isEmpty()) ||
+        grid.size() > 1024 || vuccGrids.size() > 1024) {
+        if (error) *error=QStringLiteral("Invalid QSO or grid observation");
+        return false;
+    }
+    QSqlQuery query(connection());
+    query.prepare(QStringLiteral("INSERT OR IGNORE INTO lotw_grid_observation(qso_id,grid,vucc_grids,observed_at) VALUES(?,?,?,?)"));
+    query.addBindValue(qsoId); query.addBindValue(grid); query.addBindValue(vuccGrids); query.addBindValue(nowIso());
+    if (!query.exec()) { if (error) *error=query.lastError().text(); return false; }
+    return true;
 }
 
 ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const AdifRecord& c, int windowSeconds,

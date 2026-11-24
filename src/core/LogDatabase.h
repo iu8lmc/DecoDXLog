@@ -435,6 +435,8 @@ public:
     ConfirmationResult applyConfirmation(const QString& service, const AdifRecord& confirmation,
                                          int windowSeconds = 1800, const QList<qint64>& onlyProfiles = {},
                                          const QList<qint64>& exceptProfiles = {});
+    // Stores an observation separately; it does not assert a match or award credit.
+    bool recordLotwGridObservation(qint64 qsoId, const QString& grid, const QString& vuccGrids, QString* error = nullptr);
 
     ImportResult importAdif(const QByteArray& data, const QString& source = QStringLiteral("import"),
                             qint64 stationProfileId = 0);

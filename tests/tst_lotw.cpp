@@ -4,6 +4,8 @@
 #include "core/Lotw.h"
 
 #include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QSqlQuery>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTest>
@@ -163,6 +165,25 @@ private slots:
         QVERIFY2(report.ok,qPrintable(report.error)); QCOMPARE(report.confirmations.size(),3);
         QCOMPARE(report.confirmations.first().value("GRIDSQUARE"),QString("FN42AB"));
         QCOMPARE(report.lastQsl,QString("2026-09-16 21:04:11"));
+    }
+
+    void storesSeparateGridObservationsIdempotently()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); qint64 id=0;
+        {
+            LogDatabase db; QVERIFY(db.open(path));
+            id=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture").id; QVERIFY(id>0);
+            QString error; QVERIFY2(db.recordLotwGridObservation(id,"FN42AB","FN42,FN43",&error),qPrintable(error));
+            QVERIFY2(db.recordLotwGridObservation(id,"FN42AB","FN42,FN43",&error),qPrintable(error));
+            QVERIFY(!db.recordLotwGridObservation(id,"","",&error)); QVERIFY(!error.isEmpty());
+            QVERIFY(!db.recordLotwGridObservation(id+9999,"FN44","",&error));
+            QVERIFY(db.connection().transaction()); QVERIFY(db.recordLotwGridObservation(id,"FN44","",&error)); QVERIFY(db.connection().rollback());
+            QCOMPARE(db.record(id)->value("GRIDSQUARE"),QString("FN41"));
+        }
+        LogDatabase reopened; QVERIFY(reopened.open(path)); QSqlQuery q(reopened.connection());
+        q.prepare("SELECT grid,vucc_grids FROM lotw_grid_observation WHERE qso_id=?"); q.addBindValue(id); QVERIFY(q.exec()); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toString(),QString("FN42AB")); QCOMPARE(q.value(1).toString(),QString("FN42,FN43")); QVERIFY(!q.next());
+        QCOMPARE(reopened.record(id)->value("GRIDSQUARE"),QString("FN41"));
     }
 
     void applyConfirmations()
