@@ -23,6 +23,7 @@ RoundedWindow {
     property bool activityBusy:false
     property string reportMessage:""
     property url reportProbePath:""
+    property bool reportProbeAlias: false
     property bool reportProbePdf:false
     property bool reportPdfBusy:false
     property bool customRestoreProbe:false
@@ -158,7 +159,8 @@ RoundedWindow {
         reportAggregate.currentIndex=0; root.applyNamedReport(row)
         Qt.callLater(() => { console.warn("PROBE dxcc count restored " + root.aggregateKey()); root.daysProbe=true; root.runActivityReport() })
     }
-    function probeModeFilter(path) {
+    function probeModeFilter(path, aliasTest) {
+        reportProbeAlias=!!aliasTest
         page=2; root.refreshNamedReports(); reportKind.currentIndex=3; reportYear.text="2026"; reportBand.text="20m"; reportName.text="FT8 only"; reportMode.text="FT8"
         dimension0.currentIndex=root.dimensionKeys.indexOf("band"); dimension1.currentIndex=0; dimension2.currentIndex=0; reportAggregate.currentIndex=0
         root.saveNamedReport(false); const row=root.savedReports.find(x => x.name==="FT8 only")
@@ -257,6 +259,12 @@ RoundedWindow {
                     console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
                     console.warn("PROBE activityreport context " + decolog.exportActivityReportContext(String(root.reportProbePath) + ".context.json"))
                     console.warn("PROBE activityreport context protected " + decolog.exportActivityReportContext(root.probeLocalFileUrl(decolog.currentLogInfo().path)))
+                    if (root.reportProbeAlias) {
+                        const alias=String(root.reportProbePath) + ".alias"
+                        console.warn("PROBE activityreport alias rejected=" + (decolog.exportActivityReportContext(alias).length > 0)
+                                     + " csv=" + (decolog.exportActivityReport(alias).length > 0) + " pdf=" + (decolog.exportActivityReportPdf(alias).length > 0))
+                        root.reportProbeAlias=false
+                    }
                 }
                 console.warn("PROBE activityreport protected " + decolog.exportActivityReport(root.probeLocalFileUrl(decolog.currentLogInfo().path)))
                 console.warn("PROBE activityreport settings " + JSON.stringify(decolog.activityReportSettings()))

@@ -30,6 +30,10 @@
 #include "core/TesseractOcr.h"
 #include "core/QslOcrAcquisition.h"
 #include <QCryptographicHash>
+#include "core/FileIdentity.h"
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
 #include <algorithm>
 #include <atomic>
 #include <thread>
@@ -1064,6 +1068,37 @@ private slots:
         QVERIFY2(output.contains("PROBE dxgoalrace resumed"),output.constData());
         QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
         QVERIFY2(output.count("[activity] DXCAMPAIGN|highlight|")== (satisfiesGoal ? 0 : 1),output.constData());
+    }
+
+    void reportContextRejectsHardLinkToLog()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Hard-link fixture uses POSIX link");
+#endif
+#ifdef Q_OS_UNIX
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const QString log=dir.filePath("test.sqlite"), csv=dir.filePath("empty.csv"), alias=csv+".alias";
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log)); QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0); }
+        QCOMPARE(::link(QFile::encodeName(log).constData(),QFile::encodeName(alias).constData()),0);
+        const auto before=decolog::core::fileidentity::read(log); QVERIFY(!before.isEmpty()); QCOMPARE(decolog::core::fileidentity::read(alias),before);
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("activitymodealiasprobe:")+csv,output,5500),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport alias rejected=true csv=true pdf=true"),output.constData());
+        QCOMPARE(decolog::core::fileidentity::read(alias),before); QCOMPARE(decolog::core::fileidentity::read(log),before);
+#endif
+    }
+
+    void reportExportsRejectSymlinkToWal()
+    {
+#ifndef Q_OS_UNIX
+        QSKIP("Symbolic-link fixture uses POSIX symlink");
+#endif
+#ifdef Q_OS_UNIX
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const QString log=dir.filePath("test.sqlite"), csv=dir.filePath("empty.csv"), alias=csv+".alias";
+        { decolog::core::LogDatabase db; QVERIFY(db.open(log)); QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0); }
+        QCOMPARE(::symlink(QFile::encodeName(log+"-wal").constData(),QFile::encodeName(alias).constData()),0);
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("activitymodealiasprobe:")+csv,output,5500),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport alias rejected=true csv=true pdf=true"),output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(log)); QCOMPARE(db.qsoCount(),qint64(1));
+#endif
     }
 
     void emptyCsvReportContextPreservesFilters()
