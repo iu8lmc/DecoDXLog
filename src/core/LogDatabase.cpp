@@ -2310,42 +2310,13 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
     return out;
 }
 
-// I secondi dal 1970 di un'ora ISO ("2026-09-28T12:03:00Z") senza passare da
-// QDateTime: su un milione di righe e' la differenza fra un secondo e cinque.
-// I giorni dal calendario come in days_from_civil di Howard Hinnant.
-static std::optional<qint64> isoSeconds(const QString& s)
-{
-    if (s.size() < 19)
-        return std::nullopt;
-    auto num = [&s](int from, int len) {
-        int v = 0;
-        for (int i = from; i < from + len; ++i) {
-            const QChar c = s.at(i);
-            if (c < QLatin1Char('0') || c > QLatin1Char('9'))
-                return -1;
-            v = v * 10 + (c.unicode() - '0');
-        }
-        return v;
-    };
-    const int y = num(0, 4), mo = num(5, 2), d = num(8, 2), h = num(11, 2), mi = num(14, 2), se = num(17, 2);
-    if (y < 0 || mo < 1 || mo > 12 || d < 1 || h < 0 || mi < 0 || se < 0)
-        return std::nullopt;
-    const int yy = y - (mo <= 2 ? 1 : 0);
-    const int era = (yy >= 0 ? yy : yy - 399) / 400;
-    const int yoe = yy - era * 400;
-    const int doy = (153 * (mo + (mo > 2 ? -3 : 9)) + 2) / 5 + d - 1;
-    const int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    const qint64 days = qint64(era) * 146097 + doe - 719468;
-    return days * 86400 + h * 3600 + mi * 60 + se;
-}
-
 QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit) const
 {
     QList<QList<qint64>> out;
     QSqlQuery q(connection());
     q.setForwardOnly(true);
-    if (!q.exec(QStringLiteral("SELECT id, call, band, mode, submode, qso_datetime_on, IFNULL(station_profile_id, 0) "
-                               "FROM qso NOT INDEXED WHERE deleted = 0 ORDER BY call, band, qso_datetime_on")))
+    if (!q.exec(QStringLiteral("SELECT id, call, band, mode, submode, strftime('%s',qso_datetime_on), IFNULL(station_profile_id, 0), qso_datetime_on "
+                               "FROM qso NOT INDEXED WHERE deleted = 0 ORDER BY call, band, julianday(qso_datetime_on), id")))
         return out;
     // Per nominativo e banda, un gruppo che si forma per ogni gruppo di modo
     // e profilo: un FT8 e un CW nella stessa ora non sono doppioni.
@@ -2371,15 +2342,16 @@ QList<QList<qint64>> LogDatabase::duplicateGroups(int windowSeconds, int limit) 
             forming.clear();
             current = key;
         }
-        const auto when = isoSeconds(q.value(5).toString());
-        if (!when)
+        bool validTime=false;
+        const qint64 when=q.value(5).toLongLong(&validTime);
+        if (!validTime || !parseIso(q.value(7).toString()).isValid())
             continue;
         Forming& g = forming[adif::modeGroup(q.value(3).toString(), q.value(4).toString()) + QLatin1Char('|')
                              + q.value(6).toString()];
-        if (!g.ids.isEmpty() && *when - g.last > windowSeconds)
+        if (!g.ids.isEmpty() && when - g.last > windowSeconds)
             flush(g);
         g.ids << q.value(0).toLongLong();
-        g.last = *when;
+        g.last = when;
     }
     for (Forming& g : forming)
         flush(g);

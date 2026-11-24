@@ -3027,3 +3027,11 @@ The insertion-time duplicate check keeps a bounded indexed prefilter widened for
 A/B on macOS arm64 / Qt 6.11.2: a synthetic QSO stored at `13:00+01:00` was incorrectly inserted again at `12:00Z` before the fix; the new test failed on that baseline and now detects it. It also verifies that `12:00+01:00` does not falsely block a `12:00Z` contact and that unzoned legacy UTC still matches. App and test targets built; CTest database, lotw, qsl, qsldownload, migration and qmlpopups passed 6/6.
 
 The broader indexed lookup may examine more records and has not been benchmarked on large or highly repetitive logs. This change concerns insertion-time checks; the separate duplicate-review grouping path has not yet been revalidated for offset ordering. Database lookup errors retain the existing behavior and are not surfaced by this API. No actual UDP source, physical desktop, Windows or Linux was exercised. G01/G13 acceptance remains open.
+
+## 2026-11-24 — G01 duplicate review ordering by UTC instant
+
+Duplicate-review grouping now orders QSO by their UTC instant and compares UTC epoch seconds, including explicit offsets and unzoned legacy UTC. Invalid stored timestamps are excluded. Existing grouping by call, band, mode group and station profile remains unchanged; grouping is still a proposal for operator review.
+
+A/B on macOS arm64 / Qt 6.11.2: three synthetic QSO with different offsets previously produced the wrong pair; the new fixture failed against that behavior and now groups the two contacts within the window, excluding the one an hour away. It also checks invalid dates are excluded. App and test targets built; CTest database, migration and qmlpopups passed 3/3.
+
+The grouping now asks SQLite to convert and sort timestamps and validates each parsed value. Its performance and UI responsiveness on a large log have not been measured after this change; no physical desktop, Windows or Linux test was performed. The API's existing handling of query errors and transitive grouping is unchanged. G01/G13 acceptance remains open.

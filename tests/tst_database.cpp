@@ -2350,6 +2350,17 @@ private slots:
         QCOMPARE(run("2026-09-10T12:00:00"),InsertResult::Status::Duplicate);
     }
 
+    void duplicateGroupsUseUtcOrdering()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (int i=0;i<3;++i) QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260910"},{"TIME_ON",QString("12000%1").arg(i)},{"BAND","20m"},{"MODE","CW"}},"fixture",{},true,0,false).id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE id WHEN 1 THEN '2026-09-10T13:00:00+01:00' WHEN 2 THEN '2026-09-10T12:00:20' ELSE '2026-09-10T12:00:10+01:00' END"));
+        const auto groups=db.duplicateGroups(60); QCOMPARE(groups.size(),1);
+        QCOMPARE(groups.first(),QList<qint64>({1,2}));
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2026-02-30T12:00:00Z' WHERE id IN (1,2)"));
+        QVERIFY(db.duplicateGroups(60).isEmpty());
+    }
+
     void importExportIsLossless()
     {
         const QByteArray original =
