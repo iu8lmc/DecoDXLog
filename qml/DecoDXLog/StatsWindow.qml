@@ -253,7 +253,11 @@ RoundedWindow {
             if (String(root.reportProbePath).length) {
                 console.warn("PROBE activityreport result " + JSON.stringify(result))
                 if (root.reportProbePdf) { console.warn("PROBE activityreport pdf protected " + decolog.exportActivityReportPdf(root.probeLocalFileUrl(decolog.currentLogInfo().path))); root.beginReportPdf(root.reportProbePath) }
-                else console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
+                else {
+                    console.warn("PROBE activityreport export " + decolog.exportActivityReport(root.reportProbePath))
+                    console.warn("PROBE activityreport context " + decolog.exportActivityReportContext(String(root.reportProbePath) + ".context.json"))
+                    console.warn("PROBE activityreport context protected " + decolog.exportActivityReportContext(root.probeLocalFileUrl(decolog.currentLogInfo().path)))
+                }
                 console.warn("PROBE activityreport protected " + decolog.exportActivityReport(root.probeLocalFileUrl(decolog.currentLogInfo().path)))
                 console.warn("PROBE activityreport settings " + JSON.stringify(decolog.activityReportSettings()))
                 Qt.callLater(function() {
@@ -277,6 +281,7 @@ RoundedWindow {
         nameFilters:[qsTr("CSV files (*.csv)")]
         onAccepted: { const error=decolog.exportActivityReport(selectedFile); root.reportMessage=error || qsTr("CSV exported.") }
     }
+    FileDialog { id:reportContextFile; title:qsTr("Export report context"); fileMode:FileDialog.SaveFile; nameFilters:[qsTr("JSON files (*.json)")]; onAccepted:{ const error=decolog.exportActivityReportContext(selectedFile); root.reportMessage=error || qsTr("Report context exported.") } }
     FileDialog { id:reportPdfFile; title:qsTr("Export report PDF"); fileMode:FileDialog.SaveFile; nameFilters:[qsTr("PDF files (*.pdf)")]; onAccepted:root.beginReportPdf(selectedFile) }
     Popup {
         id:removeNamedReport; anchors.centerIn:Overlay.overlay; modal:true; padding:16
@@ -656,12 +661,14 @@ RoundedWindow {
                 StyledTextField { id:reportBand; Layout.preferredWidth:150; placeholderText:qsTr("Band (all)"); Accessible.name:qsTr("Report band") }
                 GlassButton { text:qsTr("Run report"); enabled:!root.activityBusy; onClicked:root.runActivityReport() }
             }
+            Text { Layout.fillWidth:true; color:Theme.textSecondary; wrapMode:Text.Wrap; text:qsTr("Export context separately to preserve filters even for an empty CSV. Its SHA-256 identifies the CSV from this report snapshot.") }
             RowLayout {
                 Layout.fillWidth:true
                 GlassButton { text:qsTr("Save filters"); enabled:!root.activityBusy; onClicked:{ const value=reportYear.text.trim(); if (value.length && (!/^[0-9]{4}$/.test(value) || Number(value)===0)) { root.reportMessage=qsTr("Enter a four-digit year or leave it empty."); return }; const year=value.length ? Number(value) : 0; root.reportMessage=(reportKind.currentIndex===3 ? decolog.saveCustomReportModeSettings(year,reportBand.text,root.chosenDimensions(),root.aggregateKey(),reportMode.text) : reportKind.currentIndex===2 ? decolog.saveClubReportSettings(year,reportBand.text,reportStation.text) : decolog.saveSelectedReportSettings(root.chosenReportKind(),year,reportBand.text)) || qsTr("Filters saved in this log.") } }
                 GlassButton { text:qsTr("Load filters"); enabled:!root.activityBusy; onClicked:{ const s=decolog.activityReportSettings(); reportYear.text=s.year ? String(s.year) : ""; reportBand.text=s.band || ""; reportKind.currentIndex=s.kind==="custom" ? 3 : s.kind==="club" ? 2 : s.kind==="confirmation" ? 1 : 0; reportStation.text=s.station || ""; reportMode.text=s.kind==="custom" ? (s.mode || "") : ""; if (s.kind==="custom") { root.loadDimensions(s.dimensions); reportAggregate.currentIndex=root.aggregateIndex(s.aggregate) }; root.reportMessage=qsTr("Filters loaded from this log.") } }
                 GlassButton { text:qsTr("Export CSV…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportFile.open() }
                 GlassButton { text:qsTr("Export PDF…"); enabled:!root.activityBusy && !root.reportPdfBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportPdfFile.open() }
+                GlassButton { text:qsTr("Export context…"); enabled:!root.activityBusy && !!root.activityReport.generatedAt && !root.activityReport.error && !root.activityReport.truncated; onClicked:reportContextFile.open() }
             }
             RowLayout {
                 Layout.fillWidth:true

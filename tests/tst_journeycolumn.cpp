@@ -1066,6 +1066,22 @@ private slots:
         QVERIFY2(output.count("[activity] DXCAMPAIGN|highlight|")== (satisfiesGoal ? 0 : 1),output.constData());
     }
 
+    void emptyCsvReportContextPreservesFilters()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto csvPath=dir.filePath("empty.csv");
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0); }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("activitymodeprobe:")+csvPath,output,5500),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport context "),output.constData());
+        QVERIFY2(output.contains("PROBE activityreport context protected Choose a file other than the log database") || output.contains("PROBE activityreport context protected Scegli un file diverso dal database"),output.constData());
+        QFile csv(csvPath); QVERIFY(csv.open(QIODevice::ReadOnly)); const auto data=csv.readAll(); QVERIFY(!data.contains("FT8"));
+        QFile context(csvPath+".context.json"); QVERIFY(context.open(QIODevice::ReadOnly)); const auto object=QJsonDocument::fromJson(context.readAll()).object();
+        QCOMPARE(object.value("format").toString(),QString("decodxlog-report-context/1")); QCOMPARE(object.value("mode").toString(),QString("FT8"));
+        QCOMPARE(object.value("utcYear").toInt(),2026); QCOMPARE(object.value("band").toString(),QString("20m")); QCOMPARE(object.value("rows").toInt(),0);
+        QCOMPARE(object.value("csvSha256").toString(),QString::fromLatin1(QCryptographicHash::hash(data,QCryptographicHash::Sha256).toHex()));
+        QVERIFY(!object.contains("path") && !object.contains("logIdentity"));
+    }
+
     void customReportRestoresUtcDayAndHour()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

@@ -10171,6 +10171,10 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>StatsWindow</name>
+    <message><source>Export context separately to preserve filters even for an empty CSV. Its SHA-256 identifies the CSV from this report snapshot.</source><translation>Esporta il contesto separatamente per conservare i filtri anche con un CSV vuoto. Il suo SHA-256 identifica il CSV generato da questa istantanea.</translation></message>
+    <message><source>Export report context</source><translation>Esporta il contesto del rapporto</translation></message>
+    <message><source>Report context exported.</source><translation>Contesto del rapporto esportato.</translation></message>
+    <message><source>Export context…</source><translation>Esporta contesto…</translation></message>
     <message><source>Day and hour use recorded timestamps in UTC; invalid timestamps are grouped as not recorded.</source><translation>Giorno e ora usano gli orari registrati in UTC; gli orari non validi sono raggruppati come non registrati.</translation></message>
     <message><source>UTC day</source><translation>Giorno UTC</translation></message>
     <message><source>UTC hour</source><translation>Ora UTC</translation></message>
@@ -11685,6 +11689,9 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>Choose a local JSON file</source><translation>Scegli un file JSON locale</translation></message>
+    <message><source>Cannot prepare the CSV report</source><translation>Impossibile preparare il rapporto CSV</translation></message>
+    <message><source>Cannot write the report context</source><translation>Impossibile scrivere il contesto del rapporto</translation></message>
     <message><source>Select QSO and a field first.</source><translation>Seleziona prima i QSO e un campo.</translation></message>
     <message><source>The open log changed. Check the original log for the result.</source><translation>Il log aperto è cambiato. Controlla il risultato nel log originale.</translation></message>
     <message><source>The reviewed log or plan changed; reopen the cost editor.</source><translation>Il log o il piano verificato è cambiato; riapri l'editor dei costi.</translation></message>

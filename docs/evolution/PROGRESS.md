@@ -2633,3 +2633,11 @@ Expanded the actual-app UTC report PDF fixture from its previous two-row, one-pa
 A/B on macOS arm64 / Qt 6.11.2 compares the earlier one-page/two-group fixture with the expanded six-page/122-group output; it is a dataset comparison, not a production-code change. CTest activityreport, activity_power_pdf and activity_utc_pdf passed 3/3. The fixture invokes the real app programmatically with synthetic local data; git diff --check passed.
 
 This checks one grouping layout and one intermediate page visually, not every page, all dimension combinations, large cell contents, locales, physical interaction or Windows/Linux. No real log or service was used. Remaining G07 and integrated desktop acceptance stay open.
+
+## 2026-11-24 — G07 export report context for empty and nonempty CSV
+
+The activity report UI now offers a separate JSON context export for the current completed report snapshot. It records the report kind, UTC year, band, station, mode, dimensions, aggregate, generation time, row count and SHA-256 of the CSV bytes produced from that same snapshot. It omits the log path, log identity and QSO rows. CSV content and existing export behavior remain unchanged; context and CSV are separate explicit writes, not an atomic pair. The report guide documents comparison of the digest and the need to export before running another report. Italian labels were added.
+
+A/B on macOS arm64 / Qt 6.11.2 in an isolated offscreen app: a synthetic CW-only log produced an empty FT8-filtered CSV whose header contains no FT8 value; the new context contains FT8, year 2026, 20m and zero rows, and its SHA-256 equals the actual CSV bytes. The app rejected the log database as context destination. No QSO data was included in the JSON. The existing report/power/UTC PDF and qmlpopups CTest groups passed 4/4; the final empty-report and protected-destination app probe passed after rebuilding. Translation XML and git diff --check passed.
+
+The digest is not a signature and does not prove authenticity; the operator must export both files from the same snapshot and compare them. The context may contain an operator-entered station filter and is not automatically saved with CSV. Programmatic UI does not prove physical interaction or layout, and hard-link/filesystem race protection, other locales/platforms, real logs and full G07/G13 acceptance remain open.
