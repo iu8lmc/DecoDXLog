@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import Decodium.UI
 
 GlassPanel {
@@ -17,6 +18,7 @@ GlassPanel {
     property string calendarObserved: ""
     property int campaignSpotRevision: 0
     property bool matrixRaceProbeActive: false
+    property bool historyProfileProbe: false
     property var visibleEntries: []
     property int parseSerial: 0
     property int filterSerial: 0
@@ -287,6 +289,52 @@ GlassPanel {
         campaignDialog.edit(campaigns[0]); campaignHistory.displayHistory(campaigns[0],campaignDialog.logContext)
         historyProbeResult.start()
     }
+    function probeHistoryDraft() {
+        const campaigns=root.campaignBackend.dxCampaigns
+        if (!campaigns.length) { console.warn("PROBE dxhistorydraft missing campaign"); return }
+        campaignDialog.edit(campaigns[0]); campaignHistory.displayHistory(campaigns[0],campaignDialog.logContext)
+        historyDraftProbe.start()
+    }
+    function probeHistoryProfileChange() { root.historyProfileProbe=true; root.probeHistoryDraft() }
+    Timer { id:historyDraftProbe; interval:400; onTriggered: {
+        if (!campaignHistory.rows.length) { console.warn("PROBE dxhistorydraft missing history"); return }
+        const before=Number(root.campaignBackend.dxCampaigns[0].revision)
+        const item=campaignHistoryList.itemAtIndex(0)
+        if (!item) { console.warn("PROBE dxhistorydraft missing row"); return }
+        const oldTitle=titleField.text
+        item.probeUse(); historyDraftConfirm.buttonClicked(MessageDialog.No,0); historyDraftConfirm.close()
+        console.warn("PROBE dxhistorydraft cancel=" + (titleField.text===oldTitle))
+        item.probeUse(); historyDraftConfirm.buttonClicked(MessageDialog.Yes,0); historyDraftConfirm.close()
+        const loaded=!campaignHistory.visible
+        const unchanged=Number(root.campaignBackend.dxCampaigns[0].revision)===before
+        console.warn("PROBE dxhistorydraft loaded=" + loaded + " unchanged=" + unchanged + " error=" + campaignHistory.historyError)
+        if (!loaded) return
+        if (root.historyProfileProbe) {
+            const profile=campaignDialog.historyProfileChoice
+            const removed=root.campaignBackend.stationProfiles.remove(profile)
+            campaignDialog.save()
+            console.warn("PROBE dxhistorydraft profileRemoved=" + removed + " rejected=" + (campaignDialog.editorError.length>0) + " revision=" + root.campaignBackend.dxCampaigns[0].revision)
+            root.historyProfileProbe=false; return
+        }
+        const concurrent=Object.assign({},root.campaignBackend.dxCampaigns[0],{title:"Concurrent",_reviewContext:campaignDialog.logContext})
+        const changed=root.campaignBackend.saveDxCampaign(concurrent)
+        campaignDialog.save()
+        console.warn("PROBE dxhistorydraft stale=" + (changed && campaignDialog.editorError.length>0))
+        const current=root.campaignBackend.dxCampaigns[0]
+        campaignHistory.displayHistory(current,campaignDialog.logContext)
+        const old=campaignHistory.rows.find(row => row.revision===1)
+        if (!old || !campaignHistory.prepareDraft(old)) { console.warn("PROBE dxhistorydraft reload failed " + campaignHistory.historyError); return }
+        campaignDialog.save()
+        console.warn("PROBE dxhistorydraft saved=" + (Number(root.campaignBackend.dxCampaign.revision)===before+2) + " before=" + before + " after=" + root.campaignBackend.dxCampaign.revision + " error=" + campaignDialog.editorError)
+    } }
+    MessageDialog {
+        id:historyDraftConfirm
+        property var selected:({})
+        title:qsTr("Use previous campaign revision")
+        text:qsTr("Replace the current editor contents with this revision? Unsaved edits in the editor will be lost. The campaign is not changed until you save.")
+        buttons:MessageDialog.Yes | MessageDialog.No
+        onButtonClicked:function(button,role) { if (button===MessageDialog.Yes) campaignHistory.prepareDraft(selected) }
+    }
     Timer { id:historyProbeResult; interval:500; onTriggered: {
         const row=campaignHistoryList.itemAtIndex(0)
         console.warn("PROBE dxhistory " + JSON.stringify({visible:campaignHistory.visible,rows:campaignHistory.rows,error:campaignHistory.historyError,rendered:row ? row.text : ""}))
@@ -381,11 +429,31 @@ GlassPanel {
         property var rows:[]
         property bool hasMore:false
         property int beforeRevision:0
+        property int currentRevision:0
         property var previousPages:[]
         property string historyError:""
         function displayHistory(c,context) {
-            campaignId=c.id; logContext=context; rows=[]; hasMore=false; historyError=""; previousPages=[]
+            campaignId=c.id; currentRevision=c.revision; logContext=context; rows=[]; hasMore=false; historyError=""; previousPages=[]
             page(c.revision); open()
+        }
+        function prepareDraft(row) {
+            const context=root.campaignBackend.dxCampaignReviewContext()
+            if (!Object.keys(logContext).length || JSON.stringify(context)!==JSON.stringify(logContext)) {
+                historyError=qsTr("The log changed; reopen the campaign history."); return false
+            }
+            const current=root.campaignBackend.dxCampaigns.find(c => c.id===campaignId)
+            if (!current || current.revision!==currentRevision || row.id!==campaignId || row.revision>=currentRevision) {
+                historyError=qsTr("The campaign changed; reopen its history."); return false
+            }
+            if (row.profileId && profileField.ids.indexOf(row.profileId)<0) {
+                historyError=qsTr("The previous station profile is unavailable; restore it before using this revision."); return false
+            }
+            const draft=Object.assign({},row,{revision:currentRevision})
+            campaignDialog.edit(draft)
+            campaignDialog.historyProfileChoice=Number(row.profileId || 0)
+            campaignDialog.protectHistoryProfile=true
+            campaignDialog.editorNotice=qsTr("Previous revision %1 loaded as a draft. Review all fields and save to create a new revision.").arg(row.revision)
+            close(); return true
         }
         function page(before) {
             const result=root.campaignBackend.dxCampaignHistory(campaignId,before,logContext)
@@ -411,15 +479,18 @@ GlassPanel {
                 id:campaignHistoryList
                 objectName:"dxCampaignHistoryList"; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:8
                 model:campaignHistory.rows
-                delegate:Text {
+                delegate:RowLayout {
                     required property var modelData
-                    width:ListView.view.width; wrapMode:Text.Wrap; color:root.textColor
-                    text:qsTr("Revision %1 · %2\nCalls: %3 · %4 → %5\nSource: %6 · observed: %7\nBands: %8 · modes: %9\nProfile: %10 · archived: %11 · watched: %12\nGoals: %13")
+                    function probeUse() { useHistoryDraft.clicked() }
+                    width:ListView.view.width
+                    readonly property string text:qsTr("Revision %1 · %2\nCalls: %3 · %4 → %5\nSource: %6 · observed: %7\nBands: %8 · modes: %9\nProfile: %10 · archived: %11 · watched: %12\nGoals: %13")
                         .arg(modelData.revision).arg(modelData.title).arg(modelData.calls.join(", "))
                         .arg(modelData.start).arg(modelData.end).arg(modelData.source).arg(modelData.observedAt)
                         .arg(modelData.bands.join(", ")).arg(modelData.modes.join(", ")).arg(modelData.profileId)
                         .arg(modelData.archived).arg(modelData.watched).arg(JSON.stringify(modelData.goals))
                         + "\n" + qsTr("Replaced at (UTC): %1").arg(modelData.supersededAt || qsTr("unknown"))
+                    Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.textColor; text:parent.text }
+                    CalendarButton { id:useHistoryDraft; text:qsTr("Use as draft"); Accessible.name:qsTr("Use revision %1 as draft").arg(modelData.revision); onClicked: { historyDraftConfirm.selected=modelData; historyDraftConfirm.open() } }
                 }
             }
             RowLayout {
@@ -504,6 +575,9 @@ GlassPanel {
         property string logPath: ""
         property var logContext: ({})
         property string editorError: ""
+        property string editorNotice: ""
+        property bool protectHistoryProfile: false
+        property var historyProfileChoice: 0
         function edit(c) {
             draft=c || ({}); logPath=root.campaignBackend.currentLogInfo().path || ""; logContext=root.campaignBackend.dxCampaignReviewContext()
             goalDraft=(draft.goals || []).map(g => ({band:g.band,mode:g.mode,target:g.target})); goalsDirty=false
@@ -513,7 +587,7 @@ GlassPanel {
             profileField.currentIndex=Math.max(0,profileField.ids.indexOf(draft.profileId || 0)); archivedField.checked=!!draft.archived
             watchedField.checked=!!draft.watched
             watchGoalsOnlyField.checked=!!draft.watchGoalsOnly
-            editorError=""; open()
+            editorError=""; editorNotice=""; protectHistoryProfile=false; open()
         }
         function splitValues(text) { return text.split(",").map(s => s.trim()).filter(s => s.length) }
         function goalTarget(band,mode) {
@@ -527,11 +601,14 @@ GlassPanel {
         }
         function save() {
             if (!logPath || logPath !== root.campaignBackend.currentLogInfo().path) { editorError=qsTr("The open log changed; reopen the campaign."); return }
+            if (protectHistoryProfile && (profileField.ids.indexOf(historyProfileChoice)<0 || profileField.ids[profileField.currentIndex]!==historyProfileChoice)) {
+                editorError=qsTr("The station profile is unavailable or changed; select a profile again."); return
+            }
             const data={id:draft.id || "", revision:draft.revision || 0, title:titleField.text, calls:splitValues(callsField.text),
                 start:startField.text, end:endField.text, source:sourceField.text, observedAt:observedField.text,
                 bands:splitValues(bandsField.text), modes:splitValues(modesField.text), goals:goalDraft, profileId:profileField.ids[profileField.currentIndex] || 0,
                 archived:archivedField.checked, watched:watchedField.checked, watchGoalsOnly:watchGoalsOnlyField.checked,_reviewContext:logContext}
-            if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; goalsDirty=false; editorError="" }
+            if (root.campaignBackend.saveDxCampaign(data)) { draft=root.campaignBackend.dxCampaign; goalsDirty=false; protectHistoryProfile=false; editorError="" }
             else editorError=root.campaignBackend.dxCampaignError
         }
         body: RowLayout {
@@ -557,6 +634,7 @@ GlassPanel {
             ColumnLayout {
                 Layout.fillWidth: true; Layout.fillHeight: true; spacing: 5
                 Text { text: qsTr("Review the announcement and operating period before saving."); color: root.mutedColor; wrapMode: Text.Wrap; Layout.fillWidth: true }
+                Text { visible:!!campaignDialog.editorNotice; text:campaignDialog.editorNotice; color:Theme.warningColor; wrapMode:Text.Wrap; Layout.fillWidth:true }
                 StyledTextField { id: titleField; objectName:"dxCampaignTitle"; Layout.fillWidth:true; placeholderText:qsTr("Campaign name") }
                 StyledTextField { id: callsField; objectName:"dxCampaignCalls"; Layout.fillWidth:true; placeholderText:qsTr("Callsigns, comma separated") }
                 RowLayout {
@@ -574,6 +652,7 @@ GlassPanel {
                         id:profileField; Layout.preferredWidth:220
                         readonly property var ids: { const out=[0]; if (root.campaignBackend) for (let i=0;i<root.campaignBackend.stationProfiles.count;++i) { const p=root.campaignBackend.stationProfiles.get(i); if (!p.deleted) out.push(p.id) }; return out }
                         model: ids.map(id => id===0 ? qsTr("All station profiles") : root.campaignBackend.stationProfiles.byId(id).name)
+                        onActivated: if (campaignDialog.protectHistoryProfile) campaignDialog.historyProfileChoice=ids[currentIndex]
                     }
                     CheckBox { id:archivedField; text:qsTr("Archived") }
                     CheckBox { id:watchedField; objectName:"dxCampaignWatched"; text:qsTr("Watch spots") }

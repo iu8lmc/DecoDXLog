@@ -3838,6 +3838,15 @@ In Decodium: Settings → Reporting → UDP Server 127.0.0.1, porta %1, e &quot;
 </context>
 <context>
     <name>DxCalendarPanel</name>
+    <message><source>The station profile is unavailable or changed; select a profile again.</source><translation>Il profilo stazione non è disponibile o è cambiato; seleziona nuovamente un profilo.</translation></message>
+    <message><source>Use previous campaign revision</source><translation>Usa una revisione precedente della spedizione</translation></message>
+    <message><source>Replace the current editor contents with this revision? Unsaved edits in the editor will be lost. The campaign is not changed until you save.</source><translation>Sostituire il contenuto dell’editor con questa revisione? Le modifiche non salvate nell’editor andranno perse. La spedizione non viene modificata finché non salvi.</translation></message>
+    <message><source>The log changed; reopen the campaign history.</source><translation>Il log è cambiato; riapri lo storico della spedizione.</translation></message>
+    <message><source>The campaign changed; reopen its history.</source><translation>La spedizione è cambiata; riapri il suo storico.</translation></message>
+    <message><source>The previous station profile is unavailable; restore it before using this revision.</source><translation>Il profilo stazione precedente non è disponibile; ripristinalo prima di usare questa revisione.</translation></message>
+    <message><source>Previous revision %1 loaded as a draft. Review all fields and save to create a new revision.</source><translation>Revisione precedente %1 caricata come bozza. Controlla tutti i campi e salva per creare una nuova revisione.</translation></message>
+    <message><source>Use as draft</source><translation>Usa come bozza</translation></message>
+    <message><source>Use revision %1 as draft</source><translation>Usa la revisione %1 come bozza</translation></message>
     <message><source>Campaign history</source><translation>Storico della spedizione</translation></message>
     <message><source>Replaced at (UTC): %1</source><translation>Sostituita il (UTC): %1</translation></message>
     <message><source>unknown</source><translation>sconosciuto</translation></message>

@@ -1607,6 +1607,49 @@ private slots:
         QCOMPARE(first->source,QString("https://www.danplanet.com/dxcal.ics")); QCOMPARE(first->verifiedAt.toString(Qt::ISODate),QString("2026-01-09T10:00:00Z"));
         QCOMPARE(second->end,QDate(2026,10,7)); QCOMPARE(second->revision,1); QCOMPARE(second->source,QString("original source")); QCOMPARE(db.qsoCount(),1);
     }
+    void dxCampaignHistoryCanBeReviewedAsDraft()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString id;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); dxcampaign::Campaign c;
+          c.title="Original"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.watched=true; c.watchGoalsOnly=true; c.goals={{"20m","CW","confirmed"}};
+          QString error; QVERIFY(dxcampaign::save(db,c,&error)); id=c.id; c.title="Current"; c.end=QDate(2026,1,10); c.watched=false; c.watchGoalsOnly=false; c.goals.clear(); QVERIFY(dxcampaign::save(db,c,&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistorydraftprobe",output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE dxhistorydraft cancel=true") && output.contains("PROBE dxhistorydraft loaded=true unchanged=true") && output.contains("PROBE dxhistorydraft stale=true") && output.contains("PROBE dxhistorydraft saved=true"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto current=dxcampaign::load(db,id); QVERIFY(current);
+        QCOMPARE(current->revision,4); QCOMPARE(current->title,QString("Original")); QCOMPARE(current->end,QDate(2026,1,7)); QVERIFY(current->watched); QVERIFY(current->watchGoalsOnly);
+        QCOMPARE(current->goals.size(),1); QCOMPARE(current->goals.first().target,QString("confirmed"));
+        QString error; const auto history=dxcampaign::history(db,id,4,10,&error); QCOMPARE(history.size(),3);
+        QCOMPARE(history.first().title,QString("Concurrent")); QCOMPARE(history.at(1).title,QString("Current")); QCOMPARE(db.qsoCount(),qint64(0));
+    }
+
+    void dxCampaignHistoryDraftRejectsMissingProfile()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString id;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); dxcampaign::Campaign c;
+          c.title="Original"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.stationProfileId=999;
+          QString error; QVERIFY(dxcampaign::save(db,c,&error)); id=c.id; c.title="Current"; c.stationProfileId=0; QVERIFY(dxcampaign::save(db,c,&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistorydraftprobe",output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE dxhistorydraft loaded=false unchanged=true") &&
+                 (output.contains("The previous station profile is unavailable") || output.contains("Il profilo stazione precedente non")),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto current=dxcampaign::load(db,id); QVERIFY(current);
+        QCOMPARE(current->revision,2); QCOMPARE(current->title,QString("Current")); QCOMPARE(current->stationProfileId,qint64(0));
+    }
+
+    void dxCampaignHistoryDraftRejectsProfileRemovedAfterReview()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); QString id; qint64 profile=0;
+        { LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); StationProfile p; p.name="Old station"; p.stationCallsign="K1AAA"; profile=db.saveStationProfile(p); QVERIFY(profile>0);
+          dxcampaign::Campaign c; c.title="Original"; c.calls={"ZZ1AAA"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,7); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T10:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.stationProfileId=profile;
+          QString error; QVERIFY(dxcampaign::save(db,c,&error)); id=c.id; c.title="Current"; c.stationProfileId=0; QVERIFY(dxcampaign::save(db,c,&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"dxcampaignhistoryprofileprobe",output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE dxhistorydraft loaded=true unchanged=true") && output.contains("profileRemoved=true rejected=true revision=2"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto current=dxcampaign::load(db,id); QVERIFY(current);
+        QCOMPARE(current->revision,2); QCOMPARE(current->title,QString("Current")); QCOMPARE(current->stationProfileId,qint64(0));
+    }
+
     void dxCampaignHistoryPageNavigation()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
