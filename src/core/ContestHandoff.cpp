@@ -9,7 +9,7 @@
 
 namespace decolog::core::contesthandoff {
 namespace {
-const QString prefix=QStringLiteral("contest_handoff.in.");
+const QString incomingPrefix=QStringLiteral("contest_handoff.in."), outgoingPrefix=QStringLiteral("contest_handoff.out.");
 bool identifier(const QString& value) {
     static const QRegularExpression re(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$")); return re.match(value).hasMatch();
 }
@@ -34,11 +34,9 @@ QJsonObject offerFrame(const Offer& o) {
     return {{"version",1},{"id",o.id},{"scope",o.scope},{"sender",o.sender},{"recipient",o.recipient},
             {"call",o.call},{"frequencyHz",double(o.frequencyHz)},{"createdUtc",o.createdUtc}};
 }
-Result receiveOffer(LogDatabase& db,const QString& scope,const QString& recipient,const QString& envelopeSender,const QJsonObject& body) {
-    const auto offer=parse(body);
-    if (!db.isOpen() || !offer || offer->scope!=scope || offer->recipient!=recipient || offer->sender!=envelopeSender)
-        return {false,false,QStringLiteral("Invalid or misaddressed handoff offer")};
-    const QString key=prefix+offer->id, value=QString::fromUtf8(QJsonDocument(offerFrame(*offer)).toJson(QJsonDocument::Compact));
+static Result store(LogDatabase& db,const QString& prefix,const Offer& offer) {
+    if (!db.isOpen() || !valid(offer)) return {false,false,QStringLiteral("Invalid handoff offer")};
+    const QString key=prefix+offer.id, value=QString::fromUtf8(QJsonDocument(offerFrame(offer)).toJson(QJsonDocument::Compact));
     QSqlQuery q(db.connection()); q.prepare(QStringLiteral("INSERT OR IGNORE INTO app_setting(key,value) SELECT ?,? WHERE (SELECT COUNT(*) FROM app_setting WHERE substr(key,1,?)=?)<10000"));
     q.addBindValue(key); q.addBindValue(value); q.addBindValue(prefix.size()); q.addBindValue(prefix);
     if (!q.exec()) return {false,false,q.lastError().text()};
@@ -49,9 +47,16 @@ Result receiveOffer(LogDatabase& db,const QString& scope,const QString& recipien
     if (read.value(0).toString()!=value) return {false,false,QStringLiteral("Handoff identity conflicts with an existing offer")};
     return {true,true,{}};
 }
-QList<Offer> incomingOffers(const LogDatabase& db,const QString& scope,const QString& recipient,QString* error) {
+Result receiveOffer(LogDatabase& db,const QString& scope,const QString& recipient,const QString& envelopeSender,const QJsonObject& body) {
+    const auto offer=parse(body);
+    if (!db.isOpen() || !offer || offer->scope!=scope || offer->recipient!=recipient || offer->sender!=envelopeSender)
+        return {false,false,QStringLiteral("Invalid or misaddressed handoff offer")};
+    return store(db,incomingPrefix,*offer);
+}
+Result storeOutgoing(LogDatabase& db,const Offer& offer) { return store(db,outgoingPrefix,offer); }
+static QList<Offer> list(const LogDatabase& db,const QString& prefix,const QString& scope,const QString& node,bool outgoing,QString* error) {
     if (error) error->clear(); QList<Offer> out;
-    if (!db.isOpen() || !identifier(scope) || !identifier(recipient)) { if (error) *error=QStringLiteral("Invalid handoff listing"); return {}; }
+    if (!db.isOpen() || !identifier(scope) || !identifier(node)) { if (error) *error=QStringLiteral("Invalid handoff listing"); return {}; }
     QSqlQuery q(db.connection()); q.prepare(QStringLiteral("SELECT key,value FROM app_setting WHERE substr(key,1,?)=? ORDER BY key LIMIT 10001"));
     q.addBindValue(prefix.size()); q.addBindValue(prefix); if (!q.exec()) { if (error) *error=q.lastError().text(); return {}; }
     int count=0;
@@ -62,9 +67,11 @@ QList<Offer> incomingOffers(const LogDatabase& db,const QString& scope,const QSt
         if (parseError.error!=QJsonParseError::NoError || !offer || prefix+offer->id!=q.value(0).toString()) {
             if (error) *error=QStringLiteral("Invalid stored handoff offer"); return {};
         }
-        if (offer->scope==scope && offer->recipient==recipient) out << *offer;
+        if (offer->scope==scope && (outgoing ? offer->sender : offer->recipient)==node) out << *offer;
     }
     if (q.lastError().isValid()) { if (error) *error=q.lastError().text(); return {}; }
     return out;
 }
+QList<Offer> incomingOffers(const LogDatabase& db,const QString& scope,const QString& recipient,QString* error) { return list(db,incomingPrefix,scope,recipient,false,error); }
+QList<Offer> outgoingOffers(const LogDatabase& db,const QString& scope,const QString& sender,QString* error) { return list(db,outgoingPrefix,scope,sender,true,error); }
 }

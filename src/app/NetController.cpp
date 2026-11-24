@@ -2,6 +2,7 @@
 
 #include "core/Adif.h"
 #include "core/ContestSerialProtocol.h"
+#include "core/ContestHandoff.h"
 #include "core/ContestNetReconcile.h"
 #include "core/ContestNetSecure.h"
 #include "core/FileIdentity.h"
@@ -1073,6 +1074,86 @@ void NetController::sendSpot(const QString& call, double khz, const QString& com
     addMessage(m_name, tr("spot %1 %2 %3").arg(c).arg(khz, 0, 'f', 1).arg(comment.trimmed()), true);
 }
 
+bool NetController::handoffLogCurrent() const
+{
+    return !m_handoffScope.isEmpty() && m_handoffGroup==m_group && m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==m_handoffPath &&
+        m_ctx.db->identity()==m_handoffIdentity && m_ctx.db->openGeneration()==m_handoffGeneration &&
+        m_ctx.db->openFileIdentity()==m_handoffFileIdentity && m_ctx.db->fileIdentityMatchesOpen();
+}
+QString NetController::configureHandoffScope(const QString& scope)
+{
+    const QString clean=scope.trimmed();
+    static const QRegularExpression valid(QStringLiteral("^[A-Za-z0-9_.:-]{1,128}$"));
+    if (!clean.isEmpty() && (!valid.match(clean).hasMatch() || !m_ctx.db || !m_ctx.db->isOpen() ||
+        m_ctx.db->identity().isEmpty() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()))
+        return tr("Enter a valid contest scope with an open file-backed log.");
+    m_handoffScope=clean;
+    m_handoffPath=clean.isEmpty()?QString():m_ctx.db->path(); m_handoffIdentity=clean.isEmpty()?QString():m_ctx.db->identity();
+    m_handoffGroup=clean.isEmpty()?QString():m_group;
+    m_handoffFileIdentity=clean.isEmpty()?QByteArray():m_ctx.db->openFileIdentity(); m_handoffGeneration=clean.isEmpty()?0:m_ctx.db->openGeneration();
+    m_handoffStatus=clean.isEmpty()?QString():tr("Handoff offers are unauthenticated; delivery is not confirmed.");
+    emit handoffChanged(); return {};
+}
+static QVariantList handoffRows(const QList<contesthandoff::Offer>& offers)
+{
+    QVariantList rows;
+    for (const auto& o : offers) rows << QVariantMap{{QStringLiteral("id"),o.id},{QStringLiteral("scope"),o.scope},
+        {QStringLiteral("sender"),o.sender},{QStringLiteral("recipient"),o.recipient},{QStringLiteral("call"),o.call},
+        {QStringLiteral("frequencyHz"),o.frequencyHz},{QStringLiteral("createdUtc"),o.createdUtc}};
+    return rows;
+}
+QVariantList NetController::handoffInbox() const
+{
+    if (!handoffLogCurrent()) return {};
+    return handoffRows(contesthandoff::incomingOffers(*m_ctx.db,m_handoffScope,m_id));
+}
+QVariantList NetController::handoffOutbox() const
+{
+    if (!handoffLogCurrent()) return {};
+    return handoffRows(contesthandoff::outgoingOffers(*m_ctx.db,m_handoffScope,m_id));
+}
+QString NetController::handoffError() const
+{
+    if (m_handoffScope.isEmpty()) return {};
+    if (!handoffLogCurrent()) return tr("Log or network changed; configure the handoff scope again.");
+    QString error; contesthandoff::incomingOffers(*m_ctx.db,m_handoffScope,m_id,&error);
+    if (error.isEmpty()) contesthandoff::outgoingOffers(*m_ctx.db,m_handoffScope,m_id,&error);
+    return error.isEmpty()?QString():tr("Cannot read handoff offers: %1").arg(error);
+}
+QString NetController::sendHandoffOffer(const QString& recipient,const QString& call,qint64 frequencyHz)
+{
+    if (!m_net.running() || !handoffLogCurrent()) return tr("Configure a running network and the current log's handoff scope first.");
+    contesthandoff::Offer offer{QUuid::createUuid().toString(QUuid::WithoutBraces),m_handoffScope,m_id,recipient.trimmed(),
+        call.trimmed().toUpper(),frequencyHz,QDateTime::currentDateTimeUtc().toString(Qt::ISODate)};
+    const auto frame=contesthandoff::offerFrame(offer);
+    if (frame.isEmpty()) return tr("Enter a valid recipient, callsign and frequency.");
+    QJsonObject body{{QStringLiteral("offer"),frame}}; auto sizeProbe=body;
+    sizeProbe.insert(QStringLiteral("seq"),std::numeric_limits<qint64>::max()); sizeProbe.insert(QStringLiteral("session"),m_sessionId);
+    sizeProbe.insert(QStringLiteral("protocol"),2); sizeProbe.insert(QStringLiteral("name"),m_name);
+    if (ContestNet::pack(m_group,m_id,QStringLiteral("handoff_offer_v1"),sizeProbe).size()>1472)
+        return tr("Handoff datagram is too large; shorten station or network identifiers.");
+    const auto saved=contesthandoff::storeOutgoing(*m_ctx.db,offer);
+    if (!saved.ok) return tr("Cannot save handoff offer: %1").arg(saved.error);
+    emit handoffOfferSent(frame); send(QStringLiteral("handoff_offer_v1"),body);
+    m_handoffStatus=tr("Offer transmission attempted; delivery is not confirmed."); emit handoffChanged(); return {};
+}
+QString NetController::retryHandoffOffer(const QString& id)
+{
+    if (!m_net.running() || !handoffLogCurrent()) return tr("Configure a running network and the current log's handoff scope first.");
+    QString error; const auto offers=contesthandoff::outgoingOffers(*m_ctx.db,m_handoffScope,m_id,&error);
+    if (!error.isEmpty()) return tr("Cannot read handoff offers: %1").arg(error);
+    for (const auto& offer : offers) if (offer.id==id) {
+        const auto frame=contesthandoff::offerFrame(offer); QJsonObject body{{QStringLiteral("offer"),frame}}, sizeProbe=body;
+        sizeProbe.insert(QStringLiteral("seq"),std::numeric_limits<qint64>::max()); sizeProbe.insert(QStringLiteral("session"),m_sessionId);
+        sizeProbe.insert(QStringLiteral("protocol"),2); sizeProbe.insert(QStringLiteral("name"),m_name);
+        if (ContestNet::pack(m_group,m_id,QStringLiteral("handoff_offer_v1"),sizeProbe).size()>1472)
+            return tr("Handoff datagram is too large; shorten station or network identifiers.");
+        emit handoffOfferSent(frame); send(QStringLiteral("handoff_offer_v1"),body);
+        m_handoffStatus=tr("Offer transmission attempted; delivery is not confirmed."); emit handoffChanged(); return {};
+    }
+    return tr("Handoff offer not found in this log and scope.");
+}
+
 void NetController::requestSync()
 {
     if (!m_net.running() || !m_ctx.sessionStart)
@@ -1155,6 +1236,14 @@ void NetController::onReceived(const QString& from, const QString& type, const Q
         }
     } else if (type == QLatin1String("qso_chunk_v1") || type == QLatin1String("qso_first_v1") || type == QLatin1String("qso_missing_v1")) {
         if (m_wireKey.isEmpty()) handleExperimentalWireFrame(from,type,body);
+    } else if (type == QLatin1String("handoff_offer_v1")) {
+        if (handoffLogCurrent() && body.value(QStringLiteral("offer")).isObject()) {
+            const auto received=contesthandoff::receiveOffer(*m_ctx.db,m_handoffScope,m_id,from,body.value(QStringLiteral("offer")).toObject());
+            if (received.ok && !received.replayed) {
+                m_handoffStatus=tr("Handoff offer received; sender identity is not authenticated.");
+                emit handoffChanged();
+            }
+        }
     } else if (type == QLatin1String("serial_request_v3")) {
         serveDurableSerialRequest(from, body);
     } else if (type == QLatin1String("serial_grant_v3")) {

@@ -13034,6 +13034,17 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::NetController</name>
+    <message><source>Log or network changed; configure the handoff scope again.</source><translation>Il log o la rete sono cambiati; configura nuovamente l'ambito dei passaggi.</translation></message>
+    <message><source>Enter a valid contest scope with an open file-backed log.</source><translation>Inserisci un ambito contest valido con un log su file aperto.</translation></message>
+    <message><source>Handoff offers are unauthenticated; delivery is not confirmed.</source><translation>Le proposte non sono autenticate; la consegna non è confermata.</translation></message>
+    <message><source>Configure a running network and the current log's handoff scope first.</source><translation>Configura prima una rete attiva e l'ambito dei passaggi per il log corrente.</translation></message>
+    <message><source>Enter a valid recipient, callsign and frequency.</source><translation>Inserisci destinatario, nominativo e frequenza validi.</translation></message>
+    <message><source>Handoff datagram is too large; shorten station or network identifiers.</source><translation>Il datagramma del passaggio è troppo grande; abbrevia gli identificativi di stazione o rete.</translation></message>
+    <message><source>Cannot save handoff offer: %1</source><translation>Impossibile salvare la proposta di passaggio: %1</translation></message>
+    <message><source>Offer transmission attempted; delivery is not confirmed.</source><translation>Invio della proposta tentato; la consegna non è confermata.</translation></message>
+    <message><source>Cannot read handoff offers: %1</source><translation>Impossibile leggere le proposte di passaggio: %1</translation></message>
+    <message><source>Handoff offer not found in this log and scope.</source><translation>Proposta di passaggio non trovata in questo log e ambito.</translation></message>
+    <message><source>Handoff offer received; sender identity is not authenticated.</source><translation>Proposta di passaggio ricevuta; l'identità del mittente non è autenticata.</translation></message>
     <message>
         <source>off</source>
         <translation>spento</translation>

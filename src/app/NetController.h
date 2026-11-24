@@ -52,6 +52,11 @@ class NetController : public QObject {
     Q_PROPERTY(QString experimentalQsoStatus READ experimentalQsoStatus NOTIFY experimentalQsoChanged)
     Q_PROPERTY(bool experimentalQsoSending READ experimentalQsoSending NOTIFY experimentalQsoChanged)
     Q_PROPERTY(bool experimentalQsoSecure READ experimentalQsoSecure NOTIFY experimentalQsoChanged)
+    Q_PROPERTY(QString handoffScope READ handoffScope NOTIFY handoffChanged)
+    Q_PROPERTY(QVariantList handoffInbox READ handoffInbox NOTIFY handoffChanged)
+    Q_PROPERTY(QVariantList handoffOutbox READ handoffOutbox NOTIFY handoffChanged)
+    Q_PROPERTY(QString handoffStatus READ handoffStatus NOTIFY handoffChanged)
+    Q_PROPERTY(QString handoffError READ handoffError NOTIFY handoffChanged)
 
 public:
     struct Context {
@@ -138,6 +143,14 @@ public:
 
     Q_INVOKABLE void sendGab(const QString& text, const QString& to = {});
     Q_INVOKABLE void sendSpot(const QString& call, double khz, const QString& comment = {});
+    QString handoffScope() const { return m_handoffScope; }
+    QString handoffStatus() const { return m_handoffStatus; }
+    QString handoffError() const;
+    QVariantList handoffInbox() const;
+    QVariantList handoffOutbox() const;
+    Q_INVOKABLE QString configureHandoffScope(const QString& scope);
+    Q_INVOKABLE QString sendHandoffOffer(const QString& recipient,const QString& call,qint64 frequencyHz);
+    Q_INVOKABLE QString retryHandoffOffer(const QString& id);
     // Chiede agli altri i QSO della gara che qui mancano.
     Q_INVOKABLE void requestSync();
     // Per i test: invece del broadcast, a questo indirizzo.
@@ -160,11 +173,14 @@ signals:
     void qsoReviewChanged();
     void experimentalQsoChanged();
     void experimentalQsoFrameSent(const QString& type, const QJsonObject& body);
+    void handoffChanged();
+    void handoffOfferSent(const QJsonObject& offer);
 
 private:
     void restart();
     void send(const QString& type, QJsonObject body);
     void onReceived(const QString& from, const QString& type, const QJsonObject& body);
+    bool handoffLogCurrent() const;
     QString requestExperimentalQsoMissingImpl(bool extendExpiry);
     bool sendExperimentalWireFrame(const QString& type, const QJsonObject& body);
     void handleExperimentalWireFrame(const QString& from, const QString& type, const QJsonObject& body);
@@ -182,6 +198,10 @@ private:
     QString m_group;
     QString m_name;
     QString m_id;
+    QString m_handoffScope, m_handoffStatus;
+    QString m_handoffPath, m_handoffIdentity, m_handoffGroup;
+    QByteArray m_handoffFileIdentity;
+    quint64 m_handoffGeneration{0};
     int m_port{12060};
     QString m_status;
     struct Peer {

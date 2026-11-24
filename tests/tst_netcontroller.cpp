@@ -17,6 +17,42 @@
 class TestNetController : public QObject {
     Q_OBJECT
 private slots:
+    void addressedHandoffTravelsBetweenControllersAndPersists()
+    {
+        using namespace decolog::core; using decolog::app::NetController;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QSettings::setDefaultFormat(QSettings::IniFormat); QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,dir.path());
+        QCoreApplication::setOrganizationName("HandoffTest"); QCoreApplication::setApplicationName("Pair"); QSettings().setValue("net/enabled",false);
+        LogDatabase source,target; QVERIFY(source.open(dir.filePath("source.sqlite"))); QVERIFY(target.open(dir.filePath("target.sqlite")));
+        QUdpSocket p1,p2; QVERIFY(p1.bind(QHostAddress::LocalHost,0)); QVERIFY(p2.bind(QHostAddress::LocalHost,0)); const auto senderPort=p1.localPort(),receiverPort=p2.localPort(); p1.close(); p2.close();
+        NetController::Context aCtx; aCtx.db=&source; NetController a(aCtx); NetController::Context bCtx; bCtx.db=&target; NetController b(bCtx);
+        a.setIdForTests("sender"); b.setIdForTests("receiver"); a.setGroup("FIELD"); b.setGroup("FIELD"); a.setPort(senderPort); b.setPort(receiverPort);
+        a.setTarget(QHostAddress::LocalHost); b.setTarget(QHostAddress::LocalHost); a.setEnabled(true); b.setEnabled(true);
+        QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QVERIFY(b.configureHandoffScope("cqww-2026").isEmpty());
+        QVERIFY(!a.sendHandoffOffer("sender","K1ABC",14025000).isEmpty()); QVERIFY(!a.sendHandoffOffer("receiver","bad call",14025000).isEmpty());
+        QSignalSpy sent(&a,&NetController::handoffOfferSent); QVERIFY(a.sendHandoffOffer("receiver","K1ABC",14025000).isEmpty()); QCOMPARE(sent.size(),1);
+        QCOMPARE(a.handoffOutbox().size(),1); QCOMPARE(b.handoffInbox().size(),0);
+        const auto offerId=a.handoffOutbox().first().toMap().value("id").toString(); QVERIFY(!offerId.isEmpty());
+        QVERIFY(a.retryHandoffOffer(offerId).isEmpty()); QCOMPARE(sent.size(),2); QCOMPARE(sent.last().first().toJsonObject(),sent.first().first().toJsonObject());
+        QCOMPARE(a.handoffOutbox().size(),1); QVERIFY(!a.retryHandoffOffer("missing").isEmpty());
+        auto body=sent.first().first().toJsonObject(); QUdpSocket relay;
+        auto deliver=[&](int seq) { QJsonObject packet{{"offer",body},{"seq",seq},{"session","relay"}}; const auto bytes=ContestNet::pack("FIELD","sender","handoff_offer_v1",packet); return relay.writeDatagram(bytes,QHostAddress::LocalHost,receiverPort); };
+        QVERIFY(b.configureHandoffScope("other-contest").isEmpty()); QVERIFY(deliver(7)>0); QTest::qWait(100); QVERIFY(b.handoffInbox().isEmpty());
+        QVERIFY(b.configureHandoffScope("cqww-2026").isEmpty());
+        QVERIFY(deliver(1)>0); QTRY_COMPARE_WITH_TIMEOUT(b.handoffInbox().size(),1,3000);
+        QVERIFY(deliver(2)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
+        QCOMPARE(b.handoffInbox().first().toMap().value("call").toString(),QString("K1ABC"));
+        QSqlQuery corrupt(target.connection()); QVERIFY(corrupt.exec("INSERT INTO app_setting(key,value) VALUES('contest_handoff.in.bad','broken')"));
+        QVERIFY(!b.handoffError().isEmpty()); QVERIFY(b.handoffInbox().isEmpty());
+        QVERIFY(corrupt.exec("DELETE FROM app_setting WHERE key='contest_handoff.in.bad'")); QVERIFY(b.handoffError().isEmpty());
+        QCOMPARE(source.qsoCount(),qint64(0)); QCOMPARE(target.qsoCount(),qint64(0));
+        a.setEnabled(false); b.setEnabled(false); source.close(); target.close(); QVERIFY(source.open(dir.filePath("source.sqlite"))); QVERIFY(target.open(dir.filePath("target.sqlite")));
+        QVERIFY(a.handoffOutbox().isEmpty()); QVERIFY(b.handoffInbox().isEmpty()); QVERIFY(!a.handoffError().isEmpty());
+        QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QVERIFY(b.configureHandoffScope("cqww-2026").isEmpty());
+        QCOMPARE(a.handoffOutbox().size(),1); QCOMPARE(b.handoffInbox().size(),1);
+        a.setEnabled(true); b.setEnabled(true); QVERIFY(a.retryHandoffOffer(offerId).isEmpty()); QCOMPARE(sent.size(),3);
+        QVERIFY(deliver(3)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
+        a.setEnabled(false); b.setEnabled(false);
+    }
     void experimentalQsoTransferBetweenControllersRecoversMissingFragment()
     {
         using namespace decolog::core; using decolog::app::NetController;
