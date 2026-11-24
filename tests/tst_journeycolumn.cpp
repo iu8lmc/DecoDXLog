@@ -1546,13 +1546,15 @@ private slots:
             LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery q(db.connection());
             QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('pota-fixture','2020-01-01T00:00:00Z','2020-01-01T23:59:00Z','{}','{\"title\":\"POTA fixture\"}')"));
             AdifRecord record{{"CALL", "K1ABC"}, {"QSO_DATE", "20200101"}, {"TIME_ON", "120000"}, {"BAND", "20m"}, {"MODE", "CW"},
-                              {"MY_POTA_REF", "US-0015@US-MD"}, {"APP_DECOLOG_ACTIVATION_UUID", "pota-fixture"}};
+                              {"MY_POTA_REF", "US-0015@US-MD"}, {"POTA_REF", "US-0003,US-0004"}, {"APP_DECOLOG_ACTIVATION_UUID", "pota-fixture"}};
             QCOMPARE(db.insertQso(record, "manual", {}, true, 0, false).status, InsertResult::Status::Inserted);
         }
         QByteArray output; QVERIFY2(launch(dir, QStringLiteral("potacatalogueprobe"), output), output.constData());
         QVERIFY2(output.contains("PROBE potaImport success=true status=listedActive location=listed name=Park error="), output.constData());
         QVERIFY2(output.contains("PROBE potaGroup status=listedActive location=listed"), output.constData());
         QVERIFY2(output.contains("active in snapshot"), output.constData());
+        QVERIFY2(output.contains("correspondent park needs review: 1 QSO") ||
+                 output.contains("parco del corrispondente da verificare: 1 QSO"), output.constData());
         QVERIFY(QFileInfo::exists(dir.filePath("data/pota-catalogue.sqlite")));
     }
     void sotaOfficialUpdateInDesktopWhenRequested()

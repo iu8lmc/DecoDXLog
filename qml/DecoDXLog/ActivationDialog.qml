@@ -898,6 +898,8 @@ DialogFrame {
                         + qsTr(" · missing station call: %1; missing operator: %2; missing both: %3")
                             .arg(modelData.missingStationCall || 0).arg(modelData.missingOperator || 0).arg(modelData.missingCallIdentity || 0)
                         + (modelData.referenceSyntaxWarning ? qsTr(" · reference does not match local syntax; verify it") : "")
+                        + (modelData.program === "POTA" && modelData.potaCorrespondentReview > 0
+                            ? qsTr(" · correspondent park needs review: %1 QSO").arg(modelData.potaCorrespondentReview) : "")
                         + (modelData.program === "POTA" ? qsTr(" · POTA snapshot: %1%2%3")
                             .arg(({listedActive: qsTr("active in snapshot"), listedInactive: qsTr("inactive in snapshot"), notFound: qsTr("not in imported snapshot"), unavailable: qsTr("unavailable"), invalidReference: qsTr("invalid reference")})[modelData.potaSnapshotStatus] || qsTr("unavailable"))
                             .arg(modelData.potaName ? " · " + modelData.potaName : "")
@@ -905,7 +907,7 @@ DialogFrame {
                         + (modelData.program === "SOTA" ? qsTr(" · SOTA list: %1%2")
                             .arg(({active: qsTr("listed for this day"), outsideValidity: qsTr("outside listed dates"), notFound: qsTr("not in imported list"), unavailable: qsTr("unavailable")})[modelData.catalogueStatus] || qsTr("unavailable"))
                             .arg(modelData.catalogueName ? " · " + modelData.catalogueName : "") : "")
-                    color: modelData.referenceSyntaxWarning ? Theme.warningColor : Theme.textSecondary
+                    color: modelData.referenceSyntaxWarning || modelData.potaCorrespondentReview > 0 ? Theme.warningColor : Theme.textSecondary
                 }
                 GlassButton {
                     visible: ["POTA", "WWFF", "SOTA", "IOTA"].indexOf(modelData.program) >= 0

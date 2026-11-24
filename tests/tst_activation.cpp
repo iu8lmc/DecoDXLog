@@ -738,6 +738,7 @@ private slots:
         QSignalSpy previewed(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
         QTRY_COMPARE_WITH_TIMEOUT(previewed.size(),1,5000); QVERIFY(previewed.first().first().toBool());
         const auto groups=act.previewResult().value("groups").toList(); QCOMPARE(groups.size(),1);
+        QCOMPARE(groups.first().toMap().value("potaCorrespondentReview").toInt(),3);
         const QString output=dir.filePath("pota.adi"); QSignalSpy done(&act,&ActivationController::partitionExportFinished);
         QVERIFY(act.startPartitionExport(groups.first().toMap(),QUrl::fromLocalFile(output)));
         QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QVERIFY2(done.first().first().toBool(),qPrintable(done.first().at(1).toString()));

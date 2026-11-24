@@ -146,6 +146,10 @@
 <context>
     <name>ActivationDialog</name>
     <message>
+      <source> · correspondent park needs review: %1 QSO</source>
+      <translation> · parco del corrispondente da verificare: %1 QSO</translation>
+    </message>
+    <message>
         <source>Open QSO…</source>
         <translation>Apri QSO…</translation>
     </message>

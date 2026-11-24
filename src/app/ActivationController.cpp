@@ -875,6 +875,21 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                         {QStringLiteral("count"), 0}, {QStringLiteral("referenceSyntaxWarning"), !syntaxMatches}});
                 }
                 groups[key][QStringLiteral("count")] = groups[key].value(QStringLiteral("count")).toInt() + 1;
+                if (pair.first == QLatin1String("POTA")) {
+                    const auto exportedValue = [&extra, &q](const QString& adif, const QString& column) {
+                        return (extra.contains(adif) ? extra.value(adif).toString() : q.value(column).toString()).trimmed().toUpper();
+                    };
+                    const QString other = exportedValue(QStringLiteral("POTA_REF"), QStringLiteral("pota_ref"));
+                    const QString sig = exportedValue(QStringLiteral("SIG"), QStringLiteral("sig"));
+                    const QString sigInfo = exportedValue(QStringLiteral("SIG_INFO"), QStringLiteral("sig_info"));
+                    QVariantMap normalized;
+                    const bool singleValid = !other.isEmpty() && !other.contains(QLatin1Char(','))
+                        && Activation::normalizePrograms({{QStringLiteral("pota"), other}}, &normalized);
+                    const bool explicitMatch = sig == QLatin1String("POTA")
+                        && sigInfo == other.section(QLatin1Char('@'), 0, 0);
+                    if (!other.isEmpty() && (!singleValid || ((!sig.isEmpty() || !sigInfo.isEmpty()) && !explicitMatch)))
+                        groups[key][QStringLiteral("potaCorrespondentReview")] = groups[key].value(QStringLiteral("potaCorrespondentReview")).toInt() + 1;
+                }
                 if (stationCall.isEmpty()) groups[key][QStringLiteral("missingStationCall")] = groups[key].value(QStringLiteral("missingStationCall")).toInt() + 1;
                 if (op.isEmpty()) groups[key][QStringLiteral("missingOperator")] = groups[key].value(QStringLiteral("missingOperator")).toInt() + 1;
                 if (stationCall.isEmpty() && op.isEmpty()) groups[key][QStringLiteral("missingCallIdentity")] = groups[key].value(QStringLiteral("missingCallIdentity")).toInt() + 1;
