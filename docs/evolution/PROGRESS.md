@@ -3099,3 +3099,11 @@ Import-undo preview and execution now treat a later direct or linked LoTW grid o
 A/B on macOS arm64 / Qt 6.11.2: before the fix, the synthetic preview marked QSO with direct and linked observations as unchanged; the new test failed and now retains both while undoing an independent unchanged QSO. A separate injected missing-table case fails closed. An offscreen desktop fixture displays the LoTW reason and confirms that only the eligible QSO is moved to history. App and test targets built; CTest database, lotw, migration and qmlpopups passed 4/4; the final fault-injection assertion passed separately.
 
 The checks and app scenario use synthetic local data; no live LoTW or physical UI was exercised. The observation check is per QSO and its large-import cost is unmeasured. Other possible newly added related tables still need audit; Windows/Linux and full G01/G05/G13 acceptance remain open.
+
+## 2026-11-24 — G03 report unavailable QSL route provenance
+
+The QSL planner now checks whether enrichment history can be read before attributing a manager route to the QSO or an enrichment source. A database failure stops the plan with an error and discards partial candidates, rather than presenting an unsupported attribution. The existing unchecked enrichment API remains available to other callers.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic QSO with a manager produced a normal plan; after removing the enrichment table, the previous planner silently returned a plan and the new test failed. The checked planner now reports an error and returns no candidates. App and test targets built; CTest database, awards, qslplanner and qmlpopups passed 4/4. An offscreen desktop fixture also passed the normal planning, route-source, queue and invalidation flow. An initial desktop command used an incorrect executable path; the corrected command passed.
+
+The injected database failure was tested at core level, not through the actual desktop dialog. Other callers of the unchecked enrichment API retain their previous behavior. The tests use synthetic data; physical UI, Windows/Linux and full G03/G13 acceptance remain open.

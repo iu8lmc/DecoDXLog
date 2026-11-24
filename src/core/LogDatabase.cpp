@@ -2116,21 +2116,31 @@ bool LogDatabase::recordEnrichment(const QList<EnrichmentEntry>& entries)
 QList<EnrichmentEntry> LogDatabase::enrichments(qint64 qsoId) const
 {
     QList<EnrichmentEntry> out;
+    readEnrichments(qsoId,&out);
+    return out;
+}
+
+bool LogDatabase::readEnrichments(qint64 qsoId, QList<EnrichmentEntry>* rows, QString* error) const
+{
+    if (!rows) { if (error) *error=QStringLiteral("Missing enrichment output"); return false; }
+    rows->clear();
     QSqlQuery q(connection());
-    q.prepare(QStringLiteral("SELECT qso_id, field, previous_value, value, source, kind, acquired_at, valid_from, valid_to "
-                             "FROM qso_enrichment WHERE qso_id = ? ORDER BY id"));
+    if (!q.prepare(QStringLiteral("SELECT qso_id, field, previous_value, value, source, kind, acquired_at, valid_from, valid_to "
+                                  "FROM qso_enrichment WHERE qso_id = ? ORDER BY id"))) {
+        if (error) *error=q.lastError().text(); return false;
+    }
     q.addBindValue(qsoId);
-    if (!q.exec())
-        return out;
+    if (!q.exec()) { if (error) *error=q.lastError().text(); return false; }
     while (q.next()) {
         EnrichmentEntry e;
         e.qsoId = q.value(0).toLongLong(); e.field = q.value(1).toString();
         e.previousValue = q.value(2).toString(); e.value = q.value(3).toString();
         e.source = q.value(4).toString(); e.kind = q.value(5).toString();
         e.acquiredAt = q.value(6).toString(); e.validFrom = q.value(7).toString();
-        e.validTo = q.value(8).toString(); out << e;
+        e.validTo = q.value(8).toString(); rows->append(e);
     }
-    return out;
+    if (q.lastError().isValid()) { rows->clear(); if (error) *error=q.lastError().text(); return false; }
+    if (error) error->clear(); return true;
 }
 
 bool LogDatabase::undoEnrichment(qint64 qsoId, const QString& field)

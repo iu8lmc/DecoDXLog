@@ -240,7 +240,11 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         candidate.call=record->value(QStringLiteral("CALL"));
         candidate.manager=record->value(QStringLiteral("QSL_VIA")).trimmed();
         if (!candidate.manager.isEmpty()) candidate.managerSource=QStringLiteral("QSO");
-        for (const EnrichmentEntry& entry : db.enrichments(candidate.qsoId)) {
+        QList<EnrichmentEntry> provenance; QString provenanceError;
+        if (!db.readEnrichments(candidate.qsoId,&provenance,&provenanceError)) {
+            result=Plan{}; result.error=QStringLiteral("Cannot read QSL route provenance while planning: %1").arg(provenanceError); return result;
+        }
+        for (const EnrichmentEntry& entry : std::as_const(provenance)) {
             if (entry.field==QLatin1String("QSL_VIA") && entry.value.trimmed().compare(candidate.manager,Qt::CaseInsensitive)==0) {
                 candidate.managerSource=entry.source;
                 candidate.managerObservedAt=QDateTime::fromString(entry.acquiredAt,Qt::ISODate);

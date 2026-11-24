@@ -10,6 +10,14 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void rejectsMissingRouteProvenance()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        QVERIFY(db.insertQso({{"CALL","K1ABC"},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"},{"QSL_VIA","M0ABC"}},"fixture").id>0);
+        const auto before=qslplanner::build(db,{}, {"dxcc"}); QVERIFY2(before.error.isEmpty(),qPrintable(before.error)); QCOMPARE(before.candidates.size(),1);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("DROP TABLE qso_enrichment"));
+        const auto after=qslplanner::build(db,{}, {"dxcc"}); QVERIFY(!after.error.isEmpty()); QVERIFY(after.candidates.isEmpty());
+    }
     void pendingElectronicGroupsDeduplicateBenefits()
     {
         LogDatabase db; QVERIFY(db.open(":memory:"));
