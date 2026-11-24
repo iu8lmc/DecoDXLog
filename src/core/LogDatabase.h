@@ -288,7 +288,7 @@ public:
     // Crea il file e lo schema se mancano. ":memory:" per i test.
     bool open(const QString& path);
     // Read-only connection to an existing, already migrated log.
-    bool openReadOnly(const QString& path);
+    bool openReadOnly(const QString& path, int busyTimeoutMs = 100);
     bool openExistingReadWrite(const QString& path);
     QString identity() const;
     // Connection-local SQLite change token; compare only on this same open connection.

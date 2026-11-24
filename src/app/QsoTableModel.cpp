@@ -935,7 +935,7 @@ void QsoTableModel::computeCategories()
         CategoryPass pass;
         {
             core::LogDatabase db;
-            if (db.open(path))
+            if (db.openReadOnly(path,3000))
                 pass = countCategories(db.connection());
         }
         QMetaObject::invokeMethod(
@@ -1358,7 +1358,7 @@ void QsoTableModel::reloadImpl(bool preserveIfUnchanged)
             QString error;
             {
                 core::LogDatabase db;
-                if (db.open(path)) {
+                if (db.openReadOnly(path,3000)) {
                     QSqlQuery q(db.connection());
                     q.setForwardOnly(true);
                     if (!q.prepare(sql)) {
@@ -1859,7 +1859,7 @@ void QsoTableModel::requestFieldValues(const QString& key)
         QVariantList values;
         {
             core::LogDatabase db;
-            if (db.open(path))
+            if (db.openReadOnly(path,3000))
                 values = countFieldValues(db.connection(), key);
         }
         QMetaObject::invokeMethod(

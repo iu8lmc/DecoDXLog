@@ -7,6 +7,7 @@ This version expands the desktop logger across awards, QSL, portable operation, 
 ### Logging, search and imports
 - Callsign searches distinguish the requested callsign from matching locator and other fields. Bulk paper-QSL changes show how many QSOs were changed, skipped or left unchanged.
 - Imports offer a review of source and custom fields, duplicate handling and a durable journal for reviewing and selectively undoing unchanged imported QSOs. Historical entry supports explicitly recorded dates and times.
+- Large-log background reads use read-only connections, reducing contention with log writes.
 - QSO updates, deletes, QSL state and local API operations include additional transaction, log-identity and error checks to prevent silent partial changes or actions against a different log.
 
 ### Awards and QSL
@@ -47,6 +48,7 @@ Questa versione amplia il programma desktop nelle aree diplomi, QSL, attività p
 ### Log, ricerca e importazione
 - La ricerca del nominativo distingue il nominativo richiesto dalle corrispondenze in locator e altri campi. Le modifiche multiple delle QSL cartacee indicano i QSO modificati, saltati o invariati.
 - L'importazione offre la revisione dei campi di origine e personalizzati, la gestione dei duplicati e un registro persistente per controllare e annullare selettivamente i QSO importati rimasti invariati. L'inserimento storico usa date e orari indicati esplicitamente.
+- Le letture in background dei log grandi usano connessioni in sola lettura, riducendo la competizione con le scritture.
 - Modifiche, cancellazioni, stati QSL e API locali comprendono ulteriori controlli su transazioni, identità del log ed errori, per evitare modifiche parziali silenziose o operazioni sul log sbagliato.
 
 ### Diplomi e QSL

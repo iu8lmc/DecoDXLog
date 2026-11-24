@@ -85,11 +85,9 @@ private slots:
                     + "<QSO_DATE:8>20261117<TIME_ON:6>120000<BAND:3>20m<MODE:2>CW<EOR>\n";
         }
         QCOMPARE(db.importAdif(adif).inserted, 10000);
-        // A second connection can hold an exclusive writer lock to simulate
-        // a slow file without depending on CPU speed or disk hardware.
-        QSqlQuery journal(db.connection()); QVERIFY(journal.exec("PRAGMA journal_mode=DELETE"));
-        QVERIFY(journal.next()); QCOMPARE(journal.value(0).toString().toLower(), QStringLiteral("delete"));
-        journal.finish();
+        // Run reader/writer overlap in the normal WAL mode. Rollback journals
+        // intentionally prevent a writer from committing while a reader runs.
+        QSqlQuery journal(db.connection());
         QsoTableModel model(&db);
         QCOMPARE(model.count(), 10000);
         QSignalSpy resets(&model, &QAbstractItemModel::modelReset);
@@ -113,8 +111,15 @@ private slots:
         model.clearFilters();
         QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
         QCOMPARE(model.count(), 10001);
+        // A rollback journal lets a second connection hold an exclusive lock
+        // for the following timeout and recovery checks.
+        QTRY_VERIFY_WITH_TIMEOUT(journal.exec("PRAGMA journal_mode=DELETE"), 10000);
+        QVERIFY(journal.next()); QCOMPARE(journal.value(0).toString().toLower(), QStringLiteral("delete"));
+        journal.finish();
         LogDatabase blocker; QVERIFY(blocker.open(dir.filePath("large.sqlite")));
-        QSqlQuery lock(blocker.connection()); QVERIFY(lock.exec("BEGIN EXCLUSIVE"));
+        QSqlQuery lock(blocker.connection()); bool lockHeld=false;
+        auto acquireLock=[&] { if (!lockHeld) lockHeld=lock.exec("BEGIN EXCLUSIVE"); return lockHeld; };
+        QTRY_VERIFY_WITH_TIMEOUT(acquireLock(), 10000);
         QElapsedTimer timer; timer.start();
         model.reloadAfterQslUpdate();
         QVERIFY2(timer.elapsed() < 1000, "reload blocked on the locked SQLite file");
@@ -122,9 +127,10 @@ private slots:
         QTest::qWait(200);
         QVERIFY(model.busy());
         QVERIFY(lock.exec("ROLLBACK"));
+        lockHeld=false;
         QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
         QCOMPARE(model.count(), 10001);
-        QVERIFY(lock.exec("BEGIN EXCLUSIVE"));
+        QTRY_VERIFY_WITH_TIMEOUT(acquireLock(), 10000);
         const qint64 firstId = model.idAt(0);
         model.reloadAfterQslUpdate();
         QVERIFY(model.busy());
@@ -134,6 +140,7 @@ private slots:
         QCOMPARE(model.count(), 10001);
         QCOMPARE(model.idAt(0), firstId);
         QVERIFY(lock.exec("ROLLBACK"));
+        lockHeld=false;
         model.reloadAfterQslUpdate();
         QTRY_VERIFY_WITH_TIMEOUT(!model.busy(), 30000);
         QCOMPARE(model.count(), 10001);
