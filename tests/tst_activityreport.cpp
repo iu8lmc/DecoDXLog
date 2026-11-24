@@ -12,6 +12,20 @@ using namespace decolog::core;
 class TestActivityReport : public QObject {
     Q_OBJECT
 private slots:
+    void customReportGroupsByUtcDayAndHour()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));
+        for (const auto* call : {"K1AAA","K1BBB","K1CCC"}) QVERIFY(db.insertQso(AdifRecord{{"CALL",call},{"QSO_DATE","20261231"},{"TIME_ON","2300"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE call WHEN 'K1AAA' THEN '2027-01-01T01:10:00+02:00' WHEN 'K1BBB' THEN '2026-12-31T23:20:00Z' ELSE 'invalid' END"));
+        const auto result=activityreport::runCustom(db.connection(),0,"",{"day","hour"},"qsos"); QVERIFY2(result.error.isEmpty(),qPrintable(result.error)); QCOMPARE(result.rows.size(),2);
+        QCOMPARE(result.rows.at(0).toMap().value("d0").toString(),QString()); QCOMPARE(result.rows.at(0).toMap().value("value").toInt(),1);
+        QCOMPARE(result.rows.at(1).toMap().value("d0").toString(),QString("2026-12-31")); QCOMPARE(result.rows.at(1).toMap().value("d1").toString(),QString("23")); QCOMPARE(result.rows.at(1).toMap().value("value").toInt(),2);
+        QVERIFY(activityreport::customCsv(result,{"day","hour"},"qsos").contains("\"2026-12-31\",\"23\",2"));
+        const auto filtered=activityreport::runCustom(db.connection(),2026,"20m",{"day","hour"},"qsos"); QVERIFY(filtered.error.isEmpty()); QCOMPARE(filtered.rows.size(),1); QCOMPARE(filtered.rows.first().toMap().value("value").toInt(),2);
+        activityreport::Definition d; d.name="UTC hours"; d.kind="custom"; d.dimensions={"day","hour"}; d.aggregate="qsos"; QString error; QVERIFY2(activityreport::saveDefinition(db,d,&error),qPrintable(error));
+        LogDatabase reopened; QVERIFY(reopened.open(dir.filePath("report.sqlite"))); const auto saved=activityreport::loadDefinition(reopened,d.id); QVERIFY(saved); QCOMPARE(saved->dimensions,QStringList({"day","hour"}));
+    }
+
     void customReportFiltersAndPersistsMode()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("report.sqlite")));

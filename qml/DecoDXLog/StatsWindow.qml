@@ -64,11 +64,12 @@ RoundedWindow {
     }
     property var restoredDimensions:[]
     readonly property var dimensionKeys: {
-        let keys=["","year","band","mode","station","operator","grid","antenna","dxcc"]
+        let keys=["","year","band","mode","station","operator","grid","antenna","dxcc","day","hour"]
         for (const field of decolog.newQsoCustomFields) { const key="custom:"+field.name; if (keys.indexOf(key)<0) keys.push(key) }
         for (const key of restoredDimensions) if (keys.indexOf(key)<0) keys.push(key)
         return keys
     }
+    function dimensionLabel(key) { return key === "day" ? qsTr("UTC day") : key === "hour" ? qsTr("UTC hour") : (key || qsTr("No grouping")) }
     function chosenDimensions() { return [dimension0,dimension1,dimension2].map(x => root.dimensionKeys[x.currentIndex] || "").filter(x => x.length) }
     function loadDimensions(dims) { restoredDimensions=dims || []; Qt.callLater(function() { dimension0.currentIndex=Math.max(0,root.dimensionKeys.indexOf(restoredDimensions[0] || "")); dimension1.currentIndex=Math.max(0,root.dimensionKeys.indexOf(restoredDimensions[1] || "")); dimension2.currentIndex=Math.max(0,root.dimensionKeys.indexOf(restoredDimensions[2] || "")) }) }
     function beginReportPdf(path) {
@@ -132,6 +133,14 @@ RoundedWindow {
         page=2; reportKind.currentIndex=3; reportYear.text="2026"; reportBand.text="20m"
         dimension0.currentIndex=root.dimensionKeys.indexOf("band"); dimension1.currentIndex=0; dimension2.currentIndex=0; reportAggregate.currentIndex=3
         loadProbe=true; loadTicks=0; loadMaxGap=0; loadStart=Date.now(); loadLast=loadStart; loadProbeTimer.start(); runActivityReport()
+    }
+    function probeUtcGrouping() {
+        page=2; root.refreshNamedReports(); reportKind.currentIndex=3; reportYear.text=""; reportBand.text="20m"; reportName.text="UTC periods"
+        dimension0.currentIndex=root.dimensionKeys.indexOf("day"); dimension1.currentIndex=root.dimensionKeys.indexOf("hour"); dimension2.currentIndex=0; reportAggregate.currentIndex=0
+        root.saveNamedReport(false); const row=root.savedReports.find(x => x.name==="UTC periods")
+        if (!row) { console.warn("PROBE UTC grouping save failed " + root.reportMessage); return }
+        dimension1.currentIndex=0; root.applyNamedReport(row)
+        Qt.callLater(() => { console.warn("PROBE UTC grouping restored " + JSON.stringify(root.chosenDimensions())); root.daysProbe=true; root.runActivityReport() })
     }
     function probeDxcc() {
         page=2; root.refreshNamedReports(); reportKind.currentIndex=3; reportYear.text="2026"; reportBand.text="20m"; reportName.text="DXCC groups"
@@ -672,9 +681,9 @@ RoundedWindow {
             Text { Layout.fillWidth:true; visible:reportKind.currentIndex===3; wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("Mode filter matches the recorded submode when present, otherwise the recorded mode; it does not expand mode families.") }
             RowLayout {
                 visible:reportKind.currentIndex===3; Layout.fillWidth:true
-                StyledComboBox { id:dimension0; Layout.fillWidth:true; model:root.dimensionKeys.map(x => x || qsTr("No grouping")); currentIndex:2; Accessible.name:qsTr("First grouping dimension") }
-                StyledComboBox { id:dimension1; Layout.fillWidth:true; model:root.dimensionKeys.map(x => x || qsTr("No grouping")); currentIndex:3; Accessible.name:qsTr("Second grouping dimension") }
-                StyledComboBox { id:dimension2; Layout.fillWidth:true; model:root.dimensionKeys.map(x => x || qsTr("No grouping")); currentIndex:0; Accessible.name:qsTr("Third grouping dimension") }
+                StyledComboBox { id:dimension0; Layout.fillWidth:true; model:root.dimensionKeys.map(x => root.dimensionLabel(x)); currentIndex:2; Accessible.name:qsTr("First grouping dimension") }
+                StyledComboBox { id:dimension1; Layout.fillWidth:true; model:root.dimensionKeys.map(x => root.dimensionLabel(x)); currentIndex:3; Accessible.name:qsTr("Second grouping dimension") }
+                StyledComboBox { id:dimension2; Layout.fillWidth:true; model:root.dimensionKeys.map(x => root.dimensionLabel(x)); currentIndex:0; Accessible.name:qsTr("Third grouping dimension") }
                 StyledComboBox { id:reportAggregate; Layout.preferredWidth:180; model:[qsTr("Count QSO"),qsTr("Distinct calls"),qsTr("Distinct UTC days"),qsTr("Mean TX power (W)"),qsTr("Distinct recorded DXCC")]; Accessible.name:qsTr("Aggregation") }
             }
             Text { Layout.fillWidth:true; visible:root.activityBusy; text:qsTr("Preparing report…"); color:Theme.secondaryColor }
@@ -686,6 +695,7 @@ RoundedWindow {
             Text { Layout.fillWidth:true; color:Theme.textPrimary; font.bold:true; text:root.activityReport.kind==="custom" ? (root.activityReport.dimensions || []).join(" · ")+" · "+(root.activityReport.aggregate==="entities" ? qsTr("Distinct recorded DXCC") : root.activityReport.aggregate==="mean_power" ? qsTr("Mean TX power (W) · samples · excluded") : root.activityReport.aggregate==="calls" ? qsTr("Distinct calls") : root.activityReport.aggregate==="days" ? qsTr("Distinct UTC days") : qsTr("QSO")) : root.activityReport.kind==="club" ? qsTr("UTC year · recorded station · recorded operator · QSO") : root.activityReport.kind==="confirmation" ? qsTr("Service · confirmed · dated · missing · invalid · earlier · average days") : qsTr("Antenna · band · own grid · QSO") }
             Text { Layout.fillWidth:true; visible:root.activityReport.kind==="custom" && root.activityReport.aggregate==="days"; wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("Counts distinct UTC calendar dates with at least one recorded QSO; unparseable dates are excluded. This does not measure operating duration or award eligibility.") }
             Text { Layout.fillWidth:true; visible:root.activityReport.kind==="custom" && root.activityReport.aggregate==="mean_power"; wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("Uses recorded TX power, not measured output. Missing, invalid and negative values are excluded; zero is included.") }
+            Text { Layout.fillWidth:true; visible:root.activityReport.kind==="custom" && ((root.activityReport.dimensions || []).indexOf("day")>=0 || (root.activityReport.dimensions || []).indexOf("hour")>=0); wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("Day and hour use recorded timestamps in UTC; invalid timestamps are grouped as not recorded.") }
             Text { Layout.fillWidth:true; visible:root.activityReport.kind==="custom" && (root.activityReport.dimensions || []).indexOf("dxcc")>=0; wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("DXCC groups use the numeric entity recorded in each QSO. Missing or zero values are grouped as not recorded; entity and award eligibility are not verified.") }
             Text { Layout.fillWidth:true; visible:root.activityReport.kind==="custom" && root.activityReport.aggregate==="entities"; wrapMode:Text.Wrap; color:Theme.textSecondary; text:qsTr("Counts distinct positive DXCC numbers recorded in matching QSO; missing values are excluded. This does not validate entities, identify new ones, or establish award credit.") }
             ListView {

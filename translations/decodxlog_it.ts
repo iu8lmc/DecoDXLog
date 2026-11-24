@@ -10171,6 +10171,9 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>StatsWindow</name>
+    <message><source>Day and hour use recorded timestamps in UTC; invalid timestamps are grouped as not recorded.</source><translation>Giorno e ora usano gli orari registrati in UTC; gli orari non validi sono raggruppati come non registrati.</translation></message>
+    <message><source>UTC day</source><translation>Giorno UTC</translation></message>
+    <message><source>UTC hour</source><translation>Ora UTC</translation></message>
     <message><source>Mode filter matches the recorded submode when present, otherwise the recorded mode; it does not expand mode families.</source><translation>Il filtro confronta il sottomodo registrato quando presente, altrimenti il modo registrato; non include automaticamente i modi della stessa famiglia.</translation></message>
     <message><source>Recorded mode or submode (all if blank)</source><translation>Modo o sottomodo registrato (tutti se vuoto)</translation></message>
     <message><source>Report recorded mode or submode</source><translation>Modo o sottomodo registrato nel rapporto</translation></message>

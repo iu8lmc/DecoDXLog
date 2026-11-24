@@ -1066,6 +1066,18 @@ private slots:
         QVERIFY2(output.count("[activity] DXCAMPAIGN|highlight|")== (satisfiesGoal ? 0 : 1),output.constData());
     }
 
+    void customReportRestoresUtcDayAndHour()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          for (const auto* call : {"K1AAA","K1BBB"}) QVERIFY(db.insertQso(decolog::core::AdifRecord{{"CALL",call},{"QSO_DATE","20261231"},{"TIME_ON","2300"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("UPDATE qso SET qso_datetime_on=CASE call WHEN 'K1AAA' THEN '2027-01-01T01:10:00+02:00' ELSE '2026-12-31T23:20:00Z' END")); }
+        QByteArray output; QVERIFY2(launch(dir,"activityutcprobe",output,5000),output.constData());
+        QVERIFY2(output.contains("PROBE UTC grouping restored [\"day\",\"hour\"]"),output.constData());
+        QVERIFY2(output.contains("\"d0\":\"2026-12-31\"") && output.contains("\"d1\":\"23\"") && output.contains("\"value\":2"),output.constData());
+        QVERIFY2(!output.contains("TypeError"),output.constData());
+    }
+
     void watchedCampaignRecognizesOffsetQsoAtUtcBoundary()
     {
         using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

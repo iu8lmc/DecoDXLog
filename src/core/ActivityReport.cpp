@@ -237,7 +237,7 @@ QByteArray clubCsv(const Result& result)
 }
 QString validateCustomSpec(const QStringList& dimensions,const QString& aggregate)
 {
-    const QSet<QString> supported{QStringLiteral("year"),QStringLiteral("band"),QStringLiteral("mode"),QStringLiteral("station"),QStringLiteral("operator"),QStringLiteral("grid"),QStringLiteral("antenna"),QStringLiteral("dxcc")};
+    const QSet<QString> supported{QStringLiteral("year"),QStringLiteral("band"),QStringLiteral("mode"),QStringLiteral("station"),QStringLiteral("operator"),QStringLiteral("grid"),QStringLiteral("antenna"),QStringLiteral("dxcc"),QStringLiteral("day"),QStringLiteral("hour")};
     if (dimensions.isEmpty() || dimensions.size()>3 || (aggregate!=QLatin1String("qsos") && aggregate!=QLatin1String("calls") && aggregate!=QLatin1String("days") && aggregate!=QLatin1String("mean_power") && aggregate!=QLatin1String("entities"))) return QStringLiteral("Choose one to three dimensions and a supported aggregate");
     QSet<QString> seen;
     for (const QString& dimension : dimensions) {
@@ -259,6 +259,8 @@ Result runCustom(const QSqlDatabase& db,int utcYear,const QString& band,const QS
     for (int i=0;i<dimensions.size();++i) {
         const QString& d=dimensions[i]; QString expression;
         if (d==QLatin1String("year")) expression=QStringLiteral("COALESCE(strftime('%Y',qso_datetime_on),'')");
+        else if (d==QLatin1String("day")) expression=QStringLiteral("COALESCE(strftime('%Y-%m-%d',qso_datetime_on),'')");
+        else if (d==QLatin1String("hour")) expression=QStringLiteral("COALESCE(strftime('%H',qso_datetime_on),'')");
         else if (d==QLatin1String("band")) expression=QStringLiteral("COALESCE(band,'')");
         else if (d==QLatin1String("mode")) expression=QStringLiteral("COALESCE(NULLIF(submode,''),mode,'')");
         else if (d==QLatin1String("dxcc")) expression=QStringLiteral("CASE WHEN typeof(dxcc)='integer' AND dxcc>0 THEN CAST(dxcc AS TEXT) ELSE '' END");
