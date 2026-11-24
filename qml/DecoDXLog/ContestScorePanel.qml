@@ -15,6 +15,9 @@ GlassPanel {
     readonly property var act: decolog.activation
     readonly property var scoring: { revision; return act.score() }
     property string band: ""
+    function probeUnsupportedContest() {
+        console.warn("PROBE contestUnsupported valid=" + root.scoring.valid + " warning=" + unsupportedRules.visible + " text=" + unsupportedRules.text)
+    }
 
     Connections {
         target: decolog
@@ -40,12 +43,12 @@ GlassPanel {
         // Il contest che non ha una scheda non ha punteggio, e si dice:
         // un numero inventato sarebbe peggio di nessun numero.
         Text {
+            id: unsupportedRules
             Layout.fillWidth: true
             visible: !root.scoring.valid
             wrapMode: Text.Wrap
             text: root.scoring.contestId
-                  ? qsTr("The rules of %1 are not in the program: the QSOs go in the log and in "
-                         + "the Cabrillo, but the score has to be counted elsewhere.")
+                  ? qsTr("The rules of %1 are not in the program: QSO remain in the log, but scoring and Cabrillo export require a verified rule sheet.")
                         .arg(root.scoring.contestId)
                   : qsTr("No contest session open.")
             color: Theme.textSecondary

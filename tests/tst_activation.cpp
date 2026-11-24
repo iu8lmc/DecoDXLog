@@ -30,6 +30,19 @@ class TestActivation : public QObject {
     Q_OBJECT
 
 private slots:
+    void unknownCqContestDoesNotOfferVerifiedExport()
+    {
+        QTemporaryDir dir; LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","contest"},{"contestId","CQ-WW-VHF"}}).isEmpty());
+        QVERIFY(!act.editionRules().value("valid").toBool());
+        const auto now=QDateTime::currentDateTimeUtc();
+        AdifRecord record{{"CALL","K1ABC"},{"QSO_DATE",now.toString("yyyyMMdd")},{"TIME_ON",now.toString("hhmmss")},{"BAND","20m"},{"MODE","CW"}};
+        act.applyTo(record); QVERIFY(db.insertQso(record,"fixture",{},true,0,false).id>0);
+        const QString path=dir.filePath("contest.log");
+        const auto error=act.exportCabrillo(QUrl::fromLocalFile(path),{{"callsign","K1XYZ"}});
+        QVERIFY(!error.isEmpty()); QVERIFY(!QFileInfo::exists(path)); QCOMPARE(db.qsoCount(),qint64(1));
+    }
     void partitionPreviewRejectsReplacementBeforePublication()
     {
 #ifndef Q_OS_UNIX

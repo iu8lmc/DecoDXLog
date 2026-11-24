@@ -20,6 +20,15 @@ struct Tr {
     Q_DECLARE_TR_FUNCTIONS(ContestRules)
 };
 
+bool cqWwId(const QString& id)
+{
+    return id==QLatin1String("CQ-WW-CW") || id==QLatin1String("CQ-WW-SSB") || id==QLatin1String("CQ-WW-RTTY");
+}
+bool cqWpxId(const QString& id)
+{
+    return id==QLatin1String("CQ-WPX-CW") || id==QLatin1String("CQ-WPX-SSB") || id==QLatin1String("CQ-WPX-RTTY");
+}
+
 // Le bande basse del CQ WPX, dove un QSO vale il doppio.
 bool lowBand(const QString& band)
 {
@@ -113,7 +122,7 @@ ContestRules forId(const QString& contestId)
         r.bands = fiveBands();
         return r;
     }
-    if (id.startsWith(QLatin1String("CQ-WW-"))) {
+    if (cqWwId(id)) {
         r.exchange = ContestRules::Exchange::CqZone;
         r.exchangeLabel = Tr::tr("CQ zone");
         r.source = QStringLiteral("cqww.com/rules");
@@ -134,7 +143,7 @@ ContestRules forId(const QString& contestId)
         r.minOffMinutes = 60;
         return r;
     }
-    if (id.startsWith(QLatin1String("CQ-WPX-"))) {
+    if (cqWpxId(id)) {
         r.exchange = ContestRules::Exchange::Serial;
         r.exchangeLabel = Tr::tr("Number");
         r.source = QStringLiteral("cqwpx.com/rules");
@@ -277,7 +286,7 @@ int points(const ContestRules& rules, const ContestQso& qso, const ContestStatio
 
     // CQ WW (regolamento VII): stesso paese 0, stesso continente 1 (2 fra
     // stazioni del Nord America), continente diverso 3.
-    if (id.startsWith(QLatin1String("CQ-WW-"))) {
+    if (cqWwId(id)) {
         if (sameCountry(qso, me))
             return 0;
         if (sameContinent(qso, me))
@@ -289,7 +298,7 @@ int points(const ContestRules& rules, const ContestQso& qso, const ContestStatio
     // 1 dentro il continente; sulle basse il doppio. Il proprio paese vale 1
     // punto su qualunque banda. Fra stazioni del Nord America il doppio del
     // punteggio "stesso continente".
-    if (id.startsWith(QLatin1String("CQ-WPX-"))) {
+    if (cqWpxId(id)) {
         if (sameCountry(qso, me))
             return 1;
         const bool low = lowBand(qso.band);
@@ -366,7 +375,7 @@ QStringList multipliers(const ContestRules& rules, const ContestQso& qso, const 
 
     // CQ WW: la zona e il paese, ognuno una volta per banda. In RTTY anche il
     // QTH delle stazioni W/VE: 48 stati, il DC e 14 aree canadesi, per banda.
-    if (id.startsWith(QLatin1String("CQ-WW-"))) {
+    if (cqWwId(id)) {
         QStringList out;
         // Conta la zona mandata, come fa chi controlla i log: quella del
         // cty.csv sbaglia per mezza America (un W6 sta nella 3, non nella 5).
@@ -385,7 +394,7 @@ QStringList multipliers(const ContestRules& rules, const ContestQso& qso, const 
     }
 
     // CQ WPX: il prefisso, una volta sola su tutte le bande.
-    if (id.startsWith(QLatin1String("CQ-WPX-"))) {
+    if (cqWpxId(id)) {
         const QString prefix = awards::wpxPrefix(qso.call);
         return prefix.isEmpty() ? QStringList{} : QStringList{QStringLiteral("prefisso %1").arg(prefix)};
     }

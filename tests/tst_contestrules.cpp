@@ -57,6 +57,22 @@ private slots:
         QCOMPARE(known().size(), 10);
     }
 
+    void unknownCqVariantsDoNotInheritScoring()
+    {
+        for (const QString& id : {QStringLiteral("CQ-WW-VHF"),QStringLiteral("CQ-WW-RTTY-OTHER"),
+                                  QStringLiteral("CQ-WPX-DIGITAL"),QStringLiteral("CQ-WPX-CW-OTHER"),QStringLiteral("CQ-WW-")}) {
+            const auto rules=forId(id);
+            QVERIFY2(!rules.valid,qPrintable(id));
+            QCOMPARE(points(rules,qso("W1AW",291,"NA","20m"),me()),0);
+            QVERIFY(multipliers(rules,qso("W1AW",291,"NA","20m"),me()).isEmpty());
+            auto forged=rules; forged.valid=true;
+            QCOMPARE(points(forged,qso("W1AW",291,"NA","20m"),me()),0);
+            QVERIFY(multipliers(forged,qso("W1AW",291,"NA","20m"),me()).isEmpty());
+        }
+        for (const auto& id : known()) QVERIFY2(forId(id).valid,qPrintable(id));
+        QVERIFY(forId(" cq-ww-cw ").valid); QVERIFY(forId("cq-wpx-rtty").valid);
+    }
+
     void cqWorldWideCountsTheZoneAndTheCountry()
     {
         const ContestRules r = forId(QStringLiteral("CQ-WW-CW"));

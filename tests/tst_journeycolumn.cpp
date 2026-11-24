@@ -83,6 +83,14 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void unsupportedCqContestShowsNoScoreInDesktop()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        QByteArray output; QVERIFY2(launch(dir,"contestunsupportedprobe",output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE contestUnsupported valid=false warning=true") && output.contains("scoring and Cabrillo export require a verified rule sheet"),output.constData());
+    }
+
     void radioNetParticipantEditRejectsExternalCallChange()
     {
         using namespace decolog::core;

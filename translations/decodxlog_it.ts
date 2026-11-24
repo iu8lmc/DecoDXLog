@@ -2752,6 +2752,7 @@ Il nominativo che Decodium sta lavorando compare qui da solo.</translation>
 </context>
 <context>
     <name>ContestScorePanel</name>
+    <message><source>The rules of %1 are not in the program: QSO remain in the log, but scoring and Cabrillo export require a verified rule sheet.</source><translation>Il regolamento di %1 non è disponibile nel programma: i QSO restano nel log, ma il punteggio e l'esportazione Cabrillo richiedono un regolamento verificato.</translation></message>
     <message>
         <source>Score</source>
         <translation>Punteggio</translation>

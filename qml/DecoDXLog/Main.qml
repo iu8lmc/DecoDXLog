@@ -1346,6 +1346,7 @@ RoundedWindow {
         else if (what[0] === "dxcampaignhistorydraftprobe") { window.showPanel("dxcalendar"); dxCampaignHistoryDraftProbe.start() }
         else if (what[0] === "dxcampaignhistoryprofileprobe") { window.showPanel("dxcalendar"); dxCampaignHistoryProfileProbe.start() }
         else if (what[0] === "dxcampaignhistoryexternalprofileprobe") { window.showPanel("dxcalendar"); dxCampaignHistoryExternalProfileProbe.start() }
+        else if (what[0] === "contestunsupportedprobe") { decolog.activation.start({kind:"contest",contestId:"CQ-WW-VHF"}); window.openContestDesk(); contestLayout.setShown("score",true); unsupportedContestProbe.start() }
         else if (what[0] === "dxdatesprobe") { window.showPanel("dxcalendar"); dxDatesProbe.start() }
         else if (what[0] === "dxdatescontextprobe") { window.showPanel("dxcalendar"); dxDatesContextProbe.start() }
         else if (what[0] === "dxmatrixcontextprobe") { window.showPanel("dxcalendar"); dxMatrixContextProbe.start() }
@@ -1836,6 +1837,7 @@ RoundedWindow {
     Timer { id:dxCampaignHistoryDraftProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeHistoryDraft(); else console.warn("PROBE dxhistorydraft missing panel") } }
     Timer { id:dxCampaignHistoryProfileProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeHistoryProfileChange(); else console.warn("PROBE dxhistorydraft missing panel") } }
     Timer { id:dxCampaignHistoryExternalProfileProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeHistoryExternalProfileChange(); else console.warn("PROBE dxhistorydraft missing panel") } }
+    Timer { id:unsupportedContestProbe; interval:1000; onTriggered: { const p=contestLayout.panelFor("score"); if (p && p.item) p.item.probeUnsupportedContest(); else console.warn("PROBE contestUnsupported missing panel") } }
     Timer { id:dxDatesProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeDateReview(); else console.warn("PROBE dxdates missing panel") } }
     Timer { id:dxDatesContextProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeDateReviewContext(); else console.warn("PROBE dxcontext missing panel") } }
     Timer { id:dxMatrixContextProbe; interval:1000; onTriggered: { const p=window.panelItem("dxcalendar"); if (p && p.item) p.item.probeMatrixContext(); else console.warn("PROBE dxmatrix missing panel") } }
