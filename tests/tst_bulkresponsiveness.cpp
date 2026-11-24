@@ -1,4 +1,5 @@
 #include "core/LogDatabase.h"
+#include "core/WsjtxProtocol.h"
 
 #include <QDir>
 #include <QElapsedTimer>
@@ -81,6 +82,34 @@ class TestBulkResponsiveness : public QObject {
         return true;
     }
 
+    static bool runPaperWithUdp(const QTemporaryDir& dir, QByteArray& output, qint64& wallMs)
+    {
+        QUdpSocket reservation; if (!reservation.bind(QHostAddress::LocalHost,0)) return false;
+        const quint16 port=reservation.localPort(); reservation.close();
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.path()); env.insert("DECODXLOG_BULK_TEST_MODE","1"); env.insert("DECODXLOG_TRACE_ACTIVITY","1");
+        QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        QElapsedTimer timer; timer.start();
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",dir.filePath("log.sqlite"),
+                  "--port",QString::number(port),"--show","bulkcheck:paperqsl"});
+        if (!app.waitForStarted(10000)) { output=app.errorString().toUtf8(); return false; }
+        const QByteArray adif("<CALL:5>K1NEW<QSO_DATE:8>20260228<TIME_ON:6>120000<BAND:3>20m<MODE:3>FT8<EOR>");
+        const auto packet=wsjtx::buildLoggedAdif(QStringLiteral("WSJT-X"),adif); QUdpSocket sender; bool sent=false;
+        while (app.state()!=QProcess::NotRunning && timer.elapsed()<180000) {
+            app.waitForReadyRead(100); output+=app.readAll();
+            if (!sent && output.contains("PROBE paperqsl running")) {
+                if (sender.writeDatagram(packet,QHostAddress::LocalHost,port)!=packet.size()) { app.kill(); app.waitForFinished(5000); return false; }
+                sent=true;
+            }
+        }
+        if (app.state()!=QProcess::NotRunning) { app.kill(); app.waitForFinished(5000); output+="\nTimed out"; return false; }
+        output+=app.readAll(); wallMs=timer.elapsed();
+        const QString text=QString::fromUtf8(output);
+        const auto match=QRegularExpression(QStringLiteral("\\[activity\\] UDP\\|(success|highlight)\\|[^\\n]*K1NEW")).match(text);
+        const int finish=text.indexOf(QStringLiteral("PROBE bulk result"));
+        return sent && match.hasMatch() && finish>match.capturedStart() && app.exitStatus()==QProcess::NormalExit && app.exitCode()==0;
+    }
+
 private slots:
     void reviewedDuplicateMerge()
     {
@@ -156,6 +185,37 @@ private slots:
               QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event WHERE kind='confirmed' AND service='card'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),enabled?20000:0);
               QCOMPARE(db.qsoCount(),qint64(20001)); const auto other=db.record(db.latestIds("ZY0SAT",1).first()); QVERIFY(other); QVERIFY(other->value("QSL_RCVD").isEmpty()); }
             qInfo() << "QSL_EVENT_LARGE_AB enabled=" << enabled << "rows=" << rows << "max_gap_ms=" << gap << "elapsed_ms=" << elapsed;
+        }
+    }
+
+    void paperQslBulkConcurrentUdpAB()
+    {
+        if (!qEnvironmentVariableIsSet("DECODXLOG_BENCH_BULK_QSL_UDP")) QSKIP("opt-in 20k concurrent UDP comparison");
+        QTemporaryDir seed; QVERIFY(seed.isValid()); const QString seedPath=seed.filePath("seed.sqlite");
+        { LogDatabase db; QVERIFY(db.open(seedPath)); QVERIFY(db.connection().transaction()); QSqlQuery q(db.connection());
+          QVERIFY(q.prepare("INSERT INTO qso(uuid,call,qso_datetime_on,band,mode,created_at,updated_at) VALUES(?,'J51A',?,'20m','CW','2026-02-28T00:00:00Z','2026-02-28T00:00:00Z')"));
+          for (int i=0;i<20000;++i) { q.bindValue(0,QStringLiteral("fixture-%1").arg(i)); q.bindValue(1,QDateTime(QDate(2026,2,28),QTime(0,0),QTimeZone::UTC).addSecs(i).toString(Qt::ISODate)); QVERIFY2(q.exec(),qPrintable(q.lastError().text())); }
+          QVERIFY(db.connection().commit());
+          QVERIFY(db.insertQso({{"CALL","ZY0SAT"},{"QSO_DATE","20260301"},{"TIME_ON","2035"},{"BAND","20m"},{"MODE","SSB"},{"GRIDSQUARE","HJ51AM"}},"fixture").id>0);
+          QVERIFY(q.exec("PRAGMA wal_checkpoint(TRUNCATE)")); }
+        for (int enabled=0;enabled<2;++enabled) {
+            QTemporaryDir dir; QVERIFY(dir.isValid()); QVERIFY(QFile::copy(seedPath,dir.filePath("log.sqlite")));
+            QFile marker(dir.filePath(".decodxlog-bulk-test")); QVERIFY(marker.open(QIODevice::WriteOnly)); marker.write("synthetic-test-only\n"); marker.close();
+            if (!enabled) { LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+                QVERIFY(q.exec("DROP TRIGGER extension_qsl_insert")); QVERIFY(q.exec("DROP TRIGGER extension_qsl_update")); }
+            QByteArray output; qint64 wall=0; QVERIFY2(runPaperWithUdp(dir,output,wall),output.constData());
+            LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite"))); QSqlQuery q(db.connection());
+            QVERIFY(q.exec("SELECT COUNT(*) FROM qsl_status WHERE service='card' AND rcvd='Y'")); QVERIFY(q.next());
+            QVERIFY2(q.value(0).toInt()==20000,output.constData());
+            QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event WHERE kind='confirmed' AND service='card'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),enabled?20000:0);
+            QCOMPARE(db.qsoCount(),qint64(20002)); const auto received=db.latestIds("K1NEW",2); QCOMPARE(received.size(),1);
+            const auto record=db.record(received.first()); QVERIFY(record); QVERIFY(record->value("QSL_RCVD").isEmpty());
+            QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event e JOIN qso q ON q.uuid=e.qso_uuid WHERE q.call='K1NEW' AND e.kind='added'")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+            const auto other=db.record(db.latestIds("ZY0SAT",1).first()); QVERIFY(other); QVERIFY(other->value("QSL_RCVD").isEmpty());
+            const auto metrics=QRegularExpression(QStringLiteral("PROBE bulkcheck mode=paperqsl rows=20000 maxgap=(\\d+) elapsed=(\\d+)")).match(QString::fromUtf8(output));
+            QVERIFY2(metrics.hasMatch(),output.constData());
+            qInfo() << "QSL_EVENT_UDP_AB enabled=" << enabled << "qso=20000 udp=1 total_wall_ms=" << wall
+                    << "max_gap_ms=" << metrics.captured(1).toLongLong() << "bulk_elapsed_ms=" << metrics.captured(2).toLongLong();
         }
     }
 

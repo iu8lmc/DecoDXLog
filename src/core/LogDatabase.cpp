@@ -2288,9 +2288,16 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
     const QString today = QDateTime::currentDateTimeUtc().date().toString(QStringLiteral("yyyyMMdd"));
     QSqlDatabase db = connection();
     if (ids.isEmpty()) return out;
-    if (!db.transaction()) {
+    auto beginBatch = [&db](QString* message) {
+        QSqlQuery start(db);
+        if (start.exec(QStringLiteral("BEGIN IMMEDIATE"))) return true;
+        if (message) *message = start.lastError().text();
+        return false;
+    };
+    QString beginError;
+    if (!beginBatch(&beginError)) {
         out.failed = int(ids.size());
-        out.errors << db.lastError().text();
+        out.errors << beginError;
         return out;
     }
     QElapsedTimer held;
@@ -2400,9 +2407,9 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
                 break;
             }
             if (progress) progress(done, int(ids.size()));
-            if (done < ids.size() && !db.transaction()) {
+            if (done < ids.size() && !beginBatch(&beginError)) {
                 out.failed += int(ids.size()) - done;
-                error(db.lastError().text());
+                error(beginError);
                 break;
             }
             held.restart();

@@ -1309,6 +1309,9 @@ private:
     QThreadPool m_countsPool;
     QThreadPool m_backupPool;
     QThreadPool m_linkPool;
+    // Shared lifetime lets the bulk worker yield after a commit while a live
+    // incoming QSO is waiting for SQLite's writer lock.
+    std::shared_ptr<std::atomic_bool> m_incomingWriteActive{std::make_shared<std::atomic_bool>(false)};
     QThreadPool m_importPool;
     // Accepted exports must finish even when the window closes.
     QThreadPool m_exportPool;

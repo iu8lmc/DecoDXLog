@@ -692,8 +692,11 @@ RoundedWindow {
     Connections {
         target: decolog
         function onBulkChanged() {
-            if (bulkCheckHeartbeat.running && decolog.bulkProgress >= 0)
+            if (bulkCheckHeartbeat.running && decolog.bulkProgress >= 0) {
+                if (!bulkCheckHeartbeat.sawRunning && bulkCheckHeartbeat.mode === "paperqsl")
+                    console.warn("PROBE paperqsl running")
                 bulkCheckHeartbeat.sawRunning = true
+            }
         }
         function onDuplicatesChanged() {
             if (!bulkCheckHeartbeat.running || bulkCheckHeartbeat.mode !== "merge" || bulkCheckHeartbeat.mergeStarted || decolog.duplicates.busy) return

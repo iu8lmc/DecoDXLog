@@ -39,6 +39,8 @@
 #include <QHostAddress>
 #include <QLocale>
 #include <QJsonArray>
+#include <QScopeGuard>
+#include <QThread>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
@@ -3992,6 +3994,9 @@ InsertResult DecoLogController::onQsoReceived(const AdifRecord& input, const QSt
                              enriched.value(QStringLiteral("BAND")), dupeMode);
     } else {
         decolog::StartupSpan trace("Incoming QSO: SQLite insert");
+        const auto incomingWrite = m_incomingWriteActive;
+        incomingWrite->store(true, std::memory_order_release);
+        const auto clearIncomingWrite = qScopeGuard([incomingWrite] { incomingWrite->store(false, std::memory_order_release); });
         r = m_db.insertQso(enriched, source, sourceApp, false, profileId);
     }
 
@@ -5851,14 +5856,15 @@ void DecoLogController::bulkEdit(const QVariantList& ids, const QString& field, 
     m_bulkProgress = 0;
     emit bulkChanged();
     QPointer<DecoLogController> self(this);
-    m_importPool.start([self, dbPath, list, field, value, onlyEmpty, automaticServices] {
+    const auto incomingWrite = m_incomingWriteActive;
+    m_importPool.start([self, incomingWrite, dbPath, list, field, value, onlyEmpty, automaticServices] {
         LogDatabase db;
         BulkEditResult result;
         if (!db.open(dbPath)) {
             result.failed = int(list.size());
             result.errors << db.lastError();
         } else {
-            result = db.bulkEdit(list, field, value, onlyEmpty, [self](int done, int total) {
+            result = db.bulkEdit(list, field, value, onlyEmpty, [self, incomingWrite](int done, int total) {
                 const double progress = total > 0 ? double(done) / total : 1.0;
                 QMetaObject::invokeMethod(
                     self.data(), [self, progress] {
@@ -5868,6 +5874,10 @@ void DecoLogController::bulkEdit(const QVariantList& ids, const QString& field, 
                         emit self->bulkChanged();
                     },
                     Qt::QueuedConnection);
+                // The batch transaction has committed at this point. Let an
+                // incoming QSO acquire SQLite's writer lock before the next batch.
+                if (done < total)
+                    while (incomingWrite->load(std::memory_order_acquire)) QThread::msleep(2);
             }, automaticServices);
         }
         QMetaObject::invokeMethod(
