@@ -1799,9 +1799,9 @@ void DecoLogController::setN1mmPort(int port)
 // quello che N1MM non sa (conferme, note, callbook).
 void DecoLogController::onN1mmReplaced(const AdifRecord& record, const QString& id)
 {
-    const QDateTime near = QDateTime::fromString(LogDatabase::isoFromAdif(record.value(QStringLiteral("QSO_DATE")),
+    const QDateTime referenceTime = QDateTime::fromString(LogDatabase::isoFromAdif(record.value(QStringLiteral("QSO_DATE")),
                                                              record.value(QStringLiteral("TIME_ON"))), Qt::ISODate);
-    const auto found = m_db.findByExtra(QStringLiteral("APP_N1MM_ID"), id, near);
+    const auto found = m_db.findByExtra(QStringLiteral("APP_N1MM_ID"), id, referenceTime);
     if (!found) {
         onQsoReceived(record, QStringLiteral("n1mm"), QStringLiteral("N1MM Logger+"));
         return;
@@ -1827,9 +1827,9 @@ void DecoLogController::onN1mmReplaced(const AdifRecord& record, const QString& 
 
 void DecoLogController::onN1mmDeleted(const QString& id, const AdifRecord& record)
 {
-    const QDateTime near = QDateTime::fromString(LogDatabase::isoFromAdif(record.value(QStringLiteral("QSO_DATE")),
+    const QDateTime referenceTime = QDateTime::fromString(LogDatabase::isoFromAdif(record.value(QStringLiteral("QSO_DATE")),
                                                              record.value(QStringLiteral("TIME_ON"))), Qt::ISODate);
-    const auto found = m_db.findByExtra(QStringLiteral("APP_N1MM_ID"), id, near);
+    const auto found = m_db.findByExtra(QStringLiteral("APP_N1MM_ID"), id, referenceTime);
     if (!found)
         return;
     deleteQsos({QVariant::fromValue(*found)});
