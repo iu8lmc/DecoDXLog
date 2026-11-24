@@ -11,7 +11,23 @@ DialogFrame {
     readonly property var current: net.session
     readonly property var summary: net.summary
     readonly property var reminder: net.reminder
+    readonly property var activeReminders: net.activeReminders
     property double reminderClock: Date.now()
+    readonly property var otherDueReminder: {
+        let first = null, earliest = Infinity
+        for (const entry of activeReminders) {
+            const when = Date.parse(entry.deadline || "")
+            if (entry.sessionId !== current.id && isFinite(when) && when <= reminderClock && when < earliest) {
+                first = entry; earliest = when
+            }
+        }
+        return first
+    }
+    function probeOtherReminder(expectedId) {
+        console.warn("PROBE net other due=" + otherReminderButton.visible)
+        if (otherReminderButton.visible) otherReminderButton.clicked()
+        console.warn("PROBE net other selected=" + (current.id === expectedId))
+    }
     title: qsTr("Radio net manager")
     dialogKey: "radio-net"
     width: 1000
@@ -66,7 +82,7 @@ DialogFrame {
     Timer {
         interval: 250
         repeat: true
-        running: root.visible && !!root.reminder.scheduled
+        running: root.visible && root.activeReminders.length > 0
         onTriggered: root.reminderClock = Date.now()
     }
     NewQsoDialog {
@@ -217,6 +233,13 @@ DialogFrame {
             GlassButton { text: qsTr("Reopen"); enabled: !!root.current.id && !root.current.active; onClicked: root.net.reopenSession() }
             GlassButton { text: qsTr("Export JSON…"); enabled: !!root.current.id && !root.net.exportBusy; onClicked: exportDialog.open() }
             GlassButton { text: qsTr("Cancel export"); visible: root.net.exportBusy; onClicked: root.net.cancelExport() }
+        }
+        GlassButton {
+            id: otherReminderButton
+            Layout.fillWidth: true
+            visible: !!root.otherDueReminder
+            text: qsTr("Reminder due for %1 — select session").arg(root.otherDueReminder ? root.otherDueReminder.title : "")
+            onClicked: if (root.otherDueReminder) root.net.selectSession(root.otherDueReminder.sessionId)
         }
         Text {
             Layout.fillWidth: true

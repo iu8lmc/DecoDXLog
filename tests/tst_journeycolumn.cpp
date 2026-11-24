@@ -1933,6 +1933,16 @@ private slots:
         QCOMPARE(db.qsoCount(), qint64(0));
     }
 
+    void radioNetReminderWhileAnotherSessionIsOpen()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QByteArray output;
+        QVERIFY2(launch(dir, QStringLiteral("radionetotherreminderprobe"), output, 4500), output.constData());
+        QVERIFY2(output.contains("PROBE net other due=true"), output.constData());
+        QVERIFY2(output.contains("PROBE net other selected=true"), output.constData());
+        decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath(QStringLiteral("test.sqlite"))));
+        QCOMPARE(db.qsoCount(), qint64(0));
+    }
+
     void radioNetReminderForUnselectedSession()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); QByteArray output;

@@ -205,6 +205,27 @@ class TestRadioNet : public QObject {
         QCOMPARE(db.qsoCount(), 0);
     }
 
+    void multipleActiveRemindersSurviveReopen()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite");
+        qint64 first=0, second=0;
+        {
+            LogDatabase db; QVERIFY(db.open(path)); RadioNet net(&db);
+            QVERIFY(net.start("First")); first=net.session().value("id").toLongLong(); QVERIFY(net.setReminder(60));
+            QVERIFY(net.start("Second")); second=net.session().value("id").toLongLong(); QVERIFY(net.setReminder(120));
+        }
+        {
+            LogDatabase db; QVERIFY(db.open(path)); RadioNet net(&db); net.load();
+            const auto reminders=net.activeReminders(); QCOMPARE(reminders.size(), 2);
+            QSet<qint64> ids; for (const auto &r : reminders) ids.insert(r.toMap().value("sessionId").toLongLong());
+            QVERIFY(ids.contains(first)); QVERIFY(ids.contains(second));
+            QVERIFY(net.selectSession(first)); QVERIFY(net.clearReminder());
+            QCOMPARE(net.activeReminders().size(), 1);
+            QCOMPARE(net.activeReminders().first().toMap().value("sessionId").toLongLong(), second);
+            QCOMPARE(db.qsoCount(), qint64(0));
+        }
+    }
+
     void activeRemindersIncludeUnselectedSessions()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); RadioNet net(&db);

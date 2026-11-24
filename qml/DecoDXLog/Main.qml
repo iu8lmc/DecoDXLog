@@ -1396,6 +1396,14 @@ RoundedWindow {
         else if (what[0] === "qslocrreview") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrReview()) }
         else if (what[0] === "qslocrrevisions") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.probeOcrRevisions()) }
         else if (what[0] === "qslocrhistory") { qsoDialog.openFor(1); Qt.callLater(() => qsoDialog.showOcrHistory()) }
+        else if (what[0] === "radionetotherreminderprobe") {
+            decolog.radioNet.start("First reminder", 0)
+            netOtherReminderProbe.expectedSession = decolog.radioNet.session.id
+            decolog.radioNet.setReminder(1)
+            decolog.radioNet.start("Second net", 0)
+            radioNetDialog.open()
+            netOtherReminderProbe.start()
+        }
         else if (what[0] === "radionetbackgroundprobe" || what[0] === "radionetmultireminderprobe") {
             decolog.radioNet.start("Reminder probe", 0)
             netReminderProbe.expectedSession = decolog.radioNet.session.id
@@ -2079,6 +2087,12 @@ RoundedWindow {
     RoverDialog { id: roverDialog }
     PredictDialog { id: predictDialog }
     ContestSubmitDialog { id: submitDialog }
+    Timer {
+        id: netOtherReminderProbe
+        property var expectedSession: 0
+        interval: 1800
+        onTriggered: radioNetDialog.probeOtherReminder(expectedSession)
+    }
     Timer {
         id: netReminderProbe
         property var expectedSession: 0

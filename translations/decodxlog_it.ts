@@ -15145,6 +15145,10 @@ Referenze aggiuntive: %7</translation></message>
 <context>
     <name>RadioNetDialog</name>
     <message>
+        <source>Reminder due for %1 — select session</source>
+        <translation>Promemoria scaduto per %1 — seleziona la sessione</translation>
+    </message>
+    <message>
         <source>Radio net manager</source>
         <translation>Gestione rete radio</translation>
     </message>
