@@ -434,7 +434,7 @@ public:
     // suoi QSO, quello generale tutti gli altri.
     ConfirmationResult applyConfirmation(const QString& service, const AdifRecord& confirmation,
                                          int windowSeconds = 1800, const QList<qint64>& onlyProfiles = {},
-                                         const QList<qint64>& exceptProfiles = {});
+                                         const QList<qint64>& exceptProfiles = {}, bool retainLotwGridObservation = false);
     // Stores an observation separately; it does not assert a match or award credit.
     bool recordLotwGridObservation(qint64 qsoId, const QString& grid, const QString& vuccGrids, QString* error = nullptr);
 

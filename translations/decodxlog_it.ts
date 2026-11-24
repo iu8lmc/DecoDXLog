@@ -11701,6 +11701,7 @@ Referenze aggiuntive: %7</translation></message>
 </context>
 <context>
     <name>decolog::app::DecoLogController</name>
+    <message><source>; %1 database error(s), download cursor not advanced</source><translation>; %1 errori del database, cursore di download non aggiornato</translation></message>
     <message><source>Choose a local JSON file</source><translation>Scegli un file JSON locale</translation></message>
     <message><source>Cannot prepare the CSV report</source><translation>Impossibile preparare il rapporto CSV</translation></message>
     <message><source>Cannot write the report context</source><translation>Impossibile scrivere il contesto del rapporto</translation></message>

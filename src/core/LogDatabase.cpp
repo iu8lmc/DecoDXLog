@@ -2739,15 +2739,17 @@ bool LogDatabase::recordLotwGridObservation(qint64 qsoId, const QString& grid, c
         return false;
     }
     QSqlQuery query(connection());
-    query.prepare(QStringLiteral("INSERT OR IGNORE INTO lotw_grid_observation(qso_id,grid,vucc_grids,observed_at) VALUES(?,?,?,?)"));
-    query.addBindValue(qsoId); query.addBindValue(grid); query.addBindValue(vuccGrids); query.addBindValue(nowIso());
+    query.prepare(QStringLiteral("INSERT INTO lotw_grid_observation(qso_id,grid,vucc_grids,observed_at) VALUES(?,?,?,?) "
+                                 "ON CONFLICT(qso_id,grid,vucc_grids) DO NOTHING"));
+    query.addBindValue(qsoId); query.addBindValue(grid.isNull() ? QStringLiteral("") : grid);
+    query.addBindValue(vuccGrids.isNull() ? QStringLiteral("") : vuccGrids); query.addBindValue(nowIso());
     if (!query.exec()) { if (error) *error=query.lastError().text(); return false; }
     return true;
 }
 
 ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const AdifRecord& c, int windowSeconds,
                                                   const QList<qint64>& onlyProfiles,
-                                                  const QList<qint64>& exceptProfiles)
+                                                  const QList<qint64>& exceptProfiles, bool retainLotwGridObservation)
 {
     ConfirmationResult res;
     const QslFields* fields = nullptr;
@@ -2832,13 +2834,34 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     const qint64 best = bestMatches.first().first;
     const bool bestConfirmed = bestMatches.first().second;
     res.id = best;
+    q.finish();
+    const QString observedGrid = c.value(QStringLiteral("GRIDSQUARE"));
+    const QString observedGrids = c.value(QStringLiteral("VUCC_GRIDS"));
+    const bool retain = retainLotwGridObservation && service == QLatin1String("lotw")
+        && (!observedGrid.trimmed().isEmpty() || !observedGrids.trimmed().isEmpty());
+    QSqlQuery observationTransaction(connection());
+    if (retain && !observationTransaction.exec(QStringLiteral("SAVEPOINT decolog_lotw_grid_observation"))) {
+        res.status = ConfirmationResult::Status::Error; res.message = observationTransaction.lastError().text(); return res;
+    }
+    const auto rollbackObservation = [&] {
+        if (!retain) return;
+        QSqlQuery rollback(connection()); rollback.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_lotw_grid_observation"));
+        rollback.exec(QStringLiteral("RELEASE SAVEPOINT decolog_lotw_grid_observation"));
+    };
+    if (retain && !recordLotwGridObservation(best, observedGrid, observedGrids, &res.message)) {
+        rollbackObservation(); res.status = ConfirmationResult::Status::Error; return res;
+    }
     if (bestConfirmed) {
+        if (retain && !observationTransaction.exec(QStringLiteral("RELEASE SAVEPOINT decolog_lotw_grid_observation"))) {
+            res.status = ConfirmationResult::Status::Error; res.message = observationTransaction.lastError().text(); rollbackObservation(); return res;
+        }
         res.status = ConfirmationResult::Status::AlreadyConfirmed;
         return res;
     }
 
     auto r = record(best);
     if (!r) {
+        rollbackObservation();
         res.status = ConfirmationResult::Status::Error;
         return res;
     }
@@ -2867,9 +2890,13 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
 
     const InsertResult u = updateQso(best, *r, -1, service);
     if (u.status != InsertResult::Status::Inserted) {
+        rollbackObservation();
         res.status = ConfirmationResult::Status::Error;
         res.message = u.message;
         return res;
+    }
+    if (retain && !observationTransaction.exec(QStringLiteral("RELEASE SAVEPOINT decolog_lotw_grid_observation"))) {
+        res.status = ConfirmationResult::Status::Error; res.message = observationTransaction.lastError().text(); rollbackObservation(); return res;
     }
     res.status = ConfirmationResult::Status::Confirmed;
     return res;

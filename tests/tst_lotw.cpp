@@ -167,6 +167,30 @@ private slots:
         QCOMPARE(report.lastQsl,QString("2026-09-16 21:04:11"));
     }
 
+    void matchedConfirmationPersistsGridSeparatelyAndAtomically()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const qint64 id=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture").id; QVERIFY(id>0);
+        auto incoming=qso("K1ABC","20m","CW","","20260910","120000","FN42AB"); incoming.set("VUCC_GRIDS","FN42,FN43");
+        QSqlQuery query(db.connection()); QVERIFY(query.exec("CREATE TRIGGER reject_observation BEFORE INSERT ON lotw_grid_observation BEGIN SELECT RAISE(ABORT,'injected'); END"));
+        QCOMPARE(db.applyConfirmation("lotw",incoming,1800,{}, {},true).status,ConfirmationResult::Status::Error);
+        QCOMPARE(db.record(id)->value("LOTW_QSL_RCVD"),QString()); QCOMPARE(db.record(id)->value("GRIDSQUARE"),QString("FN41"));
+        QVERIFY(query.exec("DROP TRIGGER reject_observation"));
+        QCOMPARE(db.applyConfirmation("lotw",incoming,1800,{}, {},true).status,ConfirmationResult::Status::Confirmed);
+        QCOMPARE(db.record(id)->value("GRIDSQUARE"),QString("FN41"));
+        QVERIFY(query.exec("SELECT grid,vucc_grids FROM lotw_grid_observation")); QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(),QString("FN42AB")); QCOMPARE(query.value(1).toString(),QString("FN42,FN43")); QVERIFY(!query.next());
+        QCOMPARE(db.applyConfirmation("lotw",incoming,1800,{}, {},true).status,ConfirmationResult::Status::AlreadyConfirmed);
+        QVERIFY(query.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(query.next()); QCOMPARE(query.value(0).toInt(),1);
+        incoming.set("GRIDSQUARE","FN44"); incoming.remove("VUCC_GRIDS");
+        QCOMPARE(db.applyConfirmation("lotw",incoming,1800,{}, {},true).status,ConfirmationResult::Status::AlreadyConfirmed);
+        QVERIFY(query.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(query.next()); QCOMPARE(query.value(0).toInt(),2);
+        QVERIFY(db.connection().transaction()); incoming.set("GRIDSQUARE","FN45");
+        QCOMPARE(db.applyConfirmation("lotw",incoming,1800,{}, {},true).status,ConfirmationResult::Status::AlreadyConfirmed);
+        QVERIFY(db.connection().rollback());
+        QVERIFY(query.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(query.next()); QCOMPARE(query.value(0).toInt(),2);
+    }
+
     void storesSeparateGridObservationsIdempotently()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); qint64 id=0;

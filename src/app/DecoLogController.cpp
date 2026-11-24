@@ -7034,12 +7034,14 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     // Il segno dell'ultimo scarico si sposta solo con lo scarico di tutto: uno
     // scarico per periodo lo porterebbe avanti e il prossimo "solo le nuove"
     // salterebbe le conferme degli altri QSO arrivate nel frattempo.
-    if (!report.lastQsl.isEmpty() && !ranged)
+    if (!report.lastQsl.isEmpty() && !ranged && tally.errors == 0)
         m_db.setSetting(QStringLiteral("lotw.last_qsl"), report.lastQsl);
     m_db.setSetting(QStringLiteral("lotw.last_sync_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
 
     m_lotwStatus = tr("LoTW: %1 new confirmations, %2 already marked, %3 not in the log")
                        .arg(confirmed).arg(already).arg(notFound);
+    if (tally.errors > 0)
+        m_lotwStatus += tr("; %1 database error(s), download cursor not advanced").arg(tally.errors);
     m_db.setSetting(QStringLiteral("lotw.last_result"), m_lotwStatus);
     addActivity(QStringLiteral("LOTW"), m_lotwStatus, confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     for (const QString& m : missing)
@@ -7111,8 +7113,10 @@ DecoLogController::ConfirmTally DecoLogController::applyConfirmations(const QStr
         };
     };
     const bool transaction = db.transaction();
+    if (!transaction) { ++t.errors; return t; }
     for (const AdifRecord& c : list) {
-        const ConfirmationResult r = m_db.applyConfirmation(service, c, 1800, onlyProfiles, exceptProfiles);
+        const ConfirmationResult r = m_db.applyConfirmation(service, c, 1800, onlyProfiles, exceptProfiles,
+                                                           service == QLatin1String("lotw"));
         switch (r.status) {
         case ConfirmationResult::Status::Confirmed: {
             ++t.confirmed;
@@ -7159,7 +7163,7 @@ DecoLogController::ConfirmTally DecoLogController::applyConfirmations(const QStr
         }
         case ConfirmationResult::Status::Invalid:
         case ConfirmationResult::Status::Error: {
-            ++t.invalid;
+            if (r.status == ConfirmationResult::Status::Error) ++t.errors; else ++t.invalid;
             const QVariantMap m = row(c, QStringLiteral("invalid"),
                                       r.message.isEmpty() ? tr("call, band or date missing") : r.message, 0);
             if (!m.isEmpty())
@@ -7168,8 +7172,7 @@ DecoLogController::ConfirmTally DecoLogController::applyConfirmations(const QStr
         }
         }
     }
-    if (transaction)
-        db.commit();
+    if (!db.commit()) { db.rollback(); ++t.errors; t.confirmed=0; t.already=0; t.rows.clear(); }
     return t;
 }
 
@@ -7190,6 +7193,7 @@ void DecoLogController::recordQslImport(const QString& label, const QString& ser
                         {QStringLiteral("ambiguous"), t.ambiguous},
                         {QStringLiteral("notFound"), t.notFound},
                         {QStringLiteral("invalid"), t.invalid},
+                        {QStringLiteral("databaseErrors"), t.errors},
                         // Uno scarico non riuscito resta nel riepilogo, col motivo:
                         // prima la finestra restava vuota e non si capiva perche'.
                         {QStringLiteral("error"), error}};

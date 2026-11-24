@@ -1002,6 +1002,7 @@ private:
         int ambiguous{0};
         int notFound{0};
         int invalid{0};
+        int errors{0};
         QStringList missing;
         QVariantList rows;     // per il riepilogo: le nuove, le non trovate, le sbagliate
     };
