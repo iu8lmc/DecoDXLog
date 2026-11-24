@@ -30,12 +30,17 @@ QByteArray localStateFingerprint(const QSqlDatabase& db,qint64 id) {
         QStringLiteral("SELECT * FROM qso WHERE id=?"),
         QStringLiteral("SELECT service,sent,sent_date,rcvd,rcvd_date,remote_id,last_error,via FROM qsl_status WHERE qso_id=? ORDER BY service"),
         QStringLiteral("SELECT x.attachment_id,x.link_token,x.link_revision,a.sha256,a.filename,a.mime,a.size,a.created_at,length(a.data) FROM qsl_attachment_qso x LEFT JOIN qsl_attachment a ON a.id=x.attachment_id WHERE x.qso_id=? ORDER BY x.attachment_id"),
-        QStringLiteral("SELECT id,field,previous_value,value,source,kind,acquired_at,valid_from,valid_to FROM qso_enrichment WHERE qso_id=? ORDER BY id")
+        QStringLiteral("SELECT id,field,previous_value,value,source,kind,acquired_at,valid_from,valid_to FROM qso_enrichment WHERE qso_id=? ORDER BY id"),
+        QStringLiteral("SELECT o.id,o.qso_id,o.grid,o.vucc_grids,o.observed_at,l.linked_at,"
+                       "c.id,c.distance_seconds,c.station_call,c.source_qso_time,c.rxqsl,c.recorded_at "
+                       "FROM lotw_grid_observation o LEFT JOIN lotw_grid_observation_link l ON l.observation_id=o.id AND l.qso_id=? "
+                       "LEFT JOIN lotw_grid_match_context c ON c.observation_id=o.id "
+                       "WHERE o.qso_id=? OR l.qso_id IS NOT NULL ORDER BY o.id,c.id")
     };
     QCryptographicHash hash(QCryptographicHash::Sha256); hash.addData(QByteArrayLiteral("contestnet-local-review-v1"));
     for (int index=0;index<statements.size();++index) {
         QSqlQuery query(db); if (!query.prepare(statements[index])) return {};
-        query.addBindValue(id); if (!query.exec()) return {};
+        query.addBindValue(id); if (index==4) query.addBindValue(id); if (!query.exec()) return {};
         int count=0; QByteArray marker; QDataStream head(&marker,QIODevice::WriteOnly); head.setVersion(QDataStream::Qt_6_0); head << index; hash.addData(marker);
         const int columns=query.record().count();
         while (query.next()) {

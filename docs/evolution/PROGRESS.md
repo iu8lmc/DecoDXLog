@@ -3139,3 +3139,11 @@ The custom report's distinct-call aggregate now compares recorded calls after tr
 A/B on macOS arm64 / Qt 6.11.2: synthetic legacy-style stored calls `K1AAA`, ` k1aaa `, `K1AAA/P` and two blanks previously produced three distinct calls; the test failed against that behavior and now produces two, including in CSV. App and test targets built; CTest activityreport and qmlpopups passed 2/2; git diff --check passed.
 
 SQLite's built-in uppercasing is ASCII-oriented and its default trim removes ordinary spaces; malformed Unicode or other whitespace is not normalized. The test changes synthetic database rows directly to reproduce legacy variations. It does not exercise the actual report dialog, PDF, a large log or Windows/Linux. Full G07/G13 acceptance remains open.
+
+## 2026-11-24 — G10 invalidate ContestNet reviews after LoTW observations
+
+The local-state guard for a reviewed incoming ContestNet edit or deletion now includes direct and linked LoTW grid observations and their matching contexts. If these change after review, application is rejected and requires a fresh review; a database error while reading them also fails closed. The observation remains source metadata, not verified award credit.
+
+A/B on macOS arm64 / Qt 6.11.2: the prior implementation applied a received edit after a new local observation and the new test failed. The revised guard rejects changes involving a direct observation, a context and an observation link, and rejects both review and application when the link table is unavailable. A fresh review still permits the existing tested edit/deletion path. The first implementation used a repeated numbered SQLite placeholder that Qt did not bind as intended; explicit bindings corrected it. App and targets built; CTest database, contestnet and netcontroller passed 3/3, and the final missing-table case passed separately. git diff --check passed.
+
+Tests use synthetic local logs and controller fixtures, not an actual multi-station LAN, UI conflict review, live LoTW, radio, Windows or Linux. The fingerprint is a guard for listed local data, not a proof covering every future related table; linked observations remain on the QSO rather than being transferred to other stations. Full G10/G13 acceptance remains open.
