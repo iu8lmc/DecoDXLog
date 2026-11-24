@@ -4,17 +4,68 @@
 This is developer tooling, not a sandbox or an in-app extension manager.
 """
 import argparse
+import contextlib
+import errno
 import hashlib
 import json
 import os
 import pathlib
 import shutil
+import stat
 import sys
 import tempfile
 
 import extension_harness as harness
 
 MAX_ENTRY = 1024 * 1024
+
+
+@contextlib.contextmanager
+def _operation_lock(root):
+    """Serialize cooperating managers without waiting behind a running extension."""
+    if os.name == 'posix':
+        # A directory lock keeps listing and running possible on a read-only
+        # installation, and does not leave a removable lock-file sentinel.
+        fd = os.open(root, os.O_RDONLY | getattr(os, 'O_DIRECTORY', 0) | getattr(os, 'O_NOFOLLOW', 0))
+    elif os.name == 'nt':
+        path = root / '.extension-manager.lock'
+        if path.is_symlink():
+            raise ValueError('extension manager lock must not be a symlink')
+        fd = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    else:
+        raise ValueError('extension manager locking is unavailable')
+    locked = False
+    try:
+        mode = os.fstat(fd).st_mode
+        if (os.name == 'posix' and not stat.S_ISDIR(mode)) or (os.name == 'nt' and not stat.S_ISREG(mode)):
+            raise ValueError('invalid extension manager lock')
+        try:
+            if os.name == 'posix':
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            elif os.name == 'nt':
+                import msvcrt
+                if os.fstat(fd).st_size == 0:
+                    os.write(fd, b'\0')
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                raise ValueError('extension manager locking is unavailable')
+            locked = True
+        except OSError as exc:
+            if exc.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                raise ValueError('another extension operation is in progress') from exc
+            raise
+        yield
+    finally:
+        try:
+            if locked and os.name == 'posix':
+                fcntl.flock(fd, fcntl.LOCK_UN)
+            elif locked and os.name == 'nt':
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        finally:
+            os.close(fd)
 
 
 def _root(root, create=False):
@@ -87,6 +138,11 @@ def install(root, manifest_path, token='', port=None, timeout=10):
             raise ValueError('invalid extension Python source') from exc
     manifest_bytes = (json.dumps(manifest, sort_keys=True, ensure_ascii=False, indent=2)+'\n').encode()
     base = _root(root, create=True)
+    with _operation_lock(base):
+        return _install_locked(base, manifest, manifest_bytes, files, token, port, timeout)
+
+
+def _install_locked(base, manifest, manifest_bytes, files, token, port, timeout):
     new_folder = not (base / manifest['id']).exists() and not (base / manifest['id']).is_symlink()
     folder = _directory(base, manifest['id'], create=True)
     try:
@@ -156,30 +212,35 @@ def _current(root, identity):
 
 def list_installed(root):
     root = _root(root)
-    entries = []
-    for folder in sorted(root.iterdir()):
-        if folder.name.startswith('.'):
-            continue
-        try:
-            _, manifest = _current(root, folder.name)
-            entries.append(manifest)
-        except (OSError, ValueError, TypeError, UnicodeError, RecursionError):
-            # One broken installation must not prevent the operator from
-            # inspecting or removing other extensions. Do not include file
-            # contents or exception messages in the diagnostic listing.
-            entries.append({'id': folder.name, 'status': 'invalid'})
-    return entries
+    with _operation_lock(root):
+        entries = []
+        for folder in sorted(root.iterdir()):
+            if folder.name.startswith('.'):
+                continue
+            try:
+                _, manifest = _current(root, folder.name)
+                entries.append(manifest)
+            except (OSError, ValueError, TypeError, UnicodeError, RecursionError):
+                # One broken installation must not prevent the operator from
+                # inspecting or removing other extensions. Do not include file
+                # contents or exception messages in the diagnostic listing.
+                entries.append({'id': folder.name, 'status': 'invalid'})
+        return entries
 
 
 def run(root, identity, token, port, timeout):
-    manifest_path, _ = _current(root, identity)
-    return harness.run_extension(manifest_path, token, port, timeout)
+    root = _root(root)
+    with _operation_lock(root):
+        manifest_path, _ = _current(root, identity)
+        return harness.run_extension(manifest_path, token, port, timeout)
 
 
 def remove(root, identity):
-    folder = _directory(_root(root), identity)
-    # The ownership marker allows removal even when an installed version is corrupt.
-    shutil.rmtree(folder)
+    root = _root(root)
+    with _operation_lock(root):
+        folder = _directory(root, identity)
+        # The ownership marker allows removal even when an installed version is corrupt.
+        shutil.rmtree(folder)
 
 
 def main():

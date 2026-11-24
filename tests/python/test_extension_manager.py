@@ -1,12 +1,15 @@
 import importlib.util
 import json
+import os
 import pathlib
 import sqlite3
+import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from threading import Thread
+from threading import Event, Thread
 from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -31,6 +34,127 @@ class Api(BaseHTTPRequestHandler):
 
 
 class ManagerTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == 'posix','read-only directory lock test is POSIX-specific')
+    def test_list_and_run_preserve_read_only_installation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); root=base/'extensions'; source=base/'source'; source.mkdir()
+            (source/'demo.py').write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.readonly','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=source/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            root.chmod(0o500)
+            try:
+                self.assertEqual(manager.list_installed(root)[0]['id'],manifest['id'])
+                with patch.object(manager.harness,'run_extension',return_value={'scope':'recent_sample'}):
+                    self.assertEqual(manager.run(root,manifest['id'],'test',1,2),{'scope':'recent_sample'})
+            finally:
+                root.chmod(0o700)
+    def test_running_extension_cannot_be_removed_until_it_exits(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); root=base/'extensions'; source=base/'source'; source.mkdir()
+            (source/'demo.py').write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.running','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=source/'manifest.json'; path.write_text(json.dumps(manifest)); manager.install(root,path)
+            started=Event(); release=Event(); outcome=[]
+            def execute(*args,**kwargs):
+                started.set()
+                if not release.wait(5): raise ValueError('test timeout')
+                return {'scope':'recent_sample'}
+            def run():
+                try: outcome.append(manager.run(root,manifest['id'],'test',1,2))
+                except Exception as exc: outcome.append(exc)
+            with patch.object(manager.harness,'run_extension',side_effect=execute):
+                thread=Thread(target=run); thread.start()
+                if not started.wait(5): release.set(); thread.join(); self.fail('extension did not start')
+                try:
+                    with self.assertRaisesRegex(ValueError,'operation is in progress'): manager.remove(root,manifest['id'])
+                finally:
+                    release.set(); thread.join(5)
+            self.assertFalse(thread.is_alive()); self.assertEqual(outcome,[{'scope':'recent_sample'}])
+            manager.remove(root,manifest['id']); self.assertEqual(manager.list_installed(root),[])
+
+    def test_lock_serializes_separate_processes_and_releases(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); root=base/'extensions'; root.mkdir(); source=base/'source'; source.mkdir(); ready=base/'ready'
+            (source/'demo.py').write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.process','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=source/'manifest.json'; path.write_text(json.dumps(manifest))
+            script=('import pathlib,sys; sys.path.insert(0,sys.argv[1]); import extension_manager as m\n'
+                    'with m._operation_lock(m._root(sys.argv[2])):\n'
+                    ' pathlib.Path(sys.argv[3]).write_text("ready"); sys.stdin.read(1)\n')
+            process=subprocess.Popen([sys.executable,'-c',script,str(ROOT/'tools'),str(root),str(ready)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            try:
+                deadline=time.monotonic()+5
+                while not ready.exists() and process.poll() is None and time.monotonic()<deadline: time.sleep(0.01)
+                self.assertTrue(ready.exists(),'other process did not acquire lock')
+                with self.assertRaisesRegex(ValueError,'operation is in progress'): manager.install(root,path)
+                process.stdin.write(b'x'); process.stdin.flush(); self.assertEqual(process.wait(timeout=5),0)
+                self.assertEqual(manager.install(root,path)['id'],manifest['id'])
+            finally:
+                if process.poll() is None: process.kill(); process.wait(timeout=5)
+                if process.stdin: process.stdin.close()
+                if process.stdout: process.stdout.close()
+                if process.stderr: process.stderr.close()
+
+    def test_symlinked_manager_lock_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); root=base/'extensions'; root.mkdir(); target=base/'untouched'; target.write_text('unchanged')
+            try: (root/'.extension-manager.lock').symlink_to(target)
+            except (OSError,NotImplementedError): self.skipTest('symlinks unavailable')
+            if os.name == 'nt':
+                with self.assertRaises(ValueError): manager.list_installed(root)
+            else:
+                self.assertEqual(manager.list_installed(root),[])
+            self.assertEqual(target.read_text(),'unchanged')
+
+    def test_lock_is_released_when_manager_process_ends(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); root=base/'extensions'; root.mkdir(); ready=base/'ready'
+            script=('import pathlib,sys; sys.path.insert(0,sys.argv[1]); import extension_manager as m\n'
+                    'with m._operation_lock(m._root(sys.argv[2])):\n'
+                    ' pathlib.Path(sys.argv[3]).write_text("ready"); sys.stdin.read(1)\n')
+            process=subprocess.Popen([sys.executable,'-c',script,str(ROOT/'tools'),str(root),str(ready)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            try:
+                deadline=time.monotonic()+5
+                while not ready.exists() and process.poll() is None and time.monotonic()<deadline: time.sleep(0.01)
+                self.assertTrue(ready.exists(),'other process did not acquire lock')
+                with self.assertRaisesRegex(ValueError,'operation is in progress'): manager.list_installed(root)
+                process.kill(); process.wait(timeout=5)
+                self.assertEqual(manager.list_installed(root),[])
+            finally:
+                if process.poll() is None: process.kill(); process.wait(timeout=5)
+                if process.stdin: process.stdin.close()
+                if process.stdout: process.stdout.close()
+                if process.stderr: process.stderr.close()
+    def test_remove_cannot_delete_an_install_in_progress(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base=pathlib.Path(temp); source=base/'source'; source.mkdir(); root=base/'extensions'
+            log=base/'log.sqlite'
+            with sqlite3.connect(log) as db: db.execute('CREATE TABLE qso(call TEXT)'); db.execute("INSERT INTO qso VALUES('K1ABC')")
+            (source/'demo.py').write_text("print('ok')\n")
+            manifest={'schemaVersion':1,'apiVersion':1,'id':'org.example.race','version':'1.0.0','entrypoint':'demo.py','permissions':['qso.read']}
+            path=source/'manifest.json'; path.write_text(json.dumps(manifest))
+            started=Event(); release=Event(); outcome=[]
+            def preflight(*args,**kwargs):
+                started.set()
+                if not release.wait(5): raise ValueError('test timeout')
+                return {'scope':'recent_sample'}
+            def install():
+                try: outcome.append(manager.install(root,path,token='test',port=1))
+                except Exception as exc: outcome.append(exc)
+            with patch.object(manager.harness,'run_extension',side_effect=preflight):
+                thread=Thread(target=install); thread.start()
+                if not started.wait(5): release.set(); thread.join(); self.fail('preflight did not start')
+                try:
+                    try: manager.remove(root,manifest['id']); removal_error=None
+                    except Exception as exc: removal_error=exc
+                    self.assertEqual(manager.install(base/'independent',path)['id'],manifest['id'])
+                finally:
+                    release.set(); thread.join(5)
+            self.assertFalse(thread.is_alive())
+            self.assertIsInstance(removal_error,ValueError)
+            self.assertEqual(len(outcome),1); self.assertIsInstance(outcome[0],dict)
+            self.assertEqual(manager.list_installed(root)[0]['id'],manifest['id'])
+            with sqlite3.connect(log) as db: self.assertEqual(db.execute('SELECT call FROM qso').fetchall(),[('K1ABC',)])
     def test_installed_manifest_changes_are_detected(self):
         with tempfile.TemporaryDirectory() as temp:
             base=pathlib.Path(temp); src=base/'src'; src.mkdir(); root=base/'installed'
