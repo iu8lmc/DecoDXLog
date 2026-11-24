@@ -4744,13 +4744,19 @@ QString DecoLogController::logManualQso(const QVariantMap& fields)
     if (historical && (radioSessionId || radioMemberId))
         return tr("Historical entry cannot be assigned to a current radio net session.");
     if (radioSessionId || radioMemberId) {
+        const auto expectedContext=fields.value(QStringLiteral("radio_net_log_context")).toMap();
+        const auto currentContext=radioNetDraftContext();
+        const QString expectedUuid=fields.value(QStringLiteral("radio_net_session_uuid")).toString();
+        if (expectedContext.isEmpty() || currentContext.isEmpty() || expectedContext!=currentContext || expectedUuid.isEmpty())
+            return tr("The radio net draft's log or session changed; reopen the draft.");
         QSqlQuery radio(m_db.connection());
         radio.prepare(QStringLiteral("SELECT s.uuid,m.call,s.station_profile_id FROM radio_net_session s "
                                      "JOIN radio_net_member m ON m.session_id=s.id "
                                      "WHERE s.id=? AND m.id=? AND s.ended_at IS NULL"));
         radio.addBindValue(radioSessionId);
         radio.addBindValue(radioMemberId);
-        if (!radio.exec() || !radio.next() || radio.value(1).toString().compare(r.value(QStringLiteral("CALL")), Qt::CaseInsensitive) != 0)
+        if (!radio.exec() || !radio.next() || radio.value(0).toString()!=expectedUuid ||
+            radio.value(1).toString().compare(r.value(QStringLiteral("CALL")), Qt::CaseInsensitive) != 0)
             return tr("The radio net session or participant no longer matches this QSO.");
         const qint64 radioProfileId = radio.value(2).toLongLong();
         if (radioProfileId > 0 && radioProfileId != profileId)

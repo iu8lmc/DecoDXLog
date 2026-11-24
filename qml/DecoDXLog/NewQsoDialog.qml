@@ -13,6 +13,8 @@ DialogFrame {
     property string profileDialogKey: ""
     property double radioNetSessionId: 0
     property double radioNetMemberId: 0
+    property string radioNetSessionUuid: ""
+    property var radioNetLogContext: ({})
     property bool historicalMode: false
     property string historicalLastDate: ""
     property int historicalLastSeconds: -1
@@ -183,6 +185,10 @@ DialogFrame {
         root.submit(false)
         console.warn("PROBE radioNetRepeat closed=" + !root.visible + " error=" + errorText.text)
     }
+    function probeRadioNetStaleDraft() {
+        freqField.text="14.050000"; modeBox.currentIndex=modeBox.find("CW"); root.submit(false)
+        console.warn("PROBE radioNetStaleDraft result " + JSON.stringify({visible:root.visible,error:errorText.text}))
+    }
 
     function probeRadioNetClosed() {
         freqField.text = "14.050000"
@@ -326,6 +332,7 @@ DialogFrame {
             dxcc: dxccField.text, qsl_via: qslViaField.text,
             station_profile_id: root.profileId,
             radio_net_session_id: root.radioNetSessionId, radio_net_member_id: root.radioNetMemberId,
+            radio_net_session_uuid: root.radioNetSessionUuid, radio_net_log_context: root.radioNetLogContext,
             historical_entry: root.historicalMode, historical_use_profile: root.historicalMode && historicalProfile.checked
         })
         errorText.text = error

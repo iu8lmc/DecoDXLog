@@ -159,6 +159,16 @@ DialogFrame {
         }
         probeTimer.start()
     }
+    function probeStaleDraft() {
+        if (!root.net.start("Draft fixture",0) || !root.net.checkIn("K1AAA","Alice","")) { console.warn("PROBE radioNetStaleDraft setup failed " + root.net.error); return }
+        staleDraftPrepare.start()
+    }
+    Timer { id:staleDraftPrepare; interval:300; onTriggered: {
+        const row=memberList.itemAtIndex(0)
+        if (!row) { console.warn("PROBE radioNetStaleDraft no row"); return }
+        row.openQso(); console.warn("PROBE radioNetStaleDraft ready " + participantQso.visible); staleDraftSubmit.start()
+    } }
+    Timer { id:staleDraftSubmit; interval:2500; onTriggered:participantQso.probeRadioNetStaleDraft() }
     Timer {
         id: probeTimer
         interval: 300
@@ -327,6 +337,8 @@ DialogFrame {
                     participantQso.profileId = Number(root.current.stationProfileId || 0)
                     participantQso.radioNetSessionId = Number(root.current.id || 0)
                     participantQso.radioNetMemberId = Number(modelData.id || 0)
+                    participantQso.radioNetSessionUuid = root.current.uuid || ""
+                    participantQso.radioNetLogContext = decolog.radioNetDraftContext()
                     participantQso.initialCall = modelData.call
                     participantQso.initialName = modelData.name || ""
                     participantQso.open()

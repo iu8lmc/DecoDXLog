@@ -2359,6 +2359,22 @@ private slots:
         QVERIFY(adif.contains("<band_rx:4>70cm"));
     }
 
+    void radioNetDraftRejectsChangedSessionUuid()
+    {
+        using namespace decolog::core; QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true); const auto path=dir.filePath("test.sqlite");
+        { QSettings settings(iniPath(dir),QSettings::IniFormat); settings.setValue("ui/language","en"); settings.sync(); }
+        QProcessEnvironment env=QProcessEnvironment::systemEnvironment(); env.insert("QT_QPA_PLATFORM","offscreen"); env.insert("QT_QUICK_BACKEND","software");
+        env.insert("DECODXLOG_DATA_ROOT",dir.filePath("data")); env.insert("DECODXLOG_GRAB_MS","7000"); QProcess app; app.setProcessEnvironment(env); app.setProcessChannelMode(QProcess::MergedChannels);
+        app.start(QStringLiteral(DECOLOG_APP),{"--software-renderer","--settings",dir.filePath("settings"),"--db",path,"--port","0","--show","radionetstaledraftprobe","--grab",dir.filePath("screen.png")});
+        QVERIFY(app.waitForStarted(10000)); QByteArray output; QElapsedTimer timer; timer.start();
+        while (!output.contains("PROBE radioNetStaleDraft ready") && timer.elapsed()<15000 && app.state()!=QProcess::NotRunning) { app.waitForReadyRead(100); output+=app.readAll(); }
+        QVERIFY2(output.contains("PROBE radioNetStaleDraft ready true"),output.constData());
+        { LogDatabase writer; QVERIFY(writer.open(path)); QSqlQuery q(writer.connection()); QVERIFY(q.exec("UPDATE radio_net_session SET uuid='00000000-0000-4000-8000-000000000001' WHERE id=1")); }
+        QVERIFY(app.waitForFinished(20000)); output+=app.readAll(); QCOMPARE(app.exitStatus(),QProcess::NormalExit); QCOMPARE(app.exitCode(),0);
+        QVERIFY2(output.contains("PROBE radioNetStaleDraft result") && output.contains("\"visible\":true") &&
+                 output.contains("The radio net session or participant no longer matches this QSO.") && !output.contains("TypeError"),output.constData());
+        LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void radioNetRejectsReplacedOpenLog()
     {
 #ifndef Q_OS_UNIX

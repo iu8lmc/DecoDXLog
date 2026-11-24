@@ -106,7 +106,7 @@ QVariantMap RadioNet::session() const
         return {};
     QSqlQuery q(m_db->connection());
     q.prepare(QStringLiteral(
-        "SELECT id,title,started_at,ended_at,current_member_id,station_profile_id FROM radio_net_session WHERE id=?"));
+        "SELECT id,title,started_at,ended_at,current_member_id,station_profile_id,uuid FROM radio_net_session WHERE id=?"));
     q.addBindValue(m_sessionId);
     if (!q.exec() || !q.next())
         return {};
@@ -116,6 +116,7 @@ QVariantMap RadioNet::session() const
             {QStringLiteral("endedAt"), q.value(3)},
             {QStringLiteral("currentMemberId"), q.value(4)},
             {QStringLiteral("stationProfileId"), q.value(5)},
+            {QStringLiteral("uuid"), q.value(6)},
             {QStringLiteral("active"), q.value(3).isNull()}};
 }
 bool RadioNet::active() const { return session().value(QStringLiteral("active")).toBool(); }
