@@ -178,6 +178,11 @@ QList<AdifRecord> qrzConfirmations(const QList<AdifRecord>& records)
     return out;
 }
 
+bool mayAdvanceCursor(bool ranged, int databaseErrors)
+{
+    return !ranged && databaseErrors == 0;
+}
+
 QDateTime downloadSince(const QDateTime& lastSuccess, bool everything)
 {
     if (everything || !lastSuccess.isValid())

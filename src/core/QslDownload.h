@@ -78,6 +78,8 @@ QList<AdifRecord> inPeriod(const QList<AdifRecord>& records, const QDate& from, 
 // (quello che arrivava mentre si scaricava), tutto se non ce n'e' uno o se si
 // chiede tutto.
 QDateTime downloadSince(const QDateTime& lastSuccess, bool everything);
+// A partial date range or a database failure must not advance the full-sync cursor.
+bool mayAdvanceCursor(bool ranged, int databaseErrors);
 
 // Lo scarico automatico ogni `hours` ore: tocca se non si e' mai provato, o
 // se dall'ultimo tentativo (riuscito o no) sono passate le ore. Un tentativo

@@ -7036,7 +7036,7 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     // Il segno dell'ultimo scarico si sposta solo con lo scarico di tutto: uno
     // scarico per periodo lo porterebbe avanti e il prossimo "solo le nuove"
     // salterebbe le conferme degli altri QSO arrivate nel frattempo.
-    if (!report.lastQsl.isEmpty() && !ranged && tally.errors == 0)
+    if (!report.lastQsl.isEmpty() && confirmations::mayAdvanceCursor(ranged, tally.errors))
         m_db.setSetting(QStringLiteral("lotw.last_qsl"), report.lastQsl);
     m_db.setSetting(QStringLiteral("lotw.last_sync_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
 
@@ -7045,7 +7045,7 @@ void DecoLogController::onLotwReport(const lotw::Report& report)
     if (tally.errors > 0)
         m_lotwStatus += tr("; %1 database error(s), download cursor not advanced").arg(tally.errors);
     m_db.setSetting(QStringLiteral("lotw.last_result"), m_lotwStatus);
-    addActivity(QStringLiteral("LOTW"), m_lotwStatus, confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
+    addActivity(QStringLiteral("LOTW"), m_lotwStatus, tally.errors > 0 ? QStringLiteral("error") : confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     for (const QString& m : missing)
         addActivity(QStringLiteral("LOTW"), tr("  not in the log: %1").arg(m), QStringLiteral("warning"));
     if (invalid > 0)
@@ -7982,11 +7982,12 @@ void DecoLogController::onConfirmationReport(const confirmations::Report& report
     const QSet<QString> ft2Before = confirmedAwardKeys(QStringLiteral("ft2"));
     const ConfirmTally t = applyConfirmations(report.service, report.confirmations, a.only, a.except, a.label,
                                               a.credential);
+    if (t.errors > 0) m_confirmFailed = true;
     recordQslImport(a.label, report.service, t, !m_confirmAuto);
     // Uno scarico per un periodo non e' un «siamo allineati»: lo scarico di
     // sempre riparte da dove era.
     const bool ranged = m_confirmFrom.isValid() || m_confirmTo.isValid();
-    if (!ranged)
+    if (confirmations::mayAdvanceCursor(ranged, t.errors))
         m_db.setSetting(a.key + QStringLiteral(".last_sync_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
     m_confirmStatus = ranged
         ? tr("%1: %2 new confirmations in the period, %3 already marked, %4 not in the log")
@@ -7999,8 +8000,10 @@ void DecoLogController::onConfirmationReport(const confirmations::Report& report
               .arg(t.confirmed)
               .arg(t.already)
               .arg(t.notFound);
+    if (t.errors > 0)
+        m_confirmStatus += tr("; %1 database error(s), download cursor not advanced").arg(t.errors);
     m_db.setSetting(a.key + QStringLiteral(".last_result"), m_confirmStatus);
-    addActivity(category, m_confirmStatus, t.confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
+    addActivity(category, m_confirmStatus, t.errors > 0 ? QStringLiteral("error") : t.confirmed > 0 ? QStringLiteral("success") : QStringLiteral("info"));
     for (const QString& m : t.missing)
         addActivity(category, tr("  not in the log: %1").arg(m), QStringLiteral("warning"));
     if (t.invalid > 0)

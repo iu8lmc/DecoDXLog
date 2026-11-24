@@ -113,6 +113,13 @@ class TestQslDownload : public QObject {
     Q_OBJECT
 
 private slots:
+    void cursorRequiresCompleteDatabaseSuccess()
+    {
+        QVERIFY(confirmations::mayAdvanceCursor(false,0));
+        QVERIFY(!confirmations::mayAdvanceCursor(true,0));
+        QVERIFY(!confirmations::mayAdvanceCursor(false,1));
+        QVERIFY(!confirmations::mayAdvanceCursor(true,3));
+    }
     void missingCredentialsNeverOpenConnection()
     {
         FakeServer server;

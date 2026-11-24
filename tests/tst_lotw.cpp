@@ -191,6 +191,28 @@ private slots:
         QVERIFY(query.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(query.next()); QCOMPARE(query.value(0).toInt(),2);
     }
 
+    void downloadedGridIsRetainedOnlyForUniqueMatch()
+    {
+        FakeLotw server; server.body=kReport; LotwClient client; client.setEndpoint(server.url());
+        QSignalSpy done(&client,&LotwClient::finished); client.download("fixture","fixture",{}); QVERIFY(done.wait(5000));
+        const auto report=done.first().first().value<lotw::Report>(); QVERIFY(report.ok);
+        {
+            LogDatabase baseline; QVERIFY(baseline.open(":memory:"));
+            QVERIFY(baseline.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120200","FN41"),"fixture").id>0);
+            QCOMPARE(baseline.applyConfirmation("lotw",report.confirmations.first()).status,ConfirmationResult::Status::Confirmed);
+            QSqlQuery count(baseline.connection()); QVERIFY(count.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(count.next()); QCOMPARE(count.value(0).toInt(),0);
+        }
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto one=db.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120200","FN41"),"fixture",{},true,0,false);
+        const auto two=db.insertQso(qso("K1ABC","20m","MFSK","FT2","20260910","120400","FN40"),"fixture",{},true,0,false);
+        QVERIFY(one.id>0 && two.id>0);
+        QCOMPARE(db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true).status,ConfirmationResult::Status::Ambiguous);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0); q.finish();
+        QVERIFY(db.softDeleteQso(two.id));
+        QCOMPARE(db.applyConfirmation("lotw",report.confirmations.first(),1800,{}, {},true).status,ConfirmationResult::Status::Confirmed);
+        QVERIFY(q.exec("SELECT qso_id,grid FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toLongLong(),one.id); QCOMPARE(q.value(1).toString(),QString("FN42AB")); QVERIFY(!q.next());
+    }
+
     void storesSeparateGridObservationsIdempotently()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); qint64 id=0;
