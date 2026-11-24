@@ -576,6 +576,22 @@ bool LogDatabase::migrate()
               "qso_id INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE, "
               "observation_id INTEGER NOT NULL REFERENCES lotw_grid_observation(id) ON DELETE CASCADE, "
               "linked_at TEXT NOT NULL, PRIMARY KEY(qso_id,observation_id))")}, nullptr},
+        {35, {QStringLiteral("CREATE TABLE IF NOT EXISTS extension_qso_event ("
+              "sequence INTEGER PRIMARY KEY AUTOINCREMENT, qso_uuid TEXT NOT NULL, previous_qso_uuid TEXT, "
+              "revision INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('added','updated','deleted','confirmed')), "
+              "service TEXT NOT NULL DEFAULT '', recorded_at TEXT NOT NULL)"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qso_insert AFTER INSERT ON qso BEGIN "
+              "INSERT INTO extension_qso_event(qso_uuid,revision,kind,recorded_at) VALUES(NEW.uuid,NEW.revision,CASE WHEN NEW.deleted=1 THEN 'deleted' ELSE 'added' END,strftime('%Y-%m-%dT%H:%M:%fZ','now')); END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qso_update AFTER UPDATE OF uuid,revision,deleted ON qso "
+              "WHEN OLD.uuid IS NOT NEW.uuid OR OLD.revision IS NOT NEW.revision OR OLD.deleted IS NOT NEW.deleted BEGIN "
+              "INSERT INTO extension_qso_event(qso_uuid,previous_qso_uuid,revision,kind,recorded_at) VALUES(NEW.uuid,CASE WHEN OLD.uuid IS NOT NEW.uuid THEN OLD.uuid ELSE NULL END,NEW.revision,CASE WHEN NEW.deleted=1 THEN 'deleted' ELSE 'updated' END,strftime('%Y-%m-%dT%H:%M:%fZ','now')); END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qso_delete AFTER DELETE ON qso WHEN OLD.deleted=0 BEGIN "
+              "INSERT INTO extension_qso_event(qso_uuid,revision,kind,recorded_at) VALUES(OLD.uuid,OLD.revision,'deleted',strftime('%Y-%m-%dT%H:%M:%fZ','now')); END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qsl_insert AFTER INSERT ON qsl_status WHEN NEW.rcvd='Y' BEGIN "
+              "INSERT INTO extension_qso_event(qso_uuid,revision,kind,service,recorded_at) SELECT uuid,revision,'confirmed',NEW.service,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=NEW.qso_id AND deleted=0; END"),
+              QStringLiteral("CREATE TRIGGER IF NOT EXISTS extension_qsl_update AFTER UPDATE OF qso_id,service,rcvd ON qsl_status "
+              "WHEN NEW.rcvd='Y' AND (OLD.rcvd IS NOT 'Y' OR OLD.qso_id IS NOT NEW.qso_id OR OLD.service IS NOT NEW.service) BEGIN "
+              "INSERT INTO extension_qso_event(qso_uuid,revision,kind,service,recorded_at) SELECT uuid,revision,'confirmed',NEW.service,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM qso WHERE id=NEW.qso_id AND deleted=0; END")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)

@@ -34,7 +34,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 34;
+constexpr int kSchemaVersion = 35;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -70,6 +70,43 @@ class TestDatabase : public QObject {
     Q_OBJECT
 
 private slots:
+    void extensionEventJournalIsAtomicAndClassifiesQsoChanges()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("events.sqlite")));
+        QSqlQuery q(db.connection()); QVERIFY2(q.exec("SELECT COUNT(*) FROM extension_qso_event"), qPrintable(q.lastError().text()));
+        QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        const auto inserted = db.insertQso(AdifRecord{{"CALL","K1AAA"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture");
+        QVERIFY(inserted.id>0);
+        const QString id=QString::number(inserted.id);
+        QVERIFY(q.exec("SELECT kind FROM extension_qso_event ORDER BY sequence")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(),QString("added"));
+        QVERIFY(db.connection().transaction());
+        QVERIFY(q.exec("UPDATE qso SET revision=revision+1 WHERE id="+id));
+        QVERIFY(db.connection().rollback());
+        QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+        QVERIFY(q.exec("UPDATE qso SET revision=revision+1 WHERE id="+id));
+        QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd) VALUES("+id+",'lotw','N')"));
+        QVERIFY(q.exec("UPDATE qsl_status SET rcvd='Y' WHERE qso_id="+id+" AND service='lotw'"));
+        QVERIFY(q.exec("UPDATE qsl_status SET rcvd='Y' WHERE qso_id="+id+" AND service='lotw'"));
+        QVERIFY(q.exec("UPDATE qso SET deleted=1,revision=revision+1 WHERE id="+id));
+        QVERIFY(q.exec("SELECT kind,service FROM extension_qso_event ORDER BY sequence"));
+        QStringList kinds, services; while(q.next()) { kinds << q.value(0).toString(); services << q.value(1).toString(); }
+        QCOMPARE(kinds,QStringList({"added","updated","confirmed","deleted"}));
+        QCOMPARE(services.at(2),QString("lotw"));
+    }
+
+    void extensionEventMigrationPreservesExistingQsos()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("legacy.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path));
+          QVERIFY(db.insertQso(AdifRecord{{"CALL","K1OLD"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+          QSqlQuery q(db.connection());
+          for (const QString& name : {QStringLiteral("extension_qso_insert"),QStringLiteral("extension_qso_update"),QStringLiteral("extension_qso_delete"),QStringLiteral("extension_qsl_insert"),QStringLiteral("extension_qsl_update")})
+              QVERIFY2(q.exec("DROP TRIGGER " + name),qPrintable(q.lastError().text()));
+          QVERIFY(q.exec("DROP TABLE extension_qso_event")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=35")); }
+        { LogDatabase db; QVERIFY(db.open(path)); QCOMPARE(db.schemaVersion(),kSchemaVersion); QCOMPARE(db.qsoCount(),qint64(1));
+          QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT COUNT(*) FROM extension_qso_event")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0); }
+    }
+
     void logSessionTokenRejectsReopenAndReplacement()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("first.sqlite");
