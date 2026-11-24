@@ -855,7 +855,9 @@ DialogFrame {
             Text { Layout.fillWidth:true; visible:!!vuccHistory.result.error; wrapMode:Text.Wrap; color:Theme.warningColor; text:vuccHistory.result.error || "" }
             ListView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:vuccHistory.result.rows || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:ListView.view.width; wrapMode:Text.Wrap; color:Theme.textSecondary
-                    text:qsTr("%1 · grid %2 · boundary grids %3").arg(modelData.observedAt).arg(modelData.grid || "—").arg(modelData.vuccGrids || "—") } }
+                    text:qsTr("%1 · grid %2 · boundary grids %3").arg(modelData.observedAt).arg(modelData.grid || "—").arg(modelData.vuccGrids || "—")
+                        + (modelData.contextCount > 0 ? qsTr(" · latest match: %1 seconds apart, station %2, LoTW update %3 (%4 contexts)")
+                           .arg(modelData.distanceSeconds).arg(modelData.stationCall || "—").arg(modelData.rxqsl || "—").arg(modelData.contextCount) : "") } }
             RowLayout {
                 GlassButton { text:qsTr("Previous"); enabled:vuccHistory.page>0; onClicked:{vuccHistory.page--; vuccHistory.load()} }
                 Text { color:Theme.textSecondary; text:qsTr("Page %1").arg(vuccHistory.page+1) }

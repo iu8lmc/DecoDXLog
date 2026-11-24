@@ -236,6 +236,34 @@ private slots:
         QVERIFY(query.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(query.next()); QCOMPARE(query.value(0).toInt(),2);
     }
 
+    void retainsDistinctMatchContextsForSameGrid()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto id=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture").id;
+        QVERIFY(id>0);
+        auto report=qso("K1ABC","20m","CW","","20260910","120100","FN42");
+        report.set("STATION_CALLSIGN","IU8LMC"); report.set("APP_LOTW_RXQSL","2026-09-16 21:04:11");
+        QCOMPARE(db.applyConfirmation("lotw",report,1800,{}, {},true).status,ConfirmationResult::Status::Confirmed);
+        QCOMPARE(db.applyConfirmation("lotw",report,1800,{}, {},true).status,ConfirmationResult::Status::AlreadyConfirmed);
+        QSqlQuery q(db.connection());
+        QVERIFY(q.exec("SELECT distance_seconds,station_call,rxqsl FROM lotw_grid_match_context")); QVERIFY(q.next());
+        QCOMPARE(q.value(0).toInt(),60); QCOMPARE(q.value(1).toString(),QString("IU8LMC"));
+        QCOMPARE(q.value(2).toString(),QString("2026-09-16 21:04:11")); QVERIFY(!q.next());
+        report.set("APP_LOTW_RXQSL","2026-09-17 21:04:11");
+        QCOMPARE(db.applyConfirmation("lotw",report,1800,{}, {},true).status,ConfirmationResult::Status::AlreadyConfirmed);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_match_context")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),2);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+        const auto meta=db.meta(id); QVERIFY(meta);
+        const auto rows=db.lotwGridObservationPage(id,meta->uuid,meta->revision).value("rows").toList();
+        QCOMPARE(rows.size(),1); const auto row=rows.first().toMap();
+        QCOMPARE(row.value("contextCount").toInt(),2); QCOMPARE(row.value("distanceSeconds").toInt(),60);
+        QCOMPARE(row.value("rxqsl").toString(),QString("2026-09-17 21:04:11"));
+        QVERIFY(q.exec("CREATE TRIGGER reject_context BEFORE INSERT ON lotw_grid_match_context BEGIN SELECT RAISE(ABORT,'injected'); END"));
+        report.set("GRIDSQUARE","FN44");
+        QCOMPARE(db.applyConfirmation("lotw",report,1800,{}, {},true).status,ConfirmationResult::Status::Error);
+        QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+    }
+
     void delayedDownloadCanBeBoundToOriginalLog()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); FakeLotw server; server.body=kReport;

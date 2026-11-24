@@ -482,6 +482,10 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message>
+        <source> · latest match: %1 seconds apart, station %2, LoTW update %3 (%4 contexts)</source>
+        <translation> · ultimo abbinamento: distanza di %1 secondi, stazione %2, aggiornamento LoTW %3 (%4 contesti)</translation>
+    </message>
     <message><source>LoTW grid observation history</source><translation>Storico osservazioni locator LoTW</translation></message>
     <message><source>Stored observations are based on a local heuristic match and are not proof of award credit.</source><translation>Le osservazioni archiviate derivano da un abbinamento locale euristico e non costituiscono prova di credito per il diploma.</translation></message>
     <message><source>%1 · grid %2 · boundary grids %3</source><translation>%1 · locator %2 · locator di confine %3</translation></message>

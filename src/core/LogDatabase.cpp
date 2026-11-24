@@ -565,6 +565,11 @@ bool LogDatabase::migrate()
               "id INTEGER PRIMARY KEY, qso_id INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE, "
               "grid TEXT NOT NULL, vucc_grids TEXT NOT NULL, observed_at TEXT NOT NULL, "
               "UNIQUE(qso_id, grid, vucc_grids))")}, nullptr},
+        {32, {QStringLiteral("CREATE TABLE IF NOT EXISTS lotw_grid_match_context ("
+              "id INTEGER PRIMARY KEY, observation_id INTEGER NOT NULL REFERENCES lotw_grid_observation(id) ON DELETE CASCADE, "
+              "distance_seconds INTEGER NOT NULL CHECK(distance_seconds>=0), station_call TEXT NOT NULL, "
+              "source_qso_time TEXT NOT NULL, rxqsl TEXT NOT NULL, recorded_at TEXT NOT NULL, "
+              "UNIQUE(observation_id,distance_seconds,station_call,source_qso_time,rxqsl))")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -2754,15 +2759,21 @@ QVariantMap LogDatabase::lotwGridObservationPage(qint64 qsoId, const QString& uu
     if (!current || current->deleted || current->uuid!=uuid || current->revision!=revision) {
         rollback(); return fail(QStringLiteral("QSO changed; refresh the preview"));
     }
-    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT id,grid,vucc_grids,observed_at FROM lotw_grid_observation "
-        "WHERE qso_id=? AND id<? ORDER BY id DESC LIMIT 51"));
+    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT id,grid,vucc_grids,observed_at, "
+        "(SELECT COUNT(*) FROM lotw_grid_match_context c WHERE c.observation_id=o.id), "
+        "(SELECT distance_seconds FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1), "
+        "(SELECT station_call FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1), "
+        "(SELECT rxqsl FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1) "
+        "FROM lotw_grid_observation o WHERE qso_id=? AND id<? ORDER BY id DESC LIMIT 51"));
     q.addBindValue(qsoId); q.addBindValue(beforeId>0 ? beforeId : std::numeric_limits<qint64>::max());
     if (!q.exec()) { const QString error=q.lastError().text(); rollback(); return fail(error); }
     QVariantList rows; qint64 last=0; bool more=false;
     while (q.next()) {
         if (rows.size()==50) { more=true; break; }
         last=q.value(0).toLongLong(); rows << QVariantMap{{QStringLiteral("id"),QString::number(last)},
-            {QStringLiteral("grid"),q.value(1)}, {QStringLiteral("vuccGrids"),q.value(2)}, {QStringLiteral("observedAt"),q.value(3)}};
+            {QStringLiteral("grid"),q.value(1)}, {QStringLiteral("vuccGrids"),q.value(2)}, {QStringLiteral("observedAt"),q.value(3)},
+            {QStringLiteral("contextCount"),q.value(4)}, {QStringLiteral("distanceSeconds"),q.value(5)},
+            {QStringLiteral("stationCall"),q.value(6)}, {QStringLiteral("rxqsl"),q.value(7)}};
     }
     if (q.lastError().isValid()) { const QString error=q.lastError().text(); rollback(); return fail(error); }
     q.finish();
@@ -2904,6 +2915,22 @@ ConfirmationResult LogDatabase::applyConfirmation(const QString& service, const 
     };
     if (retain && !recordLotwGridObservation(best, observedGrid, observedGrids, &res.message)) {
         rollbackObservation(); res.status = ConfirmationResult::Status::Error; return res;
+    }
+    if (retain) {
+        const QString rxqsl=c.value(QStringLiteral("APP_LOTW_RXQSL"));
+        if (lotwStation.size()>1024 || rxqsl.size()>1024) {
+            rollbackObservation(); res.status=ConfirmationResult::Status::Error;
+            res.message=QStringLiteral("Invalid LoTW match context"); return res;
+        }
+        QSqlQuery context(connection());
+        context.prepare(QStringLiteral("INSERT INTO lotw_grid_match_context(observation_id,distance_seconds,station_call,source_qso_time,rxqsl,recorded_at) "
+            "SELECT id,?,?,?,?,? FROM lotw_grid_observation WHERE qso_id=? AND grid=? AND vucc_grids=? "
+            "ON CONFLICT(observation_id,distance_seconds,station_call,source_qso_time,rxqsl) DO NOTHING"));
+        context.addBindValue(bestDistance); context.addBindValue(lotwStation.isNull()?QStringLiteral(""):lotwStation);
+        context.addBindValue(iso); context.addBindValue(rxqsl.isNull()?QStringLiteral(""):rxqsl); context.addBindValue(nowIso());
+        context.addBindValue(best); context.addBindValue(observedGrid.isNull()?QStringLiteral(""):observedGrid);
+        context.addBindValue(observedGrids.isNull()?QStringLiteral(""):observedGrids);
+        if (!context.exec()) { res.message=context.lastError().text(); rollbackObservation(); res.status=ConfirmationResult::Status::Error; return res; }
     }
     if (bestConfirmed) {
         if (retain && !observationTransaction.exec(QStringLiteral("RELEASE SAVEPOINT decolog_lotw_grid_observation"))) {
