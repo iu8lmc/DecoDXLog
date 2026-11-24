@@ -256,7 +256,9 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "(SELECT COUNT(*) FROM lotw_grid_observation o WHERE o.id IN (SELECT id FROM lotw_grid_observation WHERE qso_id=q.id UNION "
             "SELECT observation_id FROM lotw_grid_observation_link WHERE qso_id=q.id)), q.uuid, q.revision "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
-            "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%' OR q.adif_extra LIKE '%\"GRIDSQUARE\"%') ORDER BY q.id"))) {
+            "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR EXISTS(SELECT 1 FROM json_each("
+            "CASE WHEN json_valid(q.adif_extra) THEN q.adif_extra ELSE '{}' END) "
+            "WHERE upper(key) IN ('VUCC_GRIDS','GRIDSQUARE'))) ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
         return {};
     }
@@ -291,7 +293,9 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
                 if (error) *error = QStringLiteral("QSO %1: invalid ADIF extra data").arg(entry.qsoId);
                 return {};
             }
-            const QJsonObject object = doc.object();
+            QJsonObject object;
+            const auto rawObject=doc.object();
+            for (auto it=rawObject.constBegin(); it!=rawObject.constEnd(); ++it) object.insert(it.key().toUpper(),it.value());
             const QJsonValue grids = object.value(QStringLiteral("VUCC_GRIDS"));
             const QJsonValue myGrids = object.value(QStringLiteral("MY_VUCC_GRIDS"));
             const QJsonValue myGrid = object.value(QStringLiteral("MY_GRIDSQUARE"));

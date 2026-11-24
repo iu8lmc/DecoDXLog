@@ -11,6 +11,21 @@ using namespace decolog::core::vucc;
 class TestVucc : public QObject {
     Q_OBJECT
 private slots:
+    void readsEscapedAndMixedCaseAdifKeys()
+    {
+        using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:"));
+        for (const auto* call : {"K1AAA","K1BBB"}) {
+            AdifRecord r{{"CALL",call},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","6m"},{"MODE","CW"},{"GRIDSQUARE","EM10"},{"QSL_RCVD","Y"}};
+            QVERIFY(db.insertQso(r,"fixture",{},true,0,false).id>0);
+        }
+        QSqlQuery q(db.connection()); q.prepare("UPDATE qso SET gridsquare='',adif_extra=? WHERE call=?");
+        q.addBindValue(QStringLiteral(R"({"\u0047RIDSQUARE":"EM15","band":"2m"})")); q.addBindValue("K1AAA"); QVERIFY(q.exec());
+        q.addBindValue(QStringLiteral(R"({"gridsquare":"EM16","prop_mode":"SAT","sat_name":"AO-91"})")); q.addBindValue("K1BBB"); QVERIFY(q.exec());
+        QString error; const auto entries=loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(entries.size(),2);
+        const auto terrestrial=select(entries,Rules{{},{},"2m",100,"terrestrial"}); QCOMPARE(terrestrial.eligible.size(),1); QCOMPARE(terrestrial.eligible.first().grid,QString("EM15"));
+        const auto satellite=select(entries,Rules{{},{},"",100,"satellite"}); QCOMPARE(satellite.eligible.size(),1); QCOMPARE(satellite.eligible.first().grid,QString("EM16"));
+        QCOMPARE(db.record(1)->value("GRIDSQUARE"),QString("EM15")); QCOMPARE(db.record(2)->value("PROP_MODE"),QString("SAT"));
+    }
     void respectsEffectiveAdifPropagationBandAndDate()
     {
         using namespace decolog::core; LogDatabase db; QVERIFY(db.open(":memory:"));
