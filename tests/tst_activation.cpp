@@ -688,13 +688,16 @@ private slots:
             "SELECT printf('bench-%d',i),'K1ABC','2027-01-01T12:00:00Z','20m','CW','2027-01-01T12:00:00Z','2027-01-01T12:00:00Z',? FROM n"));
         seed.addBindValue(json); QVERIFY2(seed.exec(),qPrintable(seed.lastError().text()));
         QVERIFY2(seed.exec("INSERT INTO qsl_status(qso_id,service,sent,rcvd) SELECT id,'lotw','Y','N' FROM qso"),qPrintable(seed.lastError().text()));
+        const bool reviews = qEnvironmentVariableIsSet("DECOLOG_BENCH_POTA_REVIEW");
+        if (reviews) QVERIFY(seed.exec("UPDATE qso SET pota_ref='US-0001,US-0002'"));
         QElapsedTimer timer; timer.start(); int ticks=0; qint64 last=0, maxGap=0;
         QTimer heartbeat; heartbeat.setInterval(10); QObject::connect(&heartbeat,&QTimer::timeout,[&] { const qint64 now=timer.elapsed(); maxGap=qMax(maxGap,now-last); last=now; ++ticks; }); heartbeat.start();
         QSignalSpy done(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
         QVERIFY(done.wait(30000)); heartbeat.stop(); const qint64 elapsed=timer.elapsed(); QVERIFY(ticks>0); QVERIFY2(done.first().first().toBool(),qPrintable(act.previewResult().value("error").toString()));
         const auto result=act.previewResult(); QCOMPARE(result.value("reportedCount").toInt(),20000); QCOMPARE(result.value("groups").toList().size(),2);
+        QCOMPARE(result.value("potaCorrespondentRows").toList().size(),reviews ? 20000 : 0);
         for (const auto& group:result.value("groups").toList()) QCOMPARE(group.toMap().value("count").toInt(),20000);
-        qInfo("ACTIVATION_PARTITION_BENCH qso=20000 qsl=20000 groups=2 elapsed_ms=%lld ticks=%d max_gap_ms=%lld",static_cast<long long>(elapsed),ticks,static_cast<long long>(maxGap));
+        qInfo("ACTIVATION_PARTITION_BENCH qso=20000 qsl=20000 groups=2 review=%d elapsed_ms=%lld ticks=%d max_gap_ms=%lld",reviews,static_cast<long long>(elapsed),ticks,static_cast<long long>(maxGap));
     }
 
     void asynchronousPreviewCanCompleteCancelAndInvalidate()

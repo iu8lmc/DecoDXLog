@@ -2719,3 +2719,11 @@ Removed the 200-contact truncation from POTA correspondent review results. The p
 A/B on macOS arm64 / Qt 6.11.2: a synthetic session with 205 flagged contacts and two parks previously returned 200 rows; afterwards it returned all 205 once, with 205 in each park's group count. An offscreen app test navigated to the third page and observed contact K0200; the existing single-row navigation test also passed. App and test targets built; CTest activation, database, migration and qmlpopups passed 4/4.
 
 The fixture does not measure memory, cold storage or responsiveness on very large sessions, nor does it prove physical UI operation, live POTA or Windows/Linux behaviour. Results still require operator review and can become stale; full G06/G13 acceptance remains open.
+
+## 2026-11-24 — G06 synthetic POTA review load
+
+Extended the opt-in 20,000-QSO, 20,000-QSL-row, two-park preview benchmark to compare no correspondent review rows against every QSO requiring review. Both variants check group counts and expected review-list size. No product behaviour changed.
+
+A/B on one macOS arm64 / Qt 6.11.2 run with `/usr/bin/time -l`: no review rows took 356 ms with 35 heartbeat callbacks, 11 ms maximum observed gap and 37,519,360 bytes peak process RSS; 20,000 review rows took 370 ms with 37 callbacks, 12 ms maximum gap and 52,215,808 bytes peak process RSS. Peak RSS includes the whole test process and fixture setup, not just the result list. Separate untimed runs measured 357 and 368 ms. Commands used `DECOLOG_BENCH_ACTIVATION_PARTITIONS=1` and additionally `DECOLOG_BENCH_POTA_REVIEW=1` for the second case. CTest activation, database, migration and qmlpopups passed 4/4.
+
+The approximately 14 MB observed peak RSS difference confirms that storing every review row has a real memory cost on this fixture; database-backed pagination remains open. These isolated warm-cache synthetic observations are not p95, do not measure actual UI rendering or interaction, concurrent writers, slow storage, larger sessions or Windows/Linux. G06/G13 acceptance remains open.
