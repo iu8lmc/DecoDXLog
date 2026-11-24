@@ -1,6 +1,7 @@
 #include "core/ActivityReport.h"
 #include "core/NewQsoFields.h"
 #include "core/LogDatabase.h"
+#include "core/LogTime.h"
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QVariantMap>
@@ -171,8 +172,8 @@ Result runConfirmations(const QSqlDatabase& db,int utcYear,const QString& band)
         const QString received=q.value(2).toString().trimmed();
         if (received.isEmpty()) { ++c.missing; continue; }
         const QDate receivedDate=QDate::fromString(received,QStringLiteral("yyyyMMdd"));
-        const QDateTime when=QDateTime::fromString(q.value(1).toString(),Qt::ISODate);
-        if (!receivedDate.isValid() || receivedDate.toString(QStringLiteral("yyyyMMdd"))!=received || !when.isValid() || when.timeSpec()==Qt::LocalTime) { ++c.invalid; continue; }
+        const QDateTime when=logtime::fromStoredQso(q.value(1).toString());
+        if (!receivedDate.isValid() || receivedDate.toString(QStringLiteral("yyyyMMdd"))!=received || !when.isValid()) { ++c.invalid; continue; }
         const qint64 days=when.toUTC().date().daysTo(receivedDate);
         if (days<0) { ++c.earlier; continue; }
         ++c.dated; c.days+=days;

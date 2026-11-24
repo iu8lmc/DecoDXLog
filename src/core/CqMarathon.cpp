@@ -3,6 +3,7 @@
 #include "core/Bands.h"
 #include "core/Maidenhead.h"
 #include "core/Modes.h"
+#include "core/LogTime.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -27,13 +28,13 @@ ReviewAdif reviewAdif(const LogDatabase& database,int year,qint64 stationProfile
     if (!q.exec()) { out.error=q.lastError().text(); db.rollback(); return out; }
     QList<qint64> ids; QList<QDateTime> starts,ends;
     while (q.next()) {
-        const auto timestamp=QDateTime::fromString(q.value(1).toString(),Qt::ISODateWithMs);
-        if (!timestamp.isValid() || timestamp.timeSpec()==Qt::LocalTime) { ++out.invalidTimestamp; continue; }
+        const auto timestamp=logtime::fromStoredQso(q.value(1).toString());
+        if (!timestamp.isValid()) { ++out.invalidTimestamp; continue; }
         if (timestamp.toUTC().date().year()==year) {
             const QString rawEnd=q.value(2).toString(); QDateTime end;
             if (!rawEnd.isEmpty()) {
-                end=QDateTime::fromString(rawEnd,Qt::ISODateWithMs);
-                if (!end.isValid() || end.timeSpec()==Qt::LocalTime) { q.finish(); db.rollback(); out.error=QStringLiteral("A selected QSO has an invalid end timestamp"); return out; }
+                end=logtime::fromStoredQso(rawEnd);
+                if (!end.isValid()) { q.finish(); db.rollback(); out.error=QStringLiteral("A selected QSO has an invalid end timestamp"); return out; }
             }
             ids.append(q.value(0).toLongLong()); starts.append(timestamp.toUTC()); ends.append(end.isValid()?end.toUTC():QDateTime());
         }
@@ -336,8 +337,8 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         entry.cqZone = query.value(3).toInt();
         entry.band = query.value(4).toString();
         entry.mode = query.value(5).toString();
-        const auto timestamp=QDateTime::fromString(query.value(6).toString(),Qt::ISODateWithMs);
-        if (timestamp.isValid() && timestamp.timeSpec()!=Qt::LocalTime) entry.timestamp=timestamp.toUTC();
+        const auto timestamp=logtime::fromStoredQso(query.value(6).toString());
+        if (timestamp.isValid()) entry.timestamp=timestamp;
         entry.stationProfileId = query.value(7).toLongLong();
         entry.propMode=query.value(9).toString(); entry.satName=query.value(10).toString();
         if (!query.value(11).isNull()) {

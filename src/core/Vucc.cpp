@@ -1,11 +1,11 @@
 #include "core/Vucc.h"
 #include "core/Maidenhead.h"
+#include "core/LogTime.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QDateTime>
-#include <QTimeZone>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -271,7 +271,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         // Inputs passed directly to select() still require an explicit zone.
         QDateTime recorded=QDateTime::fromString(entry.qsoUtc,Qt::ISODateWithMs);
         if (recorded.isValid() && recorded.timeSpec()==Qt::LocalTime) {
-            recorded.setTimeZone(QTimeZone::UTC);
+            recorded=logtime::fromStoredQso(entry.qsoUtc);
             entry.qsoUtc=recorded.toString(Qt::ISODateWithMs);
             if (recorded.time().msec()==0) entry.qsoUtc=recorded.toString(Qt::ISODate);
         }

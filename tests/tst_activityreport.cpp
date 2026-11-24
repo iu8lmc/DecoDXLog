@@ -212,6 +212,7 @@ private slots:
         QSqlQuery q(db.connection());
         QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd,rcvd_date) VALUES (1,'card','Y','20260101'),(2,'card','Y','20260103'),(3,'card','Y',NULL),(4,'card','Y','20260230'),(5,'card','Y','20251231'),(1,'lotw','Y','20260111'),(2,'eqsl','N','20260104'),(3,'qrz','Y',NULL)"));
         QVERIFY(q.exec("INSERT INTO qsl_status(qso_id,service,rcvd,rcvd_date) VALUES (6,'card','Y','20250102'),(7,'card','Y','20260102')"));
+        QVERIFY(q.exec("UPDATE qso SET qso_datetime_on='2026-01-01T12:00:00' WHERE call='K1BBB'"));
         const auto result=activityreport::runConfirmations(db.connection(),2026,"20m"); QVERIFY2(result.error.isEmpty(),qPrintable(result.error));
         QCOMPARE(result.rows.size(),3); const auto card=result.rows[0].toMap(); const auto lotw=result.rows[1].toMap();
         QCOMPARE(card.value("service").toString(),QString("card")); QCOMPARE(card.value("confirmed").toInt(),5);

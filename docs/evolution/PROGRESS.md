@@ -2995,3 +2995,11 @@ VUCC now normalizes an unzoned timestamp read from a local QSO as UTC wall time,
 A/B on macOS arm64 / Qt 6.11.2: the database-backed VUCC boundary fixture initially rejected an unzoned 1983-01-01 QSO; it now includes that candidate, retains the raw database value and still rejects a directly supplied unzoned entry and malformed data. An offscreen desktop fixture displays the normalized boundary candidate and the pre-1983 exclusion. App and tests built; CTest database, dxcampaign, migration, vucc and qmlpopups passed 5/5, and the focused desktop fixture passed separately.
 
 The legacy convention cannot verify the source clock, and selection is not proof of official eligibility or credit. The UI run is synthetic and programmatic. Other paths including Marathon and confirmation-delay reporting still treat unzoned legacy timestamps differently and require review. Live ARRL, physical UI, Windows/Linux and full G02/G13 acceptance remain open.
+
+## 2026-11-24 — G02/G07 legacy UTC in Marathon and confirmation reports
+
+Database-backed CQ Marathon preview and review ADIF export now interpret unzoned legacy QSO start and end timestamps as UTC wall time, as does the confirmation-delay report. A shared stored-QSO time helper also replaces equivalent code in campaign and VUCC loading. Direct external Marathon and VUCC selection entries retain their existing explicit-zone requirement; stored raw values are not changed.
+
+A/B on macOS arm64 / Qt 6.11.2: before the change, a Marathon fixture rejected a legacy QSO and the confirmation-delay fixture classified a valid legacy date as invalid. Both now pass, including Marathon start/end times in exported review ADIF, raw database preservation, truly malformed timestamps, offset handling and existing confirmation statistics. App and tests built; CTest activityreport, dxcampaign, cqmarathon, vucc and qmlpopups passed 5/5. The focused Marathon test passed again after final raw/export assertions; the offscreen VUCC boundary fixture also passed.
+
+The convention cannot establish the original operator's clock accuracy. The Marathon and confirmation cases are synthetic core tests, not organiser acceptance, service interoperability or physical desktop checks. Other timestamp-consuming paths have not been comprehensively audited; Windows/Linux and full G02/G07/G13 acceptance remain open.

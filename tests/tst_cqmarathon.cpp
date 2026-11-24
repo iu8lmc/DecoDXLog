@@ -185,12 +185,18 @@ private slots:
         QVERIFY(add("K1AAA","20260101",291,5,profile)>0); QVERIFY(add("K1BBB","20260102",291,5,profile)>0);
         QVERIFY(add("K1CCC","20260103",0,3,profile)>0); QVERIFY(add("K1DDD","20250101",291,5,profile)>0); QVERIFY(add("K1EEE","20260101",291,5,other)>0); QVERIFY(add("K1BAD","20260101",291,5,profile)>0);
         QSqlQuery shift(db.connection()); QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2027-01-01T00:30:00+01:00',qso_datetime_off='2027-01-01T00:35:00+01:00' WHERE call='K1AAA'"));
-        QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2026-01-01T12:00:00' WHERE call='K1BAD'"));
+        QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='invalid' WHERE call='K1BAD'"));
+        QVERIFY(shift.exec("UPDATE qso SET qso_datetime_on='2026-01-02T12:00:00',qso_datetime_off='2026-01-02T12:05:00' WHERE call='K1BBB'"));
+        QString loadError; const auto loaded=loadEntries(db,&loadError); QVERIFY2(loadError.isEmpty(),qPrintable(loadError));
+        bool foundLegacy=false; for (const auto& entry:loaded) if (entry.call=="K1BBB") { foundLegacy=true; QVERIFY(entry.timestamp.isValid()); QCOMPARE(entry.timestamp.timeSpec(),Qt::UTC); }
+        QVERIFY(foundLegacy);
         const auto report=reviewAdif(db,2026,profile); QVERIFY2(report.error.isEmpty(),qPrintable(report.error)); QCOMPARE(report.count,3); QCOMPARE(report.invalidTimestamp,1);
         const QString sample=qEnvironmentVariable("DECOLOG_MARATHON_SAMPLE");
         if (!sample.isEmpty()) { QFile file(sample); QVERIFY(file.open(QIODevice::WriteOnly|QIODevice::Truncate)); QCOMPARE(file.write(report.bytes),qint64(report.bytes.size())); }
         const auto parsed=adif::parse(report.bytes); QCOMPARE(parsed.records.size(),3);
-        QSet<QString> calls; for (const auto &r:parsed.records) { calls.insert(r.value("CALL")); QCOMPARE(r.value("APP_TEST"),QString("kept")); }
+        QSet<QString> calls; for (const auto &r:parsed.records) { calls.insert(r.value("CALL")); QCOMPARE(r.value("APP_TEST"),QString("kept"));
+            if (r.value("CALL")=="K1BBB") { QCOMPARE(r.value("QSO_DATE"),QString("20260102")); QCOMPARE(r.value("TIME_ON"),QString("120000")); QCOMPARE(r.value("TIME_OFF"),QString("120500")); } }
+        QVERIFY(shift.exec("SELECT qso_datetime_on FROM qso WHERE call='K1BBB'")); QVERIFY(shift.next()); QCOMPARE(shift.value(0).toString(),QString("2026-01-02T12:00:00")); shift.finish();
         QCOMPARE(parsed.records[0].value("QSO_DATE"),QString("20261231")); QCOMPARE(parsed.records[0].value("TIME_ON"),QString("233000")); QCOMPARE(parsed.records[0].value("TIME_OFF"),QString("233500"));
         QVERIFY(calls.contains("K1AAA") && calls.contains("K1BBB") && calls.contains("K1CCC")); QCOMPARE(db.qsoCount(),qint64(6));
         QVERIFY(!reviewAdif(db,2026,0).error.isEmpty());
