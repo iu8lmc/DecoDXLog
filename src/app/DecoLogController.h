@@ -555,6 +555,7 @@ public:
     bool dxCampaignBusy() const { return m_dxCampaignBusy; }
     QString dxCampaignError() const { return m_dxCampaignError; }
     Q_INVOKABLE QVariantMap dxCampaignReviewContext() const;
+    Q_INVOKABLE QVariantMap dxCampaignHistory(const QString& id, int beforeRevision, const QVariantMap& context) const;
     Q_INVOKABLE QVariantMap radioNetDraftContext() const { return dxCampaignReviewContext(); }
     Q_INVOKABLE bool saveDxCampaign(const QVariantMap& values);
     Q_INVOKABLE bool selectDxCampaign(const QString& id);

@@ -14,6 +14,24 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void campaignRevisionsSurviveUpdatesAndRestart()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("history.sqlite"); QString id;
+        { LogDatabase db; QVERIFY(db.open(path)); dxcampaign::Campaign c;
+          c.title="History"; c.calls={"3Y0J"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,3); c.source="fixture";
+          c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"};
+          QString error; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error)); id=c.id;
+          c.calls << "3Y0K"; c.end=QDate(2026,1,8); QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+          c.archived=true; QVERIFY2(dxcampaign::save(db,c,&error),qPrintable(error));
+          auto page=dxcampaign::history(db,id,c.revision,1,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(page.size(),1); QCOMPARE(page.first().revision,2); QCOMPARE(page.first().calls.size(),2);
+          page=dxcampaign::history(db,id,page.first().revision,1,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(page.size(),1); QCOMPARE(page.first().revision,1); QCOMPARE(page.first().calls.size(),1);
+          QSqlQuery q(db.connection()); q.prepare("SELECT value FROM app_setting WHERE key=?"); q.addBindValue("dx_campaign_revision."+id+".1"); QVERIFY(q.exec()); QVERIFY(q.next());
+          const auto first=QJsonDocument::fromJson(q.value(0).toByteArray()).object(); QCOMPARE(first.value("end").toString(),QStringLiteral("2026-01-03")); QCOMPARE(first.value("revision").toInt(),1);
+          QVERIFY(q.exec("CREATE TRIGGER reject_campaign_history BEFORE INSERT ON app_setting WHEN NEW.key LIKE 'dx_campaign_revision.%' BEGIN SELECT RAISE(ABORT,'history fault'); END"));
+          c.end=QDate(2026,1,10); QVERIFY(!dxcampaign::save(db,c,&error)); QCOMPARE(c.revision,3);
+          const auto current=dxcampaign::load(db,id); QVERIFY(current); QCOMPARE(current->end,QDate(2026,1,8)); }
+        LogDatabase db; QVERIFY(db.open(path)); QSqlQuery q(db.connection()); q.prepare("SELECT COUNT(*) FROM app_setting WHERE key LIKE ?"); q.addBindValue("dx_campaign_revision."+id+".%"); QVERIFY(q.exec()); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),2);
+    }
     void campaignReviewContextRejectsReopenAndReplacement()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("review.sqlite"), copy=dir.filePath("copy.sqlite");

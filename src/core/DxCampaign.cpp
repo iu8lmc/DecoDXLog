@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRegularExpression>
+#include <QScopeGuard>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QUuid>
@@ -119,6 +120,10 @@ bool save(LogDatabase& db,Campaign& c,QString* error)
     const bool creating=c.id.isEmpty(); Campaign next=c;
     if(creating) { next.id=QUuid::createUuid().toString(QUuid::WithoutBraces); next.revision=1; }
     else if(c.revision<1 || c.revision==std::numeric_limits<int>::max()) return fail(error,QStringLiteral("Campaign revision invalid"));
+    QSqlQuery begin(db.connection());
+    if (!begin.exec(QStringLiteral("BEGIN IMMEDIATE"))) return fail(error,begin.lastError().text());
+    bool committed=false;
+    const auto rollback=qScopeGuard([&] { if (!committed) db.connection().rollback(); });
     QSqlQuery query(db.connection());
     if(creating) {
         query.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?)"));
@@ -128,12 +133,19 @@ bool save(LogDatabase& db,Campaign& c,QString* error)
         if(!get.exec() || !get.next()) return fail(error,QStringLiteral("Campaign unavailable"));
         const QString old=get.value(0).toString(); const auto existing=decode(old);
         if(!existing || existing->revision!=c.revision) return fail(error,QStringLiteral("Campaign changed; reload before saving"));
+        QSqlQuery history(db.connection());
+        history.prepare(QStringLiteral("INSERT INTO app_setting(key,value) VALUES(?,?)"));
+        history.addBindValue(QStringLiteral("dx_campaign_revision.")+c.id+QLatin1Char('.')+QString::number(c.revision));
+        history.addBindValue(old);
+        if (!history.exec()) return fail(error,history.lastError().text());
         ++next.revision;
         query.prepare(QStringLiteral("UPDATE app_setting SET value=? WHERE key=? AND value=?"));
         query.addBindValue(QString::fromUtf8(QJsonDocument(encode(next)).toJson(QJsonDocument::Compact))); query.addBindValue(prefix+c.id); query.addBindValue(old);
     }
     if(!query.exec()) return fail(error,query.lastError().text());
     if(query.numRowsAffected()!=1) return fail(error,QStringLiteral("Campaign changed; reload before saving"));
+    if (!db.connection().commit()) return fail(error,db.connection().lastError().text());
+    committed=true;
     c=next; if(error) error->clear(); return true;
 }
 std::optional<Campaign> load(const LogDatabase& db,const QString& id,QString* error)
@@ -144,6 +156,28 @@ std::optional<Campaign> load(const LogDatabase& db,const QString& id,QString* er
     if(!q.next()) { fail(error,QStringLiteral("Campaign unavailable")); return {}; }
     auto c=decode(q.value(0).toString()); if(!c || c->id!=id) { fail(error,QStringLiteral("Invalid campaign data")); return {}; }
     if(error) error->clear(); return c;
+}
+QList<Campaign> history(const LogDatabase& db,const QString& id,int beforeRevision,int limit,QString* error)
+{
+    QList<Campaign> out;
+    if (beforeRevision<1 || limit<1 || limit>101) { fail(error,QStringLiteral("Invalid history page")); return out; }
+    QString loadError;
+    if (!load(db,id,&loadError)) { fail(error,loadError); return out; }
+    const QString keyPrefix=QStringLiteral("dx_campaign_revision.")+id+QLatin1Char('.');
+    QSqlQuery q(db.connection());
+    q.prepare(QStringLiteral("SELECT key,value FROM app_setting WHERE substr(key,1,?)=? AND CAST(substr(key,?) AS INTEGER)<? ORDER BY CAST(substr(key,?) AS INTEGER) DESC LIMIT ?"));
+    q.addBindValue(keyPrefix.size()); q.addBindValue(keyPrefix); q.addBindValue(keyPrefix.size()+1);
+    q.addBindValue(beforeRevision); q.addBindValue(keyPrefix.size()+1); q.addBindValue(limit);
+    if (!q.exec()) { fail(error,q.lastError().text()); return {}; }
+    while (q.next()) {
+        const auto row=decode(q.value(1).toString());
+        if (!row || row->id!=id || q.value(0).toString()!=keyPrefix+QString::number(row->revision) || row->revision>=beforeRevision) {
+            fail(error,QStringLiteral("Invalid campaign history")); return {};
+        }
+        out << *row;
+    }
+    if (q.lastError().isValid()) { fail(error,q.lastError().text()); return {}; }
+    if (error) error->clear(); return out;
 }
 QList<Campaign> list(const LogDatabase& db,QString* error,int* invalidCount)
 {

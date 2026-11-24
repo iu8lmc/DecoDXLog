@@ -281,6 +281,16 @@ GlassPanel {
             saveCampaign.clicked(); campaignProbeResult.start()
         })
     }
+    function probeCampaignHistory() {
+        const campaigns=root.campaignBackend.dxCampaigns
+        if (!campaigns.length) { console.warn("PROBE dxhistory missing campaign"); return }
+        campaignDialog.edit(campaigns[0]); campaignHistory.displayHistory(campaigns[0],campaignDialog.logContext)
+        historyProbeResult.start()
+    }
+    Timer { id:historyProbeResult; interval:500; onTriggered: {
+        const row=campaignHistoryList.itemAtIndex(0)
+        console.warn("PROBE dxhistory " + JSON.stringify({visible:campaignHistory.visible,rows:campaignHistory.rows,error:campaignHistory.historyError,rendered:row ? row.text : ""}))
+    } }
     function probeCampaignRestore() {
         campaignDialog.edit({bands:["20m"],modes:["CW"]})
         const campaigns=root.campaignBackend.dxCampaigns
@@ -349,6 +359,52 @@ GlassPanel {
             const rows=root.campaignBackend.dxCampaignMatrix
             if ((root.campaignBackend.cards.operationBusy || root.campaignBackend.dxCampaignBusy || !rows.length || rows[0].confirmed!==1) && ++tries<40) return
             stop(); console.warn("PROBE dxcampaign new confirmation " + JSON.stringify(rows))
+        }
+    }
+
+    DialogFrame {
+        id:campaignHistory
+        objectName:"dxCampaignHistory"
+        transientParent:root.Window.window
+        title:qsTr("Campaign history")
+        info:qsTr("Previous saved revisions")
+        width:760; height:560
+        property string campaignId:""
+        property var logContext:({})
+        property var rows:[]
+        property bool hasMore:false
+        property string historyError:""
+        function displayHistory(c,context) {
+            campaignId=c.id; logContext=context; rows=[]; hasMore=false; historyError=""
+            page(c.revision); open()
+        }
+        function page(before) {
+            const result=root.campaignBackend.dxCampaignHistory(campaignId,before,logContext)
+            historyError=result.error || ""; rows=result.rows || []; hasMore=!!result.hasMore
+        }
+        body:ColumnLayout {
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:root.mutedColor
+                text:qsTr("Only changes saved after history was introduced are available. Older revisions cannot be recovered here.") }
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:campaignHistory.historyError }
+            ListView {
+                id:campaignHistoryList
+                objectName:"dxCampaignHistoryList"; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:8
+                model:campaignHistory.rows
+                delegate:Text {
+                    required property var modelData
+                    width:ListView.view.width; wrapMode:Text.Wrap; color:root.textColor
+                    text:qsTr("Revision %1 · %2\nCalls: %3 · %4 → %5\nSource: %6 · observed: %7\nBands: %8 · modes: %9\nProfile: %10 · archived: %11 · watched: %12\nGoals: %13")
+                        .arg(modelData.revision).arg(modelData.title).arg(modelData.calls.join(", "))
+                        .arg(modelData.start).arg(modelData.end).arg(modelData.source).arg(modelData.observedAt)
+                        .arg(modelData.bands.join(", ")).arg(modelData.modes.join(", ")).arg(modelData.profileId)
+                        .arg(modelData.archived).arg(modelData.watched).arg(JSON.stringify(modelData.goals))
+                }
+            }
+            RowLayout {
+                CalendarButton { text:qsTr("Older revisions"); enabled:campaignHistory.hasMore && campaignHistory.rows.length>0
+                    onClicked:campaignHistory.page(campaignHistory.rows[campaignHistory.rows.length-1].revision) }
+                CalendarButton { text:qsTr("Close"); onClicked:campaignHistory.close() }
+            }
         }
     }
 
@@ -500,6 +556,8 @@ GlassPanel {
                     CheckBox { id:archivedField; text:qsTr("Archived") }
                     CheckBox { id:watchedField; objectName:"dxCampaignWatched"; text:qsTr("Watch spots") }
                     CalendarButton { id:saveCampaign; objectName:"saveDxCampaign"; text:qsTr("Save"); onClicked:campaignDialog.save() }
+                    CalendarButton { objectName:"dxCampaignHistoryButton"; text:qsTr("History"); enabled:!!campaignDialog.draft.id
+                        onClicked:campaignHistory.displayHistory(campaignDialog.draft,campaignDialog.logContext) }
                     CalendarButton { text:qsTr("Refresh matrix"); enabled:!!campaignDialog.draft.id && !root.campaignBackend.dxCampaignBusy; onClicked:root.campaignBackend.refreshDxCampaign() }
                 }
                 Text { Layout.fillWidth:true; color:root.mutedColor; wrapMode:Text.Wrap

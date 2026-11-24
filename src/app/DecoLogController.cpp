@@ -2540,6 +2540,14 @@ QVariantMap DecoLogController::dxCampaignReviewContext() const
         {QStringLiteral("fileIdentity"),QString::fromLatin1(context->fileIdentity.toHex())},
         {QStringLiteral("generation"),QString::number(context->generation)}};
 }
+QVariantMap DecoLogController::dxCampaignHistory(const QString& id,int beforeRevision,const QVariantMap& context) const
+{
+    if (context.isEmpty() || context!=dxCampaignReviewContext()) return {{QStringLiteral("error"),tr("The log changed; reopen the campaign review.")}};
+    QString error; const auto records=dxcampaign::history(m_db,id,beforeRevision,51,&error);
+    if (!error.isEmpty()) return {{QStringLiteral("error"),error}};
+    QVariantList rows; for (int i=0;i<qMin(50,int(records.size()));++i) rows << campaignMap(records.at(i));
+    return {{QStringLiteral("rows"),rows},{QStringLiteral("hasMore"),records.size()>50}};
+}
 bool DecoLogController::saveDxCampaign(const QVariantMap& values)
 {
     if (values.contains(QStringLiteral("_reviewContext"))) {

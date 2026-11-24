@@ -28,6 +28,7 @@ std::optional<ReviewContext> captureReviewContext(const LogDatabase& db);
 bool reviewContextCurrent(const LogDatabase& db,const ReviewContext& context);
 bool save(LogDatabase& db, Campaign& campaign, QString* error = nullptr);
 std::optional<Campaign> load(const LogDatabase& db, const QString& id, QString* error = nullptr);
+QList<Campaign> history(const LogDatabase& db, const QString& id, int beforeRevision, int limit, QString* error = nullptr);
 QList<Campaign> list(const LogDatabase& db, QString* error = nullptr, int* invalidCount = nullptr);
 QList<Cell> matrix(const LogDatabase& db, const Campaign& campaign, QString* error = nullptr);
 QString matrixMode(const Campaign& campaign, const QString& reportedMode);

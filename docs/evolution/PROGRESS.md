@@ -16,6 +16,14 @@ A/B on macOS arm64 / Qt 6.11.2: with the shared mutation engine and controller r
 
 The observed baseline does not establish that every deletion attempt fails without the fix. The test sends one synthetic packet, uses no physical radio, and does not verify other platforms, sustained traffic, long-held locks or slow storage. The full suite was not rerun for this test-only increment.
 
+## 2026-11-24 — G04 campaign revision history foundation, not integrated
+
+In the detached worktree, campaign updates now save the previous encoded revision under a separate `app_setting` key within the same immediate SQLite transaction as the update. Failed history insertion rolls the change back, and the existing revision comparison continues to reject stale updates. A/B: the new restart fixture initially failed because no previous revision existed; after the change it found the original date and revision, retained two prior revisions after reopening, and an injected history-write failure preserved the current campaign. The complete focused dxcampaign test passed 18 cases with one opt-in benchmark skipped.
+
+The detached increment now includes a 50-row paged read-only history dialog, bound to the reviewed open-log context. Core tests read two successive pages and verify their call lists and revisions. An actual offscreen app fixture reopened a synthetic log and observed the dialog visible with a rendered previous revision. Its first run failed because a QML helper named `show` shadowed the window method; renaming it fixed the test. The dxcampaign, dxcalendar and qmlpopups CTest groups passed 3/3 after building the previously missing dxcalendar test target; git diff --check passed.
+
+No restore action is provided; revisions created before this increment cannot be recovered, the stored history is unbounded, and the view does not prove all filesystem replacement races, physical interaction, concurrent writers, migrations or cross-platform behaviour. The work remains in the detached worktree and is not accepted as G04 completion.
+
 ## 2026-11-24 — G01 incoming QSO during bulk tag and delete
 
 An offscreen 20,000-QSO tag operation with a synthetic WSJT-X LoggedADIF packet exposed a separate contention failure: before the change the incoming QSO was saved but 200 tag changes failed with `database is locked` (19,800 applied). The shared mutation batch engine now reserves the SQLite writer with `BEGIN IMMEDIATE` before its reads; the background tag/delete worker also yields between committed batches while the application's incoming-QSO insert is active. The reservation applies to other users of the shared engine, but their priority behaviour has not been separately tested.
