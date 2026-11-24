@@ -43,6 +43,72 @@ class TestContestRules : public QObject {
     Q_OBJECT
 
 private slots:
+    void arrl10CandidateScoreDeduplicatesReviewedIdentities()
+    {
+        Arrl10Contact a; a.call="W1AW"; a.contestCallIdentity="W1AW"; a.band="10m"; a.mode="CW"; a.frequencyHz=28025000; a.signalReport="599";
+        a.origin=Arrl10Origin::UnitedStates; a.exchange="CT"; a.locationReviewed=true;
+        auto portable=a; portable.call="W1AW/7";
+        auto phone=a; phone.mode="SSB"; phone.frequencyHz=28350000;
+        auto other=phone; other.call="K1ABC"; other.contestCallIdentity="K1ABC"; other.exchange="MA";
+        auto missing=other; missing.call="K2ABC"; missing.contestCallIdentity.clear();
+        auto bad=other; bad.call="K3ABC"; bad.contestCallIdentity="K3ABC"; bad.band="20m";
+        const auto result=arrl10ScoreCandidates({a,portable,phone,other,missing,bad});
+        QCOMPARE(result.points,qint64(8)); QCOMPARE(result.multiplierCount,3); QCOMPARE(result.score,qint64(24));
+        QCOMPARE(result.usable,3); QCOMPARE(result.duplicates,1); QCOMPARE(result.review,1); QCOMPARE(result.excluded,1);
+        QCOMPARE(result.decisions.at(1).status,Arrl10Status::Duplicate);
+        QCOMPARE(result.decisions.at(4).status,Arrl10Status::Review);
+        QVERIFY(!forId("ARRL-10").valid);
+    }
+    void arrl10CandidateScoreMatchesPublishedArithmetic()
+    {
+        const QStringList us=QStringLiteral("AL AK AZ AR CA CO CT DC DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY").split(' ');
+        const QStringList ca=QStringLiteral("AB BC LB MB NB NF NS NT NU ON PE QC SK YT").split(' ');
+        const QStringList mx=QStringLiteral("AGS BAC BCS").split(' ');
+        QList<Arrl10Contact> phoneTypes,cwTypes;
+        auto add=[&](QList<Arrl10Contact>& out,Arrl10Origin origin,const QString& exchange,int dxcc,const QString& mode) {
+            Arrl10Contact c; c.band="10m"; c.mode=mode; c.frequencyHz=mode=="CW" ? 28025000 : 28350000; c.signalReport=mode=="CW" ? "599" : "59";
+            c.origin=origin; c.exchange=exchange; c.dxcc=dxcc; c.dxccVerified=true; c.locationReviewed=true; out << c;
+        };
+        for (int i=0;i<49;++i) add(phoneTypes,Arrl10Origin::UnitedStates,us[i],0,"SSB");
+        for (int i=0;i<10;++i) add(phoneTypes,Arrl10Origin::Canada,ca[i],0,"SSB");
+        for (const auto& value : mx) add(phoneTypes,Arrl10Origin::Mexico,value,0,"SSB");
+        for (int i=0;i<20;++i) add(phoneTypes,Arrl10Origin::Dx,"1",200+i,"SSB");
+        add(phoneTypes,Arrl10Origin::Maritime,"2",0,"SSB");
+        for (int i=0;i<30;++i) add(cwTypes,Arrl10Origin::UnitedStates,us[i],0,"CW");
+        for (int i=0;i<8;++i) add(cwTypes,Arrl10Origin::Canada,ca[i],0,"CW");
+        add(cwTypes,Arrl10Origin::Mexico,mx[0],0,"CW");
+        for (int i=0;i<18;++i) add(cwTypes,Arrl10Origin::Dx,"1",200+i,"CW");
+        QCOMPARE(phoneTypes.size(),83); QCOMPARE(cwTypes.size(),57);
+        QList<Arrl10Contact> contacts;
+        for (int i=0;i<1305;++i) { auto c=phoneTypes[i%phoneTypes.size()]; c.call=c.contestCallIdentity=QString("P%1X").arg(i); contacts << c; }
+        for (int i=0;i<930;++i) { auto c=cwTypes[i%cwTypes.size()]; c.call=c.contestCallIdentity=QString("C%1X").arg(i); contacts << c; }
+        const auto result=arrl10ScoreCandidates(contacts);
+        QCOMPARE(result.usable,2235); QCOMPARE(result.review,0); QCOMPARE(result.duplicates,0);
+        QCOMPARE(result.points,qint64(6330)); QCOMPARE(result.multiplierCount,140); QCOMPARE(result.score,qint64(886200));
+    }
+    void arrl10ContactChecksRequiredInputsAndFrequency()
+    {
+        Arrl10Contact c; c.call="W1AW"; c.band="10m"; c.mode="CW"; c.frequencyHz=28025000; c.signalReport="599";
+        c.origin=Arrl10Origin::UnitedStates; c.exchange="CT"; c.locationReviewed=true;
+        auto r=arrl10EvaluateContact(c); QCOMPARE(r.status,Arrl10Status::Usable); QCOMPARE(r.points,4); QVERIFY(!r.multiplier.isEmpty());
+        c.frequencyHz=28300000; r=arrl10EvaluateContact(c); QCOMPARE(r.status,Arrl10Status::Excluded); QCOMPARE(r.points,0);
+        c.frequencyHz=28025000; c.signalReport.clear(); QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review); c.signalReport="59"; c.frequencyHz=28300000;
+        c.mode="SSB"; r=arrl10EvaluateContact(c); QCOMPARE(r.status,Arrl10Status::Usable); QCOMPARE(r.points,2);
+        c.frequencyHz=0; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.frequencyHz=29700000; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Excluded);
+        c.frequencyHz=28300000; c.band="20m"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Excluded);
+        c.band="10m"; c.mode="FT8"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Excluded);
+        c.mode="CW"; c.frequencyHz=28025000; c.locationReviewed=false; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.locationReviewed=true; c.exchange="PR"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.origin=Arrl10Origin::Dx; c.exchange="0012"; c.dxcc=248; c.dxccVerified=false; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.dxccVerified=true; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Usable);
+        c.dxcc=291; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.dxcc=248; c.exchange="0"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.exchange="12A"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        c.origin=Arrl10Origin::Maritime; c.exchange="3"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Usable);
+        c.exchange="4"; QCOMPARE(arrl10EvaluateContact(c).status,Arrl10Status::Review);
+        QVERIFY(!forId("ARRL-10").valid);
+    }
     void arrl10MultiplierFoundationUsesOfficialCategories()
     {
         using Origin=Arrl10Origin;

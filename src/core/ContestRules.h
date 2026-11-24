@@ -94,9 +94,35 @@ namespace contestrules {
 // ARRL 10-Meter building blocks only: the caller supplies the operator-reviewed
 // category and must independently verify DXCC, location and QSO eligibility.
 // These helpers do not make ARRL-10 a supported scoring/export rule sheet.
-enum class Arrl10Origin { UnitedStates, Canada, Mexico, Dx, Maritime };
+enum class Arrl10Origin { Unspecified, UnitedStates, Canada, Mexico, Dx, Maritime };
 int arrl10Points(const QString& mode);
 QString arrl10Multiplier(Arrl10Origin origin, const QString& areaOrRegion, int dxcc, const QString& mode);
+enum class Arrl10Status { Usable, Review, Excluded, Duplicate };
+struct Arrl10Contact {
+    QString call, band, mode, exchange, signalReport; // exchange excludes the separately recorded report
+    QString contestCallIdentity; // caller-reviewed identity without portable modifiers
+    qint64 frequencyHz{0};
+    Arrl10Origin origin{Arrl10Origin::Unspecified};
+    int dxcc{0};
+    bool locationReviewed{false};
+    bool dxccVerified{false};
+};
+struct Arrl10Decision {
+    Arrl10Status status{Arrl10Status::Review};
+    int points{0};
+    QString multiplier, reason;
+};
+// Preliminary contact check only; the reviewed location and DXCC flags are
+// supplied by the caller and do not prove licensing, timing or eligibility.
+Arrl10Decision arrl10EvaluateContact(const Arrl10Contact& contact);
+struct Arrl10CandidateScore {
+    qint64 points{0}, score{0};
+    int usable{0}, review{0}, excluded{0}, duplicates{0}, multiplierCount{0};
+    QList<Arrl10Decision> decisions;
+};
+// Provisional arithmetic only. The caller must independently validate contact
+// timing, portable-call identity, location, category and all other contest rules.
+Arrl10CandidateScore arrl10ScoreCandidates(const QList<Arrl10Contact>& contacts);
 
 // La scheda di un contest, o una scheda vuota (valid = false) se non c'e'.
 ContestRules forId(const QString& contestId);

@@ -143,6 +143,64 @@ QString arrl10Multiplier(Arrl10Origin origin, const QString& areaOrRegion, int d
     return category+QLatin1Char('|')+code+QLatin1Char('|')+group;
 }
 
+Arrl10Decision arrl10EvaluateContact(const Arrl10Contact& c)
+{
+    const auto review=[](const char* reason) { return Arrl10Decision{Arrl10Status::Review,0,{},QLatin1String(reason)}; };
+    const auto excluded=[](const char* reason) { return Arrl10Decision{Arrl10Status::Excluded,0,{},QLatin1String(reason)}; };
+    if (c.call.trimmed().isEmpty()) return review("missing_call");
+    const QString band=c.band.trimmed().toLower();
+    if (band.isEmpty()) return review("missing_band");
+    if (band!=QLatin1String("10m")) return excluded("wrong_band");
+    const QString group=arrl10Mode(c.mode);
+    if (group.isEmpty()) return c.mode.trimmed().isEmpty() ? review("missing_mode") : excluded("unsupported_mode");
+    if (c.signalReport.trimmed().isEmpty()) return review("missing_signal_report");
+    if (c.frequencyHz<=0) return review("missing_frequency");
+    // Treat the upper edge as outside; occupied bandwidth still needs separate review.
+    if (c.frequencyHz<28000000 || c.frequencyHz>=29700000) return excluded("frequency_outside_band");
+    if (group==QLatin1String("CW") && c.frequencyHz>=28300000) return excluded("cw_above_limit");
+    if (!c.locationReviewed || c.origin==Arrl10Origin::Unspecified) return review("location_unreviewed");
+    if (c.origin==Arrl10Origin::Dx) {
+        static const QRegularExpression serial(QStringLiteral("^[0-9]+$"));
+        const QString value=c.exchange.trimmed(); bool ok=false; const qulonglong number=value.toULongLong(&ok);
+        if (!serial.match(value).hasMatch() || !ok || number==0) return review("invalid_serial");
+        // The caller must verify the entity against the applicable official list.
+        if (!c.dxccVerified || c.dxcc<=0 || c.dxcc==1 || c.dxcc==6 || c.dxcc==50 || c.dxcc==110 || c.dxcc==291)
+            return review("dxcc_unverified_or_conflicting");
+    }
+    const QString multiplier=arrl10Multiplier(c.origin,c.exchange,c.dxcc,c.mode);
+    if (multiplier.isEmpty()) return review("invalid_exchange");
+    return {Arrl10Status::Usable,arrl10Points(c.mode),multiplier,{}};
+}
+
+Arrl10CandidateScore arrl10ScoreCandidates(const QList<Arrl10Contact>& contacts)
+{
+    Arrl10CandidateScore result; QSet<QString> worked, multipliers;
+    static const QRegularExpression identityPattern(QStringLiteral("^[A-Z0-9]{2,24}$"));
+    result.decisions.reserve(contacts.size());
+    for (const auto& contact : contacts) {
+        auto decision=arrl10EvaluateContact(contact);
+        if (decision.status==Arrl10Status::Usable) {
+            const QString identity=contact.contestCallIdentity.trimmed().toUpper();
+            if (!identityPattern.match(identity).hasMatch()) {
+                decision={Arrl10Status::Review,0,{},QStringLiteral("identity_unreviewed")};
+            } else {
+                const QString key=identity+QLatin1Char('|')+arrl10Mode(contact.mode);
+                if (worked.contains(key)) decision={Arrl10Status::Duplicate,0,{},QStringLiteral("duplicate_mode")};
+                else { worked.insert(key); multipliers.insert(decision.multiplier); result.points+=decision.points; }
+            }
+        }
+        switch (decision.status) {
+        case Arrl10Status::Usable: ++result.usable; break;
+        case Arrl10Status::Review: ++result.review; break;
+        case Arrl10Status::Excluded: ++result.excluded; break;
+        case Arrl10Status::Duplicate: ++result.duplicates; break;
+        }
+        result.decisions << decision;
+    }
+    result.multiplierCount=multipliers.size(); result.score=result.points*result.multiplierCount;
+    return result;
+}
+
 ContestRules forId(const QString& contestId)
 {
     const QString id = contestId.trimmed().toUpper();
