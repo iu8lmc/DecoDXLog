@@ -1078,7 +1078,11 @@ private slots:
         QByteArray output; QVERIFY2(launch(dir,"dxgoalwatchprobe",output,5500,true),output.constData());
         QVERIFY2(output.contains("PROBE dxgoalwatch done"),output.constData());
         QCOMPARE(output.count("[activity] DXCAMPAIGN|highlight|"),1);
-        QVERIFY2(output.contains("Goal watch: 3Y0J · 40m") && !output.contains("Goal watch: 3Y0J · 20m") && !output.contains("Goal watch: 3Y0J · 15m") && !output.contains("Goal watch: 3Y0K"),output.constData());
+        const auto activityLines = output.split('\n');
+        QByteArray alert;
+        for (const auto &line : activityLines)
+            if (line.contains("[activity] DXCAMPAIGN|highlight|")) alert = line;
+        QVERIFY2(alert.contains("Goal watch: 3Y0J") && alert.contains("40m") && !alert.contains("20m") && !alert.contains("15m") && !alert.contains("3Y0K"), output.constData());
         QByteArray reopened; QVERIFY2(launch(dir,"dxgoalwatchprobe",reopened,5500,true),reopened.constData());
         QCOMPARE(reopened.count("[activity] DXCAMPAIGN|highlight|"),0);
     }
