@@ -8,6 +8,8 @@ A/B on macOS arm64 / Qt 6.11.2: in a native system SQLite authorizer fixture, a 
 
 This tests a single synthetic UDP packet at a controlled point, not sustained traffic or physical radio. The marker gives priority only within the application's cooperating workers; external writers and locks beyond SQLite's busy timeout can still prevent writes. Immediate transactions can increase contention with other writers. Cross-platform, slow storage, process termination and other mutation paths need independent evidence. This increment was developed in the detached worktree pending integration.
 
+After integration as `1161ab0e`, the main checkout rebuilt the application and test targets. The four opt-in reservation and busy-recovery cases passed. The 20,000-tag plus UDP app test passed with a 60 ms maximum timer gap; both 20,000-paper-QSL plus UDP event-trigger variants passed with 108/101 ms maximum gaps. Database and udppipeline CTest passed 2/2 and git diff --check passed. The full 124-group suite has not been rerun on this revision.
+
 ## 2026-11-22 — G00 / initial G01 and G02 increments
 
 Starting revision `c8c64a842d47573192032ff866d154be01ad2f4e`, branch `evolution/desktop-roadmap`; no schema migration. Baseline and goals: see BASELINE.md and PLAN.md. G00 remains in progress: the full eleven-stream UI/persistence/test audit, performance dataset and full build result are not yet complete.
