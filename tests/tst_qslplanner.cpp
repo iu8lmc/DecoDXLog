@@ -10,6 +10,20 @@ using namespace decolog::core;
 class TestQslPlanner : public QObject {
     Q_OBJECT
 private slots:
+    void pendingElectronicGroupsDeduplicateBenefits()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add=[&](const char *call) { return db.insertQso({{"CALL",call},{"QSO_DATE","20261001"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"DXCC","291"}},"fixture").id; };
+        const auto a=add("K1AAA"), b=add("K1BBB"); QVERIFY(a>0 && b>0);
+        QslState st; st.service="lotw"; st.sent="Y"; QVERIFY(db.setQslState(a,st)); QVERIFY(db.setQslState(b,st));
+        auto plan=qslplanner::build(db,{}, {"dxcc"}); QVERIFY2(plan.error.isEmpty(),qPrintable(plan.error));
+        QCOMPARE(plan.pendingElectronic.size(),1); QCOMPARE(plan.pendingElectronic.first().service,QString("lotw"));
+        QCOMPARE(plan.pendingElectronic.first().qsoIds,QList<qint64>({a,b})); QCOMPARE(plan.pendingElectronic.first().uniqueBenefits,1);
+        QSqlQuery received(db.connection()); received.prepare("UPDATE qsl_status SET rcvd='Y' WHERE qso_id=? AND service='lotw'");
+        received.addBindValue(a); QVERIFY(received.exec()); plan=qslplanner::build(db,{}, {"dxcc"});
+        QVERIFY(plan.pendingElectronic.isEmpty());
+    }
+
     void planFailsWhenQslStatusCannotBeRead()
     {
 #ifndef Q_OS_MACOS

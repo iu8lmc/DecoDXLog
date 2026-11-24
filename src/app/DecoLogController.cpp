@@ -2668,6 +2668,10 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
                 {QStringLiteral("observedDate"),route.cost->observedDate}});
             routes << row;
         }
+        QVariantList electronic;
+        for (const auto& group : plan.pendingElectronic)
+            electronic << QVariantMap{{QStringLiteral("service"),group.service},{QStringLiteral("qsoCount"),group.qsoIds.size()},
+                                      {QStringLiteral("uniqueBenefits"),group.uniqueBenefits}};
         QVariantList ungrouped; for (qint64 id : plan.ungroupedPaperQsoIds) ungrouped << id;
         for (const auto& candidate : plan.candidates) {
             QVariantList benefits;
@@ -2700,7 +2704,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
         }
         if (!self) return;
         const auto snapshot=std::make_shared<const qslplanner::Plan>(std::move(plan));
-        QMetaObject::invokeMethod(self.data(),[self,path,identity,dataVersion,openGeneration,logVersion,generation,snapshot,rows,routes,ungrouped] {
+        QMetaObject::invokeMethod(self.data(),[self,path,identity,dataVersion,openGeneration,logVersion,generation,snapshot,rows,routes,electronic,ungrouped] {
             if (!self || generation!=self->m_qslPlanGeneration) return;
             self->m_qslPlanBusy=false;
             if (self->m_db.path()!=path || !self->m_db.fileIdentityMatchesOpen() || self->m_db.identity()!=identity || self->m_db.openGeneration()!=openGeneration ||
@@ -2709,7 +2713,7 @@ void DecoLogController::buildQslPlan(const QStringList& requested)
             }
             else { self->m_qslPlanSnapshot=snapshot; self->m_qslPlan={{QStringLiteral("error"),snapshot->error},{QStringLiteral("uniqueBenefits"),snapshot->uniqueBenefits},
                                  {QStringLiteral("logPath"),path},
-                                 {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},
+                                 {QStringLiteral("candidates"),rows},{QStringLiteral("paperRoutes"),routes},{QStringLiteral("pendingElectronic"),electronic},
                                  {QStringLiteral("ungroupedPaperQsoIds"),ungrouped},{QStringLiteral("stale"),false}}; }
             emit self->qslPlanChanged();
         },Qt::QueuedConnection);

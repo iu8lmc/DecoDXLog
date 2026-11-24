@@ -463,6 +463,14 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message>
+        <source>Recorded electronic requests awaiting confirmation; potential benefits may overlap between services.</source>
+        <translation>Richieste elettroniche registrate in attesa di conferma; i benefici potenziali possono sovrapporsi tra servizi.</translation>
+    </message>
+    <message>
+        <source>%1: %2 QSO · %3 potential benefits</source>
+        <translation>%1: %2 QSO · %3 benefici potenziali</translation>
+    </message>
     <message><source>The reviewed log or plan changed; reopen the cost editor.</source><translation>Il log o il piano verificato è cambiato; riapri l'editor dei costi.</translation></message>
     <message>
         <source>Select recorded award account</source>

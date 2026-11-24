@@ -62,8 +62,14 @@ struct PaperRoute {
     int uniqueBenefits{0};
     std::optional<RouteCost> cost;
 };
+struct PendingElectronic {
+    QString service;
+    QList<qint64> qsoIds;
+    int uniqueBenefits{0};
+};
 struct Plan {
     QList<Candidate> candidates;
+    QList<PendingElectronic> pendingElectronic;
     QList<PaperRoute> paperRoutes;
     QList<qint64> ungroupedPaperQsoIds;
     int uniqueBenefits{0};

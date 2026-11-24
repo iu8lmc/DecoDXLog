@@ -333,6 +333,19 @@ Plan build(const LogDatabase& db, const AwardFilter& filter, const QSet<QString>
         Group& group=routes[{manager,candidate.paperChannel}];
         group.ids.append(candidate.qsoId); group.benefits.unite(paperBenefits);
     }
+    QMap<QString,Group> electronic;
+    for (const Candidate& candidate : std::as_const(result.candidates)) {
+        for (const QString& service : candidate.pendingServices) {
+            if (service != QLatin1String("lotw") && service != QLatin1String("eqsl") && service != QLatin1String("qrz")) continue;
+            QSet<QPair<QString,QString>> benefits;
+            for (const Benefit& benefit : candidate.benefits)
+                if (benefit.acceptedServices.contains(service)) benefits.insert({benefit.award,benefit.key});
+            if (benefits.isEmpty()) continue;
+            Group& group=electronic[service]; group.ids.append(candidate.qsoId); group.benefits.unite(benefits);
+        }
+    }
+    for (auto it=electronic.cbegin(); it!=electronic.cend(); ++it)
+        result.pendingElectronic.append({it.key(),it->ids,int(it->benefits.size())});
     for (auto it=routes.cbegin(); it!=routes.cend(); ++it)
         result.paperRoutes.append({it.key().first,it.key().second,it->ids,int(it->benefits.size()),routeCost(db,it.key().first,it.key().second)});
     return result;

@@ -253,6 +253,8 @@ DialogFrame {
             const first = qslPlanCandidates.itemAtIndex(0)
             console.warn("PROBE qslplan row " + (first ? first.probeText : "missing"))
             console.warn("PROBE qslplan route " + (first ? first.probeRoute : "missing"))
+            const electronic = electronicRoutes.itemAt(0)
+            console.warn("PROBE qslplan electronic " + (electronic ? electronic.text : "missing"))
             const grouped = paperRoutes.itemAtIndex(0)
             console.warn("PROBE qslplan group " + (grouped ? grouped.probeText : "missing"))
             costEditor.edit(plan.paperRoutes[0]); amountField.text = "12.50"; currencyField.text = "EUR"; saveCostButton.clicked()
@@ -370,6 +372,20 @@ DialogFrame {
                 visible: !decolog.qslPlan.stale && !root.plannerSelectionDirty && !!decolog.qslPlan.paperRoutes
                 text: qsTr("Paper routes by recorded QSL via text and channel; group benefits can overlap · %1 candidate(s) missing one or both")
                     .arg((decolog.qslPlan.ungroupedPaperQsoIds || []).length)
+            }
+            Text {
+                Layout.fillWidth: true; color: Theme.textSecondary; wrapMode: Text.Wrap
+                visible: !decolog.qslPlan.stale && !root.plannerSelectionDirty && (decolog.qslPlan.pendingElectronic || []).length > 0
+                text: qsTr("Recorded electronic requests awaiting confirmation; potential benefits may overlap between services.")
+            }
+            Repeater {
+                id: electronicRoutes
+                model: (decolog.qslPlan.stale || root.plannerSelectionDirty) ? [] : (decolog.qslPlan.pendingElectronic || [])
+                Text {
+                    required property var modelData
+                    Layout.fillWidth: true; color: Theme.textPrimary; wrapMode: Text.Wrap
+                    text: qsTr("%1: %2 QSO · %3 potential benefits").arg(modelData.service.toUpperCase()).arg(modelData.qsoCount).arg(modelData.uniqueBenefits)
+                }
             }
             ListView {
                 id: paperRoutes; Layout.fillWidth: true; Layout.preferredHeight: Math.min(90, contentHeight)
