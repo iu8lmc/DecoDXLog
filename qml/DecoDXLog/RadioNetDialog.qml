@@ -93,6 +93,41 @@ DialogFrame {
         id: participantQso
         profileDialogKey: "radio-net-qso"
     }
+    DialogFrame {
+        id: participantEditor
+        transientParent: root
+        title: qsTr("Edit participant")
+        width: 620; height: 310
+        property var member: ({})
+        property string sessionUuid: ""
+        property string logContext: ""
+        function edit(row) {
+            member=Object.assign({},row)
+            sessionUuid=String(root.current.uuid || "")
+            logContext=JSON.stringify(decolog.radioNetDraftContext())
+            participantName.text=member.name || ""; participantNotes.text=member.notes || ""
+            participantError.text=""; open()
+        }
+        body: ColumnLayout {
+            spacing: 8
+            Text { text: participantEditor.member.call || ""; color: Theme.textPrimary; font.bold: true }
+            StyledTextField { id: participantName; Layout.fillWidth: true; placeholderText: qsTr("Name"); Accessible.name: qsTr("Participant name") }
+            StyledTextField { id: participantNotes; Layout.fillWidth: true; placeholderText: qsTr("Notes"); Accessible.name: qsTr("Participant notes") }
+            Text { id: participantError; Layout.fillWidth: true; color: Theme.warningColor; wrapMode: Text.Wrap }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                GlassButton { id:saveParticipant; text: qsTr("Save participant"); onClicked: {
+                    if (!participantEditor.logContext || participantEditor.logContext === "{}" || participantEditor.logContext !== JSON.stringify(decolog.radioNetDraftContext())) {
+                        participantError.text=qsTr("The log changed; reopen the editor."); return
+                    }
+                    if (root.net.editParticipant(participantEditor.member.id,participantEditor.sessionUuid,
+                            participantEditor.member.name || "",participantEditor.member.notes || "",participantName.text,participantNotes.text)) participantEditor.close()
+                    else participantError.text=root.net.error
+                } }
+                GlassButton { text: qsTr("Cancel"); onClicked: participantEditor.close() }
+            }
+        }
+    }
     FileDialog {
         id: exportDialog
         title: qsTr("Export radio net session")
@@ -126,6 +161,10 @@ DialogFrame {
                 const details = JSON.parse(row.detail || "{}")
                 return qsTr("Checked in · %1 · %2").arg(details.name || "—").arg(details.notes || "—")
             } catch (e) { return qsTr("Checked in") }
+        }
+        case "participant_details": {
+            try { const details=JSON.parse(row.detail || "{}"); return qsTr("Details updated · %1 · %2").arg(details.name || "—").arg(details.notes || "—") }
+            catch (e) { return qsTr("Details updated") }
         }
         case "turn": return qsTr("Turn")
         case "reorder": return qsTr("Order changed")
@@ -163,6 +202,21 @@ DialogFrame {
         if (!root.net.start("Draft fixture",0) || !root.net.checkIn("K1AAA","Alice","")) { console.warn("PROBE radioNetStaleDraft setup failed " + root.net.error); return }
         staleDraftPrepare.start()
     }
+    function probeParticipantEdit() {
+        if (!root.net.start("Edit fixture",0) || !root.net.checkIn("K1AAA","Alice","first")) { console.warn("PROBE participantEdit setup failed"); return }
+        participantEditProbe.start()
+    }
+    Timer { id:participantEditProbe; interval:300; onTriggered: {
+        const row=memberList.itemAtIndex(0)
+        if (!row) { console.warn("PROBE participantEdit no row"); return }
+        row.editParticipant(); participantName.text="New name"; participantNotes.text=""
+        root.net.checkIn("K1AAA","Changed elsewhere","")
+        saveParticipant.clicked()
+        console.warn("PROBE participantEdit stale=" + (participantError.text.length>0) + " visible=" + participantEditor.visible)
+        participantEditor.close(); participantEditor.edit(root.net.members[0])
+        participantName.text="Alicia"; participantNotes.text=""; saveParticipant.clicked()
+        console.warn("PROBE participantEdit saved=" + !participantEditor.visible + " name=" + root.net.members[0].name + " notes=" + root.net.members[0].notes)
+    } }
     Timer { id:staleDraftPrepare; interval:300; onTriggered: {
         const row=memberList.itemAtIndex(0)
         if (!row) { console.warn("PROBE radioNetStaleDraft no row"); return }
@@ -343,6 +397,7 @@ DialogFrame {
                     participantQso.initialName = modelData.name || ""
                     participantQso.open()
                 }
+                function editParticipant() { participantEditor.edit(modelData) }
                 width: ListView.view.width
                 height: memberRow.implicitHeight + 8
                 radius: 4
@@ -365,6 +420,7 @@ DialogFrame {
                     }
                     GlassButton { text: "↑"; Accessible.name: qsTr("Move %1 up").arg(modelData.call); enabled: !!root.current.active; onClicked: root.net.moveMember(modelData.id, -1) }
                     GlassButton { text: "↓"; Accessible.name: qsTr("Move %1 down").arg(modelData.call); enabled: !!root.current.active; onClicked: root.net.moveMember(modelData.id, 1) }
+                    GlassButton { text: qsTr("Edit…"); Accessible.name: qsTr("Edit participant %1").arg(modelData.call); enabled: !!root.current.active; onClicked: memberDelegate.editParticipant() }
                     GlassButton { text: qsTr("New QSO…"); Accessible.name: qsTr("Prepare QSO for %1").arg(modelData.call); onClicked: memberDelegate.openQso() }
                 }
             }

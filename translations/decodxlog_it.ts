@@ -15338,6 +15338,13 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>RadioNetDialog</name>
+    <message><source>Edit participant</source><translation>Modifica partecipante</translation></message>
+    <message><source>Save participant</source><translation>Salva partecipante</translation></message>
+    <message><source>The log changed; reopen the editor.</source><translation>Il log è cambiato; riapri la modifica.</translation></message>
+    <message><source>Details updated · %1 · %2</source><translation>Dati aggiornati · %1 · %2</translation></message>
+    <message><source>Details updated</source><translation>Dati aggiornati</translation></message>
+    <message><source>Edit…</source><translation>Modifica…</translation></message>
+    <message><source>Edit participant %1</source><translation>Modifica partecipante %1</translation></message>
     <message><source>Radio net reminders unavailable: %1</source><translation>Promemoria della rete radio non disponibili: %1</translation></message>
     <message>
         <source>Reminder due for %1 — select session</source>
@@ -15591,6 +15598,8 @@ Referenze aggiuntive: %7</translation></message>
 
 <context>
     <name>decolog::core::RadioNet</name>
+    <message><source>Participant changed; reopen the editor</source><translation>Il partecipante è cambiato; riapri la modifica</translation></message>
+    <message><source>Cannot save participant</source><translation>Impossibile salvare il partecipante</translation></message>
     <message><source>Radio net session changed; select it again</source><translation>La sessione radio net è cambiata; selezionala nuovamente</translation></message>
     <message><source>The log file changed; reopen it</source><translation>Il file del log è cambiato; riaprilo</translation></message>
     <message><source>Invalid radio net reminder deadline</source><translation>Scadenza del promemoria della rete radio non valida</translation></message>

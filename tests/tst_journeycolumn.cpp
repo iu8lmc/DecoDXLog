@@ -83,6 +83,18 @@ private:
         return app.exitStatus() == QProcess::NormalExit && app.exitCode() == 0;
     }
 private slots:
+    void radioNetParticipantEditInDesktop()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QByteArray output;
+        QVERIFY2(launch(dir,QStringLiteral("radioneteditprobe"),output,4000),output.constData());
+        QVERIFY2(output.contains("PROBE participantEdit stale=true visible=true"),output.constData());
+        QVERIFY2(output.contains("PROBE participantEdit saved=true name=Alicia notes="),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); RadioNet net(&db); net.load();
+        QCOMPARE(net.members().first().toMap().value("name").toString(),QString("Alicia"));
+        QCOMPARE(net.members().first().toMap().value("notes").toString(),QString());
+        QCOMPARE(db.qsoCount(),qint64(0));
+    }
     void incompleteApiReviewIsDisabledInDesktop()
     {
         using namespace decolog::core;

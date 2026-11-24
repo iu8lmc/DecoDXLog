@@ -44,6 +44,8 @@ class RadioNet : public QObject {
     Q_INVOKABLE bool selectSession(qint64 id);
     Q_INVOKABLE bool start(const QString &title, qint64 stationProfileId = 0);
     Q_INVOKABLE bool checkIn(const QString &call, const QString &name, const QString &notes);
+    Q_INVOKABLE bool editParticipant(qint64 memberId, const QString &sessionUuid, const QString &expectedName,
+                                    const QString &expectedNotes, const QString &name, const QString &notes);
     Q_INVOKABLE bool setStatus(qint64 memberId, const QString &status);
     Q_INVOKABLE bool moveMember(qint64 memberId, int direction);
     Q_INVOKABLE bool nextTurn();
