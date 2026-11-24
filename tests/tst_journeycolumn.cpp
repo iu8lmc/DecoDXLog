@@ -1560,6 +1560,26 @@ private slots:
         QVERIFY2(output.contains("PROBE potaReview open QSO 1 visible=true"), output.constData());
         QVERIFY(QFileInfo::exists(dir.filePath("data/pota-catalogue.sqlite")));
     }
+    void potaReviewThirdPageInDesktop()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid()); QFile fixture(dir.filePath("test.sqlite.pota.csv"));
+        QVERIFY(fixture.open(QIODevice::WriteOnly)); fixture.write("reference,name,active,locationDesc\nUS-0015,Park,1,US-MD\n"); fixture.close();
+        {
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QSqlQuery q(db.connection());
+            QVERIFY(q.exec("INSERT INTO activation_run(uuid,started_at,ended_at,initial_json,last_json) VALUES('pota-fixture','2020-01-01T00:00:00Z','2020-01-01T23:59:00Z','{}','{}')"));
+            for (int i=0;i<205;++i) {
+                AdifRecord record{{"CALL",QStringLiteral("K%1").arg(i,4,10,QLatin1Char('0'))},{"QSO_DATE","20200101"},
+                    {"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"},{"MY_POTA_REF","US-0015"},
+                    {"POTA_REF","US-0003,US-0004"},{"APP_DECOLOG_ACTIVATION_UUID","pota-fixture"}};
+                QVERIFY(db.insertQso(record,"fixture",{},true,0,false).id>0);
+            }
+        }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("potacatalogueprobe"),output),output.constData());
+        QVERIFY2(output.contains("PROBE potaReview call=K0000 total=205"),output.constData());
+        QVERIFY2(output.contains("PROBE potaReview third=K0200 page=2"),output.constData());
+    }
+
     void sotaOfficialUpdateInDesktopWhenRequested()
     {
         if (qEnvironmentVariable("DECOLOG_SOTA_LIVE_UI") != QLatin1String("1")) QSKIP("Live desktop update not requested");

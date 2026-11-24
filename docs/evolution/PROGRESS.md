@@ -2711,3 +2711,11 @@ The offscreen desktop POTA fixture now invokes the actual review-row button and 
 A/B on macOS arm64 / Qt 6.11.2: temporarily disabling the revision comparison allowed the stale row to open and failed the new assertion; after restoring it, the stale row was rejected and the unchanged row opened QSO 1. App and test targets rebuilt, the focused scenario passed and CTest activation, database, migration and qmlpopups passed 4/4.
 
 The stale row uses a deliberately altered revision value rather than an actual concurrent edit; a separate existing excluded-QSO fixture exercises an edit. The app is programmatically driven offscreen, not a physical interaction. The 200-row limit, live POTA, Windows/Linux and full G06/G13 acceptance remain open.
+
+## 2026-11-24 — G06 reach all POTA correspondent reviews
+
+Removed the 200-contact truncation from POTA correspondent review results. The preview retains one row per affected QSO even when it belongs to multiple park groups, and the UI shows 100 at a time with previous/next navigation. The warning now displays the total; Italian text was updated. This trades the old bounded result for an in-memory list proportional to affected QSO, consistent with the existing preview's excluded-contact list; a database-backed paged model remains desirable for large sessions.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic session with 205 flagged contacts and two parks previously returned 200 rows; afterwards it returned all 205 once, with 205 in each park's group count. An offscreen app test navigated to the third page and observed contact K0200; the existing single-row navigation test also passed. App and test targets built; CTest activation, database, migration and qmlpopups passed 4/4.
+
+The fixture does not measure memory, cold storage or responsiveness on very large sessions, nor does it prove physical UI operation, live POTA or Windows/Linux behaviour. Results still require operator review and can become stale; full G06/G13 acceptance remains open.

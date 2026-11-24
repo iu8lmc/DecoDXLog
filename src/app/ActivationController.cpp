@@ -822,7 +822,6 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     QMap<QString, QVariantMap> groups;
     QMap<QString, QByteArray> hashes;
     QVariantList excluded, potaCorrespondentRows;
-    int potaCorrespondentOmitted = 0;
     const auto exclude = [&](const QString& reason) {
         if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
             {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
@@ -892,10 +891,8 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
                         groups[key][QStringLiteral("potaCorrespondentReview")] = groups[key].value(QStringLiteral("potaCorrespondentReview")).toInt() + 1;
                         if (!selectedIds && !potaReviewRecorded) {
                             potaReviewRecorded = true;
-                            if (potaCorrespondentRows.size() < 200)
-                                potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
-                                    {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)}};
-                            else ++potaCorrespondentOmitted;
+                            potaCorrespondentRows << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("uuid"), q.value(3)},
+                                {QStringLiteral("revision"), q.value(4)}, {QStringLiteral("call"), q.value(5)}, {QStringLiteral("at"), q.value(0)}};
                         }
                     }
                 }
@@ -964,7 +961,6 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     result[QStringLiteral("uncertainPeriod")] = uncertainPeriod;
     result[QStringLiteral("excluded")] = excluded;
     result[QStringLiteral("potaCorrespondentRows")] = potaCorrespondentRows;
-    result[QStringLiteral("potaCorrespondentOmitted")] = potaCorrespondentOmitted;
     if (ownsTransaction && !db.commit()) return fail(tr("Cannot complete the log preview."));
     transaction.committed = true;
     return result;

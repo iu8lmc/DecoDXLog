@@ -721,6 +721,25 @@ private slots:
         QVERIFY(!act.previewResult().value("error").toString().isEmpty());
         QVERIFY(act.previewResult().value("groups").toList().isEmpty());
     }
+    void potaReviewIncludesContactsBeyondFirstTwoPages()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));
+        ActivationController::Context ctx; ctx.db=&db; ActivationController act(std::move(ctx));
+        QVERIFY(act.start({{"kind","pota"},{"reference","IT-0001,IT-0002"}}).isEmpty());
+        for (int i=0; i<205; ++i) {
+            AdifRecord qso{{"CALL",QStringLiteral("K%1").arg(i,4,10,QLatin1Char('0'))},{"QSO_DATE","20261124"},
+                           {"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"POTA_REF","US-0001,US-0002"}};
+            act.applyTo(qso); QVERIFY(db.insertQso(qso,"fixture",{},true,0,false).id>0);
+        }
+        QSignalSpy finished(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
+        QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(finished.first().first().toBool());
+        const auto result=act.previewResult(); const auto rows=result.value("potaCorrespondentRows").toList();
+        QCOMPARE(rows.size(),205); QCOMPARE(rows.last().toMap().value("call").toString(),QString("K0204"));
+        QCOMPARE(result.value("potaCorrespondentOmitted").toInt(),0);
+        const auto groups=result.value("groups").toList(); QCOMPARE(groups.size(),2);
+        for (const auto& group : groups) QCOMPARE(group.toMap().value("potaCorrespondentReview").toInt(),205);
+    }
+
     void potaExportPreservesExplicitAndAmbiguousCorrespondentFields()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("log.sqlite")));

@@ -234,6 +234,14 @@ DialogFrame {
                     const row = potaReviewRepeater.itemAt(0)
                     if (row) {
                         console.warn("PROBE potaReview call=" + row.modelData.call + " total=" + root.partitionPreview.potaCorrespondentRows.length)
+                        if (root.partitionPreview.potaCorrespondentRows.length > 200) {
+                            potaReviewNext.clicked(); potaReviewNext.clicked()
+                            Qt.callLater(() => {
+                                const third = potaReviewRepeater.itemAt(0)
+                                if (third) console.warn("PROBE potaReview third=" + third.modelData.call + " page=" + root.potaReviewPage)
+                            })
+                            return
+                        }
                         const stale = Object.assign({}, row.modelData)
                         stale.revision = Number(stale.revision) + 1
                         console.warn("PROBE potaReview stale=" + root.openExcludedQso(stale))
@@ -874,7 +882,7 @@ DialogFrame {
         Note {
             visible: root.previewShown && (root.partitionPreview.potaCorrespondentRows || []).length > 0
             color: Theme.warningColor
-            text: qsTr("POTA correspondent references to review (up to 200 shown; %1 omitted). Open a QSO to inspect its fields.").arg(root.partitionPreview.potaCorrespondentOmitted || 0)
+            text: qsTr("POTA correspondent references to review: %1 QSO. Open a QSO to inspect its fields.").arg(root.partitionPreview.potaCorrespondentRows.length)
         }
         Repeater {
             id: potaReviewRepeater
@@ -891,7 +899,7 @@ DialogFrame {
             visible: root.previewShown && (root.partitionPreview.potaCorrespondentRows || []).length > 100
             GlassButton { text: qsTr("Previous review QSO"); enabled: root.potaReviewPage > 0; onClicked: root.potaReviewPage-- }
             Text { color: Theme.textSecondary; text: qsTr("Page %1").arg(root.potaReviewPage + 1) }
-            GlassButton { text: qsTr("Next review QSO"); enabled: (root.potaReviewPage + 1) * 100 < (root.partitionPreview.potaCorrespondentRows || []).length; onClicked: root.potaReviewPage++ }
+            GlassButton { id: potaReviewNext; text: qsTr("Next review QSO"); enabled: (root.potaReviewPage + 1) * 100 < (root.partitionPreview.potaCorrespondentRows || []).length; onClicked: root.potaReviewPage++ }
         }
         Note {
             visible: root.previewShown && !!root.partitionPreview.potaCatalogue
