@@ -807,7 +807,7 @@ namespace {
 QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std::shared_ptr<std::atomic_bool>& cancelled,
                                  bool ownsTransaction = true, const QString& selectedKey = {}, QList<qint64>* selectedIds = nullptr,
                                  const QString& cataloguePath = {}, const QString& potaCataloguePath = {},
-                                 qint64 reviewAfterId = 0, int reviewLimit = -1)
+                                 qint64 reviewAfterId = 0, int reviewLimit = -1, bool collectExcluded = true)
 {
     QVariantMap result{{QStringLiteral("groups"), QVariantList{}}, {QStringLiteral("reportedCount"), 0}};
     const auto fail = [&](const QString& error) { result[QStringLiteral("error")] = error; return result; };
@@ -831,7 +831,7 @@ QVariantMap scanPartitionPreview(QSqlDatabase db, const QString& uuid, const std
     qint64 potaCorrespondentTotal = 0;
     bool potaCorrespondentHasMore = false;
     const auto exclude = [&](const QString& reason) {
-        if (!selectedIds) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
+        if (!selectedIds && collectExcluded) excluded << QVariantMap{{QStringLiteral("id"), q.value(2)}, {QStringLiteral("call"), q.value(5)},
             {QStringLiteral("uuid"), q.value(3)}, {QStringLiteral("revision"), q.value(4)},
             {QStringLiteral("at"), q.value(0)}, {QStringLiteral("reason"), reason}};
     };
@@ -1624,7 +1624,7 @@ bool ActivationController::requestPotaReviewPage(qint64 afterId)
             const auto matches=[&] { QSqlQuery q(db); return core::fileidentity::read(path)==fileIdentity && q.exec(QStringLiteral("SELECT uuid FROM log_identity WHERE id=1")) && q.next() && q.value(0).toString()==identity; };
             if (!db.open() || !matches()) result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};
             else {
-                result=scanPartitionPreview(db,uuid,cancelled,true,{},nullptr,{},{},afterId,100);
+                result=scanPartitionPreview(db,uuid,cancelled,true,{},nullptr,{},{},afterId,100,false);
                 if (!matches() || (result.value(QStringLiteral("error")).toString().isEmpty() &&
                     (signature(result)!=expected || result.value(QStringLiteral("potaCorrespondentTotal")).toLongLong()!=expectedTotal)))
                     result={{QStringLiteral("error"),tr("The log or session changed; recalculate the preview.")}};

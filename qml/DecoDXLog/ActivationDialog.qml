@@ -239,7 +239,7 @@ DialogFrame {
                 if (root.potaReviewPage === 1 && !root.probePotaBack) potaReviewNext.clicked()
                 else if (root.potaReviewPage === 1) {
                     const second=potaReviewRepeater.itemAt(0)
-                    if (second) console.warn("PROBE potaReview back=" + second.modelData.call + " page=" + root.potaReviewPage)
+                    if (second) console.warn("PROBE potaReview back=" + second.modelData.call + " page=" + root.potaReviewPage + " excluded=" + (root.partitionPreview.excluded || []).length)
                     root.probePotaPages=false; root.probePotaBack=false
                 }
                 else {

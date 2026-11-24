@@ -803,9 +803,17 @@ private slots:
                            {"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"},{"POTA_REF","US-0001,US-0002"}};
             act.applyTo(qso); QVERIFY(db.insertQso(qso,"fixture",{},true,0,false).id>0);
         }
+        for (int i=0; i<300; ++i) {
+            AdifRecord qso{{"CALL",QStringLiteral("N%1").arg(i,4,10,QLatin1Char('0'))},{"QSO_DATE","20261124"},
+                           {"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}};
+            act.applyTo(qso); qso.set("APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN");
+            QVERIFY(db.insertQso(qso,"fixture",{},true,0,false).id>0);
+        }
         QSignalSpy finished(&act,&ActivationController::previewFinished); QVERIFY(act.startPartitionPreview());
         QTRY_COMPARE_WITH_TIMEOUT(finished.size(),1,5000); QVERIFY(finished.first().first().toBool());
         const auto result=act.previewResult(); const auto rows=result.value("potaCorrespondentRows").toList();
+        QCOMPARE(result.value("excluded").toList().size(),300);
+        QCOMPARE(result.value("uncertainPeriod").toInt(),300);
         QCOMPARE(rows.size(),205); QCOMPARE(rows.last().toMap().value("call").toString(),QString("K0204"));
         QSet<qint64> ids;
         for (int i=0; i<rows.size(); ++i) {
@@ -850,6 +858,8 @@ private slots:
         const auto second=pageDone.takeFirst().first().toMap();
         QVERIFY(second.value("error").toString().isEmpty());
         QCOMPARE(second.value("potaCorrespondentRows").toList(),rows.mid(100,100));
+        QVERIFY(second.value("excluded").toList().isEmpty());
+        QCOMPARE(second.value("uncertainPeriod").toInt(),300);
         QSqlQuery changed(db.connection());
         QVERIFY(changed.exec("UPDATE qso SET comment='changed after preview' WHERE call='K0200'"));
         const auto stale=act.partitionPreviewPage(cursor,100);

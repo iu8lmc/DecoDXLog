@@ -1957,11 +1957,17 @@ private slots:
                     {"POTA_REF","US-0003,US-0004"},{"APP_DECOLOG_ACTIVATION_UUID","pota-fixture"}};
                 QVERIFY(db.insertQso(record,"fixture",{},true,0,false).id>0);
             }
+            for (int i=0;i<3;++i) {
+                AdifRecord record{{"CALL",QStringLiteral("N%1").arg(i,4,10,QLatin1Char('0'))},{"QSO_DATE","20200101"},
+                    {"TIME_ON","120000"},{"BAND","20m"},{"MODE","CW"},{"MY_POTA_REF","US-0015"},
+                    {"APP_DECOLOG_ACTIVATION_UUID","pota-fixture"},{"APP_DECOLOG_ACTIVATION_REVIEW","PERIOD_UNCERTAIN"}};
+                QVERIFY(db.insertQso(record,"fixture",{},true,0,false).id>0);
+            }
         }
         QByteArray output; QVERIFY2(launch(dir,QStringLiteral("potacatalogueprobe"),output),output.constData());
         QVERIFY2(output.contains("PROBE potaReview call=K0000 total=205"),output.constData());
         QVERIFY2(output.contains("PROBE potaReview third=K0200 page=2"),output.constData());
-        QVERIFY2(output.contains("PROBE potaReview back=K0100 page=1"),output.constData());
+        QVERIFY2(output.contains("PROBE potaReview back=K0100 page=1 excluded=3"),output.constData());
     }
 
     void potaReviewRejectsExternalChangeInDesktop()
