@@ -24,6 +24,8 @@ struct Entry {
     QString qsoUtc;
     QJsonArray lotwGridObservations;
     int lotwGridObservationCount{0};
+    QString qsoUuid;
+    int qsoRevision{0};
 };
 
 struct Rules {

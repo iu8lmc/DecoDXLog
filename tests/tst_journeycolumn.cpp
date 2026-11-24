@@ -516,6 +516,17 @@ private slots:
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }
 
+    void vuccObservationHistoryPagesInDesktop()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const auto imported=db.importAdif("<CALL:5>K1BBB<QSO_DATE:8>20260101<TIME_ON:4>1201<BAND:2>6m<MODE:2>CW<GRIDSQUARE:4>EM11<QSL_RCVD:1>Y<EOR>");
+          QCOMPARE(imported.inserted,1); QString error;
+          for (int i=0;i<55;++i) QVERIFY(db.recordLotwGridObservation(imported.insertedIds.first(),QString("FN%1").arg(i,2,10,QLatin1Char('0')),QStringLiteral(""),&error)); }
+        QByteArray output; QVERIFY2(launch(dir,"vuccreviewprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("PROBE vuccHistory first=50 next=true") && output.contains("PROBE vuccHistory second=5 next=false") && !output.contains("TypeError"),output.constData());
+    }
+
     void vuccSatellitePreviewUsesSeparateCategory()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

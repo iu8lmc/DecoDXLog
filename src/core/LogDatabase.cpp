@@ -2743,6 +2743,34 @@ InsertResult LogDatabase::restoreRevision(qint64 id, qint64 historyId)
     return r;
 }
 
+QVariantMap LogDatabase::lotwGridObservationPage(qint64 qsoId, const QString& uuid, int revision, qint64 beforeId) const
+{
+    const auto fail=[](const QString& message) { return QVariantMap{{QStringLiteral("error"),message},{QStringLiteral("rows"),QVariantList{}}}; };
+    if (!isOpen() || qsoId<=0 || uuid.isEmpty() || revision<=0 || beforeId<0) return fail(QStringLiteral("Invalid observation history request"));
+    QSqlDatabase db=connection(); QSqlQuery transaction(db);
+    if (!transaction.exec(QStringLiteral("SAVEPOINT decolog_lotw_history"))) return fail(transaction.lastError().text());
+    const auto rollback=[&] { QSqlQuery q(db); q.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_lotw_history")); q.exec(QStringLiteral("RELEASE SAVEPOINT decolog_lotw_history")); };
+    const auto current=meta(qsoId);
+    if (!current || current->deleted || current->uuid!=uuid || current->revision!=revision) {
+        rollback(); return fail(QStringLiteral("QSO changed; refresh the preview"));
+    }
+    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT id,grid,vucc_grids,observed_at FROM lotw_grid_observation "
+        "WHERE qso_id=? AND id<? ORDER BY id DESC LIMIT 51"));
+    q.addBindValue(qsoId); q.addBindValue(beforeId>0 ? beforeId : std::numeric_limits<qint64>::max());
+    if (!q.exec()) { const QString error=q.lastError().text(); rollback(); return fail(error); }
+    QVariantList rows; qint64 last=0; bool more=false;
+    while (q.next()) {
+        if (rows.size()==50) { more=true; break; }
+        last=q.value(0).toLongLong(); rows << QVariantMap{{QStringLiteral("id"),QString::number(last)},
+            {QStringLiteral("grid"),q.value(1)}, {QStringLiteral("vuccGrids"),q.value(2)}, {QStringLiteral("observedAt"),q.value(3)}};
+    }
+    if (q.lastError().isValid()) { const QString error=q.lastError().text(); rollback(); return fail(error); }
+    q.finish();
+    if (!transaction.exec(QStringLiteral("RELEASE SAVEPOINT decolog_lotw_history"))) { const QString error=transaction.lastError().text(); rollback(); return fail(error); }
+    return {{QStringLiteral("rows"),rows},{QStringLiteral("hasMore"),more},
+            {QStringLiteral("nextBeforeId"),more ? QString::number(last) : QString()}, {QStringLiteral("error"),QString()}};
+}
+
 bool LogDatabase::recordLotwGridObservation(qint64 qsoId, const QString& grid, const QString& vuccGrids, QString* error)
 {
     if (error) error->clear();

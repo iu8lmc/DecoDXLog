@@ -482,6 +482,9 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message><source>LoTW grid observation history</source><translation>Storico osservazioni locator LoTW</translation></message>
+    <message><source>Stored observations are based on a local heuristic match and are not proof of award credit.</source><translation>Le osservazioni archiviate derivano da un abbinamento locale euristico e non costituiscono prova di credito per il diploma.</translation></message>
+    <message><source>%1 · grid %2 · boundary grids %3</source><translation>%1 · locator %2 · locator di confine %3</translation></message>
     <message><source>local grid listed</source><translation>locator locale presente</translation></message>
     <message><source>different grid</source><translation>locator diverso</translation></message>
     <message><source>grid data unusable</source><translation>dati locator non utilizzabili</translation></message>

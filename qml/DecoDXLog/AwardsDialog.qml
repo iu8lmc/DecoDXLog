@@ -800,10 +800,15 @@ DialogFrame {
     function refreshVucc() {
         vuccResult = decolog.vuccPreview(vuccBand, vuccAccount, vuccSite, vuccTarget, vuccScope)
     }
-    Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close(); root.marathonPreview=({}); marathonReview.close() } }
+    function openVuccHistory(row) {
+        vuccHistory.qso=row; vuccHistory.generation=String(vuccResult.logGeneration || "");
+        vuccHistory.cursors=[""]; vuccHistory.page=0; vuccHistory.load(); vuccHistory.open()
+    }
+    Connections { target:decolog; function onLogChanged() { root.vuccResult=({}); vuccReview.close(); vuccHistory.close(); root.marathonPreview=({}); marathonReview.close() } }
     function probeVuccReview(satellite) {
         openAt("dxcc"); vuccBand=satellite ? "2m" : "6m"; vuccScopePicker.currentIndex=satellite ? 1 : 0; refreshVucc(); vuccReview.open()
-        Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")+" gridEvidence="+((root.vuccResult.eligible || [])[0] || {}).gridEvidence+" notice="+vuccGridEvidenceNotice.text) })
+        Qt.callLater(function() { const row=vuccCandidateRows.itemAtIndex(0); const excluded=vuccExcludedRows.itemAtIndex(0); console.warn("PROBE vuccReview open="+vuccReview.visible+" row="+(row ? row.text : "missing")+" excluded="+(excluded ? excluded.text : "missing")+" gridEvidence="+((root.vuccResult.eligible || [])[0] || {}).gridEvidence+" notice="+vuccGridEvidenceNotice.text)
+            if (row && row.modelData.lotwGridObservationCount > 50) { row.probeHistory(); console.warn("PROBE vuccHistory first="+(vuccHistory.result.rows || []).length+" next="+vuccHistory.result.hasMore); vuccHistoryNext.clicked(); console.warn("PROBE vuccHistory second="+(vuccHistory.result.rows || []).length+" next="+vuccHistory.result.hasMore) } })
     }
     function probeVuccThreshold() {
         openAt("dxcc"); vuccScopePicker.currentIndex=0; vuccBand="70cm"; vuccTarget=125
@@ -823,9 +828,14 @@ DialogFrame {
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Candidate grids and recorded evidence") }
             ListView { id:vuccCandidateRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.eligible || []
                 ScrollBar.vertical:PanelScrollBar {}
-                delegate:Text { required property var modelData; width:vuccCandidateRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary
+                delegate:RowLayout { required property var modelData; width:vuccCandidateRows.width
+                    readonly property string text: candidateText.text
+                    function probeHistory() { historyButton.clicked() }
+                    Text { id:candidateText; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
                     text:qsTr("%1 · QSO %2 · local confirmation: %3%4 · %5 · %6").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "").arg(modelData.classification === "terrestrial-unreported" ? qsTr("propagation unreported; verify") : modelData.classification === "satellite-name-missing" ? qsTr("satellite name missing; verify") : modelData.classification === "satellite" ? qsTr("satellite %1 · TX %2 / RX %3").arg(modelData.satName).arg(modelData.band).arg(modelData.rxBand || qsTr("unknown")) : qsTr("propagation %1").arg(modelData.propMode)).arg(modelData.qsoUtc)
                         + (modelData.lotwGridObservationCount > 0 ? qsTr(" · LoTW observations (match unverified; showing %1 of %2): %3").arg(modelData.lotwGridObservations.length).arg(modelData.lotwGridObservationCount).arg(modelData.lotwGridObservations.map(o => (o.grid || "—") + " [" + (o.vuccGrids || "—") + "] @ " + o.observedAt + " (" + (o.comparison === "included" ? qsTr("local grid listed") : o.comparison === "different" ? qsTr("different grid") : qsTr("grid data unusable")) + ")").join("; ")) : "") }
+                    GlassButton { id:historyButton; visible:modelData.lotwGridObservationCount > 0; text:qsTr("History…"); onClicked:root.openVuccHistory(modelData) }
+                }
             }
             Text { color:Theme.textPrimary; font.bold:true; text:qsTr("Excluded or duplicate candidates") }
             ListView { id:vuccExcludedRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:root.vuccResult.exclusions || []
@@ -833,6 +843,26 @@ DialogFrame {
                 delegate:Text { required property var modelData; width:vuccExcludedRows.width; wrapMode:Text.Wrap; color:Theme.textSecondary; text:modelData }
             }
             GlassButton { text:qsTr("Close"); onClicked:vuccReview.close() }
+        }
+    }
+
+    DialogFrame {
+        id:vuccHistory; title:qsTr("LoTW grid observation history"); dialogKey:"vuccLotwHistory"; width:680; height:480; dotColor:Theme.secondaryColor
+        property var qso:({}); property string generation:""; property var cursors:[""]; property int page:0; property var result:({})
+        function load() { result=decolog.vuccLotwObservationPage(qso.qsoId,qso.qsoUuid,qso.qsoRevision,generation,cursors[page]) }
+        body:ColumnLayout { anchors.margins:12; spacing:6
+            Text { Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.warningColor; text:qsTr("Stored observations are based on a local heuristic match and are not proof of award credit.") }
+            Text { Layout.fillWidth:true; visible:!!vuccHistory.result.error; wrapMode:Text.Wrap; color:Theme.warningColor; text:vuccHistory.result.error || "" }
+            ListView { Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:vuccHistory.result.rows || []; ScrollBar.vertical:PanelScrollBar {}
+                delegate:Text { required property var modelData; width:ListView.view.width; wrapMode:Text.Wrap; color:Theme.textSecondary
+                    text:qsTr("%1 · grid %2 · boundary grids %3").arg(modelData.observedAt).arg(modelData.grid || "—").arg(modelData.vuccGrids || "—") } }
+            RowLayout {
+                GlassButton { text:qsTr("Previous"); enabled:vuccHistory.page>0; onClicked:{vuccHistory.page--; vuccHistory.load()} }
+                Text { color:Theme.textSecondary; text:qsTr("Page %1").arg(vuccHistory.page+1) }
+                GlassButton { id:vuccHistoryNext; text:qsTr("Next"); enabled:!!vuccHistory.result.hasMore; onClicked:{vuccHistory.cursors=vuccHistory.cursors.slice(0,vuccHistory.page+1).concat([vuccHistory.result.nextBeforeId]); vuccHistory.page++; vuccHistory.load()} }
+                Item { Layout.fillWidth:true }
+                GlassButton { text:qsTr("Close"); onClicked:vuccHistory.close() }
+            }
         }
     }
 

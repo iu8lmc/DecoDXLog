@@ -3473,6 +3473,7 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
     QVariantList eligible;
     for (const auto& entry : result.eligible)
         eligible << QVariantMap{{QStringLiteral("qsoId"), entry.qsoId},
+                                {QStringLiteral("qsoUuid"),entry.qsoUuid}, {QStringLiteral("qsoRevision"),entry.qsoRevision},
                                 {QStringLiteral("grid4"), entry.grid},
                                 {QStringLiteral("gridEvidence"), QStringLiteral("local-qso-unverified")},
                                 {QStringLiteral("lotwGridObservations"), entry.lotwGridObservations.toVariantList()},
@@ -3492,12 +3493,24 @@ QVariantMap DecoLogController::vuccPreview(const QString& band, const QString& a
     }
     QString validationError;
     return QVariantMap{{QStringLiteral("valid"), result.isValid(&validationError)},
+                       {QStringLiteral("logGeneration"),QString::number(m_db.openGeneration())},
                        {QStringLiteral("error"), validationError},
                        {QStringLiteral("officialRulesVerified"), result.officialRulesVerified},{QStringLiteral("scope"),rules.scope},
                        {QStringLiteral("initialThreshold"),core::vucc::initialThreshold(rules.scope,rules.band)},
                        {QStringLiteral("eligible"), eligible},
                        {QStringLiteral("exclusions"), result.exclusions},
                        {QStringLiteral("json"), QString::fromUtf8(result.toJson().toJson(QJsonDocument::Indented))}};
+}
+
+QVariantMap DecoLogController::vuccLotwObservationPage(qint64 qsoId, const QString& uuid, int revision,
+                                                        const QString& generation, const QString& beforeId) const
+{
+    bool generationOk=false, cursorOk=beforeId.isEmpty();
+    const quint64 requestedGeneration=generation.toULongLong(&generationOk);
+    const qint64 cursor=beforeId.isEmpty() ? 0 : beforeId.toLongLong(&cursorOk);
+    if (!generationOk || !cursorOk || requestedGeneration!=m_db.openGeneration() || !m_db.sessionToken())
+        return {{QStringLiteral("error"),tr("The log changed; refresh the preview.")},{QStringLiteral("rows"),QVariantList{}}};
+    return m_db.lotwGridObservationPage(qsoId,uuid,revision,cursor);
 }
 
 QVariantList DecoLogController::awardGrids() const

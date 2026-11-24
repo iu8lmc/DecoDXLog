@@ -446,6 +446,7 @@ public:
                                          const QList<qint64>& exceptProfiles = {}, bool retainLotwGridObservation = false);
     // Stores an observation separately; it does not assert a match or award credit.
     bool recordLotwGridObservation(qint64 qsoId, const QString& grid, const QString& vuccGrids, QString* error = nullptr);
+    QVariantMap lotwGridObservationPage(qint64 qsoId, const QString& uuid, int revision, qint64 beforeId = 0) const;
 
     ImportResult importAdif(const QByteArray& data, const QString& source = QStringLiteral("import"),
                             qint64 stationProfileId = 0);

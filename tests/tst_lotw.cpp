@@ -233,6 +233,25 @@ private slots:
         QVERIFY(q.exec("SELECT qso_id,grid FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toLongLong(),one.id); QCOMPARE(q.value(1).toString(),QString("FN42AB")); QVERIFY(!q.next());
     }
 
+    void gridObservationHistoryPagesAndRejectsChangedQso()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("history.sqlite")));
+        const qint64 id=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture").id; QVERIFY(id>0);
+        QString error; for (int i=0;i<55;++i) QVERIFY(db.recordLotwGridObservation(id,QString("FN%1").arg(i,2,10,QLatin1Char('0')),QStringLiteral(""),&error));
+        const auto meta=db.meta(id); QVERIFY(meta);
+        const auto first=db.lotwGridObservationPage(id,meta->uuid,meta->revision,0);
+        QVERIFY2(first.value("error").toString().isEmpty(),qPrintable(first.value("error").toString()));
+        QCOMPARE(first.value("rows").toList().size(),50); QVERIFY(first.value("hasMore").toBool());
+        QCOMPARE(first.value("rows").toList().first().toMap().value("grid").toString(),QString("FN54"));
+        const auto second=db.lotwGridObservationPage(id,meta->uuid,meta->revision,first.value("nextBeforeId").toLongLong());
+        QCOMPARE(second.value("rows").toList().size(),5); QVERIFY(!second.value("hasMore").toBool());
+        QCOMPARE(second.value("rows").toList().first().toMap().value("grid").toString(),QString("FN04"));
+        QCOMPARE(second.value("rows").toList().last().toMap().value("grid").toString(),QString("FN00"));
+        auto edited=*db.record(id); edited.set("COMMENT","changed"); QCOMPARE(db.updateQso(id,edited).status,InsertResult::Status::Inserted);
+        QVERIFY(!db.lotwGridObservationPage(id,meta->uuid,meta->revision,0).value("error").toString().isEmpty());
+        QVERIFY(!db.lotwGridObservationPage(id,"wrong-uuid",meta->revision,0).value("error").toString().isEmpty());
+    }
+
     void storesSeparateGridObservationsIdempotently()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); const QString path=dir.filePath("log.sqlite"); qint64 id=0;

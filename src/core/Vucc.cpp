@@ -249,7 +249,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,''), q.qso_datetime_on, "
             "(SELECT json_group_array(json_object('grid',grid,'vuccGrids',vucc_grids,'observedAt',observed_at)) "
             "FROM (SELECT grid,vucc_grids,observed_at FROM lotw_grid_observation WHERE qso_id=q.id ORDER BY id DESC LIMIT 3)), "
-            "(SELECT COUNT(*) FROM lotw_grid_observation WHERE qso_id=q.id) "
+            "(SELECT COUNT(*) FROM lotw_grid_observation WHERE qso_id=q.id), q.uuid, q.revision "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
             "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();
@@ -269,6 +269,7 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
         const auto observations=QJsonDocument::fromJson(query.value(12).toByteArray());
         if (!observations.isArray()) { if (error) *error=QStringLiteral("Cannot read LoTW grid observations"); return {}; }
         entry.lotwGridObservations=observations.array(); entry.lotwGridObservationCount=query.value(13).toInt();
+        entry.qsoUuid=query.value(14).toString(); entry.qsoRevision=query.value(15).toInt();
         const QByteArray extra = query.value(7).toByteArray();
         if (!extra.isEmpty()) {
             QJsonParseError parseError;
@@ -302,6 +303,7 @@ QJsonDocument Result::toJson() const
     QJsonArray rows;
     for (const Entry& entry : eligible) {
         rows.append(QJsonObject{{QStringLiteral("qsoId"), static_cast<double>(entry.qsoId)},
+                                {QStringLiteral("qsoUuid"),entry.qsoUuid}, {QStringLiteral("qsoRevision"),entry.qsoRevision},
                                 {QStringLiteral("grid4"), entry.grid},
                                 {QStringLiteral("gridEvidence"), QStringLiteral("local-qso-unverified")},
                                 {QStringLiteral("lotwGridObservations"), entry.lotwGridObservations},
