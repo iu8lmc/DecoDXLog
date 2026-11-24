@@ -2227,6 +2227,32 @@ private slots:
         QCOMPARE(db.apiIdempotency("ten")->status,-1);
     }
 
+    void apiReviewRejectsTruncatedContactFields()
+    {
+        QTemporaryDir dir; LogDatabase db; QVERIFY(db.open(dir.filePath("api.sqlite")));
+        const QList<QPair<QByteArray,int>> fields{{"CALL",32},{"QSO_DATE",16},{"TIME_ON",16},{"BAND",16},{"MODE",32}};
+        int index=0;
+        for (const auto& [field,limit] : fields) {
+            const QByteArray value(limit+1,'X');
+            const QByteArray body="<"+field+":"+QByteArray::number(value.size())+">"+value+"<EOR>";
+            const QString key=QStringLiteral("long-%1").arg(index++);
+            QVERIFY(db.claimApiIdempotency(key,{body,0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")}));
+            const auto row=db.unresolvedApiRequests().value("rows").toList().last().toMap();
+            QSqlQuery q(db.connection()); q.prepare("SELECT key,created_at,request_app,request_format,request_body,response_body FROM api_idempotency WHERE key=?"); q.addBindValue(key); QVERIFY(q.exec()); QVERIFY(q.next());
+            QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly);
+            stream << q.value(0).toString() << q.value(1).toString() << q.value(2).toByteArray() << q.value(3).toByteArray() << q.value(4).toByteArray() << q.value(5).toByteArray();
+            const QString token=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+            QString error; QVERIFY(!db.markApiRequestReviewed(row.value("rowId").toString(),token,&error));
+            QVERIFY(row.value("truncated").toBool()); QVERIFY(row.value("reviewToken").toString().isEmpty());
+            QCOMPARE(db.apiIdempotency(key)->status,0);
+        }
+        const QByteArray atLimit="<CALL:32>"+QByteArray(32,'X')+"<EOR>";
+        QVERIFY(db.claimApiIdempotency("at-limit",{atLimit,0,"application/json","owner",{},QByteArray("adif"),QByteArray("test")}));
+        const auto complete=db.unresolvedApiRequests().value("rows").toList().last().toMap();
+        QVERIFY(!complete.value("truncated").toBool()); QVERIFY(!complete.value("reviewToken").toString().isEmpty());
+        QString error; QVERIFY2(db.markApiRequestReviewed(complete.value("rowId").toString(),complete.value("reviewToken").toString(),&error),qPrintable(error));
+    }
+
     void reviewedApiReservationRequiresUnchangedUnlockedRecord()
     {
         QTemporaryDir dir; LogDatabase db,other; const auto path=dir.filePath("api.sqlite"); QVERIFY(db.open(path)); QVERIFY(other.open(path));

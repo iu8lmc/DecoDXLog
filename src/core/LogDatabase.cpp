@@ -777,6 +777,8 @@ std::optional<ApiIdempotencyRecord> LogDatabase::apiIdempotency(const QString& k
 }
 
 namespace {
+constexpr int kApiReviewCallLength=32, kApiReviewDateLength=16, kApiReviewTimeLength=16,
+    kApiReviewBandLength=16, kApiReviewModeLength=32;
 QString apiReviewToken(const QString& key, const QString& created, const QByteArray& app,
                        const QByteArray& format, const QByteArray& body, const QByteArray& owner)
 {
@@ -794,8 +796,14 @@ bool apiReviewDocument(const QByteArray& body, const QByteArray& format, AdifDoc
         input=json.object().value(QStringLiteral("adif")).toString().toUtf8();
     } else if (format!=QByteArray("adif")) return false;
     *document=adif::parse(input);
-    return !document->records.isEmpty() && document->records.size()<=10 &&
-        !document->unterminatedRecord && !document->unterminatedTag && !document->invalidFieldLength;
+    if (document->records.isEmpty() || document->records.size()>10 || document->unterminatedRecord ||
+        document->unterminatedTag || document->invalidFieldLength) return false;
+    for (const auto& record : document->records) {
+        if (record.value(QStringLiteral("CALL")).size()>kApiReviewCallLength || record.value(QStringLiteral("QSO_DATE")).size()>kApiReviewDateLength ||
+            record.value(QStringLiteral("TIME_ON")).size()>kApiReviewTimeLength || record.value(QStringLiteral("BAND")).size()>kApiReviewBandLength ||
+            record.value(QStringLiteral("MODE")).size()>kApiReviewModeLength) return false;
+    }
+    return true;
 }
 }
 
@@ -833,11 +841,11 @@ QVariantMap LogDatabase::unresolvedApiRequests(const QString& after) const
         const bool complete=!oversized && apiReviewDocument(q.value(5).toByteArray(),q.value(3).toByteArray(),&document);
         for (qsizetype i=0; i<qMin(qsizetype(10),document.records.size()); ++i) {
             const auto& record=document.records.at(i);
-            contacts << QVariantMap{{QStringLiteral("call"),record.value(QStringLiteral("CALL")).left(32)},
-                {QStringLiteral("date"),record.value(QStringLiteral("QSO_DATE")).left(16)},
-                {QStringLiteral("time"),record.value(QStringLiteral("TIME_ON")).left(16)},
-                {QStringLiteral("band"),record.value(QStringLiteral("BAND")).left(16)},
-                {QStringLiteral("mode"),record.value(QStringLiteral("MODE")).left(32)}};
+            contacts << QVariantMap{{QStringLiteral("call"),record.value(QStringLiteral("CALL")).left(kApiReviewCallLength)},
+                {QStringLiteral("date"),record.value(QStringLiteral("QSO_DATE")).left(kApiReviewDateLength)},
+                {QStringLiteral("time"),record.value(QStringLiteral("TIME_ON")).left(kApiReviewTimeLength)},
+                {QStringLiteral("band"),record.value(QStringLiteral("BAND")).left(kApiReviewBandLength)},
+                {QStringLiteral("mode"),record.value(QStringLiteral("MODE")).left(kApiReviewModeLength)}};
         }
         const QByteArray owner=q.value(7).toByteArray();
         const QString token=complete && !owner.isEmpty() ? apiReviewToken(q.value(0).toString(),q.value(1).toString(),q.value(2).toByteArray(),q.value(3).toByteArray(),q.value(5).toByteArray(),owner) : QString();

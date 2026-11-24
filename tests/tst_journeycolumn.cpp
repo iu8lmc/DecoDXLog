@@ -98,6 +98,21 @@ private slots:
         QVERIFY(entry); QCOMPARE(entry->status,0); QCOMPARE(db.qsoCount(),qint64(0));
     }
 
+    void truncatedApiContactIsDisabledInDesktop()
+    {
+        using namespace decolog::core;
+        QTemporaryDir dir; QVERIFY(dir.isValid());
+        {
+            LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+            const QByteArray body="<CALL:33>"+QByteArray(33,'X')+"<EOR>";
+            QVERIFY(db.claimApiIdempotency("long",{body,0,"application/json","owner",{},QByteArray("adif"),QByteArray("fixture")}));
+        }
+        QByteArray output; QVERIFY2(launch(dir,QStringLiteral("apipendingprobe"),output),output.constData());
+        QVERIFY2(output.contains("contacts=1 call=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX truncated=true canMark=false"),output.constData());
+        LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); const auto entry=db.apiIdempotency("long");
+        QVERIFY(entry); QCOMPARE(entry->status,0);
+    }
+
     void extensionKeysUiCreatesAndRevokes()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir, "", true); QByteArray output;
