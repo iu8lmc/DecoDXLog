@@ -13,6 +13,24 @@ using namespace decolog::core;
 class TestDxCampaign : public QObject {
     Q_OBJECT
 private slots:
+    void malformedWatchFlagsAreNotTreatedAsFalse()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;
+        c.title="Watch"; c.calls={"3Y0J"}; c.start=QDate(2026,1,1); c.end=QDate(2026,1,2);
+        c.source="fixture"; c.verifiedAt=QDateTime::fromString("2025-12-31T12:00:00Z",Qt::ISODate); c.bands={"20m"}; c.modes={"CW"}; c.archived=true;
+        QString error; QVERIFY(dxcampaign::save(db,c,&error));
+        QSqlQuery q(db.connection()); q.prepare("SELECT value FROM app_setting WHERE key=?"); q.addBindValue("dx_campaign."+c.id); QVERIFY(q.exec()); QVERIFY(q.next());
+        const auto original=QJsonDocument::fromJson(q.value(0).toString().toUtf8()).object();
+        for (const auto* key : {"archived","watched","watchGoalsOnly"}) {
+            auto json=original; json[key]=QStringLiteral("true"); QSqlQuery update(db.connection());
+            update.prepare("UPDATE app_setting SET value=? WHERE key=?"); update.addBindValue(QString::fromUtf8(QJsonDocument(json).toJson(QJsonDocument::Compact))); update.addBindValue("dx_campaign."+c.id); QVERIFY(update.exec());
+            QVERIFY(!dxcampaign::load(db,c.id,&error)); QVERIFY(!error.isEmpty());
+            QVERIFY(dxcampaign::list(db,&error).isEmpty()); QVERIFY(!error.isEmpty());
+            QVERIFY(!dxcampaign::save(db,c,&error));
+        }
+        QSqlQuery restore(db.connection()); restore.prepare("UPDATE app_setting SET value=? WHERE key=?"); restore.addBindValue(QString::fromUtf8(QJsonDocument(original).toJson(QJsonDocument::Compact))); restore.addBindValue("dx_campaign."+c.id); QVERIFY(restore.exec());
+        const auto restored=dxcampaign::load(db,c.id,&error); QVERIFY(restored); QVERIFY(restored->archived);
+    }
     void campaignCountsLegacyUnzonedUtcQso()
     {
         LogDatabase db; QVERIFY(db.open(":memory:")); dxcampaign::Campaign c;

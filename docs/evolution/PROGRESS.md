@@ -3163,3 +3163,11 @@ Optional similar-call search now proposes valid calls differing by one slash ins
 A/B on macOS arm64 / Qt 6.11.2: before the change, searching synthetic `K1ABCP` did not find `K1ABC/P` and the new test failed. Afterwards both slash insertion and deletion find the corresponding candidate, unrelated calls are excluded, and exact-only mode remains exact. CTest database, tesseractocr and qmlpopups passed 3/3; the final exact-mode assertion passed separately. App and tests built; translation XML and git diff --check passed.
 
 Suggestions are not evidence that two calls identify the same station. Removing both a slash and its suffix requires two edits and is not included; results remain bounded to 100 with exact results first. The new case was tested in the search core rather than the running OCR dialog, with synthetic records rather than a real card. Large-log cost for the expanded alternatives, physical UI, Windows/Linux and full G12/G13 acceptance remain open.
+
+## 2026-11-24 — G04 reject malformed campaign watch flags
+
+Saved campaigns now reject non-boolean `archived`, `watched` and `watchGoalsOnly` values rather than silently treating them as false. This avoids interpreting a malformed archived flag as an active campaign or changing watch behavior. Missing optional legacy flags keep their existing defaults; no saved campaign is rewritten by this validation.
+
+A/B on macOS arm64 / Qt 6.11.2: a synthetic saved campaign whose archived flag was changed from a boolean to the string `true` was previously loaded as unarchived; the new test failed. The updated reader rejects malformed values for all three flags, reports an error on listing/loading, refuses to overwrite that malformed entry and loads the original again after restoration. Existing legacy-flag and campaign tests pass. App and targets built; CTest database, dxcampaign and qmlpopups passed 3/3; git diff --check passed.
+
+One malformed campaign currently causes the campaign list to fail as a whole; no repair UI was added. The injected data test covers the core, not the visible error path, physical interaction, a live cluster or Windows/Linux. Full G04/G13 acceptance remains open.

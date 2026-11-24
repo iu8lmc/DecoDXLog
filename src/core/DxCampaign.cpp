@@ -83,6 +83,8 @@ std::optional<Campaign> decode(const QString& raw)
 {
     QJsonParseError e; const auto doc=QJsonDocument::fromJson(raw.toUtf8(),&e); if(e.error!=QJsonParseError::NoError || !doc.isObject()) return {};
     const auto o=doc.object(); if(o.value("format").toInt()!=1) return {};
+    for (const auto* key : {"archived", "watched", "watchGoalsOnly"})
+        if (o.contains(QLatin1String(key)) && !o.value(QLatin1String(key)).isBool()) return {};
     Campaign c; c.id=o.value("id").toString(); c.title=o.value("title").toString(); c.calls=strings(o.value("calls"));
     c.start=QDate::fromString(o.value("start").toString(),Qt::ISODate); c.end=QDate::fromString(o.value("end").toString(),Qt::ISODate);
     c.source=o.value("source").toString(); c.verifiedAt=QDateTime::fromString(o.value("verifiedAt").toString(),Qt::ISODate);
