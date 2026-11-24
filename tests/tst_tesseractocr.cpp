@@ -187,6 +187,19 @@ class TestTesseractOcr : public QObject {
         QVERIFY(acquisition.loadReviews(saved.value("acquisitionId").toLongLong(),acquisitionUuid,0)); QTRY_COMPARE_WITH_TIMEOUT(done.size(),5,5000);
         QVERIFY(done.last().first().toBool()); QCOMPARE(acquisition.reviews().size(),1);
     }
+    void similarCallSearchIsOptionalAndDateFiltered()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("similar.sqlite")));
+        for (const auto& c : {"K1ABC","K1ABD","K1ACB","K1XYZ"})
+            QVERIFY(db.insertQso(AdifRecord{{"CALL",c},{"QSO_DATE","20260304"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QVERIFY(db.insertQso(AdifRecord{{"CALL","K1ABE"},{"QSO_DATE","20260305"},{"TIME_ON","1430"},{"BAND","20m"},{"MODE","CW"}},"fixture").id>0);
+        QslOcrSearch search(&db); QSignalSpy done(&search,&QslOcrSearch::finished);
+        QVERIFY(search.startFiltered("K1ABC","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),1,5000); QCOMPARE(search.matches().size(),1);
+        QVERIFY(search.startSimilar("K1ABC","2026-03-04","14:30")); QTRY_COMPARE_WITH_TIMEOUT(done.size(),2,5000);
+        QSet<QString> calls; for (const auto &item : search.matches()) calls.insert(item.toMap().value("call").toString());
+        QCOMPARE(calls,QSet<QString>({"K1ABC","K1ABD","K1ACB"})); QCOMPARE(db.qsoCount(),qint64(5));
+    }
+
     void searchesDateAndTimeBeforeApplyingResultLimit()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); LogDatabase db; QVERIFY(db.open(dir.filePath("dated.sqlite")));

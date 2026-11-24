@@ -6,7 +6,8 @@
 #include <memory>
 namespace decolog::core {
 class LogDatabase;
-// Advisory exact-call lookup. It never modifies the log or confirms a QSO.
+// Advisory exact or explicitly requested one-substitution/adjacent-swap lookup.
+// It never modifies the log or confirms a QSO.
 class QslOcrSearch : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
@@ -22,11 +23,13 @@ class QslOcrSearch : public QObject {
     QString error() const { return m_error; }
     Q_INVOKABLE bool start(const QString &call);
     Q_INVOKABLE bool startFiltered(const QString &call, const QString &dateUtc, const QString &timeUtc);
+    Q_INVOKABLE bool startSimilar(const QString &call, const QString &dateUtc, const QString &timeUtc);
     Q_INVOKABLE void cancel();
   signals:
     void changed();
     void finished(bool success);
   private:
+    bool startSearch(const QString &call, const QString &dateUtc, const QString &timeUtc, bool similar);
     LogDatabase *m_db;
     QThreadPool m_pool;
     std::shared_ptr<std::atomic_bool> m_cancel;

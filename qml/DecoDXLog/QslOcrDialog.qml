@@ -22,6 +22,7 @@ DialogFrame {
     property bool probeMatches: false
     property bool probeAcquire: false
     property bool probeFiltered: false
+    property bool probeSimilar: false
     property bool probeSecondSearch: false
     property string searchedCall: ""
     property string searchedCriteria: ""
@@ -35,11 +36,12 @@ DialogFrame {
         root.selectedQsos = enabled ? remaining.concat([row]) : remaining
         root.saved = false
     }
-    function probe(url, match, acquire, filtered) {
+    function probe(url, match, acquire, filtered, similar) {
         probing = true
         probeMatches = !!match
         probeAcquire = !!acquire
         probeFiltered = !!filtered
+        probeSimilar = !!similar
         probeSecondSearch = false
         selectedImage = url
         scan.clicked()
@@ -62,6 +64,7 @@ DialogFrame {
                         time.currentIndex=time.values.findIndex(x => x.value === "14:30")+1
                         console.warn("PROBE qslFilters " + date.chosenValue() + " " + time.chosenValue())
                     }
+                    similarCall.checked = root.probeSimilar
                     searchButton.clicked()
                 }
             }
@@ -175,11 +178,21 @@ DialogFrame {
                     root.searchDone = false
                     root.searchedCall = (manualCall.text.trim() || callChoice.rows[callChoice.currentIndex].value).toUpperCase()
                     const date=manualDate.text.trim() || criteria.itemAt(0).chosenValue(), time=manualTime.text.trim() || criteria.itemAt(1).chosenValue()
-                    root.searchedCriteria = [root.searchedCall,date,time].filter(x => x.length).join(" · ")
-                    root.search.startFiltered(root.searchedCall,date,time)
+                    root.searchedCriteria = [root.searchedCall,date,time].filter(x => x.length).join(" · ") + (similarCall.checked ? " · " + qsTr("similar calls") : "")
+                    if (similarCall.checked) root.search.startSimilar(root.searchedCall,date,time)
+                    else root.search.startFiltered(root.searchedCall,date,time)
                 }
             }
             GlassButton { text: qsTr("Cancel search"); enabled: root.search.busy; onClicked: root.search.cancel() }
+        }
+        CheckBox {
+            id: similarCall
+            text: qsTr("Include similar calls (one character substitution or adjacent swap)")
+            enabled: !root.search.busy && !root.acquisition.busy
+        }
+        Text {
+            Layout.fillWidth: true; visible: similarCall.checked; color: Theme.warningColor; wrapMode: Text.Wrap
+            text: qsTr("Similar matches are suggestions only; verify each callsign on the image. Insertions and missing characters are not searched.")
         }
         RowLayout {
             Layout.fillWidth: true

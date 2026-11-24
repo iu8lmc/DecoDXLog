@@ -4,6 +4,7 @@
 #include <QPointer>
 #include <QDateTime>
 #include <QRegularExpression>
+#include <QSet>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -18,6 +19,14 @@ bool QslOcrSearch::start(const QString &rawCall)
 }
 bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc, const QString &timeUtc)
 {
+    return startSearch(rawCall, dateUtc, timeUtc, false);
+}
+bool QslOcrSearch::startSimilar(const QString &rawCall, const QString &dateUtc, const QString &timeUtc)
+{
+    return startSearch(rawCall, dateUtc, timeUtc, true);
+}
+bool QslOcrSearch::startSearch(const QString &rawCall, const QString &dateUtc, const QString &timeUtc, bool similar)
+{
     if (m_busy) return false;
     m_matches.clear(); m_error.clear(); m_truncated = false;
     const QString call = rawCall.trimmed().toUpper();
@@ -31,6 +40,19 @@ bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc,
     if (!m_db || !m_db->isOpen() || m_db->path().isEmpty() || m_db->path() == QLatin1String(":memory:") || !valid.match(call).hasMatch()) {
         m_error = tr("Choose a callsign and an open file-backed log"); emit changed(); return false;
     }
+    QSet<QString> variants{call};
+    if (similar) {
+        const QString alphabet = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
+        for (qsizetype i=0; i<call.size(); ++i) {
+            if (call.at(i)==QLatin1Char('/')) continue;
+            for (const QChar ch : alphabet) { QString v=call; v[i]=ch; if (valid.match(v).hasMatch()) variants.insert(v); }
+            if (i+1<call.size() && call.at(i+1)!=QLatin1Char('/')) {
+                QString v=call; v[i]=call.at(i+1); v[i+1]=call.at(i);
+                if (valid.match(v).hasMatch()) variants.insert(v);
+            }
+        }
+    }
+    const QStringList calls=variants.values();
     const QString path = m_db->path(), identity = m_db->identity();
     const QByteArray fileToken = m_db->openFileIdentity();
     const quint64 openGeneration = m_db->openGeneration();
@@ -41,7 +63,7 @@ bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc,
     const auto cancelled = m_cancel;
     m_busy = true; emit changed();
     QPointer<QslOcrSearch> self(this);
-    m_pool.start([self, path, identity, fileToken, openGeneration, call, dateUtc, timeUtc, cancelled] {
+    m_pool.start([self, path, identity, fileToken, openGeneration, calls, dateUtc, timeUtc, cancelled] {
         QVariantList matches;
         QString error;
         bool truncated = false;
@@ -60,12 +82,13 @@ bool QslOcrSearch::startFiltered(const QString &rawCall, const QString &dateUtc,
                     error = tr("The open log changed");
                 } else {
                     QSqlQuery q(sql);
-                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call=? AND deleted=0");
+                    const QString placeholders=QStringList(calls.size(), QStringLiteral("?")).join(QLatin1Char(','));
+                    QString query=QStringLiteral("SELECT id,call,qso_datetime_on,band,mode,source,uuid,revision FROM qso WHERE call IN (")+placeholders+QStringLiteral(") AND deleted=0");
                     if (!dateUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%Y-%m-%d',qso_datetime_on)=?");
                     if (!timeUtc.isEmpty()) query+=QStringLiteral(" AND strftime('%H:%M',qso_datetime_on)=?");
                     query+=QStringLiteral(" ORDER BY id DESC LIMIT 101");
                     q.prepare(query);
-                    q.addBindValue(call);
+                    for (const QString& candidate : calls) q.addBindValue(candidate);
                     if (!dateUtc.isEmpty()) q.addBindValue(dateUtc);
                     if (!timeUtc.isEmpty()) q.addBindValue(timeUtc);
                     if (!q.exec()) {

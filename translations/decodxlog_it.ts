@@ -15868,6 +15868,18 @@ Referenze aggiuntive: %7</translation></message>
 <context>
     <name>QslOcrDialog</name>
     <message>
+        <source>Include similar calls (one character substitution or adjacent swap)</source>
+        <translation>Includi nominativi simili (un carattere sostituito o due adiacenti scambiati)</translation>
+    </message>
+    <message>
+        <source>Similar matches are suggestions only; verify each callsign on the image. Insertions and missing characters are not searched.</source>
+        <translation>Le corrispondenze simili sono solo suggerimenti; verifica ogni nominativo sull’immagine. Non vengono cercati caratteri aggiunti o mancanti.</translation>
+    </message>
+    <message>
+        <source>similar calls</source>
+        <translation>nominativi simili</translation>
+    </message>
+    <message>
         <source>Read QSL image locally</source>
         <translation>Leggi immagine QSL in locale</translation>
     </message>
