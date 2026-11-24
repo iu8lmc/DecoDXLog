@@ -42,6 +42,8 @@ class Fixture(socketserver.BaseRequestHandler):
         elif command.startswith('PREDICT "OSCAR-7" '):
             start = int(command.rsplit(' ', 1)[1])
             base = (1800000000 if start <= 1800000000 else 1800000600 if start <= 1800000600 else 1800001200) if getattr(self.server, 'schedule', False) else (1800000180 if start > 1800000000 else 1800000000)
+            if getattr(self.server, 'overlap', False) and start > 1800000000:
+                base = 1800000060
             for part in (f'{base} Fri 15Jan27 08:00:00 0 183 240 22 75 2135 38914 *\n'.encode(),
                          f'{base + 60} Fri 15Jan27 08:01:00 30 174 243 25 72'.encode(),
                          b' 1794 38914 *\n', f'{base + 120} Fri 15Jan27 08:02:00 0 160 246 28 69 1517 38914 *\n'.encode(), b'\x1a\n'):
@@ -159,7 +161,7 @@ with tempfile.TemporaryDirectory(prefix='decolog-predict-pass-') as tmp:
         server.shutdown()
         print(f'PASS pass: {server.commands}')
 
-for change_tle in (False, True):
+for change_tle, overlap in ((False, False), (True, False), (False, True)):
     with tempfile.TemporaryDirectory(prefix='decolog-predict-schedule-') as tmp:
         root = pathlib.Path(tmp)
         with socketserver.ThreadingUDPServer(('127.0.0.1', 0), Fixture) as server:
@@ -167,6 +169,7 @@ for change_tle in (False, True):
             server.stopped = False
             server.schedule = True
             server.change_tle = change_tle
+            server.overlap = overlap
             threading.Thread(target=server.serve_forever, daemon=True).start()
             env = os.environ.copy()
             env.update(QT_QPA_PLATFORM='offscreen', QT_QUICK_BACKEND='software',
@@ -176,16 +179,18 @@ for change_tle in (False, True):
                        f'predictschedule:127.0.0.1:{server.server_address[1]}:OSCAR-7', '--grab', str(root/'screen.png')]
             result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=25)
             output = result.stdout + result.stderr
-            expected = ('PROBE predictSchedule success=false count=1 rendered=1 old=true' if change_tle
+            expected = ('PROBE predictSchedule success=false count=1 rendered=1 old=true' if change_tle or overlap
                         else 'PROBE predictSchedule success=true count=3 rendered=3 old=true')
-            if not change_tle:
+            if overlap:
+                expected += '\nPROBE predictSchedule status=Incomplete schedule: Tracker returned overlapping passes'
+            if not change_tle and not overlap:
                 expected += '\nPROBE schedule invalid rejected=true\nPROBE schedule start valid=1800000000 invalid=true\nPROBE schedule filter hidden=3 restored=3 cleared=true blocked=true\nPROBE selectedSchedule aos=1800000600 next=true\nPROBE selectedScheduleNext success=true aos=1800001200'
             if result.returncode or 'RangeError' in output or 'TypeError' in output or any(line not in output for line in expected.split('\n')):
                 raise SystemExit(f'FAIL schedule change_tle={change_tle}: {output}; requests={server.commands}')
             if 'PREDICT "OSCAR-7" 1800000000' not in server.commands:
                 raise SystemExit(f'Explicit UTC start not sent: {server.commands}')
-            count = 2 if change_tle else 4
-            if not change_tle and server.commands[-2] != 'PREDICT "OSCAR-7" 1800000721':
+            count = 2 if change_tle or overlap else 4
+            if not change_tle and not overlap and server.commands[-2] != 'PREDICT "OSCAR-7" 1800000721':
                 raise SystemExit(f'Following pass did not use selected LOS: {server.commands}')
             if len(server.commands) != count * 3 or any(not c.startswith(('GET_TLE OSCAR-7', 'PREDICT "OSCAR-7" ')) for c in server.commands):
                 raise SystemExit(f'Unexpected schedule commands: {server.commands}')

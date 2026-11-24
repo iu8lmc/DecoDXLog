@@ -882,7 +882,7 @@ DialogFrame {
         Note {
             visible: root.previewShown && (root.partitionPreview.potaCorrespondentRows || []).length > 0
             color: Theme.warningColor
-            text: qsTr("POTA correspondent references to review: %1 QSO. Open a QSO to inspect its fields.").arg(root.partitionPreview.potaCorrespondentRows.length)
+            text: qsTr("POTA correspondent references to review: %1 QSO. Open a QSO to inspect its fields.").arg((root.partitionPreview.potaCorrespondentRows || []).length)
         }
         Repeater {
             id: potaReviewRepeater

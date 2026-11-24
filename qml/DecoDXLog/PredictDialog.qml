@@ -217,6 +217,7 @@ DialogFrame {
                 console.warn("PROBE predictSchedule success=" + success + " count=" + root.schedule.passes.length
                              + " rendered=" + scheduleRepeater.count + " old=" + (root.schedule.passes.length > 0 &&
                              (Date.now() - new Date(root.schedule.passes[0].tleEpoch).getTime()) / 86400000 > 14))
+                console.warn("PROBE predictSchedule status=" + scheduleStatus.text)
                 root.probingSchedule = false
                 if (success && root.schedule.passes.length >= 2) {
                     scheduleRepeater.itemAt(1).selectPass()

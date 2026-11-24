@@ -2799,3 +2799,11 @@ The multi-pass PREDICT schedule now rejects a subsequent pass whose AOS is at or
 A/B on macOS arm64 / Qt 6.11.2 with a local synthetic UDP tracker: two passes overlapping by 60 seconds were previously reported as a successful schedule; now the second is rejected and the first remains available. Existing sequential-pass, cancellation and ongoing-pass tests also pass. App and test targets built; CTest predictpass, predicttracker, roversession, database and qmlpopups passed 5/5.
 
 The fixture checks temporal consistency, not the orbital correctness of the tracker, realistic radio Doppler or hardware. It does not exercise the incomplete-schedule message in the physical UI, a live tracker, Windows/Linux or the remaining G09/G13 acceptance requirements.
+
+## 2026-11-24 — G09 overlap warning in desktop and G06 empty preview fix
+
+Extended the offscreen PREDICT app probe with an overlapping-pass fixture and explicit schedule-status observation. During this check, the app logged a QML TypeError because the G06 POTA review heading read the length of an absent list before preview initialization. The heading now uses an empty list when no preview exists.
+
+A/B on macOS arm64 / Qt 6.11.2: temporarily removing the overlap guard let the second overlapping pass enter the schedule; the app then stopped later with two rows and a different expired-pass error. With the guard restored, it stopped after one row and displayed the overlap error. The original app probe also failed on the POTA TypeError; after the fallback fix the normal, changed-TLE and overlap scenarios all passed without TypeError. A temporary script extracted the schedule scenarios from `tests/tools/predict_ui_probe.py`; the full multi-scenario script was not run. App and predictpass targets rebuilt; CTest predictpass and qmlpopups passed 2/2.
+
+The app is driven programmatically offscreen using a synthetic UDP server, without real tracker, CAT, RF or physical UI. The error text contains an English core diagnostic even in other locales. Windows/Linux and full G06/G09/G13 acceptance remain open.
