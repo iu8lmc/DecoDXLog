@@ -144,7 +144,8 @@ private slots:
         QVERIFY2(output.contains("PROBE nethandoff") && output.contains("\"visible\":true") && output.contains("\"scope\":\"test-event\"") &&
                  output.contains("\"offers\":1") && output.contains("\"call\":\"K1ABC\"") && output.contains(warning) &&
                  output.contains("\"error\":\"\"") && output.contains("\"before\":\"pending\"") && output.contains("\"after\":\"accepted\"") &&
-                 output.contains("\"stateError\":\"\"") && !output.contains("TypeError"),output.constData());
+                 output.contains("\"stateError\":\"\"") && output.contains("\"stale\":true") && output.contains("\"staleEnabled\":false") &&
+                 output.contains("\"staleRows\":0") && !output.contains("TypeError"),output.constData());
         { using namespace decolog::core; LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
           const auto offers=contesthandoff::incomingOffers(db,"test-event","receiver"); QCOMPARE(offers.size(),1); QCOMPARE(offers.first().state,QString("accepted")); }
     }

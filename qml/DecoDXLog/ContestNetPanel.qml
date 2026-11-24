@@ -17,9 +17,13 @@ GlassPanel {
         handoffRecipient.text="other"; handoffCall.text="K1ABC"; handoffFrequency.text="14025000"; handoffDialog.sendOffer()
         const incoming=root.net.handoffInbox; const before=incoming.length ? incoming[0].state : "missing"
         const stateError=incoming.length ? root.net.setHandoffState(incoming[0].id,"accepted") : "missing"
+        const group=root.net.group; root.net.group=group + "-TEST"; root.net.group=group
+        const staleError=root.net.handoffError, staleEnabled=handoffSendButton.enabled, staleRows=root.net.handoffOutbox.length
+        handoffDialog.configure()
         return {visible:handoffDialog.visible,scope:root.net.handoffScope,offers:root.net.handoffOutbox.length,
             call:root.net.handoffOutbox.length ? root.net.handoffOutbox[0].call : "",warning:handoffWarning.text,error:handoffDialog.result,
-            before:before,after:root.net.handoffInbox.length ? root.net.handoffInbox[0].state : "missing",stateError:stateError}
+            before:before,after:root.net.handoffInbox.length ? root.net.handoffInbox[0].state : "missing",stateError:stateError,
+            stale:staleError.length>0,staleEnabled:staleEnabled,staleRows:staleRows}
     }
     function probeNetworkReviewStart(secure) {
         root.net.setLoopbackForProbe(); root.net.enabled=true; qsoWireDialog.open(); wireKey.text=secure ? "a".repeat(64) : ""
@@ -245,11 +249,11 @@ GlassPanel {
                     StyledTextField { id: handoffCall; Layout.fillWidth: true; uppercase: true } }
                 LabeledField { label: qsTr("Frequency (Hz)"); Layout.fillWidth: true
                     StyledTextField { id: handoffFrequency; Layout.fillWidth: true; inputMethodHints: Qt.ImhDigitsOnly; placeholderText: "14025000" } }
-                GlassButton { Layout.alignment: Qt.AlignBottom; text: qsTr("Send offer"); enabled: root.net.running
+                GlassButton { id: handoffSendButton; Layout.alignment: Qt.AlignBottom; text: qsTr("Send offer"); enabled: root.net.running && root.net.handoffAvailable
                     onClicked: handoffDialog.sendOffer() }
             }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.warningColor
-                text: handoffDialog.result || root.net.handoffError || root.net.handoffStatus }
+                text: root.net.handoffError || handoffDialog.result || root.net.handoffStatus }
             Text { text: qsTr("Received offers"); color: Theme.textPrimary; font.bold: true }
             ListView {
                 id: handoffInboxList; Layout.fillWidth: true; Layout.fillHeight: true; Layout.minimumHeight: 100
@@ -258,10 +262,10 @@ GlassPanel {
                     Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
                         text: qsTr("%1 · %2 Hz · from %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.sender).arg(modelData.createdUtc) + " · " +
                               (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : qsTr("Completed")) }
-                    GlassButton { text: qsTr("Accept"); visible: modelData.state === "pending"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"accepted") }
-                    GlassButton { text: qsTr("Decline"); visible: modelData.state === "pending"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"declined") }
-                    GlassButton { text: qsTr("Complete"); visible: modelData.state === "accepted"; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"completed") }
-                    GlassButton { text: qsTr("Resend status"); enabled: root.net.running; onClicked: handoffDialog.result = root.net.sendHandoffStatus(modelData.id) }
+                    GlassButton { text: qsTr("Accept"); visible: modelData.state === "pending"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"accepted") }
+                    GlassButton { text: qsTr("Decline"); visible: modelData.state === "pending"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"declined") }
+                    GlassButton { text: qsTr("Complete"); visible: modelData.state === "accepted"; enabled: root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.setHandoffState(modelData.id,"completed") }
+                    GlassButton { text: qsTr("Resend status"); enabled: root.net.running && root.net.handoffAvailable; onClicked: handoffDialog.result = root.net.sendHandoffStatus(modelData.id) }
                 }
             }
             Text { text: qsTr("Sent offers — reported status is unauthenticated"); color: Theme.textPrimary; font.bold: true }
@@ -272,7 +276,7 @@ GlassPanel {
                     Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: Theme.textPrimary
                         text: qsTr("%1 · %2 Hz · to %3 · %4 UTC").arg(modelData.call).arg(modelData.frequencyHz).arg(modelData.recipient).arg(modelData.createdUtc) + " · " +
                               (modelData.state === "pending" ? qsTr("Pending") : modelData.state === "accepted" ? qsTr("Accepted") : modelData.state === "declined" ? qsTr("Declined") : modelData.state === "completed" ? qsTr("Completed") : qsTr("No status received")) }
-                    GlassButton { text: qsTr("Retry"); enabled: root.net.running
+                    GlassButton { text: qsTr("Retry"); enabled: root.net.running && root.net.handoffAvailable
                         onClicked: handoffDialog.result = root.net.retryHandoffOffer(modelData.id) }
                 }
             }

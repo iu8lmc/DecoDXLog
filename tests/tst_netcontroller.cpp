@@ -65,6 +65,10 @@ private slots:
         QVERIFY(deliver(3)>0); QTest::qWait(100); QCOMPARE(b.handoffInbox().size(),1);
         QSignalSpy changed(&a,&NetController::handoffChanged); a.setGroup("OTHER"); QVERIFY(!changed.isEmpty());
         QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty()); QVERIFY(!a.retryHandoffOffer(offerId).isEmpty());
+        a.setGroup("FIELD"); QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty());
+        QVERIFY(a.configureHandoffScope("cqww-2026").isEmpty()); QCOMPARE(a.handoffOutbox().size(),1);
+        changed.clear(); source.close(); QVERIFY(source.open(dir.filePath("source.sqlite")));
+        QTRY_VERIFY_WITH_TIMEOUT(!changed.isEmpty(),3000); QVERIFY(!a.handoffError().isEmpty()); QVERIFY(a.handoffOutbox().isEmpty());
         a.setEnabled(false); b.setEnabled(false);
     }
     void experimentalQsoTransferBetweenControllersRecoversMissingFragment()

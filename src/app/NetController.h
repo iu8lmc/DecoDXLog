@@ -57,6 +57,7 @@ class NetController : public QObject {
     Q_PROPERTY(QVariantList handoffOutbox READ handoffOutbox NOTIFY handoffChanged)
     Q_PROPERTY(QString handoffStatus READ handoffStatus NOTIFY handoffChanged)
     Q_PROPERTY(QString handoffError READ handoffError NOTIFY handoffChanged)
+    Q_PROPERTY(bool handoffAvailable READ handoffLogCurrent NOTIFY handoffChanged)
 
 public:
     struct Context {
@@ -202,6 +203,8 @@ private:
     QString m_name;
     QString m_id;
     QString m_handoffScope, m_handoffStatus;
+    bool m_handoffInvalidated{false};
+    QTimer m_handoffWatch;
     QString m_handoffPath, m_handoffIdentity, m_handoffGroup;
     QByteArray m_handoffFileIdentity;
     quint64 m_handoffGeneration{0};

@@ -32,6 +32,13 @@ NetController::NetController(Context context, QObject* parent)
     : QObject(parent)
     , m_ctx(std::move(context))
 {
+    m_handoffWatch.setInterval(1000);
+    connect(&m_handoffWatch,&QTimer::timeout,this,[this] {
+        if (!m_handoffScope.isEmpty() && !m_handoffInvalidated && !handoffLogCurrent()) {
+            m_handoffInvalidated=true; emit handoffChanged();
+        }
+    });
+    m_handoffWatch.start();
     m_durablePool.setMaxThreadCount(1);
     m_qsoWirePool.setMaxThreadCount(1);
     m_qsoWireExpiry.setSingleShot(true); m_qsoWireExpiry.setInterval(300000);
@@ -816,6 +823,7 @@ void NetController::setGroup(const QString& group)
     const QString g = group.trimmed().toUpper();
     if (g.isEmpty() || g == m_group)
         return;
+    if (!m_handoffScope.isEmpty()) m_handoffInvalidated=true;
     m_group = g;
     QSettings().setValue(QStringLiteral("net/group"), g);
     if (m_enabled)
@@ -1077,7 +1085,7 @@ void NetController::sendSpot(const QString& call, double khz, const QString& com
 
 bool NetController::handoffLogCurrent() const
 {
-    return !m_handoffScope.isEmpty() && m_handoffGroup==m_group && m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==m_handoffPath &&
+    return !m_handoffScope.isEmpty() && !m_handoffInvalidated && m_handoffGroup==m_group && m_ctx.db && m_ctx.db->isOpen() && m_ctx.db->path()==m_handoffPath &&
         m_ctx.db->identity()==m_handoffIdentity && m_ctx.db->openGeneration()==m_handoffGeneration &&
         m_ctx.db->openFileIdentity()==m_handoffFileIdentity && m_ctx.db->fileIdentityMatchesOpen();
 }
@@ -1089,6 +1097,7 @@ QString NetController::configureHandoffScope(const QString& scope)
         m_ctx.db->identity().isEmpty() || m_ctx.db->openFileIdentity().isEmpty() || !m_ctx.db->fileIdentityMatchesOpen()))
         return tr("Enter a valid contest scope with an open file-backed log.");
     m_handoffScope=clean;
+    m_handoffInvalidated=false;
     m_handoffPath=clean.isEmpty()?QString():m_ctx.db->path(); m_handoffIdentity=clean.isEmpty()?QString():m_ctx.db->identity();
     m_handoffGroup=clean.isEmpty()?QString():m_group;
     m_handoffFileIdentity=clean.isEmpty()?QByteArray():m_ctx.db->openFileIdentity(); m_handoffGeneration=clean.isEmpty()?0:m_ctx.db->openGeneration();
