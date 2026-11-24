@@ -833,7 +833,7 @@ DialogFrame {
                     function probeHistory() { historyButton.clicked() }
                     Text { id:candidateText; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.textSecondary
                     text:qsTr("%1 · QSO %2 · local confirmation: %3%4 · %5 · %6").arg(modelData.grid4).arg(modelData.qsoId).arg(modelData.evidence).arg(modelData.otherEvidence ? qsTr(" · other recorded: %1").arg(modelData.otherEvidence) : "").arg(modelData.classification === "terrestrial-unreported" ? qsTr("propagation unreported; verify") : modelData.classification === "satellite-name-missing" ? qsTr("satellite name missing; verify") : modelData.classification === "satellite" ? qsTr("satellite %1 · TX %2 / RX %3").arg(modelData.satName).arg(modelData.band).arg(modelData.rxBand || qsTr("unknown")) : qsTr("propagation %1").arg(modelData.propMode)).arg(modelData.qsoUtc)
-                        + (modelData.lotwGridObservationCount > 0 ? qsTr(" · LoTW observations (match unverified; showing %1 of %2): %3").arg(modelData.lotwGridObservations.length).arg(modelData.lotwGridObservationCount).arg(modelData.lotwGridObservations.map(o => (o.grid || "—") + " [" + (o.vuccGrids || "—") + "] @ " + o.observedAt + " (" + (o.comparison === "included" ? qsTr("local grid listed") : o.comparison === "different" ? qsTr("different grid") : qsTr("grid data unusable")) + ")").join("; ")) : "") }
+                        + (modelData.lotwGridObservationCount > 0 ? qsTr(" · LoTW observations (match unverified; showing %1 of %2): %3").arg(modelData.lotwGridObservations.length).arg(modelData.lotwGridObservationCount).arg(modelData.lotwGridObservations.map(o => (o.grid || "—") + " [" + (o.vuccGrids || "—") + "] @ " + o.observedAt + " (" + (o.comparison === "included" ? qsTr("local grid listed") : o.comparison === "different" ? qsTr("different grid") : qsTr("grid data unusable")) + ")" + (String(o.sourceQsoId) !== String(modelData.qsoId) ? qsTr(" · from previously merged QSO %1").arg(o.sourceQsoId) : "")).join("; ")) : "") }
                     GlassButton { id:historyButton; visible:modelData.lotwGridObservationCount > 0; text:qsTr("History…"); onClicked:root.openVuccHistory(modelData) }
                 }
             }
@@ -856,6 +856,7 @@ DialogFrame {
             ListView { id:vuccHistoryRows; Layout.fillWidth:true; Layout.fillHeight:true; clip:true; model:vuccHistory.result.rows || []; ScrollBar.vertical:PanelScrollBar {}
                 delegate:Text { required property var modelData; width:ListView.view.width; wrapMode:Text.Wrap; color:Theme.textSecondary
                     text:qsTr("%1 · grid %2 · boundary grids %3").arg(modelData.observedAt).arg(modelData.grid || "—").arg(modelData.vuccGrids || "—")
+                        + (String(modelData.sourceQsoId) !== String(vuccHistory.qso.qsoId) ? qsTr(" · from previously merged QSO %1").arg(modelData.sourceQsoId) : "")
                         + (modelData.contextCount > 0 ? qsTr(" · latest match: %1 seconds apart, station %2, LoTW update %3 (%4 contexts)")
                            .arg(modelData.distanceSeconds).arg(modelData.stationCall || "—").arg(modelData.rxqsl || "—").arg(modelData.contextCount) : "") } }
             RowLayout {

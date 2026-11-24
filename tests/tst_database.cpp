@@ -34,7 +34,7 @@ namespace {
 // La versione dello schema, che sta in db/schema.sql. Sta qui una volta sola:
 // chi aggiunge una colonna cambia il file, l'ultimo passo di migrate() e questo
 // numero, e non va a caccia di tre QCOMPARE sparsi.
-constexpr int kSchemaVersion = 33;
+constexpr int kSchemaVersion = 34;
 
 // Confronto semantico: i numeri come numeri (14.074 == 14.074000), le ore a
 // quattro cifre come le stesse ore con i secondi a zero.
@@ -1891,6 +1891,17 @@ private slots:
         QStringList plan; while (q.next()) plan << q.value(3).toString();
         QVERIFY2(plan.join(' ').contains("idx_lotw_grid_match_latest"),qPrintable(plan.join(' ')));
         QVERIFY(!plan.join(' ').contains("TEMP B-TREE"));
+    }
+
+    void lotwObservationLinkMigrationPreservesData()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); const auto path=dir.filePath("schema33.sqlite");
+        { LogDatabase db; QVERIFY(db.open(path)); const auto id=db.insertQso(AdifRecord{{"CALL","K1ABC"},{"QSO_DATE","20260101"},{"TIME_ON","1200"},{"BAND","20m"},{"MODE","CW"}},"fixture").id;
+          QVERIFY(id>0); QString error; QVERIFY(db.recordLotwGridObservation(id,"FN42","",&error)); QSqlQuery q(db.connection());
+          QVERIFY(q.exec("DROP TABLE lotw_grid_observation_link")); QVERIFY(q.exec("DELETE FROM schema_version WHERE version>=34")); }
+        LogDatabase db; QVERIFY2(db.open(path),qPrintable(db.lastError())); QCOMPARE(db.schemaVersion(),kSchemaVersion);
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("SELECT grid FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toString(),QString("FN42"));
+        QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation_link")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
     }
 
     void apiIdempotencyMigrationPreservesLegacyAndRequestContext()

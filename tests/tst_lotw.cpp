@@ -2,6 +2,7 @@
 // download contro un server HTTP finto (credenziali mai negli errori).
 #include "core/LogDatabase.h"
 #include "core/Lotw.h"
+#include "core/Vucc.h"
 
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -262,6 +263,49 @@ private slots:
         report.set("GRIDSQUARE","FN44");
         QCOMPARE(db.applyConfirmation("lotw",report,1800,{}, {},true).status,ConfirmationResult::Status::Error);
         QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),1);
+    }
+
+    void mergingKeepsLinkedGridProvenance()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto one=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture",{},true,0,false).id;
+        const auto two=db.insertQso(qso("K1ABC","20m","CW","","20260910","120100","FN41"),"fixture",{},true,0,false).id;
+        QVERIFY(one>0 && two>0); QString error;
+        QVERIFY(db.recordLotwGridObservation(one,"FN42","",&error)); QVERIFY(db.recordLotwGridObservation(two,"FN42","",&error));
+        QSqlQuery context(db.connection()); context.prepare("INSERT INTO lotw_grid_match_context(observation_id,distance_seconds,station_call,source_qso_time,rxqsl,recorded_at) SELECT id,60,'IU8LMC','2026-09-10T12:01:00Z','2026-09-11 10:00:00','2026-09-12T00:00:00Z' FROM lotw_grid_observation WHERE qso_id=?"); context.addBindValue(two); QVERIFY(context.exec());
+        const auto before=db.mergeReviewFingerprint(two); QVERIFY(!before.isEmpty());
+        QVERIFY(db.recordLotwGridObservation(two,"FN43","",&error)); QVERIFY(before!=db.mergeReviewFingerprint(two));
+        MergeGroup group{one,{two}}; group.expectedFingerprints.insert(one,db.mergeReviewFingerprint(one)); group.expectedFingerprints.insert(two,before);
+        const auto stale=db.mergeBatch({group}); QCOMPARE(stale.failed,1); QCOMPARE(db.qsoCount(),qint64(2));
+        group.expectedFingerprints[two]=db.mergeReviewFingerprint(two);
+        const auto done=db.mergeBatch({group}); QCOMPARE(done.failed,0); QCOMPARE(done.keptIds.size(),1);
+        const auto meta=db.meta(one); QVERIFY(meta); const auto rows=db.lotwGridObservationPage(one,meta->uuid,meta->revision).value("rows").toList();
+        QCOMPARE(rows.size(),3); int linked=0, contexts=0; for (const auto& value:rows) if (value.toMap().value("sourceQsoId").toLongLong()==two) { ++linked; contexts+=value.toMap().value("contextCount").toInt(); }
+        QCOMPARE(linked,2); QCOMPARE(contexts,1); QVERIFY(db.meta(two)->deleted);
+        QSqlQuery q(db.connection()); q.prepare("SELECT COUNT(*) FROM lotw_grid_observation WHERE qso_id=?"); q.addBindValue(two); QVERIFY(q.exec()); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),2);
+        const auto entries=vucc::loadEntries(db,&error); QVERIFY2(error.isEmpty(),qPrintable(error)); QCOMPARE(entries.size(),1);
+        QCOMPARE(entries.first().lotwGridObservationCount,3);
+        const auto three=db.insertQso(qso("K1ABC","20m","CW","","20260910","120200","FN41"),"fixture",{},true,0,false).id; QVERIFY(three>0);
+        QCOMPARE(db.mergeQsos(three,{one}).status,InsertResult::Status::Inserted);
+        const auto third=db.meta(three); QVERIFY(third); const auto chained=db.lotwGridObservationPage(three,third->uuid,third->revision).value("rows").toList();
+        QCOMPARE(chained.size(),3); int stillTwo=0; for (const auto& value:chained) if (value.toMap().value("sourceQsoId").toLongLong()==two) ++stillTwo;
+        QCOMPARE(stillTwo,2);
+    }
+
+    void gridLinkFailureRollsBackMerge()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto one=db.insertQso(qso("K1ABC","20m","CW","","20260910","120000","FN41"),"fixture",{},true,0,false).id;
+        const auto two=db.insertQso(qso("K1ABC","20m","CW","","20260910","120100","FN41"),"fixture",{},true,0,false).id; QVERIFY(one>0 && two>0);
+        auto other=db.record(two); QVERIFY(other); other->set("COMMENT","preserve"); QCOMPARE(db.updateQso(two,*other).status,InsertResult::Status::Inserted);
+        const int revision=db.meta(one)->revision;
+        QString error; QVERIFY(db.recordLotwGridObservation(two,"FN42","",&error));
+        QSqlQuery q(db.connection()); QVERIFY(q.exec("CREATE TRIGGER reject_grid_link BEFORE INSERT ON lotw_grid_observation_link BEGIN SELECT RAISE(ABORT,'injected'); END"));
+        QCOMPARE(db.mergeQsos(one,{two}).status,InsertResult::Status::Error); QCOMPARE(db.qsoCount(),qint64(2));
+        QVERIFY(!db.meta(two)->deleted); QVERIFY(q.exec("SELECT COUNT(*) FROM lotw_grid_observation_link")); QVERIFY(q.next()); QCOMPARE(q.value(0).toInt(),0);
+        QCOMPARE(db.meta(one)->revision,revision); QVERIFY(db.record(one)->value("COMMENT").isEmpty());
+        QVERIFY(db.connection().transaction()); QCOMPARE(db.mergeQsos(one,{two}).status,InsertResult::Status::Error); QVERIFY(db.connection().commit());
+        QCOMPARE(db.meta(one)->revision,revision); QVERIFY(db.record(one)->value("COMMENT").isEmpty());
     }
 
     void delayedDownloadCanBeBoundToOriginalLog()

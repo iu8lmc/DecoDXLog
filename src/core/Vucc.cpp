@@ -248,9 +248,12 @@ QList<Entry> loadEntries(const LogDatabase& db, QString* error)
             "EXISTS(SELECT 1 FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
             "(SELECT group_concat(s.service, ',') FROM qsl_status s WHERE s.qso_id = q.id AND s.rcvd = 'Y'), "
             "IFNULL(q.adif_extra, ''), IFNULL(q.prop_mode,''), IFNULL(q.sat_name,''), IFNULL(q.band_rx,''), q.qso_datetime_on, "
-            "(SELECT json_group_array(json_object('grid',grid,'vuccGrids',vucc_grids,'observedAt',observed_at)) "
-            "FROM (SELECT grid,vucc_grids,observed_at FROM lotw_grid_observation WHERE qso_id=q.id ORDER BY id DESC LIMIT 3)), "
-            "(SELECT COUNT(*) FROM lotw_grid_observation WHERE qso_id=q.id), q.uuid, q.revision "
+            "(SELECT json_group_array(json_object('grid',grid,'vuccGrids',vucc_grids,'observedAt',observed_at,'sourceQsoId',source_id)) "
+            "FROM (SELECT o.grid,o.vucc_grids,o.observed_at,o.qso_id AS source_id FROM lotw_grid_observation o "
+            "WHERE o.id IN (SELECT id FROM lotw_grid_observation WHERE qso_id=q.id UNION "
+            "SELECT observation_id FROM lotw_grid_observation_link WHERE qso_id=q.id) ORDER BY o.id DESC LIMIT 3)), "
+            "(SELECT COUNT(*) FROM lotw_grid_observation o WHERE o.id IN (SELECT id FROM lotw_grid_observation WHERE qso_id=q.id UNION "
+            "SELECT observation_id FROM lotw_grid_observation_link WHERE qso_id=q.id)), q.uuid, q.revision "
             "FROM qso q LEFT JOIN station_profile p ON p.id = q.station_profile_id "
             "WHERE q.deleted = 0 AND (IFNULL(q.gridsquare, '') <> '' OR q.adif_extra LIKE '%\"VUCC_GRIDS\"%') ORDER BY q.id"))) {
         if (error) *error = query.lastError().text();

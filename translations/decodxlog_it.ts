@@ -482,6 +482,7 @@
 </context>
 <context>
     <name>AwardsDialog</name>
+    <message><source> · from previously merged QSO %1</source><translation> · dal QSO %1 precedentemente unito</translation></message>
     <message>
         <source> · latest match: %1 seconds apart, station %2, LoTW update %3 (%4 contexts)</source>
         <translation> · ultimo abbinamento: distanza di %1 secondi, stazione %2, aggiornamento LoTW %3 (%4 contesti)</translation>

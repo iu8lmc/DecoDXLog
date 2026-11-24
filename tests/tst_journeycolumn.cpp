@@ -517,6 +517,21 @@ private slots:
         decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite"))); QCOMPARE(db.qsoCount(),qint64(2));
     }
 
+    void vuccShowsObservationFromMergedQso()
+    {
+        QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);
+        { decolog::core::LogDatabase db; QVERIFY(db.open(dir.filePath("test.sqlite")));
+          const decolog::core::AdifRecord r{{"CALL","K1BBB"},{"QSO_DATE","20260101"},{"TIME_ON","1201"},{"BAND","6m"},{"MODE","CW"},{"GRIDSQUARE","EM11"},{"QSL_RCVD","Y"}};
+          const auto first=db.insertQso(r,"fixture",{},true,0,false).id, second=db.insertQso(r,"fixture",{},true,0,false).id; QVERIFY(first>0 && second>0);
+          QString error; for (int i=0;i<55;++i) QVERIFY(db.recordLotwGridObservation(second,QString("FN%1").arg(i,2,10,QLatin1Char('0')),QStringLiteral(""),&error));
+          QCOMPARE(db.mergeQsos(first,{second}).status,decolog::core::InsertResult::Status::Inserted); }
+        QByteArray output; QVERIFY2(launch(dir,"vuccreviewprobe",output,4500),output.constData());
+        QVERIFY2(output.contains("FN54") && output.contains("PROBE vuccHistoryContext") &&
+                 (output.contains("from previously merged QSO 2") || output.contains("dal QSO 2 precedentemente unito")) && !output.contains("TypeError"),output.constData());
+        QByteArray historyLine; for (const auto& line:output.split('\n')) if (line.contains("PROBE vuccHistoryContext")) historyLine=line;
+        QVERIFY2(historyLine.contains("from previously merged QSO 2") || historyLine.contains("dal QSO 2 precedentemente unito"),output.constData());
+    }
+
     void vuccObservationHistoryPagesInDesktop()
     {
         QTemporaryDir dir; QVERIFY(dir.isValid()); seed(dir,"",true);

@@ -571,6 +571,10 @@ bool LogDatabase::migrate()
               "source_qso_time TEXT NOT NULL, rxqsl TEXT NOT NULL, recorded_at TEXT NOT NULL, "
               "UNIQUE(observation_id,distance_seconds,station_call,source_qso_time,rxqsl))")}, nullptr},
         {33, {QStringLiteral("CREATE INDEX IF NOT EXISTS idx_lotw_grid_match_latest ON lotw_grid_match_context(observation_id,id DESC)")}, nullptr},
+        {34, {QStringLiteral("CREATE TABLE IF NOT EXISTS lotw_grid_observation_link ("
+              "qso_id INTEGER NOT NULL REFERENCES qso(id) ON DELETE CASCADE, "
+              "observation_id INTEGER NOT NULL REFERENCES lotw_grid_observation(id) ON DELETE CASCADE, "
+              "linked_at TEXT NOT NULL, PRIMARY KEY(qso_id,observation_id))")}, nullptr},
     };
     for (const Step& step : steps) {
         if (version >= step.to)
@@ -1486,7 +1490,18 @@ QString LogDatabase::mergeReviewFingerprint(qint64 id) const
 {
     if (!isOpen() || id<=0) return {};
     ImportFingerprintReader reader(connection());
-    return reader.read(id);
+    const QString base=reader.read(id); if (base.isEmpty()) return {};
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral("SELECT o.id,o.qso_id,o.grid,o.vucc_grids,o.observed_at, l.linked_at, "
+        "c.id,c.distance_seconds,c.station_call,c.source_qso_time,c.rxqsl,c.recorded_at "
+        "FROM lotw_grid_observation o LEFT JOIN lotw_grid_observation_link l ON l.observation_id=o.id AND l.qso_id=? "
+        "LEFT JOIN lotw_grid_match_context c ON c.observation_id=o.id "
+        "WHERE o.qso_id=? OR l.qso_id IS NOT NULL ORDER BY o.id,c.id"));
+    q.addBindValue(id); q.addBindValue(id); if (!q.exec()) return {};
+    QByteArray bytes; QDataStream stream(&bytes,QIODevice::WriteOnly); stream.setVersion(QDataStream::Qt_6_0); stream << base;
+    while (q.next()) for (int i=0;i<12;++i) stream << q.value(i);
+    if (q.lastError().isValid() || stream.status()!=QDataStream::Ok) return {};
+    return QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
 }
 
 /* Fingerprints retain the schema-13 JSON representation; only SQL statements
@@ -2428,14 +2443,24 @@ InsertResult LogDatabase::mergeQsos(qint64 keep, const QList<qint64>& others)
     }
 
     QSqlDatabase db = connection();
-    const bool ownTransaction = db.transaction();
+    QSqlQuery transaction(db);
+    if (!transaction.exec(QStringLiteral("SAVEPOINT decolog_merge_qsos"))) {
+        result.message=transaction.lastError().text(); return result;
+    }
+    const auto rollback=[&] { QSqlQuery q(db); q.exec(QStringLiteral("ROLLBACK TO SAVEPOINT decolog_merge_qsos")); q.exec(QStringLiteral("RELEASE SAVEPOINT decolog_merge_qsos")); };
     result = updateQso(keep, *base, profile, QStringLiteral("merge"));
     if (result.status != InsertResult::Status::Inserted) {
-        if (ownTransaction)
-            db.rollback();
+        rollback();
         return result;
     }
     for (const qint64 id : std::as_const(merged)) {
+        QSqlQuery link(db);
+        link.prepare(QStringLiteral("INSERT INTO lotw_grid_observation_link(qso_id,observation_id,linked_at) "
+            "SELECT ?,o.id,? FROM lotw_grid_observation o WHERE o.qso_id<>? AND (o.qso_id=? OR o.id IN "
+            "(SELECT observation_id FROM lotw_grid_observation_link WHERE qso_id=?)) "
+            "ON CONFLICT(qso_id,observation_id) DO NOTHING"));
+        link.addBindValue(keep); link.addBindValue(nowIso()); link.addBindValue(keep); link.addBindValue(id); link.addBindValue(id);
+        if (!link.exec()) { result.status=InsertResult::Status::Error; result.message=link.lastError().text(); rollback(); return result; }
         // Il riferimento remoto (il QSO che un servizio ha gia') passa a chi
         // resta, se lui non ne ha: altrimenti il servizio cancellerebbe l'unica
         // copia che ha.
@@ -2456,14 +2481,13 @@ InsertResult LogDatabase::mergeQsos(qint64 keep, const QList<qint64>& others)
         if (!move.exec() || !clear.exec() || !softDeleteQso(id)) {
             result.status = InsertResult::Status::Error;
             result.message = move.lastError().isValid() ? move.lastError().text() : clear.lastError().text();
-            if (ownTransaction)
-                db.rollback();
+            rollback();
             return result;
         }
     }
-    if (ownTransaction && !db.commit()) {
+    if (!transaction.exec(QStringLiteral("RELEASE SAVEPOINT decolog_merge_qsos"))) {
         result.status = InsertResult::Status::Error;
-        result.message = db.lastError().text();
+        result.message = transaction.lastError().text(); rollback();
     }
     return result;
 }
@@ -2484,10 +2508,9 @@ MergeBatchResult LogDatabase::mergeBatch(const QList<MergeGroup>& groups, const 
                 if (ids.contains(0) || ids.size()!=group.others.size()+1 || group.expectedFingerprints.size()!=ids.size()) {
                     error=QStringLiteral("Invalid reviewed merge group"); return -1;
                 }
-                ImportFingerprintReader fingerprint(connection());
                 for (const qint64 id:ids) {
                     const QString expected=group.expectedFingerprints.value(id);
-                    const QString actual=fingerprint.read(id);
+                    const QString actual=mergeReviewFingerprint(id);
                     const auto current=meta(id);
                     if (expected.isEmpty() || actual.isEmpty() || actual!=expected || !current || current->deleted) {
                         error=QStringLiteral("QSO #%1 changed since review; search again").arg(id); return -1;
@@ -2764,13 +2787,14 @@ QVariantMap LogDatabase::lotwGridObservationPage(qint64 qsoId, const QString& uu
     if (!current || current->deleted || current->uuid!=uuid || current->revision!=revision) {
         rollback(); return fail(QStringLiteral("QSO changed; refresh the preview"));
     }
-    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT id,grid,vucc_grids,observed_at, "
+    QSqlQuery q(db); q.prepare(QStringLiteral("SELECT o.id,o.grid,o.vucc_grids,o.observed_at, "
         "(SELECT COUNT(*) FROM lotw_grid_match_context c WHERE c.observation_id=o.id), "
         "(SELECT distance_seconds FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1), "
         "(SELECT station_call FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1), "
-        "(SELECT rxqsl FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1) "
-        "FROM lotw_grid_observation o WHERE qso_id=? AND id<? ORDER BY id DESC LIMIT 51"));
-    q.addBindValue(qsoId); q.addBindValue(beforeId>0 ? beforeId : std::numeric_limits<qint64>::max());
+        "(SELECT rxqsl FROM lotw_grid_match_context c WHERE c.observation_id=o.id ORDER BY id DESC LIMIT 1),o.qso_id "
+        "FROM lotw_grid_observation o WHERE o.id IN (SELECT id FROM lotw_grid_observation WHERE qso_id=? "
+        "UNION SELECT observation_id FROM lotw_grid_observation_link WHERE qso_id=?) AND o.id<? ORDER BY o.id DESC LIMIT 51"));
+    q.addBindValue(qsoId); q.addBindValue(qsoId); q.addBindValue(beforeId>0 ? beforeId : std::numeric_limits<qint64>::max());
     if (!q.exec()) { const QString error=q.lastError().text(); rollback(); return fail(error); }
     QVariantList rows; qint64 last=0; bool more=false;
     while (q.next()) {
@@ -2778,7 +2802,8 @@ QVariantMap LogDatabase::lotwGridObservationPage(qint64 qsoId, const QString& uu
         last=q.value(0).toLongLong(); rows << QVariantMap{{QStringLiteral("id"),QString::number(last)},
             {QStringLiteral("grid"),q.value(1)}, {QStringLiteral("vuccGrids"),q.value(2)}, {QStringLiteral("observedAt"),q.value(3)},
             {QStringLiteral("contextCount"),q.value(4)}, {QStringLiteral("distanceSeconds"),q.value(5)},
-            {QStringLiteral("stationCall"),q.value(6)}, {QStringLiteral("rxqsl"),q.value(7)}};
+            {QStringLiteral("stationCall"),q.value(6)}, {QStringLiteral("rxqsl"),q.value(7)},
+            {QStringLiteral("sourceQsoId"),QString::number(q.value(8).toLongLong())}};
     }
     if (q.lastError().isValid()) { const QString error=q.lastError().text(); rollback(); return fail(error); }
     q.finish();
