@@ -2649,8 +2649,17 @@ CSV, PDF and JSON context report exports now share a destination guard checking 
 A/B on macOS arm64 / Qt 6.11.2 using an isolated temporary log: before the change, a JSON context export accepted a hard link to the database; after the change, JSON, CSV and PDF all rejected it and the link still had the original file identity. A separate app fixture created a symbolic link to the temporary log's active WAL and verified all three exports refused it; the log reopened with its original QSO. The normal empty-report context export still passed. These tests use POSIX links and are skipped on non-Unix platforms. App and test targets built; CTest activityreport, activity_power_pdf, activity_utc_pdf and qmlpopups passed 4/4. git diff --check passed.
 
 The test does not exercise Windows hard-link creation, every SQLite sidecar/link ordering, filesystem attacks between validation and write, physical UI or real logs. The protection applies to the current log and named sidecars, not arbitrary unrelated files. G07 and G13 remain open.
+
 ## 2026-11-24 — G05 independent contacts during import undo
 
 Added a file-backed two-connection regression test for undo while new contacts arrive. A/B compares the non-mutating preview of 130 imported contacts with the confirmed undo: a second connection inserts independent contacts after the first deletion and at the 128-row journal boundary. The test checks that all 130 imported contacts are deleted, both new contacts remain active, and they survive reopening the log. No production behaviour was changed.
 
 On macOS arm64 with Qt 6.11.2 the focused test passed and CTest database, migration and qmlpopups passed 3/3. The first fixture used repeated calls close in time and imported only 44 records because of duplicate detection; using distinct calls produced the intended 130. This is a deterministic interleaving at progress callbacks, not a sustained simultaneous radio workload, process-crash test, physical UI test or verification on Windows/Linux. Remaining G05 and desktop roadmap acceptance stay open.
+
+## 2026-11-24 — G06 protect activation partition export paths
+
+Activation partition export now checks the resolved parent directory as well as absolute paths and existing-file equivalence against the current log and its SQLite sidecars. It repeats the check in the worker before writing and disables direct-write fallback. This prevents a currently absent sidecar path reached through a symbolic directory alias from being selected as an export destination, while retaining normal partition export.
+
+A/B on macOS arm64 / Qt 6.11.2: an isolated synthetic activation test selected the absent log.sqlite-journal through a symbolic directory alias. Before the change the export was accepted; afterwards it was rejected, and the same fixture successfully exported normal POTA, WWFF, SOTA and IOTA partitions. CTest activation, database, migration and qmlpopups passed 4/4; the application and activation test target built.
+
+This is a point-in-time path check, not protection against replacement after validation; the second check narrows but does not eliminate that race. The alias fixture runs on Unix only; physical UI, Windows/Linux, real activations and official importers were not exercised. G06 and integrated acceptance remain open.

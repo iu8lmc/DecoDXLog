@@ -1526,14 +1526,7 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
     if (!found) return false;
     const QString path = m_ctx.db->path();
     const QString output = destination.toLocalFile();
-    if (output.isEmpty()) return false;
-    const QFileInfo outInfo(output);
-    for (const QString& protectedPath : {path, path + QStringLiteral("-wal"), path + QStringLiteral("-shm"), path + QStringLiteral("-journal")}) {
-        const QFileInfo protectedInfo(protectedPath);
-        std::error_code ec;
-        const bool sameExistingFile = std::filesystem::equivalent(std::filesystem::path(output.toStdString()), std::filesystem::path(protectedPath.toStdString()), ec);
-        if (outInfo.absoluteFilePath() == protectedInfo.absoluteFilePath() || (!ec && sameExistingFile)) return false;
-    }
+    if (!safeContestReportDestination(output, path)) return false;
     const QString uuid = m_previewSessionUuid;
     const QString key = QString::fromUtf8(QJsonDocument(QJsonArray{program, group.value(QStringLiteral("reference")).toString(),
         group.value(QStringLiteral("day")).toString(), group.value(QStringLiteral("operator")).toString(), group.value(QStringLiteral("grid")).toString()}).toJson(QJsonDocument::Compact));
@@ -1583,8 +1576,11 @@ bool ActivationController::startPartitionExport(const QVariantMap& group, const 
             }
             if (!db.connection().commit() && error.isEmpty()) error = tr("Cannot complete the export snapshot.");
             if (cancelled->load() && error.isEmpty()) error = tr("Export cancelled.");
+            if (error.isEmpty() && !safeContestReportDestination(output, path))
+                error = tr("Choose a file other than the log database and its SQLite files.");
             if (error.isEmpty()) {
                 QSaveFile file(output);
+                file.setDirectWriteFallback(false);
                 if (!file.open(QIODevice::WriteOnly)) error = file.errorString();
                 else {
                     const QByteArray data = adif::writeDocument(doc);

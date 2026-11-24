@@ -818,6 +818,13 @@ private slots:
         QCOMPARE(wwff.value("missingStationCall").toInt(), 1);
         QCOMPARE(wwff.value("missingOperator").toInt(), 0);
         QVERIFY(!act.startPartitionExport(chosen, QUrl::fromLocalFile(dir.filePath("log.sqlite"))));
+#ifdef Q_OS_UNIX
+        const QString alias = dir.filePath("log-directory-alias");
+        QVERIFY(QFile::link(dir.path(), alias));
+        const QString journalAlias = alias + QStringLiteral("/log.sqlite-journal");
+        QVERIFY(!QFile::exists(journalAlias));
+        QVERIFY(!act.startPartitionExport(chosen, QUrl::fromLocalFile(journalAlias)));
+#endif
         const QString path = dir.filePath("park.adi"); QSignalSpy exported(&act, &ActivationController::partitionExportFinished);
         QVERIFY(act.startPartitionExport(chosen, QUrl::fromLocalFile(path)));
         QTRY_COMPARE_WITH_TIMEOUT(exported.size(), 1, 5000); QVERIFY2(exported.at(0).at(0).toBool(), qPrintable(exported.at(0).at(1).toString()));
