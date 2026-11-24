@@ -121,14 +121,29 @@ def run_extension(manifest_path, token, port, timeout):
             finally:
                 # Kill the session's original process group even if its leader exited;
                 # children can otherwise keep running after success, failure or timeout.
+                group_denied = False
                 if os.name == "posix":
                     try:
                         os.killpg(process.pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
+                    except PermissionError:
+                        # Reap the leader if possible, but do not report success:
+                        # surviving descendants cannot be ruled out.
+                        group_denied = True
+                        if process.poll() is None:
+                            try:
+                                process.kill()
+                            except (PermissionError, ProcessLookupError):
+                                pass
                 elif process.poll() is None:
                     process.kill()
-                process.wait()
+                try:
+                    process.wait(timeout=1 if group_denied else None)
+                except subprocess.TimeoutExpired:
+                    raise ValueError("extension process group cleanup denied; leader still running")
+                if group_denied:
+                    raise ValueError("extension process group cleanup denied; descendants may remain")
             if stdout.stat().st_size > MAX_OUTPUT or stderr.stat().st_size > MAX_OUTPUT:
                 raise ValueError("extension exceeded output limit")
             if process.returncode != 0:

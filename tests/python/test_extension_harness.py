@@ -17,6 +17,19 @@ spec.loader.exec_module(harness)
 
 class ExtensionHarnessTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "posix", "POSIX process groups required")
+    def test_denied_group_cleanup_stops_leader_and_reports_failure(self):
+        base = {"schemaVersion": 1, "apiVersion": 1, "id": "org.example.demo", "version": "1.0.0",
+                "entrypoint": "demo.py", "permissions": ["qso.read"]}
+        with tempfile.TemporaryDirectory() as directory:
+            folder=pathlib.Path(directory); marker=folder/"late-marker"
+            manifest=folder/"manifest.json"; manifest.write_text(json.dumps(base))
+            (folder/"demo.py").write_text("import time,pathlib\ntime.sleep(1)\npathlib.Path(%r).write_text('alive')\n" % str(marker))
+            with patch.object(harness.os,"killpg",side_effect=PermissionError("injected")):
+                with self.assertRaisesRegex(ValueError,"process group"):
+                    harness.run_extension(manifest,"read-only",12345,0.2)
+            time.sleep(1.1); self.assertFalse(marker.exists(),"extension leader continued after cleanup")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process groups required")
     def test_timeout_and_normal_exit_stop_descendants(self):
         base = {"schemaVersion": 1, "apiVersion": 1, "id": "org.example.demo", "version": "1.0.0",
                 "entrypoint": "demo.py", "permissions": ["qso.read"]}

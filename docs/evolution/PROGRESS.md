@@ -3259,3 +3259,11 @@ VUCC candidate loading now also applies explicit ADIF-extra overrides for band, 
 A/B on macOS arm64 / Qt 6.11.2: in a synthetic legacy-style log, the previous preview admitted terrestrial candidates despite satellite, different-band, pre-1983 and invalid-time overrides. The revised preview excludes them from the 6 m terrestrial selection and includes the satellite candidate in satellite scope; the effective QSO records show the same overrides. App and targets built; CTest awards, vucc and qmlpopups passed 3/3; the final non-string type assertion passed separately. git diff --check passed.
 
 The test injects extra fields directly and does not establish official VUCC eligibility, real ADIF import behavior or physical desktop operation. Confirmation evidence still comes from structured QSL status. Unusual JSON key spellings/encodings, other standard fields, large logs and Windows/Linux remain unverified; G02/G13 acceptance is open.
+
+## 2026-11-24 — G11 handle denied extension process-group termination
+
+During a full local CTest run, the extension harness encountered `PermissionError` while killing a process group and exited cleanup without reaping its leader. The original failure's OS cause is not established. The harness now attempts to terminate and reap the leader if group termination is denied, then reports a failure rather than claiming the extension and its descendants were fully stopped. Waiting is bounded if even leader termination fails.
+
+A/B on macOS arm64: with group termination deliberately denied in a test, the previous harness propagated `PermissionError` and left the synthetic process running; the revised harness reports a `ValueError` and the leader does not produce its delayed marker. The complete Python harness suite passed 6/6 on both Python 3.10 and the CTest-selected Python 3.14, and the manager suite passed 8/8 on Python 3.14. This reproduces the failure class, not the unexplained cause of the original intermittent OS denial.
+
+If the operating system denies group termination, descendant cleanup cannot be guaranteed; if it also denies killing the leader, that process may remain. The tooling is not a sandbox. Full CTest was still running when this change was made, so its earlier failed harness result remains a failure of that run. Windows process handling, physical UI and G11/G13 acceptance remain open.
