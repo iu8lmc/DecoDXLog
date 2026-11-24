@@ -1,5 +1,11 @@
 # Progress
 
+## 2026-11-24 — G03/G04 integrate planner and campaign history
+
+After the 124/124 full CTest on `fca99e1a`, the detached campaign-history and unverified-electronic-planner increments were cherry-picked through `ff06e4e7`. The main checkout rebuilt the app and relevant tests. The actual offscreen app tests passed for 55-revision history navigation, history after restart in English and Italian, and QSL pending/unverified filtering and invalidation. The native SQLite status-read-denial and unverified-benefit core tests passed with the opt-in macOS authorizer enabled; awards, qslplanner, dxcampaign, dxcalendar and qmlpopups CTest passed 5/5. git diff --check passed.
+
+These targeted checks validate the integrated revision, not a second full suite. Earlier entries referring to detached work describe where it was developed and are superseded by this integration note. History before this feature is unavailable, storage is unbounded, and there is no history restore; electronic station participation remains unverified. Physical UI, long-term and large-log behaviour, clean packages, other platforms and external service and hardware checks remain open.
+
 ## 2026-11-24 — G13 full local regression after bulk-contention fixes
 
 The main checkout completed sequential offscreen CTest on code revision `fca99e1a`: 124/124 test groups passed in 1844.87 seconds on macOS arm64 / Qt 6.11.2. The subsequent `ea80a640` commit changed only roadmap documentation. Optional cases skipped within groups are not proven by the group result. This is local test evidence, not a clean installation, hardware/RF, live external-service, Windows/Linux or full desktop acceptance result. Detached campaign and planner increments developed after that revision require integration and separate verification.
