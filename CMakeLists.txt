@@ -874,6 +874,9 @@ if(DECODXLOG_BUILD_TESTS)
             add_test(NAME activity_power_pdf COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_SOURCE_DIR}/tests/tools/activity_power_pdf_probe.py $<TARGET_FILE:decolog> ${DECOLOG_PDFTOTEXT_EXECUTABLE})
             set_tests_properties(activity_power_pdf PROPERTIES TIMEOUT 45)
+            add_test(NAME activity_utc_pdf COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/tests/tools/activity_utc_pdf_probe.py $<TARGET_FILE:decolog> ${DECOLOG_PDFTOTEXT_EXECUTABLE})
+            set_tests_properties(activity_utc_pdf PROPERTIES TIMEOUT 45)
         endif()
         add_test(NAME cluster_spot_race COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_SOURCE_DIR}/tests/tools/cluster_spot_race_probe.py $<TARGET_FILE:decolog>)

@@ -329,6 +329,10 @@ bool writePdf(QIODevice* output,const QVariantMap& snapshot,QString* error)
     QList<qreal> fractions=kind==QLatin1String("club") ? QList<qreal>{0.13,0.30,0.42,0.15} : kind==QLatin1String("confirmation") ? QList<qreal>{0.20,0.14,0.12,0.12,0.12,0.12,0.18} : QList<qreal>{0.39,0.14,0.32,0.15};
     if (kind==QLatin1String("custom")) {
         keys.clear(); headings=customDimensions; fractions.clear();
+        for (QString& heading : headings) {
+            if (heading==QLatin1String("day")) heading=QStringLiteral("UTC day");
+            else if (heading==QLatin1String("hour")) heading=QStringLiteral("UTC hour");
+        }
         const bool power=aggregate==QLatin1String("mean_power");
         for (int i=0;i<customDimensions.size();++i) { keys << QStringLiteral("d%1").arg(i); fractions << (power ? 0.58 : 0.8)/customDimensions.size(); }
         keys << QStringLiteral("value"); headings << (power ? QStringLiteral("Mean W") : aggregate==QLatin1String("entities") ? QStringLiteral("Recorded DXCC") : aggregate==QLatin1String("calls") ? QStringLiteral("Distinct calls") : aggregate==QLatin1String("days") ? QStringLiteral("UTC days") : QStringLiteral("QSO")); fractions << (power ? 0.18 : 0.2);

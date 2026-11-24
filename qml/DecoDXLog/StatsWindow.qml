@@ -134,13 +134,13 @@ RoundedWindow {
         dimension0.currentIndex=root.dimensionKeys.indexOf("band"); dimension1.currentIndex=0; dimension2.currentIndex=0; reportAggregate.currentIndex=3
         loadProbe=true; loadTicks=0; loadMaxGap=0; loadStart=Date.now(); loadLast=loadStart; loadProbeTimer.start(); runActivityReport()
     }
-    function probeUtcGrouping() {
+    function probeUtcGrouping(path) {
         page=2; root.refreshNamedReports(); reportKind.currentIndex=3; reportYear.text=""; reportBand.text="20m"; reportName.text="UTC periods"
         dimension0.currentIndex=root.dimensionKeys.indexOf("day"); dimension1.currentIndex=root.dimensionKeys.indexOf("hour"); dimension2.currentIndex=0; reportAggregate.currentIndex=0
         root.saveNamedReport(false); const row=root.savedReports.find(x => x.name==="UTC periods")
         if (!row) { console.warn("PROBE UTC grouping save failed " + root.reportMessage); return }
         dimension1.currentIndex=0; root.applyNamedReport(row)
-        Qt.callLater(() => { console.warn("PROBE UTC grouping restored " + JSON.stringify(root.chosenDimensions())); root.daysProbe=true; root.runActivityReport() })
+        Qt.callLater(() => { console.warn("PROBE UTC grouping restored " + JSON.stringify(root.chosenDimensions())); root.daysProbe=true; if (path) { root.reportProbePath=path; root.reportProbePdf=true }; root.runActivityReport() })
     }
     function probeDxcc() {
         page=2; root.refreshNamedReports(); reportKind.currentIndex=3; reportYear.text="2026"; reportBand.text="20m"; reportName.text="DXCC groups"
