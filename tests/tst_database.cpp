@@ -1244,6 +1244,54 @@ private slots:
         QCOMPARE(first.qsoCount(), 2);
     }
 
+    void undoPreservesContactsAddedDuringProcessing()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.filePath(QStringLiteral("live-undo.sqlite"));
+        qint64 liveFirst = 0, liveSecond = 0;
+        {
+            LogDatabase undoDb, liveDb;
+            QVERIFY(undoDb.open(path));
+            QVERIFY(liveDb.open(path));
+            QByteArray adif;
+            for (int i = 0; i < 130; ++i) {
+                const QByteArray time = QTime(9, 0).addSecs(i * 60).toString(QStringLiteral("hhmm")).toLatin1();
+                const QByteArray call = QStringLiteral("K%1").arg(i, 4, 10, QLatin1Char('0')).toLatin1();
+                adif += "<CALL:5>" + call + "<QSO_DATE:8>20260101<TIME_ON:4>" + time
+                    + "<BAND:3>20m<MODE:2>CW<EOR>";
+            }
+            const auto imported = undoDb.importAdif(adif);
+            QCOMPARE(imported.inserted, 130);
+            const auto preview = undoDb.undoLatestImport({}, true);
+            QCOMPARE(preview.eligible, 130);
+            QCOMPARE(undoDb.qsoCount(), 130);
+            const auto result = undoDb.undoLatestImport([&](int done, int total) {
+                if (total == 130 && (done == 1 || done == 128)) {
+                    const QString call = done == 1 ? QStringLiteral("K1LIVE") : QStringLiteral("K2LIVE");
+                    const auto inserted = liveDb.insertQso(AdifRecord{{"CALL", call}, {"QSO_DATE", "20260102"},
+                        {"TIME_ON", "1200"}, {"BAND", "20m"}, {"MODE", "CW"}}, "radio");
+                    if (done == 1) liveFirst = inserted.id; else liveSecond = inserted.id;
+                }
+                return true;
+            }, false, preview.batchId, preview.batchUuid, preview.journalRevision);
+            QVERIFY(liveFirst > 0);
+            QVERIFY(liveSecond > 0);
+            QVERIFY2(result.errors.isEmpty(), qPrintable(result.errors.join(QStringLiteral("; "))));
+            QCOMPARE(result.deleted, 130);
+            QCOMPARE(result.failed, 0);
+            QCOMPARE(undoDb.qsoCount(), 2);
+            for (qint64 id : imported.insertedIds) QVERIFY(undoDb.meta(id)->deleted);
+            QVERIFY(!undoDb.meta(liveFirst)->deleted);
+            QVERIFY(!undoDb.meta(liveSecond)->deleted);
+        }
+        LogDatabase reopened;
+        QVERIFY(reopened.open(path));
+        QCOMPARE(reopened.qsoCount(), 2);
+        QCOMPARE(reopened.record(liveFirst)->value(QStringLiteral("CALL")), QStringLiteral("K1LIVE"));
+        QCOMPARE(reopened.record(liveSecond)->value(QStringLiteral("CALL")), QStringLiteral("K2LIVE"));
+    }
+
     void journalRevisionTracksAndRollsBackMembershipChanges()
     {
         LogDatabase db;
