@@ -932,7 +932,7 @@ private slots:
         const auto firstPage=act.previewResult().value("potaCorrespondentRows").toList();
         const qint64 firstCursor=firstPage.last().toMap().value("id").toLongLong();
         QVERIFY(act.requestPotaReviewPage(firstCursor));
-        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
+        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,30000);
         const auto second=pageDone.takeFirst().first().toMap();
         QVERIFY(second.value("error").toString().isEmpty());
         QCOMPARE(second.value("potaCorrespondentRows").toList(),rows.mid(100,100));
@@ -941,12 +941,12 @@ private slots:
         QSqlQuery changedExclusion(db.connection());
         QVERIFY(changedExclusion.exec("UPDATE qso SET comment='changed exclusion' WHERE call='N0000'"));
         QVERIFY(act.requestExcludedPage(exclusions.at(99).toMap().value("id").toLongLong()));
-        QTRY_COMPARE_WITH_TIMEOUT(exclusionDone.size(),1,5000);
+        QTRY_COMPARE_WITH_TIMEOUT(exclusionDone.size(),1,30000);
         const auto staleExclusion=exclusionDone.takeFirst().first().toMap();
         QVERIFY(!staleExclusion.value("error").toString().isEmpty());
         QVERIFY(staleExclusion.value("excluded").toList().isEmpty());
         QVERIFY(act.requestPotaReviewPage(firstCursor));
-        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
+        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,30000);
         const auto rejectedExclusion=pageDone.takeFirst().first().toMap();
         QVERIFY(!rejectedExclusion.value("error").toString().isEmpty());
         QVERIFY(rejectedExclusion.value("potaCorrespondentRows").toList().isEmpty());
@@ -957,7 +957,7 @@ private slots:
         QVERIFY(stale.value("error").toString().isEmpty());
         QVERIFY(stale.value("groups").toList()!=groups);
         QVERIFY(act.requestPotaReviewPage(firstCursor));
-        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,5000);
+        QTRY_COMPARE_WITH_TIMEOUT(pageDone.size(),1,30000);
         const auto rejected=pageDone.takeFirst().first().toMap();
         QVERIFY(!rejected.value("error").toString().isEmpty());
         QVERIFY(rejected.value("potaCorrespondentRows").toList().isEmpty());

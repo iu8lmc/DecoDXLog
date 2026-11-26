@@ -1,5 +1,9 @@
 # Storia di DecoDXLog
 
+## 1.17.69
+
+See [the detailed English and Italian release notes](RELEASE_NOTES_1.17.69.md).
+
 ## 1.17.68
 
 See [the detailed English and Italian release notes](RELEASE_NOTES_1.17.68.md).

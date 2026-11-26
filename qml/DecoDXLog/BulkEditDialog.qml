@@ -56,14 +56,19 @@ Popup {
 
     // In una finestra sua il popup riceve i tasti solo se ha il fuoco: senza
     // "focus: true" il campo prende il cursore ma quello che si scrive si perde.
-    popupType: Popup.Window
+    // Keep the modal dialog in the main window's overlay. Its combo boxes
+    // use native popup windows, which must remain above their modal owner and
+    // receive pointer and wheel events.
+    popupType: Popup.Item
     focus: true
     parent: Overlay.overlay
     anchors.centerIn: parent
     width: 520
     modal: true
     padding: 16
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    // The field/value dropdown can extend outside this dialog. A click on an
+    // option must never dismiss the edit before the operator applies it.
+    closePolicy: Popup.CloseOnEscape
     background: Rectangle { color: Theme.panelColor; border.color: Theme.glassBorder; radius: 6 }
 
     contentItem: ColumnLayout {

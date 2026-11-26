@@ -3299,7 +3299,7 @@ QVariantList DecoLogController::awardSummary() const
             // entita' africane che il cty.csv conosce.
             {QStringLiteral("target"), r.id == QLatin1String("waac") && africanEntities() > 0
                                            ? africanEntities() : r.target},
-            {QStringLiteral("total"), r.id == QLatin1String("dxcc") && m_countries.entityCount() > 0
+            {QStringLiteral("total"), (r.id == QLatin1String("dxcc") || r.id == QLatin1String("dxcc_sat")) && m_countries.entityCount() > 0
                                           ? m_countries.entityCount()
                                           : r.id == QLatin1String("waac") ? africanEntities() : r.total},
             {QStringLiteral("slotsWorked"), slotsWorked},
@@ -3375,7 +3375,7 @@ QStringList DecoLogController::awardBands() const
 
 bool DecoLogController::awardHasMissing(const QString& awardId) const
 {
-    return awardId == QLatin1String("dxcc") || awardId == QLatin1String("ft2") || awardId == QLatin1String("waz")
+    return awardId == QLatin1String("dxcc") || awardId == QLatin1String("dxcc_sat") || awardId == QLatin1String("ft2") || awardId == QLatin1String("waz")
         || awardId == QLatin1String("was");
 }
 
@@ -3646,7 +3646,7 @@ QVariantList DecoLogController::awardItems(const QString& awardId, const QString
                 {QStringLiteral("confirmed"), false}, {QStringLiteral("missing"), true},
             };
         };
-        if (awardId == QLatin1String("dxcc") || awardId == QLatin1String("ft2")) {
+        if (awardId == QLatin1String("dxcc") || awardId == QLatin1String("dxcc_sat") || awardId == QLatin1String("ft2")) {
             for (const DxccEntity& e : m_countries.entities())
                 missing(QString::number(e.dxcc), QStringLiteral("%1 · %2 · %3").arg(e.name, e.prefix, e.continent));
         } else if (awardId == QLatin1String("waz")) {
@@ -5834,6 +5834,7 @@ QVariantList DecoLogController::bulkFields() const
         field(QStringLiteral("SOTA_REF"), tr("SOTA reference")),
         field(QStringLiteral("WWFF_REF"), tr("WWFF reference")),
         field(QStringLiteral("IOTA"), tr("IOTA")),
+        field(QStringLiteral("STATE"), tr("State / province")),
         field(QStringLiteral("SIG"), tr("Special activity (SIG)")),
         field(QStringLiteral("SIG_INFO"), tr("Special activity reference (SIG_INFO)")),
         field(QStringLiteral("CONTEST_ID"), tr("Contest")),
@@ -6698,6 +6699,13 @@ bool DecoLogController::undoQsoEnrichment(qint64 qsoId, const QString& field)
     if (!m_db.undoEnrichment(qsoId, field))
         return false;
     m_model->reloadAfterEdit(qsoId);
+    emit logChanged();
+    return true;
+}
+
+bool DecoLogController::confirmInferredState(qint64 qsoId)
+{
+    if (!m_db.confirmInferredState(qsoId)) return false;
     emit logChanged();
     return true;
 }
@@ -9612,6 +9620,47 @@ void DecoLogController::requestBandModeQsos(const QString& token, const QString&
         }
         if (self) QMetaObject::invokeMethod(self.data(), [self, token, rows, ok] {
             if (self) emit self->bandModeQsosReady(token, rows, ok);
+        }, Qt::QueuedConnection);
+    });
+}
+
+void DecoLogController::requestAwardEntityQsos(const QString& token, const QString& award, const QString& key)
+{
+    const QString path = m_db.path(), identity = m_db.identity();
+    const quint64 generation = m_db.openGeneration(), version = m_logVersion, statsGeneration = m_statsGeneration;
+    const AwardFilter filter = m_awardFilter;
+    QHash<int, QString> names;
+    for (const auto& entity : m_countries.entities()) names.insert(entity.dxcc, entity.name);
+    const AwardCalculator calc = awardCalculator(names);
+    const auto collect = [calc, filter, award, key](LogDatabase& db) {
+        AwardContributions contributions; contributions.awards.insert(award);
+        calc.compute(db, filter, &contributions);
+        QList<qint64> ids = contributions.qsoIds.value(award).value(key).values();
+        std::sort(ids.begin(), ids.end(), std::greater<qint64>());
+        QVariantList rows;
+        for (qint64 id : ids) {
+            const auto record = db.record(id); if (!record) continue;
+            QStringList services;
+            for (const auto& state : db.qslStatus(id))
+                if (state.rcvd == QLatin1String("Y")) services << state.service;
+            rows << QVariantMap{{QStringLiteral("id"), id}, {QStringLiteral("call"), record->value("CALL")},
+                {QStringLiteral("date"), record->value("QSO_DATE")}, {QStringLiteral("time"), record->value("TIME_ON")},
+                {QStringLiteral("band"), record->value("BAND")}, {QStringLiteral("mode"), record->value("SUBMODE").isEmpty() ? record->value("MODE") : record->value("SUBMODE")},
+                {QStringLiteral("services"), services.join(QStringLiteral(", "))}};
+        }
+        return rows;
+    };
+    if (path.isEmpty() || path == QLatin1String(":memory:")) {
+        emit awardEntityQsosReady(token, collect(m_db), m_db.isOpen()); return;
+    }
+    QPointer<DecoLogController> self(this);
+    m_callInfoPool.start([self, path, identity, generation, version, statsGeneration, token, collect] {
+        LogDatabase db; bool ok = db.openReadOnly(path, 3000) && db.identity() == identity;
+        const QVariantList rows = ok ? collect(db) : QVariantList();
+        if (self) QMetaObject::invokeMethod(self.data(), [self, token, rows, ok, path, identity, generation, version, statsGeneration] {
+            if (self) emit self->awardEntityQsosReady(token, rows, ok && self->m_db.path() == path
+                && self->m_db.identity() == identity && self->m_db.openGeneration() == generation && self->m_logVersion == version
+                && self->m_statsGeneration == statsGeneration);
         }, Qt::QueuedConnection);
     });
 }

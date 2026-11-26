@@ -809,7 +809,7 @@ AwardCalculator::AwardCalculator(DxccName dxccName)
 
 QStringList AwardCalculator::awardIds()
 {
-    return {QStringLiteral("dxcc"), QStringLiteral("ft2"), QStringLiteral("wac"), QStringLiteral("waac"),
+    return {QStringLiteral("dxcc"), QStringLiteral("dxcc_sat"), QStringLiteral("ft2"), QStringLiteral("wac"), QStringLiteral("waac"),
             QStringLiteral("waz"), QStringLiteral("was"), QStringLiteral("waip"),
             QStringLiteral("waja"), QStringLiteral("ajd"),
             QStringLiteral("jcc"), QStringLiteral("jcg"), QStringLiteral("wpx"),
@@ -869,7 +869,7 @@ QStringList creditServices()
 QStringList officialCredits(const QString& awardId)
 {
     // ARRL: per il DXCC e il WAS valgono LoTW e la cartolina, non eQSL ne' QRZ.
-    if (awardId == QLatin1String("dxcc") || awardId == QLatin1String("was"))
+    if (awardId == QLatin1String("dxcc") || awardId == QLatin1String("dxcc_sat") || awardId == QLatin1String("was"))
         return {QStringLiteral("lotw"), QStringLiteral("card")};
     return {};
 }
@@ -936,6 +936,7 @@ QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFi
     QStringList allAwardIds = awardIds();
     QHash<QString, awards::AwardRulePackage> rulePackages;
     define("dxcc", QStringLiteral("DXCC"), 100, 340);
+    define("dxcc_sat", QStringLiteral("DXCC Satellite"), 100, 340);
     define("ft2", QStringLiteral("FT2 Award"), 100, 0);
     // I sei continenti dell'IARU. L'Antartide non fa numero per il WAC, ma chi
     // ce l'ha vuole vederla: entra nell'elenco e non nel traguardo.
@@ -1044,7 +1045,9 @@ QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFi
         QSqlQuery enrichmentQuery(db.connection());
         enrichmentQuery.setForwardOnly(true);
         if (enrichmentQuery.exec(QStringLiteral(
-                "SELECT qso_id, field FROM qso_enrichment WHERE kind = 'inferred'"))) {
+                "SELECT e.qso_id, e.field FROM qso_enrichment e WHERE e.kind = 'inferred' "
+                "AND e.id = (SELECT MAX(latest.id) FROM qso_enrichment latest "
+                "WHERE latest.qso_id = e.qso_id AND latest.field = e.field)"))) {
             while (enrichmentQuery.next())
                 inferredFields[enrichmentQuery.value(0).toLongLong()].insert(enrichmentQuery.value(1).toString());
         }
@@ -1175,6 +1178,8 @@ QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFi
                 ++dxccSkipped;
             if (arrlBand && !satellite && dxccValid)
                 add("dxcc", QString::number(dxcc), name);
+            if (arrlBand && satellite && dxccValid && on.date() >= QDate(1965, 3, 1))
+                add("dxcc_sat", QString::number(dxcc), name);
             if (submode == QLatin1String("FT2"))
                 add("ft2", QString::number(dxcc), name);
         }
@@ -1296,6 +1301,10 @@ QList<AwardResult> AwardCalculator::compute(const LogDatabase& db, const AwardFi
         } else if (id == QLatin1String("wac")) {
             b.result.requirement = QCoreApplication::translate(
                 "Awards", "Official WAC counts six continents; Antarctica is shown but not counted.");
+        } else if (id == QLatin1String("dxcc_sat")) {
+            b.result.requirement = QCoreApplication::translate("Awards",
+                "Satellite DXCC preview: satellite contacts since 1 March 1965; LoTW or paper confirmations. "
+                "Confirmation must identify a satellite QSO. Verify eligibility and credit with ARRL/LoTW; this is not official credit.");
         } else if (id == QLatin1String("dxcc") || id == QLatin1String("was")) {
             // Che cosa si conta dei 60 metri, detto ogni volta: il numero cambia.
             QStringList said;

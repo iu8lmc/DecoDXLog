@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
+import QtQuick.Window
 import QtCore
 import Decodium.UI
 
@@ -14,6 +15,60 @@ DialogFrame {
 
     signal openQso(var id)
     signal openPaperQueue()
+
+    function showEntityQsos(key, name) {
+        entityQsos.requestToken = Date.now().toString() + Math.random().toString()
+        entityQsos.rows = []; entityQsos.loading = true; entityQsos.failed = false
+        entityQsos.title = (current.title || awardId) + " · " + (name || key)
+        entityQsos.show(); entityQsos.raise()
+        decolog.requestAwardEntityQsos(entityQsos.requestToken, awardId, key)
+    }
+    Window {
+        id: entityQsos
+        width: 720; height: 440; minimumWidth: 420; minimumHeight: 240
+        transientParent: root.Window.window
+        flags: Qt.Window | Qt.WindowTitleHint | Qt.WindowCloseButtonHint | Qt.WindowSystemMenuHint
+        color: Theme.bgDeep
+        property string requestToken: ""
+        property var rows: []
+        property bool loading: false
+        property bool failed: false
+        Connections {
+            target: decolog
+            function onAwardEntityQsosReady(token, rows, ok) {
+                if (token !== entityQsos.requestToken) return
+                entityQsos.rows = rows; entityQsos.loading = false; entityQsos.failed = !ok
+            }
+        }
+        ColumnLayout {
+            anchors.fill: parent; anchors.margins: 14; spacing: 8
+            Text {
+                Layout.fillWidth: true
+                text: entityQsos.loading ? qsTr("Loading QSOs…") : entityQsos.failed ? qsTr("Could not load QSOs; the log may have changed. Try again.")
+                      : qsTr("%n QSO(s) with the current award filters · click a row to open", "", entityQsos.rows.length)
+                color: Theme.textSecondary; wrapMode: Text.Wrap
+            }
+            ListView {
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                model: entityQsos.rows
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    required property var modelData
+                    width: ListView.view.width; height: 36
+                    color: rowHover.hovered ? Theme.bgMedium : "transparent"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 8; spacing: 10
+                        Text { text: modelData.call; Layout.preferredWidth: 85; color: Theme.accentColor; font.bold: true }
+                        Text { text: modelData.date + " " + modelData.time; Layout.fillWidth: true; color: Theme.textSecondary }
+                        Text { text: modelData.band + " " + modelData.mode; Layout.preferredWidth: 90; color: Theme.textSecondary }
+                        Text { text: modelData.services || qsTr("No received QSL"); Layout.preferredWidth: 140; elide: Text.ElideRight; color: Theme.textSecondary }
+                    }
+                    HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: { const id = modelData.id; entityQsos.close(); Qt.callLater(() => root.openQso(id)) } }
+                }
+            }
+        }
+    }
 
     property string awardId: "dxcc"
     property string search: ""
@@ -1646,7 +1701,7 @@ DialogFrame {
                         id: lineArea
                         anchors.fill: parent
                         hoverEnabled: true
-                        onDoubleClicked: root.openQso(line.modelData.firstQsoId)
+                        onClicked: if (!line.modelData.missing) root.showEntityQsos(line.modelData.key, line.modelData.name)
                     }
                 }
 

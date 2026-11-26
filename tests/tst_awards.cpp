@@ -28,6 +28,46 @@ class TestAwards : public QObject {
     }
 
 private slots:
+    void hawaiiLotwAndInferredState()
+    {
+        LogDatabase db;
+        QVERIFY(db.open(":memory:"));
+        const auto result = db.insertQso(AdifRecord{{"CALL", "AH6U"}, {"QSO_DATE", "20261113"},
+            {"TIME_ON", "170215"}, {"BAND", "20m"}, {"MODE", "FT8"}, {"DXCC", "110"},
+            {"STATE", "HI"}, {"LOTW_QSL_RCVD", "Y"}}, QStringLiteral("import"));
+        QVERIFY(result.id > 0);
+        AwardFilter filter;
+        filter.band = QStringLiteral("20m");
+        const AwardCalculator calc;
+        auto was = find(calc.compute(db, filter), QStringLiteral("was"));
+        QCOMPARE(was.worked(), 1);
+        QCOMPARE(was.confirmed(), 1);
+        QVERIFY(db.recordEnrichment({EnrichmentEntry{result.id, QStringLiteral("STATE"), {}, QStringLiteral("HI"),
+            QStringLiteral("callbook"), QStringLiteral("inferred"), QStringLiteral("2026-11-13T17:03:00Z"), {}, {}}}));
+        was = find(calc.compute(db, filter), QStringLiteral("was"));
+        QCOMPARE(was.worked(), 0);
+        QCOMPARE(was.confirmed(), 0);
+        QVERIFY(db.confirmInferredState(result.id));
+        was = find(calc.compute(db, filter), QStringLiteral("was"));
+        QCOMPARE(was.worked(), 1);
+        QCOMPARE(was.confirmed(), 1);
+        QCOMPARE(db.enrichments(result.id).size(), 2);
+        QVERIFY(!db.confirmInferredState(result.id));
+        const auto other = db.insertQso(AdifRecord{{"CALL", "WH6S"}, {"QSO_DATE", "20261112"},
+            {"TIME_ON", "172900"}, {"BAND", "40m"}, {"MODE", "FT8"}, {"DXCC", "110"},
+            {"STATE", "HI"}}, QStringLiteral("import"));
+        QVERIFY(other.id > 0);
+        QVERIFY(db.recordEnrichment({EnrichmentEntry{other.id, QStringLiteral("STATE"), {}, QStringLiteral("HI"),
+            QStringLiteral("callbook"), QStringLiteral("inferred"), QStringLiteral("2026-11-13T17:03:00Z"), {}, {}}}));
+        QCOMPARE(db.bulkEdit({other.id}, QStringLiteral("STATE"), QStringLiteral("HI"), true).changed, 0);
+        QCOMPARE(db.bulkEdit({other.id}, QStringLiteral("STATE"), QStringLiteral("HI"), false).changed, 1);
+        filter.band = QStringLiteral("40m");
+        was = find(calc.compute(db, filter), QStringLiteral("was"));
+        QCOMPARE(was.worked(), 1);
+        QCOMPARE(was.confirmed(), 0);
+        QCOMPARE(db.confirmedIds(QStringLiteral("lotw")).contains(other.id), false);
+    }
+
     void wpx_data()
     {
         QTest::addColumn<QString>("call");
@@ -300,10 +340,70 @@ private slots:
         const AwardCalculator calc;
         const auto results = calc.compute(db, AwardFilter{});
         QCOMPARE(find(results, "dxcc").worked(), 0);
+        QCOMPARE(find(results, "dxcc_sat").worked(), 1);
+        QCOMPARE(find(results, "dxcc_sat").confirmed(), 1);
         QCOMPARE(find(results, "was").worked(), 0);
         QVERIFY(find(results, "dxcc").requirement.contains(QStringLiteral("Satellite")));
         // La validita' per il diploma non deve cancellare ne' alterare il QSO.
         QCOMPARE(db.qsoCount(), 1);
+    }
+
+    void satelliteDxccSeparatesConfirmedAndTerrestrial()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        auto add = [&db](const char* call, const char* dxcc, const char* band, const char* prop, const char* lotw, const char* eqsl) {
+            AdifRecord r{{"CALL", call}, {"QSO_DATE", "20261113"}, {"TIME_ON", "120000"}, {"BAND", band},
+                         {"MODE", "FT8"}, {"DXCC", dxcc}, {"PROP_MODE", prop}, {"LOTW_QSL_RCVD", lotw}, {"EQSL_QSL_RCVD", eqsl}};
+            QCOMPARE(db.insertQso(r, "import").status, InsertResult::Status::Inserted);
+        };
+        add("C50A", "422", "13cm", "SAT", "Y", "N");
+        add("S21WD", "305", "13cm", "SAT", "N", "Y");
+        add("K1ABC", "291", "20m", "", "Y", "N");
+        AwardFilter f; f.confirmEqsl = true;
+        auto results = AwardCalculator().compute(db, f);
+        QCOMPARE(find(results, "dxcc").worked(), 1);
+        QCOMPARE(find(results, "dxcc").confirmed(), 1);
+        QCOMPARE(find(results, "dxcc_sat").worked(), 2);
+        QCOMPARE(find(results, "dxcc_sat").confirmed(), 1);
+        f.band = "20m";
+        QCOMPARE(find(AwardCalculator().compute(db, f), "dxcc_sat").worked(), 0);
+        f.band = "13cm";
+        f.confirmLotw = false;
+        QCOMPARE(find(AwardCalculator().compute(db, f), "dxcc_sat").confirmed(), 0);
+    }
+
+    void contributionIdsFollowAwardAndFilters()
+    {
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto a = db.insertQso(AdifRecord{{"CALL", "KH6AAA"}, {"QSO_DATE", "20261101"}, {"TIME_ON", "120000"},
+            {"BAND", "20m"}, {"MODE", "FT8"}, {"DXCC", "110"}, {"STATE", "HI"}}, "import");
+        const auto b = db.insertQso(AdifRecord{{"CALL", "KH6BBB"}, {"QSO_DATE", "20261102"}, {"TIME_ON", "120000"},
+            {"BAND", "40m"}, {"MODE", "CW"}, {"DXCC", "110"}, {"STATE", "HI"}}, "import");
+        const auto c = db.insertQso(AdifRecord{{"CALL", "K1AAA"}, {"QSO_DATE", "20261103"}, {"TIME_ON", "120000"},
+            {"BAND", "20m"}, {"MODE", "FT8"}, {"DXCC", "291"}, {"STATE", "CT"}}, "import");
+        QVERIFY(a.id > 0 && b.id > 0 && c.id > 0);
+        AwardContributions contributions; contributions.awards.insert("was");
+        AwardFilter filter;
+        AwardCalculator().compute(db, filter, &contributions);
+        QCOMPARE(contributions.qsoIds.value("was").value("HI"), QSet<qint64>({a.id, b.id}));
+        QCOMPARE(contributions.qsoIds.value("was").value("CT"), QSet<qint64>({c.id}));
+        filter.band = "20m";
+        AwardCalculator().compute(db, filter, &contributions);
+        QCOMPARE(contributions.qsoIds.value("was").value("HI"), QSet<qint64>({a.id}));
+    }
+
+    void satelliteDxccExternalAdif()
+    {
+        const QString path = qEnvironmentVariable("DECODXLOG_TEST_SAT_ADIF");
+        if (path.isEmpty()) QSKIP("set DECODXLOG_TEST_SAT_ADIF to an isolated ADIF fixture");
+        QFile file(path); QVERIFY(file.open(QIODevice::ReadOnly));
+        LogDatabase db; QVERIFY(db.open(":memory:"));
+        const auto imported = db.importAdif(file.readAll());
+        QCOMPARE(imported.inserted, 15);
+        const auto results = AwardCalculator().compute(db, AwardFilter{});
+        QCOMPARE(find(results, "dxcc").worked(), 0);
+        QCOMPARE(find(results, "dxcc_sat").worked(), 12);
+        QCOMPARE(find(results, "dxcc_sat").confirmed(), 4);
     }
 
     void filterByProfileAndTag()

@@ -412,6 +412,7 @@ public:
     BulkEditResult softDeleteBatch(const QList<qint64>& ids,
                                    const std::function<void(int, int)>& progress = {});
     bool recordEnrichment(const QList<EnrichmentEntry>& entries);
+    bool confirmInferredState(qint64 qsoId);
     QList<EnrichmentEntry> enrichments(qint64 qsoId) const;
     bool readEnrichments(qint64 qsoId, QList<EnrichmentEntry>* rows, QString* error = nullptr) const;
     bool undoEnrichment(qint64 qsoId, const QString& field);

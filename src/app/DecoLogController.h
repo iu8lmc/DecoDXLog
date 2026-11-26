@@ -863,6 +863,7 @@ public:
     Q_INVOKABLE void cancelImportUndo();
     Q_INVOKABLE QVariantList qsoEnrichments(qint64 qsoId) const;
     Q_INVOKABLE bool undoQsoEnrichment(qint64 qsoId, const QString& field);
+    Q_INVOKABLE bool confirmInferredState(qint64 qsoId);
     Q_INVOKABLE void exportAdif(const QUrl& file);
     Q_INVOKABLE void exportQsos(const QVariantList& ids, const QUrl& file);
     // Correggere una cella della tabella del log sul posto (F2, menu della riga): le colonne che
@@ -913,6 +914,7 @@ public:
     Q_INVOKABLE void recordUiLatency(const QString& scenario, qint64 elapsedMs);
     Q_INVOKABLE void requestBandModeQsos(const QString& token, const QString& call, int dxcc,
                                          const QString& band, const QString& group);
+    Q_INVOKABLE void requestAwardEntityQsos(const QString& token, const QString& award, const QString& key);
     // Per le prove: un evento del mouse vero ("press", "move", "release") nel
     // punto x, y della finestra, come se l'avesse fatto l'operatore. Serve a
     // provare che un clic arrivi davvero al pulsante giusto.
@@ -930,6 +932,7 @@ signals:
     void countsChanged();
     void lookupChanged();
     void bandModeQsosReady(const QString& token, const QVariantList& rows, bool ok);
+    void awardEntityQsosReady(const QString& token, const QVariantList& rows, bool ok);
     // Un DX scelto altrove — per ora dal cluster — da mettere nel riquadro del
     // QSO nuovo: call, mhz, mode, grid.
     void qsoPrepared(const QVariantMap& fields);

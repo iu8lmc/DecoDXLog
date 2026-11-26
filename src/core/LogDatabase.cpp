@@ -2209,6 +2209,20 @@ bool LogDatabase::recordEnrichment(const QList<EnrichmentEntry>& entries)
     return !ownTransaction || db.commit();
 }
 
+bool LogDatabase::confirmInferredState(qint64 qsoId)
+{
+    QSqlQuery q(connection());
+    q.prepare(QStringLiteral("SELECT e.value FROM qso_enrichment e JOIN qso ON qso.id=e.qso_id "
+        "WHERE e.qso_id=? AND e.field='STATE' AND e.kind='inferred' AND qso.deleted=0 "
+        "AND e.id=(SELECT MAX(id) FROM qso_enrichment WHERE qso_id=e.qso_id AND field=e.field) "
+        "AND UPPER(TRIM(qso.state))=UPPER(TRIM(e.value)) AND TRIM(e.value)<>''"));
+    q.addBindValue(qsoId);
+    if (!q.exec() || !q.next()) return false;
+    const QString value = q.value(0).toString();
+    return recordEnrichment({EnrichmentEntry{qsoId, QStringLiteral("STATE"), value, value,
+        QStringLiteral("user"), QStringLiteral("confirmed"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs), {}, {}}});
+}
+
 QList<EnrichmentEntry> LogDatabase::enrichments(qint64 qsoId) const
 {
     QList<EnrichmentEntry> out;
@@ -2368,6 +2382,11 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
             const QString current = r->value(name);
             // Uno stato QSL a N e' vuoto: non e' ne' mandato ne' ricevuto.
             const bool empty = current.isEmpty() || (!dateField.isEmpty() && current == QLatin1String("N"));
+            if (!onlyEmpty && name == QLatin1String("STATE") && !clean.isEmpty()
+                && current.compare(clean, Qt::CaseInsensitive) == 0 && confirmInferredState(id)) {
+                blockChanged << id;
+                return true;
+            }
             if ((onlyEmpty && !empty) || current.compare(clean, Qt::CaseInsensitive) == 0) {
                 ++out.unchanged;
                 return true;
@@ -2384,7 +2403,10 @@ BulkEditResult LogDatabase::bulkEdit(const QList<qint64>& ids, const QString& fi
             return false;
         }
         const InsertResult res = updateQso(id, *r, profile ? clean.toLongLong() : -1, QStringLiteral("bulk"));
-        const bool remoteQueued = res.status == InsertResult::Status::Inserted && queueRemoteEdit(id);
+        const bool stateRecorded = res.status == InsertResult::Status::Inserted && (name != QLatin1String("STATE") || clean.isEmpty()
+            || recordEnrichment({EnrichmentEntry{id, QStringLiteral("STATE"), {}, clean, QStringLiteral("user"),
+                QStringLiteral("confirmed"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs), {}, {}}}));
+        const bool remoteQueued = stateRecorded && queueRemoteEdit(id);
         if (!remoteQueued || !savepoint.exec(QStringLiteral("RELEASE SAVEPOINT bulk_row"))) {
             const QString message = res.status != InsertResult::Status::Inserted ? res.message
                                   : !remoteQueued ? m_lastError : savepoint.lastError().text();

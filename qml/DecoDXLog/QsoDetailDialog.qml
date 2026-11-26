@@ -964,10 +964,15 @@ DialogFrame {
             }
 
             // ── Colonna QSL e award ─────────────────────────────────────────
-            ColumnLayout {
+            ScrollView {
+                id: qslSideScroll
                 Layout.preferredWidth: 250
                 Layout.maximumWidth: 250
                 Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
+              ColumnLayout {
+                width: qslSideScroll.availableWidth
                 spacing: 6
 
                 SectionTitle { text: qsTr("QSL status · per service") }
@@ -1093,8 +1098,6 @@ DialogFrame {
                     }
                 }
 
-                Item { Layout.fillHeight: true }
-
                 SectionTitle { text: qsTr("Data provenance") }
                 Rectangle {
                     Layout.fillWidth: true
@@ -1111,20 +1114,33 @@ DialogFrame {
                         spacing: 4
                         Repeater {
                             model: root.enrichments
-                            RowLayout {
+                            ColumnLayout {
                                 required property var modelData
                                 Layout.fillWidth: true
                                 Text {
                                     Layout.fillWidth: true
+                                    Layout.minimumWidth: 0
                                     text: modelData.field + ": " + (modelData.previousValue || qsTr("empty"))
                                           + " → " + modelData.value + " · " + modelData.source
                                           + " · " + modelData.acquiredAt
                                     color: Theme.textSecondary
                                     font.pixelSize: 11
-                                    elide: Text.ElideRight
+                                    wrapMode: Text.WrapAnywhere
+                                }
+                                GlassButton {
+                                    text: qsTr("Confirm state")
+                                    visible: modelData.field === "STATE" && modelData.kind === "inferred"
+                                             && root.enrichments.filter(e => e.field === "STATE").slice(-1)[0] === modelData
+                                    enabled: !root.edited
+                                    buttonHeight: 24
+                                    onClicked: {
+                                        if (decolog.confirmInferredState(root.qsoId)) root.reload()
+                                    }
                                 }
                                 GlassButton {
                                     text: qsTr("Undo")
+                                    visible: modelData.kind === "inferred"
+                                             && root.enrichments.filter(e => e.field === modelData.field).slice(-1)[0] === modelData
                                     buttonHeight: 24
                                     onClicked: {
                                         if (decolog.undoQsoEnrichment(root.qsoId, modelData.field))
@@ -1187,6 +1203,7 @@ DialogFrame {
                         }
                     }
                 }
+              }
             }
         }
 
